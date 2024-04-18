@@ -1,0 +1,28 @@
+﻿赋值语句和If语句：    
+```
+var a = true;
+if(a)
+    A();
+else
+    B();
+```
+抽象语法树：  
+Program
+├── VariableDeclaration
+│   └── VariableDeclarator
+│       ├── id: Identifier (name: "a")
+│       └── init: Literal (value: true)
+└── IfStatement
+    ├── Test: Identifier (name: "a")
+    ├── Consequent
+    │   └── BlockStatement
+    │       └── ExpressionStatement
+    │           └── CallExpression
+    │               ├── Callee: Identifier (name: "A")
+    │               └── Arguments: []
+    └── Alternate
+        └── BlockStatement
+            └── ExpressionStatement
+                └── CallExpression
+                    ├── Callee: Identifier (name: "B")
+                    └── Arguments: []
