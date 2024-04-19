@@ -65,51 +65,55 @@ namespace FanLangTest
         {
             string source =
                 @"
-                void Foo()
-                {
-                    int tmp = 0;
-                }
-                
-                float Add(float x, float y)
-                {
-                    return x + y;
-                }
-                  
-                bool IsPositive(float x)
-                {
-                    return true;
-                }
+                    void Foo()
+                    {
+                        int tmp = 0;
+                    }
+                    
+                    float Add(float x, float y)
+                    {
+                        return x + y;
+                    }
+                      
+                    bool IsPositive(float x)
+                    {
+                        return true;
+                    }
 
-                int a = 233 ;
-                int b = (a + 111) * 222;
-                float c = 123.0f;                  
-                string d = ""AAA"";
+                    int a = 233 ;
+                    int b = (a + 111) * 222;
+                    float c = 123.0f;                  
+                    string d = ""AAA"";
 
-                float e = Add(1.0f, 2.0f);
-                bool isPositive = IsPositive(e);
+                    float e = Add(1.0f, 2.0f);
+                    bool isPositive = IsPositive(e);
 
-                if(isPositive)
-                {
-                    Foo();
-                }
-                else if(true)
-                {
-                    a = a + 1;
-                }
-                else
-                {
-                    b = b + 1;
-                }
+                    if(isPositive)
+                    {
+                        Foo();
+                    }
+                    else if(true)
+                    {
+                        a = a + 1;
+                    }
+                    else
+                    {
+                        b = b + 1;
+                    }
 
 
-                while(c < 999.0f)
-                {
-                    c = c + 1.0f;
-                }
-                for(int i = 0; i < 99; ++i)
-                {
-                    a *= 2;
-                }
+                    while(c < 999.0f)
+                    {
+                        c = c + 1.0f;
+                    }
+                    for(int i = 0; i < 99; ++i)
+                    {
+                        a *= 2;
+                    }
+
+                    int fff = (float) a;
+
+                    b.aaa();
                 ";
 
             ////二义性文法测试  

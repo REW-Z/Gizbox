@@ -279,7 +279,11 @@ namespace FanLang
             }
         }
 
-
+        public class UnaryOpNode : ExprNode
+        {
+            public string op;
+            public ExprNode exprNode;
+        }
 
         public class SpecialExprNode : ExprNode { }//特殊表达式(new、assign、call、increase)（带有副作用）     
 
@@ -292,9 +296,13 @@ namespace FanLang
 
         public class CallNode : SpecialExprNode//调用表达式（低优先级）
         {
-            public IdentityNode identifierNode;
+            public bool isMemberFunction;
+
+            public ExprNode funcNode;
+
             public ArgumentListNode argumantsNode;
         }
+
 
         public class IncDecNode : SpecialExprNode//自增自减表达式（低优先级）
         {
@@ -303,6 +311,17 @@ namespace FanLang
             public IdentityNode identifierNode;
         }
 
+        public class CastNode : ExprNode
+        {
+            public TypeNode typeNode;
+            public ExprNode factorNode;
+        }
+
+        public class MemberAccessNode : ExprNode
+        {
+            public ExprNode objectNode;
+            public IdentityNode memberNode;
+        }
 
         // ******************** TYPE NODES ******************************
 

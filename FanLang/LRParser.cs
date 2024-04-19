@@ -701,87 +701,6 @@ namespace FanLang.Translator
                 });
             }
 
-            AddActionAtTail("incdec -> ++ ID", (psr, production) => {
-
-                psr.newElement.attributes["ast_node"] = new SyntaxTree.IncDecNode()
-                {
-                    op = "++",
-                    isFront = true,
-                    identifierNode = new SyntaxTree.IdentityNode()
-                    {
-                        attributes = psr.stack[psr.stack.Top].attributes,
-                        token = psr.stack[psr.stack.Top].attributes["token"] as Token,
-                    },
-
-                    attributes = psr.newElement.attributes,
-                };
-            });
-
-            AddActionAtTail("incdec -> -- ID", (psr, production) => {
-
-                psr.newElement.attributes["ast_node"] = new SyntaxTree.IncDecNode()
-                {
-                    op = "--",
-                    isFront = true,
-                    identifierNode = new SyntaxTree.IdentityNode()
-                    {
-                        attributes = psr.stack[psr.stack.Top].attributes,
-                        token = psr.stack[psr.stack.Top].attributes["token"] as Token,
-                    },
-
-                    attributes = psr.newElement.attributes,
-                };
-            });
-
-            AddActionAtTail("incdec -> ID ++", (psr, production) => {
-
-                psr.newElement.attributes["ast_node"] = new SyntaxTree.IncDecNode()
-                {
-                    op = "++",
-                    isFront = false,
-                    identifierNode = new SyntaxTree.IdentityNode()
-                    {
-                        attributes = psr.stack[psr.stack.Top - 1].attributes,
-                        token = psr.stack[psr.stack.Top - 1].attributes["token"] as Token,
-                    },
-
-                    attributes = psr.newElement.attributes,
-                };
-            });
-
-            AddActionAtTail("incdec -> ID --", (psr, production) => {
-
-                psr.newElement.attributes["ast_node"] = new SyntaxTree.IncDecNode()
-                {
-                    op = "--",
-                    isFront = false,
-                    identifierNode = new SyntaxTree.IdentityNode()
-                    {
-                        attributes = psr.stack[psr.stack.Top - 1].attributes,
-                        token = psr.stack[psr.stack.Top - 1].attributes["token"] as Token,
-                    },
-
-                    attributes = psr.newElement.attributes,
-                };
-            });
-
-
-            AddActionAtTail("call -> ID ( args )", (psr, production) => {
-
-                psr.newElement.attributes["ast_node"] = new SyntaxTree.CallNode()
-                {
-                    identifierNode = new SyntaxTree.IdentityNode()
-                    {
-                        attributes = psr.stack[psr.stack.Top - 3].attributes,
-                        token = psr.stack[psr.stack.Top - 3].attributes["token"] as Token,
-                    },
-                    argumantsNode = (SyntaxTree.ArgumentListNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"],
-
-
-                    attributes = psr.newElement.attributes,
-                };
-            });
-
 
 
             AddActionAtTail("type -> primitive", (psr, production) => {
@@ -897,27 +816,178 @@ namespace FanLang.Translator
             AddActionAtTail("term -> factor", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes["ast_node"];
             });
-            AddActionAtTail("factor -> ( expr )", (psr, production) => {
+            
+            AddActionAtTail("factor -> incdec", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = (SyntaxTree.SpecialExprNode)psr.stack[psr.stack.Top].attributes["ast_node"];
+            });
+
+            AddActionAtTail("factor -> ! factor", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.UnaryOpNode()
+                {
+                    op = "!",
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
+
+            AddActionAtTail("factor -> - factor", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.UnaryOpNode()
+                {
+                    op = "-",
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
+
+            AddActionAtTail("factor -> cast", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes["ast_node"];
+            });
+
+            AddActionAtTail("factor -> primary", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes["ast_node"];
+            });
+
+
+            AddActionAtTail("primary -> ( expr )", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"];
             });
-            AddActionAtTail("factor -> ID", (psr, production) => {
+            AddActionAtTail("primary -> ID", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.IdentityNode()
                 {
                     attributes = psr.stack[psr.stack.Top].attributes,
                     token = psr.stack[psr.stack.Top].attributes["token"] as Token,
                 };
             });
-
-            AddActionAtTail("factor -> call", (psr, production) => {
+            AddActionAtTail("primary -> memberaccess", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = (SyntaxTree.SpecialExprNode)psr.stack[psr.stack.Top].attributes["ast_node"];
             });
 
-            AddActionAtTail("factor -> incdec", (psr, production) => {
+            AddActionAtTail("primary -> call", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = (SyntaxTree.SpecialExprNode)psr.stack[psr.stack.Top].attributes["ast_node"];
             });
 
-            AddActionAtTail("factor -> lit", (psr, production) => {
+            AddActionAtTail("primary -> lit", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes["ast_node"];
+            });
+
+
+            AddActionAtTail("incdec -> ++ ID", (psr, production) => {
+
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.IncDecNode()
+                {
+                    op = "++",
+                    isFront = true,
+                    identifierNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = psr.stack[psr.stack.Top].attributes,
+                        token = psr.stack[psr.stack.Top].attributes["token"] as Token,
+                    },
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
+
+            AddActionAtTail("incdec -> -- ID", (psr, production) => {
+
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.IncDecNode()
+                {
+                    op = "--",
+                    isFront = true,
+                    identifierNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = psr.stack[psr.stack.Top].attributes,
+                        token = psr.stack[psr.stack.Top].attributes["token"] as Token,
+                    },
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
+
+            AddActionAtTail("incdec -> ID ++", (psr, production) => {
+
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.IncDecNode()
+                {
+                    op = "++",
+                    isFront = false,
+                    identifierNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = psr.stack[psr.stack.Top - 1].attributes,
+                        token = psr.stack[psr.stack.Top - 1].attributes["token"] as Token,
+                    },
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
+
+            AddActionAtTail("incdec -> ID --", (psr, production) => {
+
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.IncDecNode()
+                {
+                    op = "--",
+                    isFront = false,
+                    identifierNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = psr.stack[psr.stack.Top - 1].attributes,
+                        token = psr.stack[psr.stack.Top - 1].attributes["token"] as Token,
+                    },
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
+
+            AddActionAtTail("call -> ID ( args )", (psr, production) => {
+
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.CallNode()
+                {
+                    isMemberFunction = false,
+                    funcNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = psr.stack[psr.stack.Top - 3].attributes,
+                        token = psr.stack[psr.stack.Top - 3].attributes["token"] as Token,
+                    },
+                    argumantsNode = (SyntaxTree.ArgumentListNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"],
+
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
+
+            AddActionAtTail("call -> memberaccess ( args )", (psr, production) => {
+
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.CallNode()
+                {
+                    isMemberFunction = true,
+                    funcNode = (SyntaxTree.MemberAccessNode)psr.stack[psr.stack.Top - 3].attributes["ast_node"],
+                    argumantsNode = (SyntaxTree.ArgumentListNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"],
+
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
+
+            AddActionAtTail("cast -> ( type ) factor", (psr, production) => {
+
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.CastNode()
+                {
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 2].attributes["ast_node"],
+                    factorNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes["ast_node"],
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
+
+            AddActionAtTail("memberaccess -> primary . ID", (psr, production) => {
+
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.MemberAccessNode()
+                {
+                    objectNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes["ast_node"],
+                    memberNode = new SyntaxTree.IdentityNode() {
+                        attributes = psr.stack[psr.stack.Top].attributes,
+                        token = psr.stack[psr.stack.Top].attributes["token"] as Token,
+                    },
+
+                    attributes = psr.newElement.attributes,
+                };
             });
 
             string[] litTypes = new string[] { "LITINT", "LITFLOAT", "LITSTRING", "LITBOOL" };

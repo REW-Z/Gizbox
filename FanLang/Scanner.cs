@@ -20,12 +20,12 @@ namespace FanLang
             //词法分析器初始化    
             keywords = new List<TokenPattern>();
 
-            keywords.Add(new TokenPattern("var", "var\\s", 1));
-            keywords.Add(new TokenPattern("void", "void\\s", 1));
-            keywords.Add(new TokenPattern("bool", "bool\\s", 1));
-            keywords.Add(new TokenPattern("int", "int\\s", 1));
-            keywords.Add(new TokenPattern("float", "float\\s", 1));
-            keywords.Add(new TokenPattern("string", "string\\s", 1));
+            keywords.Add(new TokenPattern("var", "var\\W", 1));
+            keywords.Add(new TokenPattern("void", "void\\W", 1));
+            keywords.Add(new TokenPattern("bool", "bool\\W", 1));
+            keywords.Add(new TokenPattern("int", "int\\W", 1));
+            keywords.Add(new TokenPattern("float", "float\\W", 1));
+            keywords.Add(new TokenPattern("string", "string\\W", 1));
 
             keywords.Add(new TokenPattern(",", ",", 0));
             keywords.Add(new TokenPattern(";", ";[\\s|\\t|\\n]", 1));
@@ -58,7 +58,6 @@ namespace FanLang
 
             operators.Add(new TokenPattern("==", "=="));
             operators.Add(new TokenPattern("!=", "!="));
-            //operators.Add(new TokenPattern("!", "![^=]", 1));
             operators.Add(new TokenPattern("<=", "<="));
             operators.Add(new TokenPattern(">=", ">="));
             operators.Add(new TokenPattern(">", ">[^=>]", 1));
@@ -71,6 +70,10 @@ namespace FanLang
 
             operators.Add(new TokenPattern("||", "\\|\\|"));
             operators.Add(new TokenPattern("&&", "\\&\\&"));
+
+            operators.Add(new TokenPattern("!", "![^=]", 1));
+
+            operators.Add(new TokenPattern(".", "\\.[\\w]", 1));
 
             literals = new List<TokenPattern>();
 

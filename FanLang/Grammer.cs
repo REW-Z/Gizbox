@@ -43,7 +43,10 @@ namespace FanLang
             "aexpr",//普通表达式
             "term",
             "factor",
+            "primary",
             "lit",
+            "cast",
+            "memberaccess",
 
             //函数过程  
             "params",
@@ -85,11 +88,6 @@ namespace FanLang
             "assign -> ID *= expr",
             "assign -> ID /= expr",
             "assign -> ID %= expr",
-            "incdec -> ++ ID",
-            "incdec -> -- ID",
-            "incdec -> ID ++",
-            "incdec -> ID --",
-            "call -> ID ( args )",
 
 
 
@@ -125,17 +123,33 @@ namespace FanLang
             "term -> term / factor",
             "term -> factor",
             
-            "factor -> ( expr )",
-            "factor -> ID",
-            "factor -> call",
             "factor -> incdec",
-            "factor -> lit",
+            "factor -> ! factor",
+            "factor -> - factor",
+            "factor -> cast",
+            "factor -> primary",
 
+            
+            "primary -> ( expr )",
+            "primary -> ID",
+            "primary -> memberaccess",
+            "primary -> call",
+            "primary -> lit",
+
+            "incdec -> ++ ID",
+            "incdec -> -- ID",
+            "incdec -> ID ++",
+            "incdec -> ID --",
+            "call -> ID ( args )",
+            "call -> memberaccess ( args )",
+            "cast -> ( type ) factor",
+            "memberaccess -> primary . ID",
 
             "lit -> LITINT",
             "lit -> LITFLOAT",
             "lit -> LITSTRING",
             "lit -> LITBOOL",
+
 
 
             "params -> ε",

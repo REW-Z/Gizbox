@@ -445,7 +445,7 @@ namespace FanLang
         public static void Pause(string txt = "")
         {
             Console.WriteLine(txt + "\n按任意键继续...");
-            Console.ReadKey();
+            //Console.ReadKey();
         }
 
         /// <summary>
