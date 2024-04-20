@@ -16,10 +16,15 @@ namespace FanLang
             //起始符  
             "S",
 
-            //语句
+            //语句容器  
             "statements",
             "statementblock",
+
+            "declstatements",
+            
+            //语句
             "stmt",
+            "declstmt",
 
             //子句  
             "elifclauselist",
@@ -27,9 +32,10 @@ namespace FanLang
             "elseclause",
             
             //复合语句表达式  
-            "stmtexpr",
+            "stmtexpr",//特殊的表达式（不属于expr）(仅作为几种特殊表达式的集合)
             "assign",
             "call",
+            "newobj",
             "incdec",//++\--
 
             //类型  
@@ -46,6 +52,7 @@ namespace FanLang
             "primary",
             "lit",
             "cast",
+            "lvalue",
             "memberaccess",
 
             //函数过程  
@@ -56,20 +63,28 @@ namespace FanLang
         public List<string> productionExpressions = new List<string>() {
             "S -> statements",
 
-            "statements -> stmt",
-            "statements -> statements stmt",
-
             "statementblock -> { statements }",
 
+            "statements -> stmt statements",
+            "statements -> stmt",
+            "statements -> ε",
+
+            "declstatements -> declstmt declstatements",
+            "declstatements -> declstmt",
+            "declstatements -> ε",
+
             "stmt -> statementblock",
-            "stmt -> type ID = expr ;",
+            "stmt -> declstmt",
             "stmt -> stmtexpr ;",
-            "stmt -> type ID ( params ) { statements }",
             "stmt -> break ;",
             "stmt -> return expr ;",
             "stmt -> while ( expr ) stmt",
             "stmt -> for ( stmt bexpr ; stmtexpr ) stmt",
             "stmt -> if ( expr ) stmt elifclauselist elseclause",
+
+            "declstmt -> type ID = expr ;",
+            "declstmt -> type ID ( params ) { statements }",
+            "declstmt -> class ID { declstatements }",
 
             "elifclauselist -> ε",
             "elifclauselist -> elifclauselist elifclause",
@@ -77,21 +92,19 @@ namespace FanLang
             "elseclause -> ε",
             "elseclause -> else stmt",
 
+            "assign -> lvalue = expr",
+            "assign -> lvalue += expr",
+            "assign -> lvalue -= expr",
+            "assign -> lvalue *= expr",
+            "assign -> lvalue /= expr",
+            "assign -> lvalue %= expr",
 
-            "stmtexpr -> assign",
-            "stmtexpr -> call",
-            "stmtexpr -> incdec",
-
-            "assign -> ID = expr",
-            "assign -> ID += expr",
-            "assign -> ID -= expr",
-            "assign -> ID *= expr",
-            "assign -> ID /= expr",
-            "assign -> ID %= expr",
-
+            "lvalue -> ID",
+            "lvalue -> memberaccess",
 
 
             "type -> primitive",
+            "type -> ID",
             "primitive -> void",
             "primitive -> bool",
             "primitive -> int",
@@ -100,6 +113,11 @@ namespace FanLang
 
             "expr -> assign",
             "expr -> nexpr",
+
+            "stmtexpr -> assign",
+            "stmtexpr -> call",
+            "stmtexpr -> incdec",
+            "stmtexpr -> newobj",
 
             "nexpr -> bexpr",
             "nexpr -> aexpr",
@@ -134,6 +152,7 @@ namespace FanLang
             "primary -> ID",
             "primary -> memberaccess",
             "primary -> call",
+            "primary -> newobj",
             "primary -> lit",
 
             "incdec -> ++ ID",
@@ -142,8 +161,12 @@ namespace FanLang
             "incdec -> ID --",
             "call -> ID ( args )",
             "call -> memberaccess ( args )",
+            "newobj -> new ID ( )",
+
             "cast -> ( type ) factor",
+
             "memberaccess -> primary . ID",
+            "memberaccess -> this . ID",
 
             "lit -> LITINT",
             "lit -> LITFLOAT",

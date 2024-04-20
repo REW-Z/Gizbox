@@ -21,6 +21,7 @@ namespace FanLang
             keywords = new List<TokenPattern>();
 
             keywords.Add(new TokenPattern("var", "var\\W", 1));
+            keywords.Add(new TokenPattern("class", "class\\W", 1));
             keywords.Add(new TokenPattern("void", "void\\W", 1));
             keywords.Add(new TokenPattern("bool", "bool\\W", 1));
             keywords.Add(new TokenPattern("int", "int\\W", 1));
@@ -29,12 +30,14 @@ namespace FanLang
 
             keywords.Add(new TokenPattern(",", ",", 0));
             keywords.Add(new TokenPattern(";", ";[\\s|\\t|\\n]", 1));
+            keywords.Add(new TokenPattern("new", "new\\W", 1));
             keywords.Add(new TokenPattern("while", "while\\W", 1));
             keywords.Add(new TokenPattern("for", "for\\W", 1));
             keywords.Add(new TokenPattern("if", "if\\W", 1));
             keywords.Add(new TokenPattern("else", "else\\W", 1));
             keywords.Add(new TokenPattern("break", "break\\W", 1));
             keywords.Add(new TokenPattern("return", "return\\W", 1));
+            keywords.Add(new TokenPattern("this", "this\\W", 1));
 
             operators = new List<TokenPattern>();
 

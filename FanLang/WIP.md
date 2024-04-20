@@ -1,4 +1,6 @@
 ﻿
+## 进度  
+
 （DONE）添加常量池    
 
 （DONE）identifier的token属性改为词素  
@@ -37,8 +39,23 @@
 
 （DONE）引入成员访问。    
 
+（DONE）引入类声明。    
+
+（DONE）可空语句块。    
+
+（DONE）memberAccess完善（ID.ID或者this.ID）  
+
+（DONE）自定义类作为Type。    
+
+## 脚本模式  
+
+脚本引擎    
+
+
+
+## 编译模式    
+
 符号表和常量表的填充。    
 
 类型检查。    
 
-三地址模式和递归执行模式。      

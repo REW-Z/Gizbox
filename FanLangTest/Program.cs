@@ -63,58 +63,11 @@ namespace FanLangTest
 
         static void Test()
         {
-            string source =
-                @"
-                    void Foo()
-                    {
-                        int tmp = 0;
-                    }
-                    
-                    float Add(float x, float y)
-                    {
-                        return x + y;
-                    }
-                      
-                    bool IsPositive(float x)
-                    {
-                        return true;
-                    }
+            string source = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\test.txt");
 
-                    int a = 233 ;
-                    int b = (a + 111) * 222;
-                    float c = 123.0f;                  
-                    string d = ""AAA"";
-
-                    float e = Add(1.0f, 2.0f);
-                    bool isPositive = IsPositive(e);
-
-                    if(isPositive)
-                    {
-                        Foo();
-                    }
-                    else if(true)
-                    {
-                        a = a + 1;
-                    }
-                    else
-                    {
-                        b = b + 1;
-                    }
-
-
-                    while(c < 999.0f)
-                    {
-                        c = c + 1.0f;
-                    }
-                    for(int i = 0; i < 99; ++i)
-                    {
-                        a *= 2;
-                    }
-
-                    int fff = (float) a;
-
-                    b.aaa();
-                ";
+            Console.Write(source);
+            Console.WriteLine("代码读取完毕，任意键继续...");
+            Console.ReadKey();
 
             ////二义性文法测试  
             //string input =

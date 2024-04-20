@@ -210,3 +210,4 @@ C:\Users\Administrator\Desktop\笔记\FanLang\FanLangTest\obj\Debug\FanLangTest.
 C:\Users\Administrator\Desktop\笔记\FanLang\FanLangTest\obj\Debug\FanLangTest.csproj.CopyComplete
 C:\Users\Administrator\Desktop\笔记\FanLang\FanLangTest\obj\Debug\FanLangTest.exe
 C:\Users\Administrator\Desktop\笔记\FanLang\FanLangTest\obj\Debug\FanLangTest.pdb
+F:\Legacy\MyProjects\FanLang\FanLangTest\bin\Debug\test.txt

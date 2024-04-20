@@ -164,14 +164,17 @@ namespace FanLang
             public List<StmtNode> statements = new List<StmtNode>();
         }
 
-        public class StmtNode : Node { }
-
         public class StatementBlockNode : StmtNode
         {
             public List<StmtNode> statements;
         }
 
-        public class VarDeclareNode : StmtNode
+        public abstract class StmtNode : Node { }
+
+
+        public abstract class DeclareNode : StmtNode { }
+
+        public class VarDeclareNode : DeclareNode
         {
             public TypeNode typeNode;
             public IdentityNode identifierNode;
@@ -179,13 +182,21 @@ namespace FanLang
         }
 
 
-        public class FuncDeclareNode : StmtNode
+        public class FuncDeclareNode : DeclareNode
         {
             public TypeNode returnTypeNode;
             public IdentityNode identifierNode;
             public ParameterListNode parametersNode;
-            public StatementsNode statementsBlockNode;
+            public StatementsNode statementsNode;
         }
+
+        public class ClassDeclareNode : DeclareNode
+        {
+            public IdentityNode classNameNode;
+            public List<DeclareNode> memberDelareNodes;
+        }
+
+
         public class SingleExprStmtNode : StmtNode//单个特殊表达式(new、assign、call、increase)的语句  
         {
             public SpecialExprNode exprNode;
@@ -254,7 +265,7 @@ namespace FanLang
         }
 
         // ******************** EXPR NODES ******************************
-        public class ExprNode : Node { }
+        public abstract class ExprNode : Node { }
 
         public class IdentityNode : ExprNode
         {
@@ -285,13 +296,13 @@ namespace FanLang
             public ExprNode exprNode;
         }
 
-        public class SpecialExprNode : ExprNode { }//特殊表达式(new、assign、call、increase)（带有副作用）     
+        public abstract class SpecialExprNode : ExprNode { }//特殊表达式(new、assign、call、increase)（带有副作用）     
 
         public class AssignNode : SpecialExprNode//赋值表达式（高优先级）
         {
             public string op;//=、+=、-=、*=、/=、%=  
-            public IdentityNode identifierNode;
-            public ExprNode exprNode;
+            public ExprNode lvalueNode;
+            public ExprNode rvalueNode;
         }
 
         public class CallNode : SpecialExprNode//调用表达式（低优先级）
@@ -311,22 +322,37 @@ namespace FanLang
             public IdentityNode identifierNode;
         }
 
+        public class NewObjectNode : SpecialExprNode
+        {
+            public IdentityNode className;
+        }
+
+
         public class CastNode : ExprNode
         {
             public TypeNode typeNode;
             public ExprNode factorNode;
         }
 
-        public class MemberAccessNode : ExprNode
+        public abstract class MemberAccessNode : ExprNode { }
+
+        public class ObjectMemberAccessNode : MemberAccessNode
         {
             public ExprNode objectNode;
+            public IdentityNode memberNode;
+        }
+        public class ThisMemberAccessNode : MemberAccessNode
+        {
             public IdentityNode memberNode;
         }
 
         // ******************** TYPE NODES ******************************
 
-        public class TypeNode : Node
-        {}
+        public abstract class TypeNode : Node {}
+        public class ClassTypeNode : TypeNode
+        {
+            public IdentityNode classname;
+        }
         public class PrimitiveNode : TypeNode
         {
             public Token token;

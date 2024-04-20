@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
+using System.IO;
+
 using FanLang.LRParse;
 using FanLang.LALRGenerator;
 
@@ -31,15 +33,53 @@ namespace FanLang.LRParse
         {
             if (type == ACTION_TYPE.Shift)
                 return type.ToString().ToLower().Substring(0, 1) + num.ToString();
-            else if ((type == ACTION_TYPE.Reduce))
+            else if (type == ACTION_TYPE.Reduce)
                 return type.ToString().ToLower().Substring(0, 1) + (num + 1).ToString();//产生式序号是从0开始的
             else
                 return type.ToString().ToLower().Substring(0, 3);
+        }
+
+        public static ACTION Parse(string str)
+        {
+            switch (str[0])
+            {
+                case 'r':
+                    {
+                        return new ACTION() { type = ACTION_TYPE.Reduce, num = (int.Parse(str.Substring(1)) - 1) };
+                    }
+                case 's':
+                    {
+                        return new ACTION() { type = ACTION_TYPE.Shift, num = int.Parse(str.Substring(1)) };
+                    }
+                case 'a':
+                    {
+                        if(str == "acc")
+                        {
+                            return new ACTION() { type = ACTION_TYPE.Accept };
+                        }
+                        else
+                        {
+                            throw new Exception("acc字符串格式错误！");
+                        }
+                    }
+                default:
+                    return new ACTION() { type = ACTION_TYPE.Error };
+            }
         }
     }
     public struct GOTO
     {
         public int stateId;
+
+        public override string ToString()
+        {
+            return stateId.ToString();
+        }
+
+        public static GOTO Parse(string str)
+        {
+            return new GOTO() { stateId = int.Parse(str) };
+        }
     }
 
 
@@ -57,32 +97,15 @@ namespace FanLang.LRParse
         public List<string> nonterminals;
 
 
+        public int accState = -99;
+        public string accSymbol = "not set !";
+
         //ACTION子表（使用嵌套Dic的话，找不到ACTION项认为是Err）  
         private Dictionary<int, Dictionary<string, ACTION>> actions = new Dictionary<int, Dictionary<string, ACTION>>();
         //GOTO子表  
         private Dictionary<int, Dictionary<string, GOTO>> gotos = new Dictionary<int, Dictionary<string, GOTO>>();
 
-        //设置    
-        public void SetACTION(int i, string a, ACTION act)
-        {
-            if (actions.ContainsKey(i) == false)
-                actions[i] = new Dictionary<string, ACTION>();
-
-            //无冲突  
-            if (actions[i].ContainsKey(a) == false)
-            {
-                actions[i][a] = act;
-            }
-            //冲突  
-            else if (actions[i][a].type != act.type && actions[i][a].num != act.num)
-            {
-                var prevAct = actions[i][a];
-                Console.WriteLine("发生" + prevAct.type.ToString() + "-" + act.type.ToString() + "冲突！");
-                throw new Exception("语法动作冲突：ACTION[" + i + ", " + a + "]   old:" + actions[i][a].ToString() + "  new:" + act.ToString());
-            }
-
-        }
-
+        //检查  
         public bool CheckACTION(int i, string terminal)
         {
             if (actions.ContainsKey(i))
@@ -95,6 +118,32 @@ namespace FanLang.LRParse
             return false;
         }
 
+        //设置    
+        public void SetACTION(int i, string a, ACTION act)
+        {
+            if (actions.ContainsKey(i) == false)
+                actions[i] = new Dictionary<string, ACTION>();
+
+            //无冲突  
+            if (actions[i].ContainsKey(a) == false)
+            {
+                actions[i][a] = act;
+
+                if(act.type ==  ACTION_TYPE.Accept)
+                {
+                    accState = i;
+                    accSymbol = a;
+                }
+            }
+            //冲突  
+            else if (actions[i][a].type != act.type && actions[i][a].num != act.num)
+            {
+                var prevAct = actions[i][a];
+                Console.WriteLine("发生" + prevAct.type.ToString() + "-" + act.type.ToString() + "冲突！");
+                throw new Exception("语法动作冲突：ACTION[" + i + ", " + a + "]   old:" + actions[i][a].ToString() + "  new:" + act.ToString());
+            }
+
+        }
         public void SetGOTO(int statei, string X, int j)
         {
             //if (X is Terminal) return; //保存终结符的GOTO信息没有必要
@@ -141,6 +190,130 @@ namespace FanLang.LRParse
             }
 
             return default;
+        }
+
+        //序列化  
+        public string Serialize()
+        {
+            bool accSet = false;
+            StringBuilder strb = new StringBuilder();
+
+            strb.AppendLine("ACTION_TABLE");
+            for (int i = 0; i < stateCount; ++i)
+            {
+                if (actions.ContainsKey(i))
+                {
+                    strb.AppendLine(i.ToString());
+                    Dictionary<string, ACTION> row = actions[i];
+                    for (int j = 0; j < this.terminals.Count; ++j)
+                    {
+                        if (j != 0) strb.Append(",");
+                        if (row.ContainsKey(this.terminals[j]))
+                        {
+                            var act = row[this.terminals[j]];
+                            strb.Append(act.ToString());
+
+                            if(act.type == ACTION_TYPE.Accept) accSet = true;
+                        }
+                    }
+                    strb.Append("\n");
+                }
+            }
+
+            strb.AppendLine("GOTO_TABLE");
+            for (int i = 0; i < stateCount; ++i)
+            {
+                if (gotos.ContainsKey(i))
+                {
+                    strb.AppendLine(i.ToString());
+                    Dictionary<string, GOTO> row = gotos[i];
+                    for (int j = 0; j < this.terminals.Count; ++j)
+                    {
+                        if (j != 0) strb.Append(",");
+                        if (row.ContainsKey(this.terminals[j]))
+                        {
+                            strb.Append(row[this.terminals[j]].ToString());
+                        }
+                    }
+                    for (int j = 0; j < this.nonterminals.Count; ++j)
+                    {
+                        strb.Append(",");
+                        if (row.ContainsKey(this.nonterminals[j]))
+                        {
+                            strb.Append(row[this.nonterminals[j]].ToString());
+                        }
+                    }
+                    strb.Append("\n");
+                }
+            }
+
+            strb.AppendLine("ENDTABLE");
+
+            if(accSet == false)
+            {
+                throw new Exception("错误：表中没有ACC!");
+            }
+
+            return strb.ToString();
+        }
+
+        //反序列化  
+        public void Deserialize(string data)
+        {
+            //Console.WriteLine("terminals:");
+            //Console.WriteLine(string.Concat(this.terminals.Select(t => t + ",")));
+            //Console.WriteLine("nonterminals:");
+            //Console.WriteLine(string.Concat(this.nonterminals.Select(nt => nt + ",")));
+            //Console.ReadKey();
+
+            StringReader reader = new StringReader(data);
+
+            if (reader.ReadLine() != "ACTION_TABLE") throw new Exception("Deserialze Err 10000");
+
+            while(true)
+            {
+                string line1 = reader.ReadLine();
+                if (line1 == "GOTO_TABLE") break;
+                string line2 = reader.ReadLine();
+
+                int idx = int.Parse(line1);
+
+                string[] segments = line2.Split(',');
+
+                if (segments.Length != terminals.Count) throw new Exception("记录长度不一致1");
+
+
+
+                for (int i = 0; i < this.terminals.Count; ++i) 
+                {
+                    if (string.IsNullOrEmpty(segments[i])) continue;
+                    SetACTION(idx, terminals[i], FanLang.LRParse.ACTION.Parse(segments[i]));
+                }
+            }
+            while (true)
+            {
+                string line1 = reader.ReadLine();
+                if (line1 == "ENDTABLE") break;
+                string line2 = reader.ReadLine();
+
+                int idx = int.Parse(line1);
+
+                string[] segments = line2.Split(',');
+
+                if (segments.Length != (terminals.Count + nonterminals.Count)) throw new Exception("记录长度不一致2");
+
+
+                for (int i = 0; i < this.terminals.Count; ++i)
+                {
+                    if (string.IsNullOrEmpty(segments[i])) continue;
+                    SetGOTO(idx, terminals[i], int.Parse(segments[i]));
+                }
+                for (int i = 0; i < this.nonterminals.Count; ++i)
+                {
+                    if (string.IsNullOrEmpty(segments[i + this.terminals.Count])) continue;
+                    SetGOTO(idx, nonterminals[i], int.Parse(segments[i + this.terminals.Count]));
+                }
+            }
         }
 
         //打印该表  
@@ -221,7 +394,6 @@ namespace FanLang.LALRGenerator
         public List<Nonterminal> nonterminals = new List<Nonterminal>();//非终结符列表  
         public List<Terminal> terminals = new List<Terminal>();//终结符列表  
         public List<Production> productions = new List<Production>();  //产生式列表（索引代表产生式编号）  
-        public List<LR1Item> items = new List<LR1Item>();//Item列表  
 
         //分析表  
         public ParseTable table;
@@ -241,6 +413,8 @@ namespace FanLang.LALRGenerator
         public Dictionary<string, LR1Item> itemDic = new Dictionary<string, LR1Item>();
         public Dictionary<Production, int> productionIdDic = new Dictionary<Production, int>();
 
+        //项列表  
+        public List<LR1Item> items = new List<LR1Item>();//Item列表  
 
         //G'项集族  
         public List<LR1ItemSet> canonicalItemCollection; // 即C  
@@ -273,8 +447,215 @@ namespace FanLang.LALRGenerator
             //生成器输入  
             this.genratorInput = input;
 
+
+            //判断是否分析器数据文件
+            string path = AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt";
+            if (System.IO.File.Exists(path))
+            {
+                if (CompareInfo(path) == true)//信息一致
+                {
+                    Console.WriteLine("存在分析表： " + path);
+                    Console.ReadKey();
+
+                    ReadExistData(path);
+                    return;
+                }
+            }
+
+
+            Console.WriteLine("不存在分析表： " + path);
+            Console.ReadKey();
+
             //文法初始化  
             InitGrammar();
+
+            Console.WriteLine("即将保存分析表到：" + path);
+            Console.ReadKey();
+
+            //保存分析器数据  
+            SaveData(path);
+        }
+
+        // ------------------------------------- 数据读写 ------------------------------------------
+        public bool CompareInfo(string path)
+        {
+            using (StreamReader reader = new StreamReader(path))
+            {
+                reader.ReadLine();
+                foreach (var terminal in genratorInput.terminalNames)
+                {
+                    string t = reader.ReadLine();
+                    if (t != terminal)
+                    {
+
+                        reader.Close();
+                        return false;
+                    }
+                }
+                reader.ReadLine();
+                foreach (var nonterminal in genratorInput.nonterminalNames)
+                {
+                    string nt = reader.ReadLine();
+                    if (nt != nonterminal)
+                    {
+
+                        reader.Close();
+                        return false;
+                    }
+                }
+                reader.ReadLine();
+                foreach (var production in genratorInput.productionExpressions)
+                {
+                    string p = reader.ReadLine();
+                    if (p != production)
+                    {
+
+                        reader.Close();
+                        return false;
+                    }
+                }
+
+                reader.Close();
+            }
+
+            return true;
+        }
+
+        public void ReadExistData(string path)
+        {
+            using (StreamReader reader = new StreamReader(path))
+            {
+                while (true)
+                {
+                    string line = reader.ReadLine();
+                    if (line == "***Terminals***") break;
+                }
+
+                while (true)
+                {
+                    string line = reader.ReadLine();
+                    if (line == "***Nonterminals***") break;
+                    NewTerminal(line);
+                }
+
+                while (true)
+                {
+                    string line = reader.ReadLine();
+                    if (line == "***Productions***") break;
+                    NewNonterminal(line);
+                }
+
+                while (true)
+                {
+                    string line = reader.ReadLine();
+                    if (line == "***States***") break;
+                    NewProduction(line);
+                }
+
+                outputData.startSymbol = outputData.nonterminals.FirstOrDefault(nt => nt.name == "S");
+                outputData.augmentedStartSymbol = outputData.nonterminals.FirstOrDefault(nt => nt.name == @"S'");
+
+
+                outputData.lalrStates = new List<State>();
+                while (true)
+                {
+                    if (reader.ReadLine() == "***Table***") break;
+
+                    string strIdx = reader.ReadLine();
+                    string name = reader.ReadLine();
+
+                    LR1ItemSet itemset = new LR1ItemSet();
+                    if (reader.ReadLine() != "***Set***") throw new Exception("not match ***Set***");
+
+                    while(true)
+                    {
+                        string line = reader.ReadLine();
+                        if (line == "***EndSet***") break;
+
+                        var item = GetOrCreateLR1Item(line);
+                        itemset.AddImmediate(item);
+                    }
+
+                    if (reader.ReadLine() != "***EndState***") throw new Exception("not match ***EndState***");
+
+                    State state = new State(int.Parse(strIdx), name, itemset);
+                    outputData.lalrStates.Add(state);
+                }
+
+                string strTable = reader.ReadToEnd();
+
+                outputData.table = new ParseTable();
+                outputData.table.stateCount = outputData.lalrStates.Count;
+                outputData.table.terminals = outputData.terminals.Select(t => t.name).ToList();
+                outputData.table.nonterminals = outputData.nonterminals.Select(nont => nont.name).ToList();
+
+                outputData.table.Deserialize(strTable);
+            }
+        }
+
+        public void SaveData(string path)
+        {
+            StringBuilder strb = new StringBuilder();
+            strb.AppendLine("***Raw Terminals***");
+            foreach (var terminal in genratorInput.terminalNames)
+            {
+                strb.AppendLine(terminal);
+            }
+            strb.AppendLine("***Raw Nonterminals***");
+            foreach (var nonterminal in genratorInput.nonterminalNames)
+            {
+                strb.AppendLine(nonterminal);
+            }
+            strb.AppendLine("***Raw Productions***");
+            foreach (var production in genratorInput.productionExpressions)
+            {
+                strb.AppendLine(production);
+            }
+
+            strb.AppendLine("");
+            strb.AppendLine("");
+            strb.AppendLine("");
+            strb.AppendLine("***Data***");
+
+
+            strb.AppendLine("***Terminals***");
+            foreach (var t in outputData.terminals)
+            {
+                strb.AppendLine(t.name);
+            }
+            strb.AppendLine("***Nonterminals***");
+            foreach (var nt in outputData.nonterminals)
+            {
+                strb.AppendLine(nt.name);
+            }
+            strb.AppendLine("***Productions***");
+            foreach (var production in outputData.productions)
+            {
+                strb.AppendLine(production.ToExpression());
+            }
+            strb.AppendLine("***States***");
+            foreach (var state in outputData.lalrStates)
+            {
+                strb.AppendLine("***State***");
+                strb.AppendLine(state.idx.ToString());
+                strb.AppendLine(state.name);
+
+                strb.AppendLine("***Set***");
+
+                foreach (var item in state.set.ToArray())
+                {
+                    strb.AppendLine(item.ToExpression());
+                }
+
+                strb.AppendLine("***EndSet***");
+
+                strb.AppendLine("***EndState***");
+            }
+            strb.AppendLine("***Table***");
+
+            strb.Append(outputData.table.Serialize());
+
+            File.WriteAllText(path, strb.ToString());
         }
 
         // ------------------------------------- 初始化 ------------------------------------------
@@ -347,7 +728,6 @@ namespace FanLang.LALRGenerator
 
             //构造LALR分析表  
             InitLALRTable();
-
         }
 
         /// <summary>
@@ -788,26 +1168,55 @@ namespace FanLang.LALRGenerator
 
         private void NewLR1Item(string expression) //形式: "A -> α · β, a"  
         {
-            string[] productionAndLookahead = expression.Split(',');
-            string lookaheadStr = productionAndLookahead[1].Trim();  //a
-            string itemNonLookahead = productionAndLookahead[0].Trim();  //A -> α·β
+            int lastSpaceIdx = -1;
+            for (int i = expression.Length - 1; i > -1; --i)
+            {
+                if (expression[i] == ' ')
+                {
+                    lastSpaceIdx = i;
+                    break;
+                }
+            }
+            if (lastSpaceIdx == -1) throw new Exception("LR1项不合规，分量前加空格!:" + expression);
+
+            Console.WriteLine("new item:" + expression);
+            string lookaheadStr = expression.Substring(lastSpaceIdx).Trim();//a
+            string itemNonLookahead = expression.Substring(0, lastSpaceIdx - 1).Trim();  //A -> α·β
 
             string[] segments = itemNonLookahead.Split(' ');
             if (segments[1] != "->") { throw new Exception("LR1项格式错误"); }
 
             //find production
-            string productionExpression = itemNonLookahead.Replace(" ·", "");
+            string productionExpression;
+            if (segments.Length == 3 && segments[2] == "·")
+            {
+                productionExpression = segments[0] + " -> ε";
+            }
+            else
+            {
+                productionExpression = itemNonLookahead.Replace(" ·", "");
+            }
+
             if (productionDic.ContainsKey(productionExpression) == false) { throw new Exception("没找到产生式:" + productionExpression); }
             Production production = productionDic[productionExpression];
 
             //Find iDot  
-            var itembody = segments[2].Trim();//α·β  
-            int idot = itembody.IndexOf('·');
+            int idot = -1;
+
+            for (int i = 0; i < segments.Length; ++i)
+            {
+                if (segments[i] == "·")
+                {
+                    idot = i - 2;
+                        break;
+                }
+            }
+            
             if (idot == -1) throw new Exception(@"项 " + expression + " 不合规:没有'·'");
 
             //lookahead  
             Terminal lookahead = outputData.terminals.FirstOrDefault(t => t.name == lookaheadStr);
-            if (lookahead == null) { throw new Exception("没找到终结符:" + lookaheadStr); }
+            if (lookahead == null) { throw new Exception("没找到终结符: [" + lookaheadStr + "](" + lookaheadStr.Length + ")"); }
 
             //ADD  
             CreateLR1Item(production, idot, lookahead);
@@ -831,7 +1240,7 @@ namespace FanLang.LALRGenerator
                 throw new Exception("LR1项不合规");
             }
 
-            outputData.items.Add(newItem);
+            this.items.Add(newItem);
             this.itemDic.Add(newItem.ToExpression(), newItem);
 
             return newItem;
@@ -867,7 +1276,7 @@ namespace FanLang.LALRGenerator
 
         public LR1Item GetOrCreateLR1Item(Production production, int idot, Terminal lookahead)
         {
-            foreach (var item in outputData.items)
+            foreach (var item in this.items)
             {
                 if (item.production != production) continue;
                 if (item.iDot != idot) continue;
@@ -978,80 +1387,91 @@ namespace FanLang.LALRGenerator
         private TerminalSet FIRST(Symbol symbol)
         {
             if (symbol == null) throw new Exception("不能计算null的FIRST集！");
-            Console.WriteLine("计算" + symbol.name + "的FIRST集...");
+            //Console.WriteLine("计算" + symbol.name + "的FIRST集...");
 
             //访问过的节点（直接读取缓存）  
             if (symbol.cachedFIRST != null)
             {
                 return symbol.cachedFIRST;
             }
-
             //未访问过的节点  
-            TerminalSet newSet = new TerminalSet();
-            symbol.cachedFIRST = (newSet);//缓存(即标记为visited)  
-
-            //终结符的FIRST集只包含它自己  
-            if (symbol is Terminal)
-            {
-                newSet.AddDistinct(symbol as Terminal);
-                return symbol.cachedFIRST;
-            }
-            //非终结符
             else
             {
-                Nonterminal nt = symbol as Nonterminal;
-                foreach (var production in nt.productions)
+                TerminalSet newSet = new TerminalSet();
+                symbol.cachedFIRST = (newSet);//缓存(即标记为visited)  
+
+                //终结符的FIRST集只包含它自己  
+                if (symbol is Terminal)
                 {
-                    //ε产生式  
-                    if (production.IsεProduction())
+                    newSet.AddDistinct(symbol as Terminal);
+                    return symbol.cachedFIRST;
+                }
+                //非终结符
+                else
+                {
+                    Nonterminal nt = symbol as Nonterminal;
+                    foreach (var production in nt.productions)
                     {
-                        newSet.AddDistinct(null);
-                        continue;
-                    }
-
-                    int i = 0;
-                    while (i < production.body.Length)
-                    {
-                        Symbol currentSymbol = production.body[i];
-
-                        if (currentSymbol == null)
+                        //ε产生式  
+                        if (production.IsεProduction())
                         {
-                            throw new Exception("错误的产生式:" + production.ToExpression() + "，含有ε。");
+                            newSet.AddDistinct(null);
+                            continue;
                         }
 
-                        if (currentSymbol is Terminal)
+                        int i = 0;
+                        while (i < production.body.Length)
                         {
-                            //终结符 -> 添加并结束  
-                            newSet.AddDistinct(currentSymbol as Terminal);
-                            break;
-                        }
-                        else if (currentSymbol != symbol)
-                        {
-                            var currentFirst = FIRST(currentSymbol);
-                            newSet.UnionWith(currentFirst);
+                            Symbol currentSymbol = production.body[i];
 
-                            //如果当前符号的FIRST没有ε -> 到此结束  
-                            if (currentFirst.Contains(null) == false) break;
-                        }
-                        else // currentSymbol == symbol
-                        {
-                            //后续有本身  ->  左递归  ->  到此结束  
-                            if (!production.body.Skip(i).Contains(symbol))
+                            //DEBUG  
+                            //if (currentSymbol == null)
+                            //{
+                            //    throw new Exception("错误的产生式:" + production.ToExpression() + "，含有ε。");
+                            //}
+
+                            if (currentSymbol is Terminal)
                             {
+                                //终结符 -> 添加并结束  
+                                newSet.AddDistinct(currentSymbol as Terminal);
                                 break;
                             }
-
-                            //到最后一个字符了还未结束 -> 添加ε  
-                            if (++i >= production.body.Length)
+                            else if (currentSymbol != symbol)
                             {
-                                newSet.AddDistinct(null);
+                                var currentFirst = FIRST(currentSymbol);
+                                newSet.UnionWith(currentFirst);
+
+                                //如果当前符号的FIRST没有ε -> 到此结束  
+                                if (currentFirst.Contains(null) == false)
+                                {
+                                    break;
+                                }
+                                //4.19修改添加    
+                                else
+                                {
+                                    i++; break;
+                                }
+                            }
+                            else // currentSymbol == symbol
+                            {
+                                //后续有本身  ->  左递归  ->  到此结束  
+                                if (!production.body.Skip(i).Contains(symbol))
+                                {
+                                    break;
+                                }
+
+                                //到最后一个字符了还未结束 -> 添加ε  
+                                if (++i >= production.body.Length)
+                                {
+                                    newSet.AddDistinct(null);
+                                }
                             }
                         }
                     }
+
+
+                    return newSet;
                 }
-
-
-                return newSet;
             }
         }
         private TerminalSet FIRST(IEnumerable<Symbol> sstr)
