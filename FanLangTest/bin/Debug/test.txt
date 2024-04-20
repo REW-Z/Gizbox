@@ -1,64 +1,31 @@
-﻿void Foo()
-{
-    int tmp = 0;
-}
+﻿int num = 0;
 
-float Add(float x, float y)
-{
-    return x + y;
-}
-  
-bool IsPositive(float x)
-{
-    return true;
-}
-                    
 class Student
 {
-    string name = "ZZZ";
-    int age = 18;
-    void ChangeName(string newName)
-    {
-        this.name = newName;
-    }
-    void Speak(string txt)
-    {
-    }
+	string name = "default";
+	int age = 1;
 }
 
-int a = 233 ;
-int b = (a + 111) * 222;
-float c = 123.0f;                  
-string d = "AAA";
-float e = Add(1.0f, 2.0f);
-
-Student stu = new Student( );
-
-bool isPositive = IsPositive(e);
-
-if(isPositive)
+int Pow2(int input)
 {
-    Foo();
-}
-else if(true)
-{
-    a = a + 1;
-}
-else
-{
-    b = b + 1;
+	int result = input * input;
+	return result;
 }
 
-
-while(c < 999.0f)
+int main()
 {
-    c = c + 1.0f;
-}
-for(int i = 0; i < 99; ++i)
-{
-    a *= 2;
+	num += 1;
+	num *= 3;
+	num++;
+	print("result is " + Pow2(num));
+	
+
+	Student stu = new Student();
+
+	stu.name = "REW";
+	stu.age = 28;
+
+	print("My name is " + stu.name);
 }
 
-int fff = (float) a;
-
-b.aaa();
+main();

@@ -404,6 +404,9 @@ namespace FanLang
         //Constant Value Pool  
         public ConstantValueTable constantValueTable;
 
+        //AST  
+        public SyntaxTree syntaxTree;
+
         //CTOR  
         public Compiler()
         {
@@ -473,6 +476,8 @@ namespace FanLang
 
             Console.WriteLine("\n\n抽象语法树：");
             Console.WriteLine(parser.syntaxTree.Serialize());
+
+            this.syntaxTree = parser.syntaxTree;
         }
     }
 

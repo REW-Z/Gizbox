@@ -494,11 +494,11 @@ namespace FanLang.Translator
                 };
             });
 
-            AddActionAtTail("statements -> stmt statements", (psr, production) => {
+            AddActionAtTail("statements -> statements stmt", (psr, production) => {
 
-                var newStmt = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"];
+                var newStmt = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top].attributes["ast_node"];
 
-                psr.newElement.attributes["ast_node"] = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top].attributes["ast_node"];
+                psr.newElement.attributes["ast_node"] = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"];
                 ((SyntaxTree.StatementsNode)psr.newElement.attributes["ast_node"]).statements.Add(newStmt);
             });
             AddActionAtTail("statements -> stmt", (psr, production) => {
@@ -521,11 +521,11 @@ namespace FanLang.Translator
             });
 
 
-            AddActionAtTail("declstatements -> declstmt declstatements", (psr, production) => {
+            AddActionAtTail("declstatements -> declstatements declstmt", (psr, production) => {
 
-                var newDeclStmt = (SyntaxTree.DeclareNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"];
+                var newDeclStmt = (SyntaxTree.DeclareNode)psr.stack[psr.stack.Top].attributes["ast_node"];
 
-                psr.newElement.attributes["decl_stmts"] = (List<SyntaxTree.DeclareNode>)psr.stack[psr.stack.Top].attributes["decl_stmts"];
+                psr.newElement.attributes["decl_stmts"] = (List<SyntaxTree.DeclareNode>)psr.stack[psr.stack.Top - 1].attributes["decl_stmts"];
 
                 ((List<SyntaxTree.DeclareNode>)psr.newElement.attributes["decl_stmts"]).Add(newDeclStmt);
             });
@@ -942,7 +942,7 @@ namespace FanLang.Translator
                 };
             });
             AddActionAtTail("primary -> memberaccess", (psr, production) => {
-                psr.newElement.attributes["ast_node"] = (SyntaxTree.SpecialExprNode)psr.stack[psr.stack.Top].attributes["ast_node"];
+                psr.newElement.attributes["ast_node"] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes["ast_node"];
             });
 
             AddActionAtTail("primary -> newobj", (psr, production) => {
@@ -1026,7 +1026,7 @@ namespace FanLang.Translator
 
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.CallNode()
                 {
-                    isMemberFunction = false,
+                    isMemberAccessFunction = false,
                     funcNode = new SyntaxTree.IdentityNode()
                     {
                         attributes = psr.stack[psr.stack.Top - 3].attributes,
@@ -1043,7 +1043,7 @@ namespace FanLang.Translator
 
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.CallNode()
                 {
-                    isMemberFunction = true,
+                    isMemberAccessFunction = true,
                     funcNode = (SyntaxTree.MemberAccessNode)psr.stack[psr.stack.Top - 3].attributes["ast_node"],
                     argumantsNode = (SyntaxTree.ArgumentListNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"],
 
@@ -1143,17 +1143,17 @@ namespace FanLang.Translator
                 };
             });
 
-            AddActionAtTail("params -> type ID , params", (psr, production) => {
-                psr.newElement.attributes["ast_node"] = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top].attributes["ast_node"];
+            AddActionAtTail("params -> params , type ID", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 3].attributes["ast_node"];
 
                 ((SyntaxTree.ParameterListNode)psr.newElement.attributes["ast_node"]).parameterNodes.Add(
                     new SyntaxTree.ParameterNode()
                     {
-                        typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 3].attributes["ast_node"],
+                        typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"],
                         identifierNode = new SyntaxTree.IdentityNode()
                         {
-                            attributes = psr.stack[psr.stack.Top - 2].attributes,
-                            token = psr.stack[psr.stack.Top - 2].attributes["token"] as Token,
+                            attributes = psr.stack[psr.stack.Top].attributes,
+                            token = psr.stack[psr.stack.Top].attributes["token"] as Token,
                         },
                     }
                 );
@@ -1175,11 +1175,11 @@ namespace FanLang.Translator
                 };
             });
 
-            AddActionAtTail("args -> expr , args", (psr, production) => {
-                psr.newElement.attributes["ast_node"] = (SyntaxTree.ArgumentListNode)psr.stack[psr.stack.Top].attributes["ast_node"];
+            AddActionAtTail("args -> args , expr", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = (SyntaxTree.ArgumentListNode)psr.stack[psr.stack.Top - 2].attributes["ast_node"];
 
                 ((SyntaxTree.ArgumentListNode)psr.newElement.attributes["ast_node"]).arguments.Add(
-                    (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes["ast_node"]
+                    (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes["ast_node"]
                 );
             });
         }

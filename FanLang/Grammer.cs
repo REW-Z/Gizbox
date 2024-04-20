@@ -65,11 +65,11 @@ namespace FanLang
 
             "statementblock -> { statements }",
 
-            "statements -> stmt statements",
+            "statements -> statements stmt",
             "statements -> stmt",
             "statements -> ε",
 
-            "declstatements -> declstmt declstatements",
+            "declstatements -> declstatements declstmt",
             "declstatements -> declstmt",
             "declstatements -> ε",
 
@@ -177,11 +177,11 @@ namespace FanLang
 
             "params -> ε",
             "params -> type ID",
-            "params -> type ID , params",
+            "params -> params , type ID",
 
             "args -> ε",
             "args -> expr",
-            "args -> expr , args",
+            "args -> args , expr",
         };
     }
 }

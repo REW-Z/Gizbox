@@ -307,7 +307,7 @@ namespace FanLang
 
         public class CallNode : SpecialExprNode//调用表达式（低优先级）
         {
-            public bool isMemberFunction;
+            public bool isMemberAccessFunction;
 
             public ExprNode funcNode;
 

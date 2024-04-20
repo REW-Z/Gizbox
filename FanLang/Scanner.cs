@@ -83,7 +83,7 @@ namespace FanLang
             literals.Add(new TokenPattern("LITBOOL", "(true|false)[^a-zA-Z]", 1));
             literals.Add(new TokenPattern("LITINT", "[0-9]+[^\\d\\.]", 1));
             literals.Add(new TokenPattern("LITFLOAT", "[0-9]+\\.[0-9]+[F|f]\\D", 1));
-            literals.Add(new TokenPattern("LITSTRING", "\"\\w*\"\\D", 1));
+            literals.Add(new TokenPattern("LITSTRING", "\\\"[\\w|\\s]*\\\"[^\\\"]", 1));
 
             identifierPattern = new TokenPattern("ID", "[a-z|A-Z][a-z|A-Z|0-9]*\\W", 1);
 
@@ -128,6 +128,11 @@ namespace FanLang
             //Scan  
             while (lexemBegin != source.Length)
             {
+                if (lexemBegin + (forward - lexemBegin) > source.Length - 1)
+                {
+                    Console.WriteLine("发现越界：" + (lexemBegin + (forward - lexemBegin)));
+                    Console.WriteLine("总长度：" + source.Length);
+                }
                 var seg = source.Substring(lexemBegin, forward - lexemBegin);
 
                 Console.WriteLine("[" + seg + "]" + "(" + lexemBegin + "," + forward + ")");
@@ -218,7 +223,7 @@ namespace FanLang
                 //ID  
                 if (PatternMatch(seg, identifierPattern))
                 {
-                    string identifierName = seg.Substring(0, identifierPattern.back);
+                    string identifierName = seg.Substring(0, seg.Length - identifierPattern.back);
                     Console.WriteLine("\n>>>>> identifier:" + identifierName + "\n\n");
 
                     //int idx = globalSymbolTable.AddIdentifier(identifierName);//词法分析阶段最好不创建符号表条目（编译原理p53）  

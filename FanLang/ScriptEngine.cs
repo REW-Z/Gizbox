@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using FanLang;
 
@@ -31,6 +32,12 @@ namespace FanLang.ScriptEngine
     }
 
 
+    public class FanObject
+    {
+        public string name;
+        public Dictionary<string, object> fields = new Dictionary<string, object>();
+    }
+
     public class VirtualMemory
     {
         private List<object> data = new List<object>();
@@ -45,8 +52,15 @@ namespace FanLang.ScriptEngine
         }
         public object this[int addr]
         {
-            get { return data[addr]; }
-            set { data[addr] = value; }
+            get 
+            {
+                return data[addr];
+            }
+            set 
+            {
+                if (value.GetType() == typeof(ExecuteResult)) throw new Exception("不应把ExecuteResult存入虚拟内存");
+                data[addr] = value; 
+            }
         }
     }
 
@@ -58,33 +72,79 @@ namespace FanLang.ScriptEngine
             public string name;
             public int addr;
         }
-        private VirtualMemory memory;
 
-        private Dictionary<string, Record> data;
+        public string name;
 
-        public Env(VirtualMemory mem)
+        private Dictionary<string, Record> data = new Dictionary<string, Record>();
+
+        private VirtualMemory targetMem;
+
+
+        public Env(string name, VirtualMemory mem)
         {
-            this.memory = mem;
+            this.name = name;
+            this.targetMem = mem;
         }
 
+        public bool ContainsKey(string name)
+        {
+            return data.ContainsKey(name);
+        }
         public Record this[string name]
         {
             get
             {
+                if (data.ContainsKey(name) == false) throw new Exception("Env中没有" + name + "条目");
                 return data[name];
             }
         }
 
+
+        public Record GetOrNewRecord(string name)
+        {
+            if(data.ContainsKey("name"))
+            {
+                return data["name"];
+            }
+            else
+            {
+                int newAddr = targetMem.MemAlloc(1);
+                var newrec = new Record()
+                {
+                    name = name,
+                    addr = newAddr
+                };
+                data[name] = newrec;
+
+                return newrec;
+            }
+        }
         public Record NewRecord(string name)
         {
-            int newAddr = memory.MemAlloc(1);
+            if (data.ContainsKey(name)) throw new Exception("重复添加同名条目！:" + name);
+
+            int newAddr = targetMem.MemAlloc(1);
             var newrec = new Record() { 
                 name = name,
                 addr = newAddr
             };
             data[name] = newrec;
 
+            Console.WriteLine("添加条目:" + name + "指向虚拟内存：" + newAddr);
+
             return newrec;
+        }
+
+        public void Print()
+        {
+            Console.WriteLine("---------------Table:" + this.name + "---------------");
+            Console.WriteLine("NAME" + "\t\t|" + "ADDR" + "\t\t|");
+            Console.WriteLine("------------------------------------");
+            foreach (var key in data.Keys)
+            {
+                Console.WriteLine(key + "\t\t|" + data[key].addr + "\t\t|"); 
+            }
+            Console.WriteLine("------------------------------------");
         }
     }
 
@@ -95,7 +155,7 @@ namespace FanLang.ScriptEngine
 
         public Env globalEnv;
 
-        private Stack<Env> envStack;
+        private FanLang.Stack<Env> envStack;
 
         private VirtualMemory mem;
 
@@ -109,8 +169,8 @@ namespace FanLang.ScriptEngine
             this.mem = new VirtualMemory();
 
             //table stack  
-            this.globalEnv = new Env(mem);
-            this.envStack = new Stack<Env>();
+            this.globalEnv = new Env("global", mem);
+            this.envStack = new FanLang.Stack<Env>();
             this.envStack.Push(this.globalEnv);
 
             //start  
@@ -119,6 +179,8 @@ namespace FanLang.ScriptEngine
 
         public ExecuteResult ExecuteNode(SyntaxTree.Node node)
         {
+            Console.WriteLine(" ****** 执行节点：" + node.ToString() + " ****** ");
+
             var type = node.GetType();
             switch(type.Name)
             {
@@ -146,7 +208,7 @@ namespace FanLang.ScriptEngine
                 case "VarDeclareNode":
                     {
                         string name = (node as SyntaxTree.VarDeclareNode).identifierNode.token.attribute;
-                        object val = ExecuteNode((node as SyntaxTree.VarDeclareNode).initializerNode);
+                        object val = ExecuteNode((node as SyntaxTree.VarDeclareNode).initializerNode).returnValue;
                         DeclareVariable_CurrentEnv(name, val);
                         return 0;
                     }
@@ -174,7 +236,8 @@ namespace FanLang.ScriptEngine
                     }
                 case "ReturnStmtNode":
                     {
-                        return 0;
+                        var ret = ExecuteNode((node as SyntaxTree.ReturnStmtNode).returnExprNode).returnValue;
+                        return ExecuteResult.Return(ret);
                     }
                 case "WhileStmtNode":
                     {
@@ -285,13 +348,13 @@ namespace FanLang.ScriptEngine
                 //    }
                 case "IdentityNode":
                     {
-                        string name = ((SyntaxTree.IdentityNode)node).token.name;
+                        string name = ((SyntaxTree.IdentityNode)node).token.attribute;
                         return new ExecuteResult(GetIdentidierValue(name), ExecuteState.Finish);
                     }
                 case "LiteralNode":
                     {
-                        string name = ((SyntaxTree.LiteralNode)node).token.name;
-                        return new ExecuteResult(GetLiteralValue(name), ExecuteState.Finish);
+                        var token = ((SyntaxTree.LiteralNode)node).token;
+                        return new ExecuteResult(GetLiteralValue(token), ExecuteState.Finish);
                     }
                 case "BinaryOpNode":
                     {
@@ -384,66 +447,476 @@ namespace FanLang.ScriptEngine
 
             var rec = envStack.Peek().NewRecord(name);
             
-            //函数作用域环境  
-            mem[rec.addr] = new Env(mem);
+            //函数环境  
+            var newEnv = new Env("function:" + name, mem);
+            mem[rec.addr] = newEnv;
+
+            //函数符号表第一条存储函数定义节点  
+            int nodeAddr = newEnv.NewRecord("Node").addr;
+            mem[nodeAddr] = node;
         }
 
         public void DeclareClass_CurrentEnv(string name, List<SyntaxTree.DeclareNode> memberDeclares)
         {
-            //Env classEnv = new Env(this.mem);
-            //envStack.Peek().NewRecord(name, classEnv);
+            var rec = envStack.Peek().NewRecord(name);
+            var newEnv = new Env("class " + name,this.mem);
+            mem[rec.addr] = newEnv;
+
+            //类成员作用域  
+            envStack.Push(newEnv);
+
+            foreach(var decl in memberDeclares)
+            {
+                ExecuteNode(decl);
+            }
+
+            envStack.Pop();
         }
 
+        public object GetIdentidierAddr(string varName)
+        {
+            Console.WriteLine("查找名称地址:" + varName);
+            for (int i = envStack.Top; i > -1; --i)
+            {
+                var env = envStack[i];
+                if (env.ContainsKey(varName))
+                {
+                    return env[varName].addr;
+                }
+            }
+
+
+            {
+                Console.WriteLine("找不到" + varName);
+                PrintAllTables();
+            }
+
+            return -1;
+        }
         public object GetIdentidierValue(string varName)
         {
-            return null;
+            int addr = (int)GetIdentidierAddr(varName);
+            if (addr == -1) throw new Exception(varName + "地址错误！");
+
+            Console.WriteLine("变量" + varName + "的类型：" + mem[addr].GetType().Name + "  值：" + mem[addr]);
+            return mem[addr];
         }
-        public object GetLiteralValue(string lexeme)
+        public object GetLiteralValue(Token token)
         {
-            return null;
+            switch(token.name)
+            {
+                case "LITBOOL":
+                    return bool.Parse(token.attribute);
+                case "LITINT":
+                    return int.Parse(token.attribute);
+                case "LITFLOAT":
+                    return float.Parse(token.attribute);
+                case "LITSTRING":
+                    return token.attribute.Substring(1, token.attribute.Length - 2);
+                default:
+                    return null;
+            }
         }
 
         public object BinaryOp(string op, object vl, object vr)
         {
-            return null;
+            return Calculator.CalBinary(op, vl, vr);
         }
         public object UnaryOp(string op, object val)
         {
+            switch(op)
+            {
+                case "!":
+                    {
+                        if (val is bool)
+                        {
+                            return !((bool)val);
+                        }
+                    }
+                    break;
+                case "-":
+                    {
+                        return Calculator.CalNegtive(val);
+                    }
+                    break;
+            }
             return null;
         }
 
         public object Assign(string op, SyntaxTree.ExprNode lNode, SyntaxTree.ExprNode rNode)
         {
+            if(lNode is SyntaxTree.IdentityNode)
+            {
+                var lexeme = (lNode as SyntaxTree.IdentityNode).token.attribute;
+                int addr = (int)GetIdentidierAddr(lexeme);
+
+                AssignAddr(op, addr, ExecuteNode(rNode).returnValue);
+            }
+            else if(lNode is SyntaxTree.MemberAccessNode)
+            {
+                if(lNode is SyntaxTree.ObjectMemberAccessNode)
+                {
+
+                }
+                else if(lNode is SyntaxTree.ThisMemberAccessNode)
+                {
+                }
+                throw new Exception("未实现");
+            }
+            else
+            {
+                throw new Exception("只能给左值赋值！");
+            }
+
             return null;
+        }
+        public object AssignAddr(string op, int addr, object rval)
+        {
+            switch (op)
+            {
+                case "=":
+                    {
+                        mem[addr] = rval;
+                        return mem[addr];
+                    }
+                case "+=":
+                    {
+                        mem[addr] = Calculator.CalBinary("+", mem[addr], rval);
+                        return mem[addr];
+                    }
+                case "-=":
+                    {
+                        mem[addr] = Calculator.CalBinary("-", mem[addr], rval);
+                        return mem[addr];
+                    }
+                case "*=":
+                    {
+                        mem[addr] = Calculator.CalBinary("*", mem[addr], rval);
+                        return mem[addr];
+                    }
+                case "/=":
+                    {
+                        mem[addr] = Calculator.CalBinary("/", mem[addr], rval);
+                        return mem[addr];
+                    }
+                case "%=":
+                    {
+                        mem[addr] = Calculator.CalBinary("%", mem[addr], rval);
+                        return mem[addr];
+                    }
+                default:
+                    {
+                        return mem[addr];
+                    }
+            }
         }
 
-        public object Call(SyntaxTree.CallNode callNode)
-        {
-            return null;
-        }
         public object IncDec(SyntaxTree.IncDecNode node)
         {
-            return null;
+            var token = node.identifierNode.token;
+            int addr = (int)GetIdentidierAddr(token.attribute);
+
+            if(node.isFront)
+            {
+                switch (node.op)
+                {
+                    case "++":
+                        {
+                            var newvalue = Calculator.CalBinary("+", mem[addr], 1);
+                            mem[addr] = newvalue;
+                            return mem[addr];
+                        }
+                    case "--":
+                        {
+                            var newvalue = Calculator.CalBinary("-", mem[addr], 1);
+                            mem[addr] = newvalue;
+                            return mem[addr];
+                        }
+                }
+            }
+            else
+            {
+                switch (node.op)
+                {
+                    case "++":
+                        {
+                            var prevValue = mem[addr];
+                            var newvalue = Calculator.CalBinary("+", mem[addr], 1);
+                            mem[addr] = newvalue;
+                            return prevValue;
+                        }
+                    case "--":
+                        {
+                            var prevValue = mem[addr];
+                            var newvalue = Calculator.CalBinary("-", mem[addr], 1);
+                            mem[addr] = newvalue;
+                            return prevValue;
+                        }
+                }
+            }
+
+            throw new Exception("op：" + node.op + " err");
         }
 
         public object NewObject(SyntaxTree.NewObjectNode node)
         {
-            return null;
+            string className = node.className.token.attribute;
+            FanObject obj = new FanObject() { name = className };
+
+            Console.WriteLine("创建了类型为" + className + "的新对象");
+
+            return obj;
         }
 
         public object Cast(SyntaxTree.CastNode node)
         {
-            return null;
+            Type t = (Type)ExecuteNode(node.typeNode).returnValue;
+
+            return System.Convert.ChangeType(ExecuteNode(node.factorNode).returnValue, t);
         }
 
         public object MemberAccess(SyntaxTree.MemberAccessNode accessNode)
         {
-            return null;
+            if(accessNode is SyntaxTree.ObjectMemberAccessNode)
+            {
+            }
+            else if(accessNode is SyntaxTree.ThisMemberAccessNode)
+            {
+            }
+
+            throw new Exception("未实现");
         }
 
         public Type ConvertCSharpType(SyntaxTree.TypeNode typeNode)
         {
+            if(typeNode is SyntaxTree.PrimitiveNode)
+            {
+                var primitive = (typeNode as SyntaxTree.PrimitiveNode).token.name;
+                switch (primitive)
+                {
+                    case "void": return typeof(void);
+                    case "bool": return typeof(bool);
+                    case "int": return typeof(int);
+                    case "float": return typeof(float);
+                    case "string": return typeof(string);
+                    default: throw new Exception("类型错误");
+                }
+            }
+            else if(typeNode is SyntaxTree.ClassTypeNode)
+            {
+                return typeof(FanObject);
+            }
             return default;
+        }
+
+        public object Call(SyntaxTree.CallNode callNode)
+        {
+            if(callNode.isMemberAccessFunction == false)
+            {
+                string funcName = (callNode.funcNode as SyntaxTree.IdentityNode).token.attribute;
+
+                //实参列表    
+                List<SyntaxTree.ExprNode> argNodes = callNode.argumantsNode.arguments;
+                List<object> args = argNodes.Select(n => ExecuteNode(n).returnValue).ToList();
+
+
+                //是外部调用  
+                if ((int)GetIdentidierAddr(funcName) == -1)
+                {
+                    Console.WriteLine("外部调用：" + funcName);
+                    PrintAllTables();
+                    return ExternCall(funcName, args);
+                }
+
+                //进入函数作用域  
+                int addr = (int)GetIdentidierAddr(funcName);
+                Env funEnv = (Env)mem[addr];
+                envStack.Push(funEnv);
+
+                //返回值  
+                object ret = null;
+
+
+                //DEBUG  
+                if (funEnv.ContainsKey("Node") == false)
+                {
+                    Console.WriteLine("未找到node");
+                    PrintAllTables();
+                }
+
+                //传参（形参初始化）  
+                var declNode = (SyntaxTree.FuncDeclareNode)(mem[funEnv["Node"].addr]);
+                if (args.Count != declNode.parametersNode.parameterNodes.Count) throw new Exception("参数个数不匹配！");
+                for (int i = 0; i < declNode.parametersNode.parameterNodes.Count; ++i) 
+                {
+                    var paramNode = declNode.parametersNode.parameterNodes[i];
+                    string paramName = paramNode.identifierNode.token.attribute;
+                    var rec = envStack.Peek().GetOrNewRecord(paramName);
+                    mem[rec.addr] = args[i];
+                }
+
+                //执行语句  
+                foreach(var stmt in declNode.statementsNode.statements)
+                {
+                    var result = ExecuteNode(stmt);
+                    if(stmt is SyntaxTree.ReturnStmtNode)
+                    {
+                        ret = result.returnValue;
+                        Console.WriteLine("返回值：" + ret);
+                        break;
+                    }
+                }
+
+
+
+                //离开函数作用域  
+                envStack.Pop();
+
+                //返回  
+                return ret;
+            }
+            else
+            {
+            }
+
+            throw new Exception("调用错误！");
+        }
+
+        public object ExternCall(string name, List<object> args)
+        {
+            switch(name)
+            {
+                case "print":
+                    {
+                        Console.WriteLine("fan:" + args[0]);
+                    }
+                    break;
+            }
+            return null;
+        }
+
+
+
+        // ------------- DEBUG -----------------
+        private void PrintAllTables()
+        {
+            for (int i = envStack.Top; i > -1; --i)
+            {
+                var env = envStack[i];
+                env.Print();
+            }
+        }
+
+    }
+
+    public class Calculator
+    {
+        private static bool IsNumberType(Type type)
+        {
+            if (type == typeof(int) || type == typeof(float))
+                return true;
+
+            return false;
+        }
+        public static object CalNegtive(object v)
+        {
+            Type t = v.GetType();
+            if (IsNumberType(t))
+            {
+                if (t == typeof(float))
+                {
+                    return -(float)v;
+                }
+                else if (t == typeof(int))
+                {
+                    return -(int)v;
+                }
+            }
+            return null;
+        }
+        public static object CalBinary(string op, object v1, object v2)
+        {
+            Type t1 = v1.GetType();
+            Type t2 = v2.GetType();
+
+            if (IsNumberType(t1) && IsNumberType(t2))
+            {
+                if (t1 == typeof(float))
+                {
+                    if(t2 == typeof(float))
+                    {
+                        return CalBinary(op, (float)v1 , (float)v2);
+                    }
+                    else if(t2 == typeof(int))
+                    {
+                        return CalBinary(op, (float)v1 , (int)v2);
+                    }
+                }
+                else if(t1 == typeof(int))
+                {
+                    if (t2 == typeof(float))
+                    {
+                        return CalBinary(op, (int)v1, (float)v2);
+                    }
+                    else if (t2 == typeof(int))
+                    {
+                        return CalBinary(op, (int)v1, (int)v2);
+                    }
+                }
+            }
+            else if ((t1 == typeof(string) || t2 == typeof(string)) && op == "+")
+            {
+                return v1.ToString() + v2.ToString();
+            }
+            return null;
+        }
+        public static object CalBinary(string op, int v1, int v2)
+        {
+            switch(op)
+            {
+                case "+": return v1 + v2;
+                case "-": return v1 - v2;
+                case "*": return v1 * v2;
+                case "/": return v1 / v2;
+                case "%": return v1 % v2;
+                default: return null;
+            }
+        }
+        public static object CalBinary(string op, float v1, int v2)
+        {
+            switch (op)
+            {
+                case "+": return v1 + v2;
+                case "-": return v1 - v2;
+                case "*": return v1 * v2;
+                case "/": return v1 / v2;
+                case "%": return v1 % v2;
+                default: return null;
+            }
+        }
+        public static object CalBinary(string op, int v1, float v2)
+        {
+            switch (op)
+            {
+                case "+": return v1 + v2;
+                case "-": return v1 - v2;
+                case "*": return v1 * v2;
+                case "/": return v1 / v2;
+                case "%": return v1 % v2;
+                default: return null;
+            }
+        }
+        public static object CalBinary(string op, float v1, float v2)
+        {
+            switch (op)
+            {
+                case "+": return v1 + v2;
+                case "-": return v1 - v2;
+                case "*": return v1 * v2;
+                case "/": return v1 / v2;
+                case "%": return v1 % v2;
+                default: return null;
+            }
         }
     }
 }
