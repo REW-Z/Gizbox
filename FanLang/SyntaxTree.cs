@@ -270,6 +270,11 @@ namespace FanLang
         public class IdentityNode : ExprNode
         {
             public Token token;
+
+            public override string ToString()
+            {
+                return this.GetType().Name + "(\"" + token.attribute + "\")";
+            }
         }
 
 

@@ -1,31 +1,13 @@
-﻿int num = 0;
-
-class Student
-{
-	string name = "default";
-	int age = 1;
-}
-
-int Pow2(int input)
+﻿int Pow2(int input)
 {
 	int result = input * input;
 	return result;
 }
 
 int main()
-{
-	num += 1;
-	num *= 3;
-	num++;
+{	
+	int num = 0;
 	print("result is " + Pow2(num));
-	
-
-	Student stu = new Student();
-
-	stu.name = "REW";
-	stu.age = 28;
-
-	print("My name is " + stu.name);
 }
 
 main();
