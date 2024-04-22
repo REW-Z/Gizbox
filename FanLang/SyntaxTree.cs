@@ -152,7 +152,7 @@ namespace FanLang
 
         public class ProgramNode : Node
         {
-            public StatementsNode statements;
+            public StatementsNode statementsNode;
         }
 
 
@@ -353,14 +353,24 @@ namespace FanLang
 
         // ******************** TYPE NODES ******************************
 
-        public abstract class TypeNode : Node {}
+        public abstract class TypeNode : Node { public abstract string ToExpression(); }
         public class ClassTypeNode : TypeNode
         {
             public IdentityNode classname;
+
+            public override string ToExpression()
+            {
+                return classname.token.attribute;
+            }
         }
         public class PrimitiveNode : TypeNode
         {
             public Token token;
+
+            public override string ToExpression()
+            {
+                return token.name;
+            }
         }
 
 

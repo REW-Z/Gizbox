@@ -73,40 +73,54 @@ namespace FanLang
     }
 
 
-    ///// <summary>
-    ///// 作用域  
-    ///// </summary>
-    //public class Scope
-    //{
-    //    public SymbolTable symbolTable = new SymbolTable();
-
-    //    public List<Scope> subScopes = new List<Scope>();
-    //}
-
     /// <summary>
     /// 符号表  
     /// </summary>
     public class SymbolTable
     {
-        public struct Record
+        public enum RecordCatagory
+        {
+            VariableOrParam,
+            Function,
+            Class
+        }
+        public class Record
         {
             public string name;
+            public RecordCatagory category;
             public string type;
-            public int addr;//相对地址（函数变量的相对地址指向局部作用域的符号表）  
+            public int addr;
         }
 
-        public int header;
+        public string name;
 
-        public List<Record> records = new List<Record>();
+        public SymbolTable parent;
+
+        public Dictionary<string, Record> records;
+
+        //构造  
+        public SymbolTable(string name, SymbolTable table = null)
+        {
+            this.name = name;
+            this.parent = table;
+            this.records = new Dictionary<string, Record>();
+        }
+
+
+        //查询信息  
+        public Record GetRecord(string symbolName)
+        {
+            return records[symbolName];
+        }
 
         //记录符号  
-        public int AddIdentifier(string symbol)
+        public Record NewRecord(string synbolName, RecordCatagory catagory)
         {
             int variableAddr = 99999;//TODO:地址存放  
-            records.Add(new Record() { name = symbol, addr = variableAddr });
-            return records.Count - 1;
+            var newRec = (new Record() { name = synbolName, category = catagory, addr = variableAddr });
+            records[synbolName] = newRec;
+            return newRec;
         }
-
 
         private string GenGuid()
         {
@@ -411,7 +425,7 @@ namespace FanLang
         public Compiler()
         {
             //全局符号表    
-            globalSymbolTable = new SymbolTable();
+            globalSymbolTable = new SymbolTable("global");
 
             //全局常量池  
             constantValueTable = new ConstantValueTable();
@@ -466,18 +480,30 @@ namespace FanLang
             var data = generator.GetResult();
 
             //语法分析  
-            LRParse.LRParser parser = new LRParse.LRParser(data);
+            LRParse.LRParser parser = new LRParse.LRParser(data, this);
             parser.Parse(tokens);
-            //...  
 
             Console.WriteLine("\n\n语法分析树：");
             Console.WriteLine(parser.parseTree.Serialize());
 
-
             Console.WriteLine("\n\n抽象语法树：");
             Console.WriteLine(parser.syntaxTree.Serialize());
-
             this.syntaxTree = parser.syntaxTree;
+            Compiler.Pause("抽象语法树生成完成");
+
+
+            //语义分析  
+            SemanticRule.SemanticAnalyzer semanticAnalyzer = new SemanticRule.SemanticAnalyzer(this.syntaxTree, this);
+            semanticAnalyzer.Analysis();
+
+
+            //中间代码生成    
+            FanLang.IL.ILGenerator ilGenerator = new IL.ILGenerator(this.syntaxTree, this);
+            ilGenerator.Generate();
+            ilGenerator.PrintCodes();
+
+
+            Compiler.Pause("中间代码生成完毕");
         }
     }
 

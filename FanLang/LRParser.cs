@@ -7,169 +7,13 @@ using System.Text;
 using FanLang;
 using FanLang.LRParse;
 using FanLang.LALRGenerator;
-using FanLang.Translator;
+using FanLang.SemanticRule;
 
 
 
 
 namespace FanLang.LRParse
 {
-    /// <summary>
-    /// 项目  
-    /// </summary>
-    public class LR1Item
-    {
-        public Production production;
-        public int iDot;
-        public Terminal lookahead;
-    }
-
-    /// <summary>
-    /// 项集  
-    /// </summary>
-    public class LR1ItemSet : IEnumerable<LR1Item>
-    {
-        public int id;
-
-        private List<LR1Item> items = new List<LR1Item>();
-
-        public int Count => this.items.Count;
-
-        public IEnumerator<LR1Item> GetEnumerator()
-        {
-            return ((IEnumerable<LR1Item>)items).GetEnumerator();
-        }
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return ((IEnumerable)items).GetEnumerator();
-        }
-
-
-        public void AddImmediate(LR1Item item)//立即添加 - 反序列使用
-        {
-            items.Add(item);
-        }
-
-        public void AddDistinct(LR1Item item)
-        {
-            if (this.AnyRepeat(item) == false)
-            {
-                items.Add(item);
-            }
-        }
-
-        public bool AnyRepeat(LR1Item item)
-        {
-            if (items.Any(i => i.production == item.production && i.iDot == item.iDot && i.lookahead == item.lookahead))
-            {
-                return true;
-            }
-            return false;
-        }
-
-        public bool IsSameTo(LR1ItemSet another)
-        {
-            if (another.Count != this.Count) return false;
-
-            foreach (var itm in another.items)
-            {
-                if (this.items.Contains(itm) == false)
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        public LR1ItemSet Clone()
-        {
-            LR1ItemSet newCollection = new LR1ItemSet();
-            foreach (var itm in this.items)
-            {
-                newCollection.AddDistinct(itm);
-            }
-            return newCollection;
-        }
-    }
-
-
-    /// <summary>
-    /// 扩展方法    
-    /// </summary>
-    public static class LR1ItemExtensions
-    {
-        public static string GetLeft(this LR1Item item)
-        {
-            return item.ToExpression().Split(',')[0];
-        }
-
-        public static string ToExpression(this LR1Item item)
-        {
-            StringBuilder strb = new StringBuilder();
-
-            strb.Append(item.production.head.name);
-            strb.Append(" ->");
-            for (int i = 0; i < item.production.body.Length; ++i)
-            {
-                if (i == item.iDot)
-                {
-                    strb.Append(' ');
-                    strb.Append('·');
-                }
-
-                strb.Append(' ');
-                strb.Append(item.production.body[i] != null ? item.production.body[i].name : "ε");
-            }
-            if (item.iDot == item.production.body.Length)
-            {
-                strb.Append(' ');
-                strb.Append("·");
-            }
-
-            strb.Append(", ");
-            strb.Append(item.lookahead != null ? item.lookahead.name : "ε");
-
-            return strb.ToString();
-        }
-
-        public static string ToExpression(this LR1ItemSet set)
-        {
-            StringBuilder strb = new StringBuilder();
-            strb.AppendLine(" ----------------");
-            foreach (var itm in set.ToArray())
-            {
-                strb.Append("| ");
-                strb.Append(itm.ToExpression());
-                strb.Append('\n');
-            }
-            strb.AppendLine(" ----------------");
-            return strb.ToString();
-        }
-    }
-
-
-
-
-    /// <summary>
-    /// 状态    
-    /// </summary>
-    public class State
-    {
-        public int idx;
-
-        public string name;
-
-        public LR1ItemSet set;
-
-        public State(int idx, string name, LR1ItemSet _set)
-        {
-            this.idx = idx;
-            this.name = name;
-            this.set = _set;
-        }
-    }
-
-
     /// <summary>
     /// 分析栈  
     /// </summary>
@@ -233,6 +77,9 @@ namespace FanLang.LRParse
 {
     public class LRParser
     {
+        //上下文  
+        public Compiler compilerContext;
+
         //输出  
         public ParseTree parseTree;
         public SyntaxTree syntaxTree;
@@ -251,9 +98,10 @@ namespace FanLang.LRParse
         /// <summary>
         /// 构造函数  
         /// </summary>
-        public LRParser(ParserData data)
+        public LRParser(ParserData data, Compiler context)
         {
             this.data = data;
+            this.compilerContext = context;
         }
 
         /// <summary>
@@ -279,8 +127,8 @@ namespace FanLang.LRParse
 
 
 
-            //初始化语法制导翻译方案  
-            Translator.Translator translator = new Translator.Translator(this);
+            //语义动作执行器  
+            SematicActionExecutor sematicActionExecutor = new SematicActionExecutor(this);
 
             //初始状态入栈  
             stack = new ParseStack();
@@ -341,7 +189,7 @@ namespace FanLang.LRParse
 
                             // *** 执行语义动作 ***    
                             //语义动作执行在物理出栈和入栈之前  
-                            translator.ExecuteSemanticAction(production);
+                            sematicActionExecutor.ExecuteSemanticAction(production);
                             // ********************
 
 
@@ -377,8 +225,8 @@ namespace FanLang.LRParse
 
                                 Console.WriteLine("当前栈状态：" + string.Concat(stack.ToList().Select(s => "\n" + s.state.idx + ": \"" + s.state.name + "\"")) + "\n");
 
-                                this.parseTree = translator.parseTreeBuilder.resultTree;
-                                this.syntaxTree = new SyntaxTree(translator.syntaxRootNode);
+                                this.parseTree = sematicActionExecutor.parseTreeBuilder.resultTree;
+                                this.syntaxTree = new SyntaxTree(sematicActionExecutor.syntaxRootNode);
                                 return;
                             }
                             else
@@ -401,12 +249,12 @@ namespace FanLang.LRParse
 
 
 /// <summary>
-/// 语法制导翻译器     
+/// 语义规则  
 /// </summary>
-namespace FanLang.Translator
+namespace FanLang.SemanticRule
 {
     /// <summary>
-    /// 语法动作  
+    /// 语义动作  
     /// </summary>
     public class SemanticAction
     {
@@ -431,16 +279,79 @@ namespace FanLang.Translator
 
 
     /// <summary>
-    /// 三地址代码  
+    /// 自底向上的语法分析树构造器  
     /// </summary>
-    public class TAC
+    public class BottomUpParseTreeBuilder
     {
+        // 分析树  
+        public ParseTree resultTree = new ParseTree();
+
+        // 动作构建  
+        public void BuildAction(LRParser parser, Production production)
+        {
+            //产生式头  
+            ParseTree.Node newNode = (parser.newElement.attributes["cst_node"] = new ParseTree.Node() { isLeaf = false, name = production.head.name }) as ParseTree.Node;
+            resultTree.allnodes.Add(newNode);
+
+            //产生式体  
+            for (int i = 0; i < production.body.Length; ++i)
+            {
+                int offset = parser.stack.Count - production.body.Length;
+                var ele = parser.stack[offset + i];
+                var symbol = production.body[i];
+
+                //叶子节点（终结符节点）  
+                if (symbol is Terminal)
+                {
+                    var node = (ele.attributes["cst_node"] = new ParseTree.Node() { isLeaf = true, name = symbol.name + "," + (ele.attributes["token"] as Token).attribute }) as ParseTree.Node;
+
+                    resultTree.allnodes.Add(node);
+
+                    node.parent = newNode;
+                    newNode.children.Add(node);
+                }
+                //内部节点（非终结符节点）
+                else
+                {
+                    var node = ele.attributes["cst_node"] as ParseTree.Node;
+
+                    node.parent = newNode;
+                    newNode.children.Add(node);
+                }
+            }
+
+
+            if (parser.remainingInput.Count == 1 && parser.remainingInput.Peek().name == "$")
+            {
+                Accept(parser);
+            }
+
+        }
+
+        // 完成  
+        public void Accept(LRParser parser)
+        {
+            //设置根节点  
+            resultTree.root = parser.newElement.attributes["cst_node"] as ParseTree.Node;
+
+            //设置深度
+            resultTree.root.depth = 0;
+            resultTree.Traversal((node) => {
+                foreach (var c in node.children)
+                {
+                    c.depth = node.depth + 1;
+                }
+            });
+
+            Console.WriteLine("根节点:" + resultTree.root.name);
+            Console.WriteLine("节点数:" + resultTree.allnodes.Count);
+        }
     }
 
     /// <summary>
-    /// 翻译器  
+    /// 语义动作执行器  
     /// </summary>
-    public class Translator
+    public class SematicActionExecutor 
     {
         private LRParser parserContext;
 
@@ -453,10 +364,8 @@ namespace FanLang.Translator
         //抽象语法树构造    
         public SyntaxTree.ProgramNode syntaxRootNode;
 
-
-
         // 构造  
-        public Translator(LRParser parser)
+        public SematicActionExecutor(LRParser parser)
         {
             this.parserContext = parser;
 
@@ -475,7 +384,7 @@ namespace FanLang.Translator
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.ProgramNode()
                 {
 
-                    statements = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top].attributes["ast_node"],
+                    statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top].attributes["ast_node"],
 
                     attributes = psr.newElement.attributes,
                 };
@@ -1184,19 +1093,7 @@ namespace FanLang.Translator
             });
         }
 
-        // 执行语法动作  
-        public void ExecuteSemanticAction(Production production)
-        {
-            if (translateScheme.ContainsKey(production) == false) return;
-
-            foreach(var act in translateScheme[production])
-            {
-                act.Execute();
-            }
-        }
-
-
-        // 插入语法动作
+        // 插入语义动作
         public void AddActionAtTail(string productionExpression, System.Action<LRParser, Production> act)
         {
             Production production = parserContext.data.productions.FirstOrDefault(p => p.ToExpression() == productionExpression);
@@ -1217,77 +1114,163 @@ namespace FanLang.Translator
             translateScheme[production].Add(semanticAction) ;
         }
 
+
+        // 执行语义动作  
+        public void ExecuteSemanticAction(Production production)
+        {
+            if (translateScheme.ContainsKey(production) == false) return;
+
+            foreach (var act in translateScheme[production])
+            {
+                act.Execute();
+            }
+        }
     }
 
 
-
     /// <summary>
-    /// 自底向上的语法分析树构造器  
+    /// 语义分析器  
     /// </summary>
-    public class BottomUpParseTreeBuilder
+    public class SemanticAnalyzer//（补充的语义分析器，自底向上规约已经进行了部分语义分析）  
     {
-        // 分析树  
-        public  ParseTree resultTree = new ParseTree();
+        public SyntaxTree ast;
 
-        // 动作构建  
-        public  void BuildAction(LRParser parser, Production production)
+        public Compiler compilerContext;
+
+        private FanLang.Stack<SymbolTable> tableStack = new Stack<SymbolTable>();
+
+        /// <summary>
+        /// 构造  
+        /// </summary>
+        public SemanticAnalyzer(SyntaxTree ast, Compiler compilerContext)
         {
-            //产生式头  
-            ParseTree.Node newNode = (parser.newElement.attributes["cst_node"] = new ParseTree.Node() { isLeaf = false, name = production.head.name }) as ParseTree.Node;
-            resultTree.allnodes.Add(newNode);
-
-            //产生式体  
-            for (int i = 0; i < production.body.Length; ++i)
-            {
-                int offset = parser.stack.Count - production.body.Length;
-                var ele = parser.stack[offset + i];
-                var symbol = production.body[i];
-
-                //叶子节点（终结符节点）  
-                if (symbol is Terminal)
-                {
-                    var node = (ele.attributes["cst_node"] = new ParseTree.Node() { isLeaf = true, name = symbol.name + "," + (ele.attributes["token"] as Token).attribute }) as ParseTree.Node;
-
-                    resultTree.allnodes.Add(node);
-
-                    node.parent = newNode;
-                    newNode.children.Add(node);
-                }
-                //内部节点（非终结符节点）
-                else
-                {
-                    var node = ele.attributes["cst_node"] as ParseTree.Node;
-
-                    node.parent = newNode;
-                    newNode.children.Add(node);
-                }
-            }
-
-
-            if(parser.remainingInput.Count == 1 && parser.remainingInput.Peek().name == "$")
-            {
-                Accept(parser);
-            }
-
+            this.ast = ast;
+            this.compilerContext = compilerContext;
         }
 
-        // 完成  
-        public void Accept(LRParser parser)
+        /// <summary>
+        /// 开始语义分析  
+        /// </summary>
+        public void Analysis()
         {
-            //设置根节点  
-            resultTree.root = parser.newElement.attributes["cst_node"] as ParseTree.Node;
+            tableStack.Push(compilerContext.globalSymbolTable);
 
-            //设置深度
-            resultTree.root.depth = 0;
-            resultTree.Traversal((node) => {
-                foreach (var c in node.children)
-                {
-                    c.depth = node.depth + 1;
-                }
-            });
+            Analysis(ast.rootNode);
+        }
 
-            Console.WriteLine("根节点:" + resultTree.root.name);
-            Console.WriteLine("节点数:" + resultTree.allnodes.Count);
+        /// <summary>
+        /// 递归向下语义分析（符号表初始化/类型检查等）  
+        /// </summary>
+        private void Analysis(SyntaxTree.Node node)
+        {
+            ///很多编译器从语法分析阶段甚至词法分析阶段开始初始化和管理符号表    
+            ///为了降低复杂性、实现低耦合和模块化，在语义分析阶段和中间代码生成阶段管理符号表  
+
+            //类型检查  
+            switch (node)
+            {
+                case SyntaxTree.VarDeclareNode varDeclNode:
+                    CheckType(varDeclNode.typeNode.ToExpression(), varDeclNode.initializerNode);
+                    break;
+                case SyntaxTree.FuncDeclareNode funcDeclNode:
+                    {
+                        if(funcDeclNode.returnTypeNode is SyntaxTree.PrimitiveNode && (funcDeclNode.returnTypeNode as SyntaxTree.PrimitiveNode).token.name == "void")
+                        {
+                        }
+                        else
+                        {
+                            var returnStmt = funcDeclNode.statementsNode.statements.FirstOrDefault(s => s is SyntaxTree.ReturnStmtNode);
+                            if (returnStmt == null) throw new Exception("类型错误：没有返回语句！");
+
+                            CheckType(funcDeclNode.returnTypeNode.ToExpression(), (returnStmt as SyntaxTree.ReturnStmtNode).returnExprNode);
+                        }
+                    }
+                    break;
+                default:
+                    break;
+            }
+
+            //符号表填充  
+            switch (node)
+            {
+                case SyntaxTree.ProgramNode programNode:
+                    {
+                        Analysis(programNode.statementsNode);
+                    }
+                    break;
+                case SyntaxTree.StatementsNode stmtsNode:
+                    {
+                        foreach(var stmtNode in stmtsNode.statements)
+                        {
+                            Analysis(stmtNode);
+                        }
+                    }
+                    break;
+                case SyntaxTree.StatementBlockNode stmtBlockNode:
+                    {
+                        //进入作用域  
+                        var newEnv = new SymbolTable("stmtblock", tableStack.Peek());
+                        stmtBlockNode.attributes["env"] = newEnv;
+                        tableStack.Push(newEnv);
+
+                        foreach (var stmtNode in stmtBlockNode.statements)
+                        {
+                            Analysis(stmtNode);
+                        }
+
+                        //离开作用域  
+                        tableStack.Pop();
+                    }
+                    break;
+                case SyntaxTree.VarDeclareNode varDeclNode:
+                    {
+                        var newRec = tableStack.Peek().NewRecord(varDeclNode.identifierNode.token.attribute, SymbolTable.RecordCatagory.VariableOrParam);
+                    }
+                    break;
+                case SyntaxTree.FuncDeclareNode funcDeclNode:
+                    {
+                        var newRec = tableStack.Peek().NewRecord(funcDeclNode.identifierNode.token.attribute, SymbolTable.RecordCatagory.Function);
+
+                        //进入作用域  
+                        var newEnv = new SymbolTable("func" + funcDeclNode.identifierNode.token.attribute, tableStack.Peek());
+                        funcDeclNode.attributes["env"] = newEnv;
+                        tableStack.Push(newEnv);
+
+                        //分析形参定义和局部语句  
+                        foreach (var paramNode in funcDeclNode.parametersNode.parameterNodes)
+                        {
+                            Analysis(paramNode);
+                        }
+                        foreach(var stmtNode in funcDeclNode.statementsNode.statements)
+                        {
+                            Analysis(stmtNode);
+                        }
+                        
+
+                        //离开作用域  
+                        tableStack.Pop();
+                    }
+                    break;
+                case SyntaxTree.ParameterNode paramNode:
+                    {
+                        var newRec = tableStack.Peek().NewRecord(paramNode.identifierNode.token.attribute, SymbolTable.RecordCatagory.VariableOrParam);
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        private bool CheckType(string typeExpr, SyntaxTree.ExprNode exprNode)
+        {
+            if(true)
+            {
+                return true;
+            }
+            else
+            {
+                throw new Exception("类型错误!");
+            }
         }
     }
 }

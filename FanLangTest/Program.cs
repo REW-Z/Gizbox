@@ -80,10 +80,10 @@ namespace FanLangTest
             Console.WriteLine("按任意键执行");
             Console.ReadKey();
 
-            FanLang.ScriptEngine.ScriptEngine engine = new FanLang.ScriptEngine.ScriptEngine();
-            engine.tree = compiler.syntaxTree;
+            //FanLang.ScriptEngine.ScriptEngine engine = new FanLang.ScriptEngine.ScriptEngine();
+            //engine.tree = compiler.syntaxTree;
 
-            engine.Execute();
+            //engine.Execute();
         }
     }
 }

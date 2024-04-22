@@ -1,13 +1,2 @@
-﻿int Pow2(int input)
-{
-	int result = input * input;
-	return result;
-}
-
-int main()
-{	
-	int num = 0;
-	print("result is " + Pow2(num));
-}
-
-main();
+﻿int a = 0;
+a = 1 + 2;

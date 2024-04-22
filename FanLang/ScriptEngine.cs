@@ -186,7 +186,7 @@ namespace FanLang.ScriptEngine
             {
                 case "ProgramNode":
                     {
-                        ExecuteNode((node as SyntaxTree.ProgramNode).statements);
+                        ExecuteNode((node as SyntaxTree.ProgramNode).statementsNode);
                         return 0;
                     }
                 case "StatementsNode":

@@ -49,21 +49,19 @@
 
 静态函数调用。    
 
-## 脚本模式  
+int AddOne(int input){ int result = input + 1; return result; } int main(){ int a = 2; int b = AddOne(a); }
+编译为：
+AddOne:
+    t1 = input + 1
+    result = t1
+    return result
 
-（DONE）脚本引擎    
+main:
+    a = 2
+    param a
+    call AddOne, 1
+    b = RET
 
-（DONE）算术运算    
-
-函数调用     
-    修改：每次调用应该创建新的符号表、并且创建栈帧（否则不能实现递归和并行调用）      
-    全局作用域存储在静态的地址位置。        
-
-对象创建和访问（成员变量赋值取值，成员函数调用）      
-    声明成员变量时不分配内存，仅加入符号表？  
-    成员的值存储在object中还是内存中？  
-
-外部代理对象    
 
 ## 编译模式    
 

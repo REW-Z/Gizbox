@@ -12,6 +12,164 @@ using FanLang.LALRGenerator;
 
 namespace FanLang.LRParse
 {
+    /// <summary>
+    /// 项目  
+    /// </summary>
+    public class LR1Item
+    {
+        public Production production;
+        public int iDot;
+        public Terminal lookahead;
+    }
+
+    /// <summary>
+    /// 项集  
+    /// </summary>
+    public class LR1ItemSet : IEnumerable<LR1Item>
+    {
+        public int id;
+
+        private List<LR1Item> items = new List<LR1Item>();
+
+        public int Count => this.items.Count;
+
+        public IEnumerator<LR1Item> GetEnumerator()
+        {
+            return ((IEnumerable<LR1Item>)items).GetEnumerator();
+        }
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return ((IEnumerable)items).GetEnumerator();
+        }
+
+
+        public void AddImmediate(LR1Item item)//立即添加 - 反序列使用
+        {
+            items.Add(item);
+        }
+
+        public void AddDistinct(LR1Item item)
+        {
+            if (this.AnyRepeat(item) == false)
+            {
+                items.Add(item);
+            }
+        }
+
+        public bool AnyRepeat(LR1Item item)
+        {
+            if (items.Any(i => i.production == item.production && i.iDot == item.iDot && i.lookahead == item.lookahead))
+            {
+                return true;
+            }
+            return false;
+        }
+
+        public bool IsSameTo(LR1ItemSet another)
+        {
+            if (another.Count != this.Count) return false;
+
+            foreach (var itm in another.items)
+            {
+                if (this.items.Contains(itm) == false)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        public LR1ItemSet Clone()
+        {
+            LR1ItemSet newCollection = new LR1ItemSet();
+            foreach (var itm in this.items)
+            {
+                newCollection.AddDistinct(itm);
+            }
+            return newCollection;
+        }
+    }
+
+
+    /// <summary>
+    /// 扩展方法    
+    /// </summary>
+    public static class LR1ItemExtensions
+    {
+        public static string GetLeft(this LR1Item item)
+        {
+            return item.ToExpression().Split(',')[0];
+        }
+
+        public static string ToExpression(this LR1Item item)
+        {
+            StringBuilder strb = new StringBuilder();
+
+            strb.Append(item.production.head.name);
+            strb.Append(" ->");
+            for (int i = 0; i < item.production.body.Length; ++i)
+            {
+                if (i == item.iDot)
+                {
+                    strb.Append(' ');
+                    strb.Append('·');
+                }
+
+                strb.Append(' ');
+                strb.Append(item.production.body[i] != null ? item.production.body[i].name : "ε");
+            }
+            if (item.iDot == item.production.body.Length)
+            {
+                strb.Append(' ');
+                strb.Append("·");
+            }
+
+            strb.Append(", ");
+            strb.Append(item.lookahead != null ? item.lookahead.name : "ε");
+
+            return strb.ToString();
+        }
+
+        public static string ToExpression(this LR1ItemSet set)
+        {
+            StringBuilder strb = new StringBuilder();
+            strb.AppendLine(" ----------------");
+            foreach (var itm in set.ToArray())
+            {
+                strb.Append("| ");
+                strb.Append(itm.ToExpression());
+                strb.Append('\n');
+            }
+            strb.AppendLine(" ----------------");
+            return strb.ToString();
+        }
+    }
+
+
+
+
+    /// <summary>
+    /// 状态    
+    /// </summary>
+    public class State
+    {
+        public int idx;
+
+        public string name;
+
+        public LR1ItemSet set;
+
+        public State(int idx, string name, LR1ItemSet _set)
+        {
+            this.idx = idx;
+            this.name = name;
+            this.set = _set;
+        }
+    }
+
+
+
+
     public enum ACTION_TYPE
     {
         Shift,  //移入(s)
@@ -377,6 +535,8 @@ namespace FanLang.LRParse
             Console.WriteLine(strb.ToString());
         }
     }
+
+
 
 }
 
