@@ -88,7 +88,7 @@ namespace FanLang
         {
             public string name;
             public RecordCatagory category;
-            public string type;
+            public string typeExpression;
             public int addr;
         }
 
@@ -113,11 +113,33 @@ namespace FanLang
             return records[symbolName];
         }
 
+        //包含信息  
+        public bool ContainRecordName(string name)
+        {
+            return records.ContainsKey(name);
+        }
+
+        //获取某类型记录  
+        public List<Record> FindByCategory(RecordCatagory catagory)
+        {
+            List<Record> result = null;
+            foreach(var key in records.Keys)
+            {
+                if(records[key].category == catagory)
+                {
+                    if (result == null) result = new List<Record>();
+
+                    result.Add(records[key]);
+                }
+            }
+            return result;
+        }
+
         //记录符号  
-        public Record NewRecord(string synbolName, RecordCatagory catagory)
+        public Record NewRecord(string synbolName, RecordCatagory catagory, string typeExpr)
         {
             int variableAddr = 99999;//TODO:地址存放  
-            var newRec = (new Record() { name = synbolName, category = catagory, addr = variableAddr });
+            var newRec = (new Record() { name = synbolName, category = catagory, addr = variableAddr, typeExpression = typeExpr });
             records[synbolName] = newRec;
             return newRec;
         }

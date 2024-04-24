@@ -109,6 +109,10 @@ namespace FanLang
 
             public Node Parent
             {
+                get
+                {
+                    return this.parent;
+                }
                 set 
                 {
                     this.parent = value;
@@ -314,7 +318,7 @@ namespace FanLang
         {
             public bool isMemberAccessFunction;
 
-            public ExprNode funcNode;
+            public ExprNode funcNode;//id or memberaccesss  
 
             public ArgumentListNode argumantsNode;
         }

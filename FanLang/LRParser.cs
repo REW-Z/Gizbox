@@ -1166,31 +1166,9 @@ namespace FanLang.SemanticRule
             ///很多编译器从语法分析阶段甚至词法分析阶段开始初始化和管理符号表    
             ///为了降低复杂性、实现低耦合和模块化，在语义分析阶段和中间代码生成阶段管理符号表  
 
-            //类型检查  
-            switch (node)
-            {
-                case SyntaxTree.VarDeclareNode varDeclNode:
-                    CheckType(varDeclNode.typeNode.ToExpression(), varDeclNode.initializerNode);
-                    break;
-                case SyntaxTree.FuncDeclareNode funcDeclNode:
-                    {
-                        if(funcDeclNode.returnTypeNode is SyntaxTree.PrimitiveNode && (funcDeclNode.returnTypeNode as SyntaxTree.PrimitiveNode).token.name == "void")
-                        {
-                        }
-                        else
-                        {
-                            var returnStmt = funcDeclNode.statementsNode.statements.FirstOrDefault(s => s is SyntaxTree.ReturnStmtNode);
-                            if (returnStmt == null) throw new Exception("类型错误：没有返回语句！");
-
-                            CheckType(funcDeclNode.returnTypeNode.ToExpression(), (returnStmt as SyntaxTree.ReturnStmtNode).returnExprNode);
-                        }
-                    }
-                    break;
-                default:
-                    break;
-            }
-
-            //符号表填充  
+            /// 分析节点
+            ///（符号表填充）
+            ///（类型检查）
             switch (node)
             {
                 case SyntaxTree.ProgramNode programNode:
@@ -1224,12 +1202,48 @@ namespace FanLang.SemanticRule
                     break;
                 case SyntaxTree.VarDeclareNode varDeclNode:
                     {
-                        var newRec = tableStack.Peek().NewRecord(varDeclNode.identifierNode.token.attribute, SymbolTable.RecordCatagory.VariableOrParam);
+                        //类型检查（初始值）  
+                        CheckType(varDeclNode.typeNode.ToExpression(), varDeclNode.initializerNode);
+
+                        //新建符号表条目  
+                        var newRec = tableStack.Peek().NewRecord(
+                            varDeclNode.identifierNode.token.attribute, 
+                            SymbolTable.RecordCatagory.VariableOrParam,
+                            varDeclNode.typeNode.ToExpression()
+                            );
                     }
                     break;
                 case SyntaxTree.FuncDeclareNode funcDeclNode:
                     {
-                        var newRec = tableStack.Peek().NewRecord(funcDeclNode.identifierNode.token.attribute, SymbolTable.RecordCatagory.Function);
+                        //返回值类型检查（仅限非void的函数）  
+                        if (!(funcDeclNode.returnTypeNode is SyntaxTree.PrimitiveNode && (funcDeclNode.returnTypeNode as SyntaxTree.PrimitiveNode).token.name == "void"))
+                        {
+                            //检查返回语句和返回表达式    
+                            var returnStmt = funcDeclNode.statementsNode.statements.FirstOrDefault(s => s is SyntaxTree.ReturnStmtNode);
+                            if (returnStmt == null) throw new Exception("类型错误：没有返回语句！");
+
+                            CheckType(funcDeclNode.returnTypeNode.ToExpression(), (returnStmt as SyntaxTree.ReturnStmtNode).returnExprNode);
+                        }
+
+
+                        //记录函数符号  
+                        {
+                            //符号的类型表达式  
+                            string typeExpr = "";
+                            for (int i = 0; i < funcDeclNode.parametersNode.parameterNodes.Count; ++i)
+                            {
+                                if (i != 0) typeExpr += ",";
+                                var paramNode = funcDeclNode.parametersNode.parameterNodes[i];
+                                typeExpr += (paramNode.typeNode.ToExpression());
+                            }
+                            typeExpr += (" -> " + funcDeclNode.returnTypeNode.ToExpression());
+                            //添加条目  
+                            var newRec = tableStack.Peek().NewRecord(
+                                funcDeclNode.identifierNode.token.attribute,
+                                SymbolTable.RecordCatagory.Function,
+                                typeExpr
+                                );
+                        }
 
                         //进入作用域  
                         var newEnv = new SymbolTable("func" + funcDeclNode.identifierNode.token.attribute, tableStack.Peek());
@@ -1253,24 +1267,86 @@ namespace FanLang.SemanticRule
                     break;
                 case SyntaxTree.ParameterNode paramNode:
                     {
-                        var newRec = tableStack.Peek().NewRecord(paramNode.identifierNode.token.attribute, SymbolTable.RecordCatagory.VariableOrParam);
+                        //形参加入函数作用域的符号表  
+                        var newRec = tableStack.Peek().NewRecord(
+                            paramNode.identifierNode.token.attribute,
+                            SymbolTable.RecordCatagory.VariableOrParam,
+                            paramNode.typeNode.ToExpression()
+                            );
+                    }
+                    break;
+                case SyntaxTree.AssignNode assignNode:
+                    {
+                        //类型检查（赋值）  
+                        {
+                            CheckType(assignNode.lvalueNode, assignNode.rvalueNode);
+                        }
                     }
                     break;
                 default:
                     break;
             }
+
         }
 
+
+        /// <summary>
+        /// 获取表达式的类型表达式  
+        /// </summary>
+        /// <param name="exprNode"></param>
+        /// <returns></returns>
+        private string GetTypeExpression(SyntaxTree.ExprNode exprNode)
+        {
+            switch(exprNode)
+            {
+                case SyntaxTree.IdentityNode idNode:
+                    {
+                        return null;
+                    }
+                case SyntaxTree.ThisMemberAccessNode accessNode:
+                    {
+                        return null;
+                    }
+                case SyntaxTree.ObjectMemberAccessNode accessNode:
+                    {
+                        return null;
+                    }
+                case SyntaxTree.CallNode callNode:
+                    {
+                        return null;
+                    }
+                default:
+                    throw new Exception("无法分析类型：" + exprNode.GetType().Name);
+            }
+        }
+
+
+        private bool CheckType(string typeExpr1, string typeExpr2)
+        {
+            return typeExpr1 == typeExpr2;
+        }
         private bool CheckType(string typeExpr, SyntaxTree.ExprNode exprNode)
         {
-            if(true)
+            return typeExpr == GetTypeExpression(exprNode);
+        }
+        private bool CheckType(SyntaxTree.ExprNode exprNode1, SyntaxTree.ExprNode exprNode2)
+        {
+            return GetTypeExpression(exprNode1) == GetTypeExpression(exprNode2);
+        }
+
+
+        private SymbolTable.Record QueryRecord_In_EnvStack(string name)
+        {
+            var toList = tableStack.ToList();
+            for (int i = toList.Count - 1; i > 0; --i)
             {
-                return true;
+                if (toList[i].ContainRecordName(name))
+                {
+                    return toList[i].GetRecord(name);
+                }
             }
-            else
-            {
-                throw new Exception("类型错误!");
-            }
+
+            return null;
         }
     }
 }
