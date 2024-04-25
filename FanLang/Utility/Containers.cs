@@ -34,6 +34,11 @@ namespace FanLang
             return result;
         }
 
+        public void Clear()
+        {
+            this.data.Clear();
+        }
+
         public List<T> ToList()
         {
             return data;

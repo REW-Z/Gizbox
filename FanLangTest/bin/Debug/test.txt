@@ -1,2 +1,22 @@
-﻿int a = 0;
+﻿
+class Person
+{
+	string name = 123;
+	int age = 0;
+}
+
+int Calculate(int input)
+{
+	int fac1 = 2;
+	int fac2 = 3;
+	input *= fac1;
+	input += fac2;
+	return input;
+}
+
+int a = 0;
 a = 1 + 2;
+
+int b = Calculate(a);
+
+

@@ -122,7 +122,7 @@ namespace FanLang.IL
                     }
                     break;
                 default:
-                    throw new Exception("Not Implement:" + node.GetType().Name);
+                    throw new Exception("中间代码生成未实现:" + node.GetType().Name);
             }
         }
 

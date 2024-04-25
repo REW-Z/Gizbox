@@ -47,7 +47,8 @@
 
 （DONE）自定义类作为Type。    
 
-静态函数调用。    
+
+
 
 int AddOne(int input){ int result = input + 1; return result; } int main(){ int a = 2; int b = AddOne(a); }
 编译为：

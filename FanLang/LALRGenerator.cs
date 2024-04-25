@@ -1339,7 +1339,6 @@ namespace FanLang.LALRGenerator
             }
             if (lastSpaceIdx == -1) throw new Exception("LR1项不合规，分量前加空格!:" + expression);
 
-            Console.WriteLine("new item:" + expression);
             string lookaheadStr = expression.Substring(lastSpaceIdx).Trim();//a
             string itemNonLookahead = expression.Substring(0, lastSpaceIdx - 1).Trim();  //A -> α·β
 

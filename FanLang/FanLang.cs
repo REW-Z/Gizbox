@@ -84,26 +84,46 @@ namespace FanLang
             Function,
             Class
         }
+        public enum TableCatagory
+        {
+            GlobalScope,
+            StmtBlockScope,
+            ClassScope,
+            FuncScope,
+        }
         public class Record
         {
             public string name;
             public RecordCatagory category;
             public string typeExpression;
             public int addr;
+            public SymbolTable envPtr;
         }
 
+        //符号表名称  
         public string name;
 
-        public SymbolTable parent;
+        //符号表类型  
+        public TableCatagory tableCatagory;
 
+        //符号表关系    
+        public SymbolTable parent;
+        public List<SymbolTable> children = new List<SymbolTable>();
+
+        //条目数据  
         public Dictionary<string, Record> records;
 
         //构造  
-        public SymbolTable(string name, SymbolTable table = null)
+        public SymbolTable(string name, TableCatagory tableCatagory, SymbolTable parentTable = null)
         {
             this.name = name;
-            this.parent = table;
             this.records = new Dictionary<string, Record>();
+
+            if(parentTable != null)
+            {
+                this.parent = parentTable;
+                parentTable.children.Add(this);
+            }
         }
 
 
@@ -120,7 +140,7 @@ namespace FanLang
         }
 
         //获取某类型记录  
-        public List<Record> FindByCategory(RecordCatagory catagory)
+        public List<Record> GetByCategory(RecordCatagory catagory)
         {
             List<Record> result = null;
             foreach(var key in records.Keys)
@@ -136,10 +156,16 @@ namespace FanLang
         }
 
         //记录符号  
-        public Record NewRecord(string synbolName, RecordCatagory catagory, string typeExpr)
+        public Record NewRecord(string synbolName, RecordCatagory catagory, string typeExpr, SymbolTable envPtr = null)
         {
             int variableAddr = 99999;//TODO:地址存放  
-            var newRec = (new Record() { name = synbolName, category = catagory, addr = variableAddr, typeExpression = typeExpr });
+            var newRec = new Record() {
+                name = synbolName, 
+                category = catagory,
+                addr = variableAddr,
+                typeExpression = typeExpr ,
+                envPtr = envPtr,
+            };
             records[synbolName] = newRec;
             return newRec;
         }
@@ -147,6 +173,22 @@ namespace FanLang
         private string GenGuid()
         {
             return System.Guid.NewGuid().ToString();
+        }
+
+        public void Print()
+        {
+            int pad = 16;
+            Console.WriteLine();
+            Console.WriteLine($"|{new string('-', pad)}-{new string('-', pad)}-{ this.name.PadRight(pad) }-{new string('-', pad)}-{new string('-', pad)}|");
+            Console.WriteLine($"|{"NAME".PadRight(pad)}|{"CATAGORY".PadRight(pad)}|{"TYPE".PadRight(pad)}|{"ADDR".PadRight(pad)}|{"SubTable".PadRight(pad)}|");
+            Console.WriteLine($"|{new string('-', pad * 5 + 4)}|");
+            foreach (var key in records.Keys)
+            {
+                var rec = records[key];
+                Console.WriteLine($"|{rec.name.PadRight(pad)}|{rec.category.ToString().PadRight(pad)}|{rec.typeExpression.PadRight(pad)}|{rec.addr.ToString().PadRight(pad)}|{(rec.envPtr != null ? "hasSubTable" : "").PadRight(pad)}|");
+            }
+            Console.WriteLine($"|{new string('-', pad * 5 + 4)}|");
+            Console.WriteLine();
         }
     }
 
@@ -447,7 +489,7 @@ namespace FanLang
         public Compiler()
         {
             //全局符号表    
-            globalSymbolTable = new SymbolTable("global");
+            globalSymbolTable = new SymbolTable("global", SymbolTable.TableCatagory.GlobalScope);
 
             //全局常量池  
             constantValueTable = new ConstantValueTable();
@@ -484,7 +526,7 @@ namespace FanLang
         public static void Pause(string txt = "")
         {
             Console.WriteLine(txt + "\n按任意键继续...");
-            //Console.ReadKey();
+            Console.ReadKey();
         }
 
         /// <summary>
