@@ -117,6 +117,7 @@ namespace FanLang
         public SymbolTable(string name, TableCatagory tableCatagory, SymbolTable parentTable = null)
         {
             this.name = name;
+            this.tableCatagory = tableCatagory;
             this.records = new Dictionary<string, Record>();
 
             if(parentTable != null)

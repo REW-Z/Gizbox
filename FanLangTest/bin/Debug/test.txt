@@ -1,8 +1,20 @@
 ﻿
 class Person
 {
-	string name = 123;
+	string name = "AAA";
 	int age = 0;
+
+	int AgeAdd(int year)
+	{
+		this.age += year;
+		return this.age;
+	}
+
+	int Birthday()
+	{
+		int newage = this.AgeAdd(1);
+		return newage;
+	}
 }
 
 int Calculate(int input)
@@ -14,9 +26,16 @@ int Calculate(int input)
 	return input;
 }
 
-int a = 0;
-a = 1 + 2;
+string str = "Hello World";
+
+{
+	int a = 0;
+	a = 1 + 2;
+}
+
 
 int b = Calculate(a);
 
+Person sam = new Person();
+int c = sam.Birthday();
 

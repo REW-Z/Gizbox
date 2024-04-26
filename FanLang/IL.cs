@@ -5,8 +5,10 @@ using FanLang;
 
 namespace FanLang.IL
 {
-    public struct TAC
+    public class TAC
     {
+        public string label;
+
         public string op;
         public string arg1;
         public string arg2;
@@ -14,7 +16,19 @@ namespace FanLang.IL
 
         public string ToExpression()
         {
-            string str = op;
+            string str = "";
+
+            if(string.IsNullOrEmpty(label))
+            {
+                str += new string(' ', 20);
+            }
+            else
+            {
+                str += (label + ":").PadRight(20);
+            }
+
+            str += op;
+
             if(string.IsNullOrEmpty(arg1) == false)
             {
                 str += (" " + arg1);
@@ -36,50 +50,132 @@ namespace FanLang.IL
     /// </summary>
     public class ILGenerator
     {
-        public Compiler context; 
+        //public  
+        public Compiler complierContext; 
 
         public SyntaxTree ast;
 
-        public List<TAC> codes;
+        public Dictionary<int, string> labelDic = new Dictionary<int, string>();
+
+        public List<TAC> codes = new List<TAC>();
+
+        public int codeEntry;
+
+
+        //temp info  
+        private FanLang.Stack<SymbolTable> envStack = new Stack<SymbolTable>();
+
+
+
 
         public ILGenerator(SyntaxTree ast, Compiler compilerContext)
         {
-            this.context = compilerContext;
+            this.complierContext = compilerContext;
             this.ast = ast;
         }
         public void Generate()
         {
-            this.codes = new List<TAC>();
-            ExecuteNode(ast.rootNode);
+            this.envStack.Push(complierContext.globalSymbolTable);
+
+            GenNode(ast.rootNode);
         }
 
 
-        public void ExecuteNode(SyntaxTree.Node node)
+        public void GenNode(SyntaxTree.Node node)
         {
+
+            //节点代码生成  
             switch (node)
             {
                 case SyntaxTree.ProgramNode programNode:
                     {
-                        ExecuteNode(programNode.statementsNode);
+                        GenNode(programNode.statementsNode);
                     }
                     break;
                 case SyntaxTree.StatementsNode stmtsNode:
                     {
                         foreach(var stmt in stmtsNode.statements)
                         {
-                            ExecuteNode(stmt);
+                            GenNode(stmt);
                         }
                     }
                     break;
-                case SyntaxTree.SingleExprStmtNode singleExprNode:
+                case SyntaxTree.StatementBlockNode blockNode:
                     {
-                        ExecuteNode(singleExprNode.exprNode);
+                        GeneratorCode("env", (blockNode.attributes["env"] as SymbolTable).name);
+
+                        foreach (var stmt in blockNode.statements)
+                        {
+                            GenNode(stmt);
+                        }
+
+                        GeneratorCode("envpop", (blockNode.attributes["env"] as SymbolTable).name);
                     }
                     break;
 
-                case SyntaxTree.IdentityNode id:
+                //类声明  
+                case SyntaxTree.ClassDeclareNode classDeclNode:
                     {
-                        id.attributes["ret"] = id.token.attribute;
+                        string className = classDeclNode.classNameNode.token.attribute;
+                        GeneratorCode("JUMP", "End " + className);
+                        GeneratorCode(" ").label = className;
+                        GeneratorCode("env", (classDeclNode.attributes["env"] as SymbolTable).name);
+
+
+                        //...
+
+
+                        GeneratorCode("envpop");
+                        GeneratorCode(" ").label = className + "End";
+                    }
+                    break;
+                //函数声明
+                case SyntaxTree.FuncDeclareNode funcDeclNode:
+                    {
+                        string funcFullName;
+                        if (envStack.Peek().tableCatagory == SymbolTable.TableCatagory.ClassScope)
+                            funcFullName = envStack.Peek().name + "." + funcDeclNode.identifierNode.token.attribute;
+                        else
+                            funcFullName = funcDeclNode.identifierNode.token.attribute;
+
+
+                        GeneratorCode("JUMP", "End " + funcFullName);
+                        GeneratorCode(" ").label = funcFullName;
+                        GeneratorCode("env", (funcDeclNode.attributes["env"] as SymbolTable).name);
+
+
+                        //...
+
+
+                        GeneratorCode("envpop");
+                        GeneratorCode(" ").label = funcFullName + "End";
+                    }
+                    break;
+                //变量声明
+                case SyntaxTree.VarDeclareNode varDeclNode:
+                    {
+                        GenNode(varDeclNode.identifierNode);
+                        GenNode(varDeclNode.initializerNode);
+
+                        if(varDeclNode.initializerNode.attributes.ContainsKey("ret") == false)
+                        {
+                            throw new Exception("子表达式节点无返回变量：" + varDeclNode.identifierNode.token.attribute);
+                        }
+
+                        GeneratorCode("=", (string)varDeclNode.identifierNode.attributes["ret"], (string)varDeclNode.initializerNode.attributes["ret"]);
+                    }
+                    break;
+
+
+
+                case SyntaxTree.SingleExprStmtNode singleExprNode:
+                    {
+                        GenNode(singleExprNode.exprNode);
+                    }
+                    break;
+                case SyntaxTree.IdentityNode idNode:
+                    {
+                        idNode.attributes["ret"] = idNode.token.attribute;
                     }
                     break;
                 case SyntaxTree.LiteralNode literalNode:
@@ -89,8 +185,8 @@ namespace FanLang.IL
                     break;
                 case SyntaxTree.BinaryOpNode binaryOp:
                     {
-                        ExecuteNode(binaryOp.leftNode);
-                        ExecuteNode(binaryOp.rightNode);
+                        GenNode(binaryOp.leftNode);
+                        GenNode(binaryOp.rightNode);
 
                         binaryOp.attributes["ret"] = NewTemp();
 
@@ -98,18 +194,10 @@ namespace FanLang.IL
 
                     }
                     break;
-                case SyntaxTree.VarDeclareNode varDeclNode:
-                    {
-                        ExecuteNode(varDeclNode.identifierNode);
-                        ExecuteNode(varDeclNode.initializerNode);
-
-                        GeneratorCode("=", (string)varDeclNode.identifierNode.attributes["ret"], (string)varDeclNode.initializerNode.attributes["ret"]);
-                    }
-                    break;
                 case SyntaxTree.AssignNode assignNode:
                     {
-                        ExecuteNode(assignNode.lvalueNode);
-                        ExecuteNode(assignNode.rvalueNode);
+                        GenNode(assignNode.lvalueNode);
+                        GenNode(assignNode.rvalueNode);
                         foreach(var key in assignNode.lvalueNode.attributes)
                         {
                             Console.WriteLine("Key:" + key);
@@ -121,17 +209,53 @@ namespace FanLang.IL
                         GeneratorCode("=", (string)assignNode.lvalueNode.attributes["ret"], (string)assignNode.rvalueNode.attributes["ret"]);
                     }
                     break;
+                case SyntaxTree.CallNode callNode:
+                    {
+                        string funcFullName;
+                        if(callNode.isMemberAccessFunction == false)
+                        {
+                            funcFullName = (callNode.funcNode as SyntaxTree.IdentityNode).token.attribute;
+                        }
+                        else
+                        {
+                            string className = (string)(callNode.funcNode as SyntaxTree.MemberAccessNode).attributes["class"];
+                            string funcName = (string)(callNode.funcNode as SyntaxTree.MemberAccessNode).attributes["member_name"];
+                            funcFullName = className + "," + funcName;
+                        }
+
+                        for(int i = 0; i < callNode.argumantsNode.arguments.Count; ++i)
+                        {
+                            //计算参数表达式的值  
+                            GenNode(callNode.argumantsNode.arguments[i]);
+
+                            GeneratorCode("param", (string)callNode.argumantsNode.arguments[i].attributes["ret"]);
+                        }
+
+                        callNode.attributes["ret"] = NewTemp();
+
+                        GeneratorCode("call", callNode.attributes["ret"], funcFullName, callNode.argumantsNode.arguments.Count);
+                    }
+                    break;
+                case SyntaxTree.NewObjectNode newObjNode:
+                    {
+                        newObjNode.attributes["ret"] = NewTemp();
+                    }
+                    break;
                 default:
                     throw new Exception("中间代码生成未实现:" + node.GetType().Name);
             }
         }
 
-        public int GeneratorCode(string op, string arg1 = "", string arg2 = "", string arg3 = "")
+        public TAC GeneratorCode(string op, object arg1 = null, object arg2 = null, object arg3 = null)
         {
-            int idx = codes.Count - 1;
-            codes.Add(new TAC() { op = op, arg1 = arg1, arg2 = arg2, arg3 = arg3 });
-            return idx;
+            var newCode = new TAC() { op = op, arg1 = arg1?.ToString(), arg2 = arg2?.ToString(), arg3 = arg3?.ToString() };
+
+            codes.Add(newCode);
+
+            return newCode;
         }
+
+
 
         private int counter = 0;
         public string NewTemp()
@@ -142,10 +266,13 @@ namespace FanLang.IL
 
         public void PrintCodes()
         {
+            Console.WriteLine("中间代码输出：");
+            Console.WriteLine(new string('-', 50));
             for (int i = 0; i < codes.Count; ++i)
             {
-                Console.WriteLine(i.ToString() + "\t|" + codes[i].ToExpression());
+                Console.WriteLine($"{i.ToString().PadRight(4)}|{codes[i].ToExpression()}");
             }
+            Console.WriteLine(new string('-', 50));
         }
     }
 }
