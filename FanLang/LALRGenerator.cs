@@ -422,7 +422,7 @@ namespace FanLang.LRParse
             //Console.WriteLine(string.Concat(this.terminals.Select(t => t + ",")));
             //Console.WriteLine("nonterminals:");
             //Console.WriteLine(string.Concat(this.nonterminals.Select(nt => nt + ",")));
-            //Console.ReadKey();
+
 
             StringReader reader = new StringReader(data);
 
@@ -614,8 +614,8 @@ namespace FanLang.LALRGenerator
             {
                 if (CompareInfo(path) == true)//信息一致
                 {
-                    Console.WriteLine("存在分析表： " + path);
-                    Console.ReadKey();
+                    Compiler.Pause("存在分析表： " + path);
+                    
 
                     ReadExistData(path);
                     return;
@@ -623,14 +623,14 @@ namespace FanLang.LALRGenerator
             }
 
 
-            Console.WriteLine("不存在分析表： " + path);
-            Console.ReadKey();
+            Compiler.Pause("不存在分析表： " + path);
+
 
             //文法初始化  
             InitGrammar();
 
-            Console.WriteLine("即将保存分析表到：" + path);
-            Console.ReadKey();
+            Compiler.Pause("即将保存分析表到：" + path);
+
 
             //保存分析器数据  
             SaveData(path);

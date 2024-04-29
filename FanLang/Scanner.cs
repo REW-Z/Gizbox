@@ -15,10 +15,16 @@ namespace FanLang
         public TokenPattern identifierPattern;
         public TokenPattern whitespace;
 
+
+        //log  
+        private static bool enableLog = false;
+
         public Scanner()
         {
             //词法分析器初始化    
             keywords = new List<TokenPattern>();
+
+            keywords.Add(new TokenPattern("extern", "extern\\W", 1));
 
             keywords.Add(new TokenPattern("var", "var\\W", 1));
             keywords.Add(new TokenPattern("class", "class\\W", 1));
@@ -83,9 +89,9 @@ namespace FanLang
             literals.Add(new TokenPattern("LITBOOL", "(true|false)[^a-zA-Z]", 1));
             literals.Add(new TokenPattern("LITINT", "[0-9]+[^\\d\\.]", 1));
             literals.Add(new TokenPattern("LITFLOAT", "[0-9]+\\.[0-9]+[F|f]\\D", 1));
-            literals.Add(new TokenPattern("LITSTRING", "\\\"[\\w|\\s]*\\\"[^\\\"]", 1));
+            literals.Add(new TokenPattern("LITSTRING", "\\\"[^\\\"]*\\\"[^\\\"]", 1));
 
-            identifierPattern = new TokenPattern("ID", "[a-z|A-Z][a-z|A-Z|0-9]*\\W", 1);
+            identifierPattern = new TokenPattern("ID", "[a-z|A-Z|_][a-z|A-Z|_|0-9]*\\W", 1);
 
             whitespace = new TokenPattern("space", "[\\n|\\s|\\t]+");
         }
@@ -108,16 +114,23 @@ namespace FanLang
             return ismatch;
         }
 
-        public List<Token> Scan(string source)
+        public List<Token> Scan(string input)
         {
+            StringBuilder strb = new StringBuilder(input);
+            strb.Append('\n');
+            string source = strb.ToString();
+
             List<Token> tokens = new List<Token>();
 
-            Console.WriteLine("source:\n" + source);
+            Log("source:\n" + source);
 
             //Pointers  
             int lexemBegin = 0;
             int forward = 0;
 
+
+            //line  
+            int currLine = 1;//当前行数  
 
             Action<int> MovePointer = (offset) =>
             {
@@ -128,19 +141,29 @@ namespace FanLang
             //Scan  
             while (lexemBegin != source.Length)
             {
-                if (lexemBegin + (forward - lexemBegin) > source.Length - 1)
+                if (lexemBegin + (forward - lexemBegin) > source.Length)
                 {
-                    Console.WriteLine("发现越界：" + (lexemBegin + (forward - lexemBegin)));
-                    Console.WriteLine("总长度：" + source.Length);
+                    Log("发现越界：" + (lexemBegin + (forward - lexemBegin)));
+                    Log("总长度：" + source.Length);
                 }
                 var seg = source.Substring(lexemBegin, forward - lexemBegin);
 
-                Console.WriteLine("[" + seg + "]" + "(" + lexemBegin + "," + forward + ")");
+                Log("[" + seg + "]" + "(" + lexemBegin + "," + forward + ")");
 
                 //WHITE SPACE  
                 if (seg != "" && PatternMatch(seg, whitespace))
                 {
-                    Console.WriteLine("\n>>>>> white space. length:" + seg.Length + "\n\n");
+                    Log("\n>>>>> white space. length:" + seg.Length + "\n\n");
+
+                    //识别换行  
+                    string spaceStr = seg.Substring(0, seg.Length - whitespace.back);
+                    for (int i = 0; i < spaceStr.Length; ++i)
+                    {
+                        if(spaceStr[i] == '\n')
+                        {
+                            currLine++;
+                        }
+                    }
 
                     MovePointer(seg.Length - whitespace.back);
                     continue;
@@ -154,9 +177,9 @@ namespace FanLang
                     {
                         string keyword = seg.Substring(0, seg.Length - kw.back);
 
-                        Console.WriteLine("\n>>>>> keyword:" + keyword + "\n\n");
+                        Log("\n>>>>> keyword:" + keyword + "\n\n");
 
-                        Token token = new Token(keyword, PatternType.Keyword);
+                        Token token = new Token(keyword, PatternType.Keyword, currLine);
                         tokens.Add(token);
 
 
@@ -179,9 +202,9 @@ namespace FanLang
                     if (PatternMatch(seg, op))
                     {
                         string opStr = seg.Substring(0, seg.Length - op.back);
-                        Console.WriteLine("\n>>>>> operator:" + opStr + "  tokenname:" + op.tokenName + "\n\n");
+                        Log("\n>>>>> operator:" + opStr + "  tokenname:" + op.tokenName + "\n\n");
 
-                        Token token = new Token(opStr, PatternType.Operator);
+                        Token token = new Token(opStr, PatternType.Operator, currLine);
                         tokens.Add(token);
 
                         MovePointer(seg.Length - op.back);
@@ -203,9 +226,9 @@ namespace FanLang
                     if (PatternMatch(seg, lit))
                     {
                         string litstr = seg.Substring(0, seg.Length - lit.back);
-                        Console.WriteLine("\n>>>>> literal value:" + lit.tokenName + ":" + litstr + "\n\n");
+                        Log("\n>>>>> literal value:" + lit.tokenName + ":" + litstr + "\n\n");
 
-                        Token token = new Token(lit.tokenName, PatternType.Number, litstr);
+                        Token token = new Token(lit.tokenName, PatternType.Number, currLine, litstr);
                         tokens.Add(token);
 
                         MovePointer(seg.Length - lit.back);
@@ -224,10 +247,10 @@ namespace FanLang
                 if (PatternMatch(seg, identifierPattern))
                 {
                     string identifierName = seg.Substring(0, seg.Length - identifierPattern.back);
-                    Console.WriteLine("\n>>>>> identifier:" + identifierName + "\n\n");
+                    Log("\n>>>>> identifier:" + identifierName + "\n\n");
 
                     //int idx = globalSymbolTable.AddIdentifier(identifierName);//词法分析阶段最好不创建符号表条目（编译原理p53）  
-                    Token token = new Token(identifierPattern.tokenName, PatternType.Id, identifierName);
+                    Token token = new Token(identifierPattern.tokenName, PatternType.Id, currLine, identifierName);
                     tokens.Add(token);
 
                     MovePointer(seg.Length - identifierPattern.back);
@@ -242,10 +265,10 @@ namespace FanLang
 
             //DEBUG  
             {
-                Console.WriteLine("Token列表：");
+                Log("Token列表：");
                 foreach(var token in tokens)
                 {
-                    Console.WriteLine("<" + token.name + (string.IsNullOrEmpty(token.attribute) ? "" : ("," + token.attribute)) + ">");
+                    Log(token.ToString());
                 }
 
                 Compiler.Pause("词法单元扫描完毕，共" + tokens.Count + "个...");
@@ -254,5 +277,11 @@ namespace FanLang
             return tokens;
         }
 
+
+        private static void Log(object content)
+        {
+            if(!enableLog) return;
+            Console.WriteLine("Scanner >>>" + content);
+        }
     }
 }

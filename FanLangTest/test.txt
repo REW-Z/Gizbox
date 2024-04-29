@@ -1,4 +1,7 @@
 ﻿
+extern void Log(string text);
+extern void Console_WriteLine(string text);
+
 class Person
 {
 	string name = "AAA";
@@ -9,7 +12,6 @@ class Person
 		this.age += year;
 		return this.age;
 	}
-
 	int Birthday()
 	{
 		int newage = this.AgeAdd(1);
@@ -17,25 +19,41 @@ class Person
 	}
 }
 
-int Calculate(int input)
-{
-	int fac1 = 2;
-	int fac2 = 3;
-	input *= fac1;
-	input += fac2;
-	return input;
-}
-
-string str = "Hello World";
-
-{
-	int a = 0;
-	a = 1 + 2;
-}
-
-
-int b = Calculate(a);
-
 Person sam = new Person();
-int c = sam.Birthday();
+int newAge = sam.Birthday();
 
+int result = 0;
+sam.age = 0;
+
+for(int i = 0; i < 99; i++)
+{
+	int j = 0;
+	while(j < 99)
+	{
+		sam.age  = sam.age + 1;
+		j++;
+
+		if(j >= 11) break;
+	}
+}
+
+result = sam.age;
+
+Log(result);
+
+result += (int)2.0f;
+
+Log(result);
+
+if(result > 2000)
+{
+	Log("多于 2000 !");
+}
+else if(result > 1000)
+{
+	Log((string)result + "多于 1000 !");
+}
+else
+{
+	Log("少于 1000 !");
+}

@@ -34,16 +34,23 @@ namespace FanLang
         /// </summary>
         public PatternType patternType;
 
+
+        /// <summary>
+        /// 行号    
+        /// </summary>
+        public int line;
+
         /// <summary>
         /// 属性值（一般是词素或者指针）    
         /// </summary>
         public string attribute;
 
 
-        public Token(string name, PatternType type, string attribute = null)
+        public Token(string name, PatternType type, int lineCount, string attribute = null)
         {
             this.name = name;
             this.patternType = type;
+            this.line = lineCount;
             this.attribute = attribute;
         }
         public override string ToString()
@@ -80,7 +87,8 @@ namespace FanLang
     {
         public enum RecordCatagory
         {
-            VariableOrParam,
+            Var,
+            Param,
             Function,
             Class
         }
@@ -89,6 +97,7 @@ namespace FanLang
             GlobalScope,
             StmtBlockScope,
             ClassScope,
+            LoopScope,
             FuncScope,
         }
         public class Record
@@ -107,6 +116,7 @@ namespace FanLang
         public TableCatagory tableCatagory;
 
         //符号表关系    
+        public int depth;
         public SymbolTable parent;
         public List<SymbolTable> children = new List<SymbolTable>();
 
@@ -124,6 +134,11 @@ namespace FanLang
             {
                 this.parent = parentTable;
                 parentTable.children.Add(this);
+                this.depth = this.parent.depth + 1;
+            }
+            else
+            {
+                this.depth = 0;
             }
         }
 
@@ -171,6 +186,19 @@ namespace FanLang
             return newRec;
         }
 
+        //获取子表  
+        public SymbolTable GetTableInChildren(string name)
+        {
+            foreach(var child in children)
+            {
+                if(child.name == name)
+                {
+                    return child;
+                }
+            }
+            throw new Exception(this.name + "找不到名为" + name + "的子表！");
+        }
+
         private string GenGuid()
         {
             return System.Guid.NewGuid().ToString();
@@ -180,7 +208,7 @@ namespace FanLang
         {
             int pad = 16;
             Console.WriteLine();
-            Console.WriteLine($"|{new string('-', pad)}-{new string('-', pad)}-{ this.name.PadRight(pad) }-{new string('-', pad)}-{new string('-', pad)}|");
+            Console.WriteLine($"|{new string('-', pad)}-{new string('-', pad)}-{ this.name.PadRight(pad) + (this.parent != null ? ("(parent:" + this.parent.name + ")") : "") }-{new string('-', pad)}-{new string('-', pad)}|");
             Console.WriteLine($"|{"NAME".PadRight(pad)}|{"CATAGORY".PadRight(pad)}|{"TYPE".PadRight(pad)}|{"ADDR".PadRight(pad)}|{"SubTable".PadRight(pad)}|");
             Console.WriteLine($"|{new string('-', pad * 5 + 4)}|");
             foreach (var key in records.Keys)
@@ -190,6 +218,14 @@ namespace FanLang
             }
             Console.WriteLine($"|{new string('-', pad * 5 + 4)}|");
             Console.WriteLine();
+
+            if(this.children .Count > 0)
+            {
+                foreach(var c in children)
+                {
+                    c.Print();
+                }
+            }
         }
     }
 
@@ -498,26 +534,46 @@ namespace FanLang
 
 
         /// <summary>
-        /// 测试简单编译
+        /// 例程：测试简单编译
         /// </summary>
-        public SimpleParseTree TestSimpleCompile(string source)
+        public SimpleParseTree TestSimpleCompile()
         {
+            string source =
+                @"var a = 233;
+                  var b = 111;
+                  var c = a + 999;
+                 ";
+
             Scanner scanner = new Scanner();
             List<Token> tokens = scanner.Scan(source);
             SimpleParser parser = new SimpleParser();
             parser.Parse(tokens);
+
+            Console.WriteLine("\n\n语法分析树：");
+            Console.WriteLine(parser.parseTree.Serialize());
+
             return parser.parseTree;
         }
 
         /// <summary>
-        /// 测试LL0  
+        /// 例程：测试LL0  
         /// </summary>
-        public SimpleParseTree TestLL0Compile(string source)
+        public SimpleParseTree TestLL0Compile()
         {
+            string source =
+                @"var a = 233;
+                  var b = (a + 111) * 222;
+                 ";
+
             Scanner scanner = new Scanner();
             List<Token> tokens = scanner.Scan(source);
             LLParser parser = new LLParser();
             parser.Parse(tokens);
+
+
+            Console.WriteLine("\n\n语法分析树：");
+            Console.WriteLine(parser.parseTree.Serialize());
+
             return parser.parseTree;
         }
 
@@ -526,6 +582,8 @@ namespace FanLang
         /// </summary>
         public static void Pause(string txt = "")
         {
+            return;
+
             Console.WriteLine(txt + "\n按任意键继续...");
             Console.ReadKey();
         }
@@ -547,14 +605,7 @@ namespace FanLang
             //语法分析  
             LRParse.LRParser parser = new LRParse.LRParser(data, this);
             parser.Parse(tokens);
-
-            Console.WriteLine("\n\n语法分析树：");
-            Console.WriteLine(parser.parseTree.Serialize());
-
-            Console.WriteLine("\n\n抽象语法树：");
-            Console.WriteLine(parser.syntaxTree.Serialize());
             this.syntaxTree = parser.syntaxTree;
-            Compiler.Pause("抽象语法树生成完成");
 
 
             //语义分析  
@@ -563,12 +614,16 @@ namespace FanLang
 
 
             //中间代码生成    
-            FanLang.IL.ILGenerator ilGenerator = new IL.ILGenerator(this.syntaxTree, this);
+            FanLang.IR.ILGenerator ilGenerator = new IR.ILGenerator(this.syntaxTree, this);
             ilGenerator.Generate();
-            ilGenerator.PrintCodes();
+            
 
 
-            Compiler.Pause("中间代码生成完毕");
+            //脚本引擎  
+            ScriptEngine.ScriptEngine engine = new ScriptEngine.ScriptEngine(this, ilGenerator.il);
+            engine.Execute();
+
+            Compiler.Pause("执行完毕");
         }
     }
 

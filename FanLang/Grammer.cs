@@ -78,12 +78,14 @@ namespace FanLang
             "stmt -> stmtexpr ;",
             "stmt -> break ;",
             "stmt -> return expr ;",
+            "stmt -> return ;",
             "stmt -> while ( expr ) stmt",
             "stmt -> for ( stmt bexpr ; stmtexpr ) stmt",
             "stmt -> if ( expr ) stmt elifclauselist elseclause",
 
             "declstmt -> type ID = expr ;",
             "declstmt -> type ID ( params ) { statements }",
+            "declstmt -> extern type ID ( params ) ;",
             "declstmt -> class ID { declstatements }",
 
             "elifclauselist -> ε",

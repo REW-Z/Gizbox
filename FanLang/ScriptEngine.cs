@@ -1,816 +1,775 @@
 ﻿using System;
+using System.Reflection;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using FanLang;
+using FanLang.IR;
 
 
 namespace FanLang.ScriptEngine
 {
-    public enum ExecuteState
+    //全局内存区  
+    public class GlobalMemory
     {
-        Finish,
-        Break,
-        Error,
+        public Dictionary<string, object> data = new Dictionary<string, object>();
     }
-    public struct ExecuteResult
+    //堆区    
+    public class HeapMemory
     {
-        public object returnValue;
-        public ExecuteState state;
+        public Dictionary<string, object> data = new Dictionary<string, object>();
+    }
+    //虚拟栈帧（活动记录）  
+    public class Frame
+    {
+        public FanLang.Stack<object> args = new FanLang.Stack<object>();//由Caller压栈(从后往前)  
+        public int returnPtr;//返回地址  
+        public Dictionary<string, object> localVariables = new Dictionary<string, object>();//局部变量和临时变量  
+    }
 
+    //调用堆栈  
+    public class CallStack
+    {
+        private Frame[] frames;
+        private int top;    
 
-        public static implicit operator ExecuteResult(int ret) => Return(ret);
-        public static implicit operator ExecuteResult(float ret) => Return(ret);
-        public static implicit operator ExecuteResult(string ret) => Return(ret);
-        public static implicit operator ExecuteResult(bool ret) => Return(ret);
-        public ExecuteResult(object ret, ExecuteState state)
+        public CallStack()
         {
-            this.state = state;
-            this.returnValue = ret;
+            frames = new Frame[1000];
+            top = 0;
         }
-        public static ExecuteResult Return(object ret) => new ExecuteResult() { state = ExecuteState.Finish, returnValue = ret };
-    }
 
-
-    public class FanObject
-    {
-        public string name;
-        public Dictionary<string, object> fields = new Dictionary<string, object>();
-    }
-
-    public class VirtualMemory
-    {
-        private List<object> data = new List<object>();
-        public int MemAlloc(int length)
+        public int Top
         {
-            int addr = data.Count - 1 + 1;
-            for(int i = 0; i < length; ++i)
-            {
-                data.Add(null);
-            }
-            return addr;
+            get { return top; }
+            set { top = value; }
         }
-        public object this[int addr]
+
+        public Frame this[int idx]
         {
             get 
             {
-                return data[addr];
-            }
-            set 
-            {
-                if (value.GetType() == typeof(ExecuteResult)) throw new Exception("不应把ExecuteResult存入虚拟内存");
-                data[addr] = value; 
-            }
-        }
-    }
-
-
-    public class Env
-    {
-        public struct Record
-        {
-            public string name;
-            public int addr;
-        }
-
-        public string name;
-
-        private Dictionary<string, Record> data = new Dictionary<string, Record>();
-
-        private VirtualMemory targetMem;
-
-
-        public Env(string name, VirtualMemory mem)
-        {
-            this.name = name;
-            this.targetMem = mem;
-        }
-
-        public bool ContainsKey(string name)
-        {
-            return data.ContainsKey(name);
-        }
-        public Record this[string name]
-        {
-            get
-            {
-                if (data.ContainsKey(name) == false) throw new Exception("Env中没有" + name + "条目");
-                return data[name];
-            }
-        }
-
-
-        public Record GetOrNewRecord(string name)
-        {
-            if(data.ContainsKey("name"))
-            {
-                return data["name"];
-            }
-            else
-            {
-                int newAddr = targetMem.MemAlloc(1);
-                var newrec = new Record()
+                if(frames[idx] == null)
                 {
-                    name = name,
-                    addr = newAddr
-                };
-                data[name] = newrec;
-
-                return newrec;
+                    frames[idx] = new Frame();
+                }
+                return frames[idx];
             }
         }
-        public Record NewRecord(string name)
+
+        public void DestoryFrame(int idx)
         {
-            if (data.ContainsKey(name)) throw new Exception("重复添加同名条目！:" + name);
-
-            int newAddr = targetMem.MemAlloc(1);
-            var newrec = new Record() { 
-                name = name,
-                addr = newAddr
-            };
-            data[name] = newrec;
-
-            Console.WriteLine("添加条目:" + name + "指向虚拟内存：" + newAddr);
-
-            return newrec;
+            this.frames[idx] = null;
         }
+    }
 
-        public void Print()
+    // Fan对象  
+    public class FanObject
+    {
+        private static int currentMaxId = 0;
+
+        public int instanceID = 0;
+        public Dictionary<string, object> fields = new Dictionary<string, object>();
+        
+        public FanObject()
         {
-            Console.WriteLine("---------------Table:" + this.name + "---------------");
-            Console.WriteLine("NAME" + "\t\t|" + "ADDR" + "\t\t|");
-            Console.WriteLine("------------------------------------");
-            foreach (var key in data.Keys)
-            {
-                Console.WriteLine(key + "\t\t|" + data[key].addr + "\t\t|"); 
-            }
-            Console.WriteLine("------------------------------------");
+            this.instanceID = currentMaxId++;
+        }
+        public override string ToString()
+        {
+            return "FanObect(instanceID:" + this.instanceID + ")";
         }
     }
 
 
+
+
+    //脚本引擎  
     public class ScriptEngine
     {
-        public SyntaxTree tree;
+        //编译器上下文  
+        public Compiler compilerContext;
 
-        public Env globalEnv;
+        //符号表堆栈  
+        public FanLang.Stack<SymbolTable> envStack;
 
-        private FanLang.Stack<Env> envStack;
+        //中间代码  
+        public FanLang.IR.IntermediateCodes ir;
+        private int current;
 
-        private VirtualMemory mem;
+        //全局内存  
+        private GlobalMemory globalMemory = new GlobalMemory();
 
-        // ********************** EXECUTE ***************************
+        //堆区    
+        private HeapMemory heap = new HeapMemory();
+
+        //调用堆栈  
+        private CallStack callStack = new CallStack();
+
+        //返回值寄存器（虚拟）(实际在x86架构通常为EAX寄存器 x86-64架构通常为RAX寄存器)
+        private object retRegister = null;
+
+        //临时数据  
+        private List<SymbolTable> envsHitTemp = new List<SymbolTable>();//所在的所有符号表  
+        private int previous = 0;
+
+        //外部调用相关  
+        private static Dictionary<string, Type> typeCache = new Dictionary<string, Type>();
+
+
+
+        public ScriptEngine(Compiler compiler, FanLang.IR.IntermediateCodes ir)
+        {
+            this.compilerContext = compiler;
+            this.ir = ir;
+
+            List<string> distinceOps = new List<string>();
+            foreach(var tac in ir.codes)
+            {
+                if(distinceOps.Contains(tac.op) == false)
+                {
+                    distinceOps.Add(tac.op);
+                }
+            }
+            EngineLog("不重复的指令列表：");
+            foreach(var op in distinceOps)
+            {
+                EngineLog(op);
+            }
+            
+        }
 
         public void Execute()
         {
-            if (tree == null) throw new Exception("AST Null");
+            System.Diagnostics.Stopwatch watch = new System.Diagnostics.Stopwatch();
+            watch.Start();
 
-            //mem  
-            this.mem = new VirtualMemory();
+            //调用堆栈  
+            this.callStack = new CallStack();
 
-            //table stack  
-            this.globalEnv = new Env("global", mem);
-            this.envStack = new FanLang.Stack<Env>();
-            this.envStack.Push(this.globalEnv);
-
-            //start  
-            ExecuteNode(tree.rootNode);
-        }
-
-        public ExecuteResult ExecuteNode(SyntaxTree.Node node)
-        {
-            Console.WriteLine(" ****** 执行节点：" + node.ToString() + " ****** ");
-
-            var type = node.GetType();
-            switch(type.Name)
-            {
-                case "ProgramNode":
-                    {
-                        ExecuteNode((node as SyntaxTree.ProgramNode).statementsNode);
-                        return 0;
-                    }
-                case "StatementsNode":
-                    {
-                        foreach(var stmtNode in (node as SyntaxTree.StatementsNode).statements)
-                        {
-                            ExecuteNode(stmtNode);
-                        }
-                        return 0;
-                    }
-                case "StatementBlockNode":
-                    {
-                        foreach (var stmtNode in (node as SyntaxTree.StatementBlockNode).statements)
-                        {
-                            ExecuteNode(stmtNode);
-                        }
-                        return 0;
-                    }
-                case "VarDeclareNode":
-                    {
-                        string name = (node as SyntaxTree.VarDeclareNode).identifierNode.token.attribute;
-                        object val = ExecuteNode((node as SyntaxTree.VarDeclareNode).initializerNode).returnValue;
-                        DeclareVariable_CurrentEnv(name, val);
-                        return 0;
-                    }
-                case "FuncDeclareNode":
-                    {
-                        DeclareFunction_CurrentEnv(node as SyntaxTree.FuncDeclareNode);
-                        return 0;
-                    }
-                case "ClassDeclareNode":
-                    {
-                        DeclareClass_CurrentEnv(
-                            (node as SyntaxTree.ClassDeclareNode).classNameNode.token.attribute,
-                            (List<SyntaxTree.DeclareNode>)((node as SyntaxTree.ClassDeclareNode).memberDelareNodes)
-                            );
-                        return 0;
-                    }
-                case "SingleExprStmtNode":
-                    {
-                        ExecuteNode((node as SyntaxTree.SingleExprStmtNode).exprNode);
-                        return 0;
-                    }
-                case "BreakStmtNode":
-                    {
-                        return new ExecuteResult(null, ExecuteState.Break);
-                    }
-                case "ReturnStmtNode":
-                    {
-                        var ret = ExecuteNode((node as SyntaxTree.ReturnStmtNode).returnExprNode).returnValue;
-                        return ExecuteResult.Return(ret);
-                    }
-                case "WhileStmtNode":
-                    {
-                        var conditionNode = (node as SyntaxTree.WhileStmtNode).conditionNode;
-                        var stmtNode = (node as SyntaxTree.WhileStmtNode).stmtNode;
-
-                        List<SyntaxTree.StmtNode> stmtList;
-                        if(stmtNode is SyntaxTree.StatementBlockNode)
-                        {
-                            stmtList = (stmtNode as SyntaxTree.StatementBlockNode).statements;
-                        }
-                        else
-                        {
-                            stmtList = new List<SyntaxTree.StmtNode>() { stmtNode };
-                        }
-
-                        while ((bool)(ExecuteNode(conditionNode).returnValue))
-                        {
-                            bool breakWhile = false;
-                            foreach (var stmt in stmtList)
-                            {
-                                var result = ExecuteNode(stmt);
-                                if (result.state == ExecuteState.Break)
-                                {
-                                    breakWhile = true;
-                                    break;
-                                }
-                            }
-                            if (breakWhile)
-                            {
-                                break;
-                            }
-                        }
-
-                        return 0;
-                    }
-                case "ForStmtNode":
-                    {
-                        var initializer = (node as SyntaxTree.ForStmtNode).initializerNode;
-                        var contition = (node as SyntaxTree.ForStmtNode).conditionNode;
-                        var iter = (node as SyntaxTree.ForStmtNode).iteratorNode;
-                        var stmt = (node as SyntaxTree.ForStmtNode).stmtNode;
-
-                        ExecuteNode(initializer);
-
-
-                        List<SyntaxTree.StmtNode> stmtList;
-                        if (stmt is SyntaxTree.StatementBlockNode)
-                        {
-                            stmtList = (stmt as SyntaxTree.StatementBlockNode).statements;
-                        }
-                        else
-                        {
-                            stmtList = new List<SyntaxTree.StmtNode>() { stmt };
-                        }
-
-                        while ((bool)ExecuteNode(contition).returnValue)
-                        {
-                            bool breakWhile = false;
-                            foreach (var s in stmtList)
-                            {
-                                var result = ExecuteNode(s);
-                                if (result.state == ExecuteState.Break)
-                                {
-                                    breakWhile = true;
-                                    break;
-                                }
-                            }
-                            if (breakWhile)
-                            {
-                                break;
-                            }
-
-                            ExecuteNode(iter); 
-                        }
-
-                        return 0;
-                    }
-                case "IfStmtNode":
-                    {
-                        var conditionClauseList = ((SyntaxTree.IfStmtNode)node).conditionClauseList;
-                        var elseClause = ((SyntaxTree.IfStmtNode)node).elseClause;
-
-                        bool anyConidtionValid = false;
-                        foreach(var clause in conditionClauseList)
-                        {
-                            if ((bool)ExecuteNode(clause.conditionNode).returnValue)
-                            {
-                                anyConidtionValid = true;
-                                ExecuteNode(clause.thenNode);
-                                break;
-                            }
-                        }
-                        if (anyConidtionValid == false)
-                        {
-                            ExecuteNode(elseClause.stmt);
-                        }
-
-                        return 0;
-                    }
-                //case "ConditionClauseNode":
-                //    {
-                //        return 0;
-                //    }
-                //case "ElseClauseNode":
-                //    {
-                //        return 0;
-                //    }
-                case "IdentityNode":
-                    {
-                        string name = ((SyntaxTree.IdentityNode)node).token.attribute;
-                        return new ExecuteResult(GetIdentidierValue(name), ExecuteState.Finish);
-                    }
-                case "LiteralNode":
-                    {
-                        var token = ((SyntaxTree.LiteralNode)node).token;
-                        return new ExecuteResult(GetLiteralValue(token), ExecuteState.Finish);
-                    }
-                case "BinaryOpNode":
-                    {
-                        var vl = ExecuteNode(((SyntaxTree.BinaryOpNode)node).leftNode).returnValue;
-                        var vr = ExecuteNode(((SyntaxTree.BinaryOpNode)node).rightNode).returnValue ;
-                        var opname = ((SyntaxTree.BinaryOpNode)node).op;
-                        return ExecuteResult.Return(BinaryOp(opname, vl, vr));
-                    }
-                case "UnaryOpNode":
-                    {
-                        var v = ExecuteNode(((SyntaxTree.UnaryOpNode)node).exprNode).returnValue;
-                        string op = ((SyntaxTree.UnaryOpNode)node).op;
-                        return ExecuteResult.Return(UnaryOp(op, v));
-                    }
-                case "AssignNode":
-                    {
-                        var lNode = ((SyntaxTree.AssignNode)node).lvalueNode;
-                        var rNode = ((SyntaxTree.AssignNode)node).rvalueNode;
-                        string op = ((SyntaxTree.AssignNode)node).op;
-                        return ExecuteResult.Return(Assign(op, lNode, rNode));
-                    }
-                case "CallNode":
-                    {
-                        var ret = Call((SyntaxTree.CallNode)node);
-                        return ExecuteResult.Return(ret);
-                    }
-                case "IncDecNode":
-                    {
-                        return ExecuteResult.Return(IncDec((SyntaxTree.IncDecNode)node));
-                    }
-                case "NewObjectNode":
-                    {
-                        return ExecuteResult.Return(NewObject((SyntaxTree.NewObjectNode)node));
-                    }
-
-                case "CastNode":
-                    {
-                        return ExecuteResult.Return(Cast((SyntaxTree.CastNode)node));
-                    }
-                case "ObjectMemberAccessNode":
-                    {
-                        return ExecuteResult.Return(MemberAccess((SyntaxTree.ObjectMemberAccessNode)node));
-                    }
-                case "ThisMemberAccessNode":
-                    {
-                        return ExecuteResult.Return(MemberAccess((SyntaxTree.ThisMemberAccessNode)node));
-                    }
-                //case "TypeNode":
-                //    {
-                        
-                //    }
-                case "PrimitiveNode":
-                    {
-                        return ExecuteResult.Return(ConvertCSharpType((SyntaxTree.PrimitiveNode)node));
-                    }
-                case "ClassTypeNode":
-                    {
-                        return ExecuteResult.Return(ConvertCSharpType((SyntaxTree.ClassTypeNode)node));
-                    }
-                //case "ArgumentListNode":
-                //    {
-                //        return 0;
-                //    }
-                //case "ParameterListNode":
-                //    {
-                //        return 0;
-                //    }
-                //case "ParameterNode":
-                //    {
-                //        return 0;
-                //    }
-                default:
-                    throw new Exception("UnknownNode！");
-            }
-        }
-
-
-        // ********************** METHODS ***************************
-
-        public void DeclareVariable_CurrentEnv(string name, object initValue)
-        {
-            var rec = envStack.Peek().NewRecord(name);
-            mem[rec.addr] = initValue;
-        }
-
-        public void DeclareFunction_CurrentEnv(SyntaxTree.FuncDeclareNode node)
-        {
-            Type type = (Type)(ExecuteNode(node.returnTypeNode).returnValue);
-            string name = node.identifierNode.token.attribute;
-
-            var rec = envStack.Peek().NewRecord(name);
+            //符号表链    
+            this.envStack = new Stack<SymbolTable>();
+            ResetEnv();
             
-            //函数环境  
-            var newEnv = new Env("function:" + name, mem);
-            mem[rec.addr] = newEnv;
+            //入口
+            this.current = ir.codeEntry;
 
-            //函数符号表第一条存储函数定义节点  
-            int nodeAddr = newEnv.NewRecord("Node").addr;
-            mem[nodeAddr] = node;
-        }
+            //留空  
+            Console.WriteLine(new string('\n', 20));
 
-        public void DeclareClass_CurrentEnv(string name, List<SyntaxTree.DeclareNode> memberDeclares)
-        {
-            var rec = envStack.Peek().NewRecord(name);
-            var newEnv = new Env("class " + name,this.mem);
-            mem[rec.addr] = newEnv;
-
-            //类成员作用域  
-            envStack.Push(newEnv);
-
-            foreach(var decl in memberDeclares)
+            while(this.current < ir.codes.Count)
             {
-                ExecuteNode(decl);
+                Interpret(ir.codes[this.current]);
             }
 
-            envStack.Pop();
+            watch.Stop();
+
+            Console.WriteLine(new string('\n', 3));
+            Console.WriteLine("执行时间：" + watch.ElapsedMilliseconds + "ms");
         }
 
-        public object GetIdentidierAddr(string varName)
+        /*
+
+         */
+
+        private void Interpret(TAC tac)
         {
-            Console.WriteLine("查找名称地址:" + varName);
-            for (int i = envStack.Top; i > -1; --i)
+            //设置符号表链（用于解析符号）  
             {
-                var env = envStack[i];
-                if (env.ContainsKey(varName))
+                if (this.ir.NeedRefreshStack(previous, current))
                 {
-                    return env[varName].addr;
+                    ResetEnv();
                 }
+                previous = current;
             }
+            
 
-
+            //开始指向本条指令  
+            EngineLog(new string('>', 10) + tac.ToExpression(showlabel:false));
+            switch(tac.op)
             {
-                Console.WriteLine("找不到" + varName);
-                PrintAllTables();
-            }
-
-            return -1;
-        }
-        public object GetIdentidierValue(string varName)
-        {
-            int addr = (int)GetIdentidierAddr(varName);
-            if (addr == -1) throw new Exception(varName + "地址错误！");
-
-            Console.WriteLine("变量" + varName + "的类型：" + mem[addr].GetType().Name + "  值：" + mem[addr]);
-            return mem[addr];
-        }
-        public object GetLiteralValue(Token token)
-        {
-            switch(token.name)
-            {
-                case "LITBOOL":
-                    return bool.Parse(token.attribute);
-                case "LITINT":
-                    return int.Parse(token.attribute);
-                case "LITFLOAT":
-                    return float.Parse(token.attribute);
-                case "LITSTRING":
-                    return token.attribute.Substring(1, token.attribute.Length - 2);
-                default:
-                    return null;
-            }
-        }
-
-        public object BinaryOp(string op, object vl, object vr)
-        {
-            return Calculator.CalBinary(op, vl, vr);
-        }
-        public object UnaryOp(string op, object val)
-        {
-            switch(op)
-            {
-                case "!":
+                case "": break;
+                case "JUMP":
                     {
-                        if (val is bool)
+                        this.current = ir.labelDic[tac.arg1];
+                        return;
+                    } 
+                case "FUNC_BEGIN": 
+                    {
+                        //新的栈帧
+                        this.callStack.Top += 1;
+                    }
+                    break;
+                case "FUNC_END":
+                    {
+                        //返回地址  
+                        current = this.callStack[callStack.Top].returnPtr;
+
+                        //返回原栈帧  
+                        this.callStack.Top -= 1;
+
+                        //销毁移出栈栈帧  
+                        this.callStack.DestoryFrame(this.callStack.Top + 1);
+                        
+                        return;
+                    }
+                case "METHOD_BEGIN":
+                    {
+                        //进入类作用域、方法作用域    
+                        string className = tac.arg1.Split('.')[0];
+                        string methodName = tac.arg1.Split('.')[1];
+
+                        //新的栈帧
+                        this.callStack.Top += 1;
+                    }
+                    break;
+                case "METHOD_END":
+                    {
+                        //返回地址  
+                        current = this.callStack[callStack.Top].returnPtr;
+
+                        //返回原栈帧  
+                        this.callStack.Top -= 1;
+
+                        //销毁移出栈栈帧  
+                        this.callStack.DestoryFrame(this.callStack.Top + 1);
+
+                        return;
+                    }
+                case "RETURN":
+                    {
+                        var retValue = tac.arg1;
+                        if(retValue != null)
                         {
-                            return !((bool)val);
+                            retRegister = GetValue(tac.arg1);
                         }
+                        int exitLine = ir.labelDic["exit:" + envStack.Peek().name];
+                        int endLine = exitLine - 1;    
+                        
+                        if(ir.codes[endLine].op != "METHOD_END" && ir.codes[endLine].op != "FUNC_END")
+                        {
+                            throw new Exception("函数或方法的END没有紧接exit标签");  
+                        }
+                        this.current = endLine;
+
+                        return;
+                    }
+                case "EXTERN_IMPL":
+                    {
+                        List<object> arguments = callStack[callStack.Top].args.ToList();
+                        arguments.Reverse();
+
+                        var result = ExternCall(tac.arg1, arguments);
+
+                        retRegister = result;
+
+                        int exitLine = ir.labelDic["exit:" + envStack.Peek().name];
+                        int endLine = exitLine - 1;
+
+                        if (ir.codes[endLine].op != "METHOD_END" && ir.codes[endLine].op != "FUNC_END")
+                        {
+                            throw new Exception("函数或方法的END没有紧接exit标签");
+                        }
+                        this.current = endLine;
+
+                        return;
+                    }
+                    break;
+                case "PARAM":
+                    {
+                        object arg = GetValue(tac.arg1); if (arg == null) throw new Exception("null实参");
+                        this.callStack[this.callStack.Top + 1].args.Push(arg);
+                    }
+                    break;
+                case "CALL":
+                    {
+                        string funcFullName = TrimName(tac.arg1);
+                        int argCount = int.Parse(tac.arg2);
+
+                        this.callStack[this.callStack.Top + 1].returnPtr = (current + 1);
+
+                        string label = "entry:" + funcFullName;
+
+                        if (ir.labelDic.ContainsKey(label))
+                        {
+                            current = ir.labelDic[label];
+                        }
+                        
+
+                        return;
+                    }
+                case "=":
+                    {
+                        if (tac.arg3 != null) throw new Exception("赋值语句只有包含两个地址！");
+
+                        SetValue(tac.arg1, GetValue(tac.arg2)); 
+                    }
+                    break;
+                case "+=":
+                    {
+                        if (tac.arg3 != null) throw new Exception("赋值语句只有包含两个地址！");
+
+                        SetValue(tac.arg1, Calculator.CalBinary("+", GetValue(tac.arg1), GetValue(tac.arg2)));
+                    }
+                    break;
+                case "-=":
+                    {
+                        if (tac.arg3 != null) throw new Exception("赋值语句只有包含两个地址！");
+
+                        SetValue(tac.arg1, Calculator.CalBinary("-", GetValue(tac.arg1), GetValue(tac.arg2)));
+                    }
+                    break;
+                case "*=":
+                    {
+                        if (tac.arg3 != null) throw new Exception("赋值语句只有包含两个地址！");
+
+                        SetValue(tac.arg1, Calculator.CalBinary("*", GetValue(tac.arg1), GetValue(tac.arg2)));
+                    }
+                    break;
+                case "/=":
+                    {
+                        if (tac.arg3 != null) throw new Exception("赋值语句只有包含两个地址！");
+
+                        SetValue(tac.arg1, Calculator.CalBinary("/", GetValue(tac.arg1), GetValue(tac.arg2)));
+                    }
+                    break;
+                case "%=":
+                    {
+                        if (tac.arg3 != null) throw new Exception("赋值语句只有包含两个地址！");
+
+                        SetValue(tac.arg1, Calculator.CalBinary("%", GetValue(tac.arg1), GetValue(tac.arg2)));
+                    }
+                    break;
+                case "+":
+                    {
+                        SetValue(tac.arg1, Calculator.CalBinary("+", GetValue(tac.arg2), GetValue(tac.arg3)));
                     }
                     break;
                 case "-":
                     {
-                        return Calculator.CalNegtive(val);
+                        SetValue(tac.arg1, Calculator.CalBinary("-", GetValue(tac.arg2), GetValue(tac.arg3)));
+                    }
+                    break;
+                case "*":
+                    {
+                        SetValue(tac.arg1, Calculator.CalBinary("*", GetValue(tac.arg2), GetValue(tac.arg3)));
+                    }
+                    break;
+                case "/":
+                    {
+                        SetValue(tac.arg1, Calculator.CalBinary("/", GetValue(tac.arg2), GetValue(tac.arg3)));
+                    }
+                    break;
+                case "%":
+                    {
+                        SetValue(tac.arg1, Calculator.CalBinary("%", GetValue(tac.arg2), GetValue(tac.arg3)));
+                    }
+                    break;
+                case "ALLOC":
+                    {
+                        FanObject newfanObj = new FanObject();
+                        this.heap.data["1"] = newfanObj;
+
+                        SetValue(tac.arg1, newfanObj);
+                    }
+                    break;
+                case "IF_FALSE_JUMP":
+                    {
+                        bool conditionTrue = (bool)GetValue(tac.arg1);
+                        if(conditionTrue == false)
+                        {
+                            current = ir.labelDic[tac.arg2];
+                            return;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                case "<":
+                    {
+                        SetValue(tac.arg1, Calculator.CalBinary("<", GetValue(tac.arg2), GetValue(tac.arg3)));
+                    }
+                    break;
+                case "<=":
+                    {
+                        SetValue(tac.arg1, Calculator.CalBinary("<=", GetValue(tac.arg2), GetValue(tac.arg3)));
+                    }
+                    break;
+                case ">":
+                    {
+                        SetValue(tac.arg1, Calculator.CalBinary(">", GetValue(tac.arg2), GetValue(tac.arg3)));
+                    }
+                    break;
+                case ">=":
+                    {
+                        SetValue(tac.arg1, Calculator.CalBinary(">=", GetValue(tac.arg2), GetValue(tac.arg3)));
+                    }
+                    break;
+                case "==":
+                    {
+                        SetValue(tac.arg1, Calculator.CalBinary("==", GetValue(tac.arg2), GetValue(tac.arg3)));
+                    }
+                    break;
+                case "!=":
+                    {
+                        SetValue(tac.arg1, Calculator.CalBinary("!=", GetValue(tac.arg2), GetValue(tac.arg3)));
+                    }
+                    break;
+                case "++":
+                    {
+                        SetValue(tac.arg1, (int)GetValue(tac.arg1) + 1);
+                    }
+                    break;
+                case "--":
+                    {
+                        SetValue(tac.arg1, (int)GetValue(tac.arg1) - 1);
+                    }
+                    break;
+                case "CAST":
+                    {
+                        SetValue(tac.arg1, Calculator.Cast(tac.arg2, GetValue(tac.arg3)));
                     }
                     break;
             }
+
+
+            this.current++;
+        }
+
+
+        private void ResetEnv()
+        {
+            this.ir.EnvHits(current, this.envsHitTemp);
+            this.envsHitTemp.Sort((e1, e2) => e1.depth - e2.depth);
+            this.envStack.Clear();
+            foreach (var env in this.envsHitTemp)
+            {
+                this.envStack.Push(env);
+            }
+        }
+
+        private SymbolTable.Record Query(string symbolName, out SymbolTable tableFound)
+        {
+            for (int i = envStack.Count - 1; i > -1; --i)
+            {
+                if(envStack[i].ContainRecordName(symbolName))
+                {
+                    tableFound = envStack[i];
+                    return envStack[i].GetRecord(symbolName);
+                }
+            }
+
+            Console.WriteLine("在符号表链中未找到：" + symbolName + "符号表链：" + string.Concat(envStack.ToList().Select(e => e.name + " - ")) + " 当前行数：" + current);
+            tableFound = null;
             return null;
         }
 
-        public object Assign(string op, SyntaxTree.ExprNode lNode, SyntaxTree.ExprNode rNode)
+        private object GetValue(string str)
         {
-            if(lNode is SyntaxTree.IdentityNode)
-            {
-                var lexeme = (lNode as SyntaxTree.IdentityNode).token.attribute;
-                int addr = (int)GetIdentidierAddr(lexeme);
+            return AccessData(str, write:false);
+        }
+        private void SetValue(string str, object v)
+        {
+            AccessData(str, write: true, value: v);
+        }
 
-                AssignAddr(op, addr, ExecuteNode(rNode).returnValue);
+        private object AccessData(string str, bool write, object value = null)
+        {
+            //虚拟寄存器  
+            if(str == "RET")
+            {
+                if(write)
+                {
+                    retRegister = value;
+                }
+                else
+                {
+                    return retRegister;
+                }
+                
             }
-            else if(lNode is SyntaxTree.MemberAccessNode)
+            //符号表查找  
+            else if (str[0] == '[')
             {
-                if(lNode is SyntaxTree.ObjectMemberAccessNode)
-                {
+                string expr = TrimName(str);
+                bool isAccess = expr.Contains('.');
 
-                }
-                else if(lNode is SyntaxTree.ThisMemberAccessNode)
+                //普通变量访问  
+                if (isAccess == false)
                 {
+                    string name = expr;
+
+                    return AccessVariable(name, write:write, value);
                 }
-                throw new Exception("未实现");
+                //对象成员访问  
+                else
+                {
+                    string name = expr.Split('.')[0];
+
+                    object obj = AccessVariable(name, write:false);
+
+                    string fieldName = expr.Split('.')[1];
+
+                    if (obj == null) throw new Exception("找不到对象" + name + "！");
+                    if ((obj is FanObject) == false) throw new Exception("对象" + name + "不是FanObject类型！而是" + obj.GetType().Name);
+
+                    if (write)
+                    {
+                        (obj as FanObject).fields[fieldName] = value;
+                        EngineLog("对象" + name + "(InstanceID:" + (obj as FanObject).instanceID + ")字段" + fieldName + "写入：" + (value != null ? value : "null"));
+                        return null;
+                    }
+                    else
+                    {
+                        if ((obj as FanObject).fields.ContainsKey(fieldName) == false) throw new Exception("对象" + name + "字段未初始化" + fieldName);
+                        return (obj as FanObject).fields[fieldName];
+                    }
+                }
+            }
+            //常量(只读)  
+            else if(str.Contains(':') && write == false)
+            {
+                string baseType = str.Split(':')[0];
+                string lex = str.Split(':')[1];
+                switch (baseType)
+                {
+                    case "LITBOOL": return bool.Parse(lex);
+                    case "LITINT": return int.Parse(lex);
+                    case "LITFLOAT": return float.Parse(lex.Substring(0, lex.Length - 1));//去除F标记  
+                    case "LITSTRING": return lex.Substring(1, lex.Length - 2);//去除双引号
+                }
+
+                throw new Exception("未知的参数：" + str);
+            }
+
+            throw new Exception("无法识别：" + str);
+        }
+
+        private object AccessVariable(string varname, bool write, object value = null)
+        {
+            string name = varname;
+
+            var currentEnv = this.envStack.Peek();
+            var currentFrame = this.callStack[this.callStack.Top];
+
+            SymbolTable envFount;
+            var rec = Query(name, out envFount);
+
+            //查找局部符号表  
+            if (rec != null && envFount.tableCatagory != SymbolTable.TableCatagory.GlobalScope)
+            {
+                //是参数  
+                if (rec.category == SymbolTable.RecordCatagory.Param)
+                {
+                    var allParams = envFount.GetByCategory(SymbolTable.RecordCatagory.Param);
+                    int idxInParams = allParams.FindIndex(p => p.name == rec.name);
+                    if (idxInParams < 0) throw new Exception("形参列表中未找到：" + name);
+
+                    if (write)
+                    {
+                        currentFrame.args[currentFrame.args.Top - idxInParams] = value;
+                        EngineLog("参数" + name + "写入：" + (value != null ? value : "null"));
+                        return null;
+                    }
+                    else
+                    {
+                        return currentFrame.args[currentFrame.args.Top - idxInParams];
+                    }
+                }
+                //局部变量  
+                else if (rec.category == SymbolTable.RecordCatagory.Var)
+                {
+                    if (write)
+                    {
+                        currentFrame.localVariables[name] = value;
+                        EngineLog("局部变量" + name + "写入：" + (value != null ? value : "null"));
+                        return null;
+                    }
+                    else
+                    {
+                        if (currentFrame.localVariables.ContainsKey(name) == false)
+                            throw new Exception("局部变量 " + name + "还未初始化！");
+
+                        return currentFrame.localVariables[name];
+                    }
+                }
+                else
+                {
+                    throw new Exception("不是参数也不是局部变量！：" + name);
+                }
+            }
+            //查找全局符号表  
+            else if (compilerContext.globalSymbolTable.ContainRecordName(name))
+            {
+                var gloabalRec = compilerContext.globalSymbolTable.GetRecord(name);
+
+                if (write)
+                {
+                    globalMemory.data[name] = value;
+                    EngineLog("全局变量" + name + "写入：" + (value != null ? value : "null"));
+                    return null;
+                }
+                else
+                {
+                    if (globalMemory.data.ContainsKey(name) == false)
+                        throw new Exception("全局变量 " + name + " 还未初始化！");
+
+                    return globalMemory.data[name];
+                }
             }
             else
             {
-                throw new Exception("只能给左值赋值！");
+                throw new Exception("栈帧和全局符号都不包含：" + name);
+            }
+        }
+
+
+        private string TrimName(string input)
+        {
+            if (input[0] != ('[')) throw new Exception("无法Trim:" + input);
+
+            return input.Substring(1, input.Length - 2);
+        }
+
+
+        private bool IsBaseType(string typeExpr)
+        {
+            switch(typeExpr)
+            {
+                case "bool": return true;
+                case "int": return true;
+                case "float": return true;
+                case "string": return true;
+                default: return false;
+            }
+        }
+        private bool IsFuncType(string typeExpr)
+        {
+            if(typeExpr.Contains("->"))
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+
+        private static void EngineLog(object content)
+        {
+            return;
+            Console.WriteLine("ScriptEngine >>" + content);
+        }
+
+        public static void Log(object content)
+        {
+            Console.WriteLine("FanLang >>" + content);
+        }
+
+        private static object ExternCall(string funcName, List<object> argments)
+        {
+            //静态方法调用  
+            if(funcName.Contains('_'))
+            {
+                int idx = funcName.IndexOf('_');
+                string className = funcName.Substring(0, idx);
+                string staticMemberFuncName = funcName.Substring(idx + 1);
+                
+                Type targetType = null;
+                if(typeCache.ContainsKey(className))
+                {
+                    targetType = typeCache[className];
+                }
+                else
+                {
+                    foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                    {
+                        Type type = null;
+                        foreach(var t in asm.GetTypes())
+                        {
+                            if(t.Name == className)
+                            {
+                                type = t;
+                                targetType = t;
+                                typeCache[className] = t;
+                                break;
+                            }
+                        }
+                        if (type != null) break;
+                    }
+                }
+
+                if(targetType != null)
+                {
+                    var methodInfoOverloads = targetType.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+                        .Where(m => m.Name == staticMemberFuncName);
+
+                    foreach(var overload in methodInfoOverloads)
+                    {
+                        var parameters = overload.GetParameters();
+                        if (parameters.Length != argments.Count) continue;
+
+                        bool nextOverload = false;
+                        for (int i = 0; i < parameters.Length; ++i)
+                        {
+                            if(parameters[i].ParameterType != argments[i].GetType())
+                            {
+                                nextOverload = true;
+                                break;
+                            }
+                        }
+                        if (nextOverload) continue;
+
+                        return overload.Invoke(null, argments.ToArray());
+                    }
+                }
+                else
+                {
+                    throw new Exception("找不到静态方法：" + staticMemberFuncName);
+                }
+            }
+            //预定义方法调用  
+            else
+            {
+                var funcInfo = typeof(ScriptEngine).GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+                    .FirstOrDefault(m => m.Name == funcName);
+                if (funcInfo != null)
+                {
+                    return funcInfo.Invoke(null, argments.ToArray());
+                }
             }
 
             return null;
         }
-        public object AssignAddr(string op, int addr, object rval)
-        {
-            switch (op)
-            {
-                case "=":
-                    {
-                        mem[addr] = rval;
-                        return mem[addr];
-                    }
-                case "+=":
-                    {
-                        mem[addr] = Calculator.CalBinary("+", mem[addr], rval);
-                        return mem[addr];
-                    }
-                case "-=":
-                    {
-                        mem[addr] = Calculator.CalBinary("-", mem[addr], rval);
-                        return mem[addr];
-                    }
-                case "*=":
-                    {
-                        mem[addr] = Calculator.CalBinary("*", mem[addr], rval);
-                        return mem[addr];
-                    }
-                case "/=":
-                    {
-                        mem[addr] = Calculator.CalBinary("/", mem[addr], rval);
-                        return mem[addr];
-                    }
-                case "%=":
-                    {
-                        mem[addr] = Calculator.CalBinary("%", mem[addr], rval);
-                        return mem[addr];
-                    }
-                default:
-                    {
-                        return mem[addr];
-                    }
-            }
-        }
 
-        public object IncDec(SyntaxTree.IncDecNode node)
+        private void PrintCallStack()
         {
-            var token = node.identifierNode.token;
-            int addr = (int)GetIdentidierAddr(token.attribute);
-
-            if(node.isFront)
+            for (int i = 0; i <= callStack.Top; ++i)
             {
-                switch (node.op)
+                Console.WriteLine(i.ToString() + "(top:" + callStack.Top + ")" + new string('-', 20));
+                Console.WriteLine("Arguments:");
+                foreach(var k in callStack[i].args.ToList())
                 {
-                    case "++":
-                        {
-                            var newvalue = Calculator.CalBinary("+", mem[addr], 1);
-                            mem[addr] = newvalue;
-                            return mem[addr];
-                        }
-                    case "--":
-                        {
-                            var newvalue = Calculator.CalBinary("-", mem[addr], 1);
-                            mem[addr] = newvalue;
-                            return mem[addr];
-                        }
+                    Console.WriteLine(k.GetType().Name + ":" + k.ToString());
                 }
-            }
-            else
-            {
-                switch (node.op)
+                Console.WriteLine("LOCALs:");
+                foreach (var k in callStack[i].localVariables.Keys)
                 {
-                    case "++":
-                        {
-                            var prevValue = mem[addr];
-                            var newvalue = Calculator.CalBinary("+", mem[addr], 1);
-                            mem[addr] = newvalue;
-                            return prevValue;
-                        }
-                    case "--":
-                        {
-                            var prevValue = mem[addr];
-                            var newvalue = Calculator.CalBinary("-", mem[addr], 1);
-                            mem[addr] = newvalue;
-                            return prevValue;
-                        }
+                    var v = callStack[i].localVariables[k];
+                    Console.WriteLine(v.GetType().Name + ":" + v.ToString());
                 }
-            }
-
-            throw new Exception("op：" + node.op + " err");
-        }
-
-        public object NewObject(SyntaxTree.NewObjectNode node)
-        {
-            string className = node.className.token.attribute;
-            FanObject obj = new FanObject() { name = className };
-
-            Console.WriteLine("创建了类型为" + className + "的新对象");
-
-            return obj;
-        }
-
-        public object Cast(SyntaxTree.CastNode node)
-        {
-            Type t = (Type)ExecuteNode(node.typeNode).returnValue;
-
-            return System.Convert.ChangeType(ExecuteNode(node.factorNode).returnValue, t);
-        }
-
-        public object MemberAccess(SyntaxTree.MemberAccessNode accessNode)
-        {
-            if(accessNode is SyntaxTree.ObjectMemberAccessNode)
-            {
-            }
-            else if(accessNode is SyntaxTree.ThisMemberAccessNode)
-            {
-            }
-
-            throw new Exception("未实现");
-        }
-
-        public Type ConvertCSharpType(SyntaxTree.TypeNode typeNode)
-        {
-            if(typeNode is SyntaxTree.PrimitiveNode)
-            {
-                var primitive = (typeNode as SyntaxTree.PrimitiveNode).token.name;
-                switch (primitive)
-                {
-                    case "void": return typeof(void);
-                    case "bool": return typeof(bool);
-                    case "int": return typeof(int);
-                    case "float": return typeof(float);
-                    case "string": return typeof(string);
-                    default: throw new Exception("类型错误");
-                }
-            }
-            else if(typeNode is SyntaxTree.ClassTypeNode)
-            {
-                return typeof(FanObject);
-            }
-            return default;
-        }
-
-        public object Call(SyntaxTree.CallNode callNode)
-        {
-            if(callNode.isMemberAccessFunction == false)
-            {
-                string funcName = (callNode.funcNode as SyntaxTree.IdentityNode).token.attribute;
-
-                //实参列表    
-                List<SyntaxTree.ExprNode> argNodes = callNode.argumantsNode.arguments;
-                List<object> args = argNodes.Select(n => ExecuteNode(n).returnValue).ToList();
-
-
-                //是外部调用  
-                if ((int)GetIdentidierAddr(funcName) == -1)
-                {
-                    Console.WriteLine("外部调用：" + funcName);
-                    PrintAllTables();
-                    return ExternCall(funcName, args);
-                }
-
-                //进入函数作用域  
-                int addr = (int)GetIdentidierAddr(funcName);
-                Env funEnv = (Env)mem[addr];
-                envStack.Push(funEnv);
-
-                //返回值  
-                object ret = null;
-
-
-                //DEBUG  
-                if (funEnv.ContainsKey("Node") == false)
-                {
-                    Console.WriteLine("未找到node");
-                    PrintAllTables();
-                }
-
-                //传参（形参初始化）  
-                var declNode = (SyntaxTree.FuncDeclareNode)(mem[funEnv["Node"].addr]);
-                if (args.Count != declNode.parametersNode.parameterNodes.Count) throw new Exception("参数个数不匹配！");
-                for (int i = 0; i < declNode.parametersNode.parameterNodes.Count; ++i) 
-                {
-                    var paramNode = declNode.parametersNode.parameterNodes[i];
-                    string paramName = paramNode.identifierNode.token.attribute;
-                    var rec = envStack.Peek().GetOrNewRecord(paramName);
-                    mem[rec.addr] = args[i];
-                }
-
-                //执行语句  
-                foreach(var stmt in declNode.statementsNode.statements)
-                {
-                    var result = ExecuteNode(stmt);
-                    if(stmt is SyntaxTree.ReturnStmtNode)
-                    {
-                        ret = result.returnValue;
-                        Console.WriteLine("返回值：" + ret);
-                        break;
-                    }
-                }
-
-
-
-                //离开函数作用域  
-                envStack.Pop();
-
-                //返回  
-                return ret;
-            }
-            else
-            {
-            }
-
-            throw new Exception("调用错误！");
-        }
-
-        public object ExternCall(string name, List<object> args)
-        {
-            switch(name)
-            {
-                case "print":
-                    {
-                        Console.WriteLine("fan:" + args[0]);
-                    }
-                    break;
-            }
-            return null;
-        }
-
-
-
-        // ------------- DEBUG -----------------
-        private void PrintAllTables()
-        {
-            for (int i = envStack.Top; i > -1; --i)
-            {
-                var env = envStack[i];
-                env.Print();
+                Console.WriteLine(new string('-', 20));
             }
         }
-
     }
 
     public class Calculator
     {
+        private static string[] arithmeticOperators = new string[] { "+", "-", "*", "/", "%" };
+        private static string[] comparisonOperators = new string[] { ">", "<", ">=", "<=", "==", "!=" };
+
         private static bool IsNumberType(Type type)
         {
             if (type == typeof(int) || type == typeof(float))
@@ -839,28 +798,33 @@ namespace FanLang.ScriptEngine
             Type t1 = v1.GetType();
             Type t2 = v2.GetType();
 
-            if (IsNumberType(t1) && IsNumberType(t2))
+            if (t1 != t2) throw new Exception("类型不同的值不能进行二元运算！");
+
+            //数字计算  
+            if (IsNumberType(t1))
             {
-                if (t1 == typeof(float))
+                //算数运算 
+                if(arithmeticOperators.Contains(op))
                 {
-                    if(t2 == typeof(float))
+                    if (t1 == typeof(float))
                     {
-                        return CalBinary(op, (float)v1 , (float)v2);
-                    }
-                    else if(t2 == typeof(int))
+                        return CalBinaryFloat(op, (float)v1, (float)v2);
+                    } 
+                    else if (t1 == typeof(int))
                     {
-                        return CalBinary(op, (float)v1 , (int)v2);
+                        return CalBinaryInt(op, (int)v1, (int)v2);
                     }
                 }
-                else if(t1 == typeof(int))
+                //布尔运算 
+                else if (comparisonOperators.Contains(op))
                 {
-                    if (t2 == typeof(float))
+                    if (t1 == typeof(float))
                     {
-                        return CalBinary(op, (int)v1, (float)v2);
+                        return CalCompareFloat(op, (float)v1, (float)v2);
                     }
-                    else if (t2 == typeof(int))
+                    else if (t1 == typeof(int))
                     {
-                        return CalBinary(op, (int)v1, (int)v2);
+                        return CalCompareInt(op, (int)v1, (int)v2);
                     }
                 }
             }
@@ -870,7 +834,8 @@ namespace FanLang.ScriptEngine
             }
             return null;
         }
-        public static object CalBinary(string op, int v1, int v2)
+
+        public static object CalBinaryInt(string op, int v1, int v2)
         {
             switch(op)
             {
@@ -882,7 +847,7 @@ namespace FanLang.ScriptEngine
                 default: return null;
             }
         }
-        public static object CalBinary(string op, float v1, int v2)
+        public static object CalBinaryFloat(string op, float v1, float v2)
         {
             switch (op)
             {
@@ -894,28 +859,44 @@ namespace FanLang.ScriptEngine
                 default: return null;
             }
         }
-        public static object CalBinary(string op, int v1, float v2)
+
+
+        public static object CalCompareInt(string op, int v1, int v2)
         {
             switch (op)
             {
-                case "+": return v1 + v2;
-                case "-": return v1 - v2;
-                case "*": return v1 * v2;
-                case "/": return v1 / v2;
-                case "%": return v1 % v2;
+                case ">": return v1 > v2;
+                case "<": return v1 < v2;
+                case ">=": return v1 >= v2;
+                case "<=": return v1 <= v2;
+                case "==": return v1 == v2;
+                case "!=": return v1 != v2;
                 default: return null;
             }
         }
-        public static object CalBinary(string op, float v1, float v2)
+        public static object CalCompareFloat(string op, float v1, float v2)
         {
             switch (op)
             {
-                case "+": return v1 + v2;
-                case "-": return v1 - v2;
-                case "*": return v1 * v2;
-                case "/": return v1 / v2;
-                case "%": return v1 % v2;
+                case ">": return v1 > v2;
+                case "<": return v1 < v2;
+                case ">=": return v1 >= v2;
+                case "<=": return v1 <= v2;
+                case "==": return v1 == v2;
+                case "!=": return v1 != v2;
                 default: return null;
+            }
+        }
+
+        public static object Cast(string toType, object val)
+        {
+            switch (toType)
+            {
+                case "bool": return System.Convert.ToBoolean(val);
+                case "int": return System.Convert.ToInt32(val);
+                case "float": return System.Convert.ToSingle(val);
+                case "string": return val.ToString();
+                default:return null;
             }
         }
     }

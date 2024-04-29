@@ -48,7 +48,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
-    <None Include="WIP.md" />
+    <Content Include="LanguageFeature.txt" />
+    <Content Include="Note.txt" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\FanLang\FanLang.csproj">

@@ -186,6 +186,12 @@ namespace FanLang
         }
 
 
+        public class ExternFuncDeclareNode : DeclareNode
+        {
+            public TypeNode returnTypeNode;
+            public IdentityNode identifierNode;
+            public ParameterListNode parametersNode;
+        }
         public class FuncDeclareNode : DeclareNode
         {
             public TypeNode returnTypeNode;
@@ -326,7 +332,7 @@ namespace FanLang
 
         public class IncDecNode : SpecialExprNode//自增自减表达式（低优先级）
         {
-            public bool isFront;//在前还是在后
+            public bool isOperatorFront;//操作符在标识符前
             public string op;//++、--  
             public IdentityNode identifierNode;
         }
