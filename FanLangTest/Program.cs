@@ -5,6 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using FanLang;
+using FanLang.ScriptEngine;
 
 
 
@@ -16,13 +17,15 @@ namespace FanLangTest
         {
             string source = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\test.txt");
 
-            Compiler.Pause("代码读取完毕，任意键继续...");
-
+            //Compile  
             FanLang.Compiler compiler = new Compiler();
-            compiler.Compile(source);
+            var il = compiler.Compile(source);
 
+            //Interpret  
+            ScriptEngine engine = new ScriptEngine();
+            engine.Execute(il);
 
-            Compiler.Pause("按任意键执行");
+            Compiler.Pause("End");
         }
     }
 }

@@ -64,6 +64,7 @@ namespace FanLang.IR
         public int codeEntry;
         public List<Scope> scopes = new List<Scope>();
         public Scope globalScope = new Scope();
+        public Dictionary<int, FanLang.Stack<SymbolTable>> stackDic;
 
         //完成构建  
         public void Complete()
@@ -73,7 +74,20 @@ namespace FanLang.IR
 
             FillLabelDic();
             BuildMarkArray();
+            CacheEnvStack();
         }
+        //刷新  
+        public bool NeedResetStack(int prev, int curr)
+        {
+            return scopeStatusArr[curr] != scopeStatusArr[prev];
+        }
+        // 获取堆栈  
+        public FanLang.Stack<SymbolTable> GetEnvStack(int currentLine)
+        {
+            var status = this.scopeStatusArr[currentLine];
+            return stackDic[status];
+        }
+
         //填充作用域标记  
         private void BuildMarkArray()
         {
@@ -106,13 +120,37 @@ namespace FanLang.IR
             }
         }
 
-        //跳转行号时是否需要刷新作用域  
-        public bool NeedRefreshStack(int prevLine, int currLine)
+        //缓存符号表栈  
+        private void CacheEnvStack()
         {
-            return this.scopeStatusArr[prevLine] != this.scopeStatusArr[currLine];
+            this.stackDic = new Dictionary<int, Stack<SymbolTable>>();
+
+            List<SymbolTable> tempList = new List<SymbolTable>();
+
+            int prevStatus = -1;
+            for (int i = 0; i < this.codes.Count; ++i)
+            {
+                if(scopeStatusArr[i] != prevStatus)
+                {
+                    int newstate = scopeStatusArr[i];
+                    if (stackDic.ContainsKey(newstate) == false)
+                    {
+                        EnvHits(i, tempList);
+                        tempList.Sort((e1, e2) => e1.depth - e2.depth);
+                        var newEnvStack = new Stack<SymbolTable>();
+                        foreach (var env in tempList)
+                        {
+                            newEnvStack.Push(env);
+                        }
+                        stackDic[newstate] = newEnvStack;
+                    }
+                    prevStatus = newstate;
+                }
+            }
         }
+
         //所在符号表链  
-        public void EnvHits(int currentLine, List<SymbolTable> envs)
+        private void EnvHits(int currentLine, List<SymbolTable> envs)
         {
             envs.Clear();
             envs.Add(globalScope.env);

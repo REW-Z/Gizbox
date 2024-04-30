@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Runtime.InteropServices;
 using FanLang;
 using FanLang.IR;
 
@@ -12,19 +13,15 @@ namespace FanLang.ScriptEngine
     //全局内存区  
     public class GlobalMemory
     {
-        public Dictionary<string, object> data = new Dictionary<string, object>();
+        public Dictionary<string, Value> data = new Dictionary<string, Value>();
     }
-    //堆区    
-    public class HeapMemory
-    {
-        public Dictionary<string, object> data = new Dictionary<string, object>();
-    }
+
     //虚拟栈帧（活动记录）  
     public class Frame
     {
-        public FanLang.Stack<object> args = new FanLang.Stack<object>();//由Caller压栈(从后往前)  
+        public FanLang.Stack<Value> args = new FanLang.Stack<Value>();//由Caller压栈(从后往前)  
         public int returnPtr;//返回地址  
-        public Dictionary<string, object> localVariables = new Dictionary<string, object>();//局部变量和临时变量  
+        public Dictionary<string, Value> localVariables = new Dictionary<string, Value>();//局部变量和临时变量  
     }
 
     //调用堆栈  
@@ -63,35 +60,12 @@ namespace FanLang.ScriptEngine
         }
     }
 
-    // Fan对象  
-    public class FanObject
-    {
-        private static int currentMaxId = 0;
-
-        public int instanceID = 0;
-        public Dictionary<string, object> fields = new Dictionary<string, object>();
-        
-        public FanObject()
-        {
-            this.instanceID = currentMaxId++;
-        }
-        public override string ToString()
-        {
-            return "FanObect(instanceID:" + this.instanceID + ")";
-        }
-    }
-
-
-
-
     //脚本引擎  
     public class ScriptEngine
     {
-        //编译器上下文  
-        public Compiler compilerContext;
-
         //符号表堆栈  
-        public FanLang.Stack<SymbolTable> envStack;
+        public Stack<SymbolTable> envStack;
+
 
         //中间代码  
         public FanLang.IR.IntermediateCodes ir;
@@ -100,92 +74,125 @@ namespace FanLang.ScriptEngine
         //全局内存  
         private GlobalMemory globalMemory = new GlobalMemory();
 
-        //堆区    
-        private HeapMemory heap = new HeapMemory();
-
         //调用堆栈  
         private CallStack callStack = new CallStack();
 
         //返回值寄存器（虚拟）(实际在x86架构通常为EAX寄存器 x86-64架构通常为RAX寄存器)
-        private object retRegister = null;
-
-        //临时数据  
-        private List<SymbolTable> envsHitTemp = new List<SymbolTable>();//所在的所有符号表  
-        private int previous = 0;
+        private Value retRegister = Value.Void;
 
         //外部调用相关  
         private static Dictionary<string, Type> typeCache = new Dictionary<string, Type>();
 
+        //临时数据  
+        private int prev = 0;
+
+        //DEBUG    
+        private static bool enableLog = false;
+        private static bool debug = true;
+        private System.Diagnostics.Stopwatch watch = new System.Diagnostics.Stopwatch();
+        private long prevTicks;
+        private List<long> timeList = new List<long>(10000);
+        private List<int> lineList = new List<int>(10000);
 
 
-        public ScriptEngine(Compiler compiler, FanLang.IR.IntermediateCodes ir)
+
+
+
+
+        public ScriptEngine()
         {
-            this.compilerContext = compiler;
-            this.ir = ir;
-
-            List<string> distinceOps = new List<string>();
-            foreach(var tac in ir.codes)
-            {
-                if(distinceOps.Contains(tac.op) == false)
-                {
-                    distinceOps.Add(tac.op);
-                }
-            }
-            EngineLog("不重复的指令列表：");
-            foreach(var op in distinceOps)
-            {
-                EngineLog(op);
-            }
-            
+            Value data = "str";
         }
 
-        public void Execute()
+        public void Execute(FanLang.IR.IntermediateCodes ir)
         {
-            System.Diagnostics.Stopwatch watch = new System.Diagnostics.Stopwatch();
-            watch.Start();
+            this.ir = ir;
+
 
             //调用堆栈  
             this.callStack = new CallStack();
-
-            //符号表链    
-            this.envStack = new Stack<SymbolTable>();
-            ResetEnv();
             
             //入口
             this.current = ir.codeEntry;
 
+            //符号栈  
+            this.envStack = ir.GetEnvStack(0);
+
             //留空  
             Console.WriteLine(new string('\n', 20));
 
-            while(this.current < ir.codes.Count)
+            watch.Start();
+
+            while (this.current < ir.codes.Count)
             {
                 Interpret(ir.codes[this.current]);
             }
 
             watch.Stop();
 
+            if(debug)
+            {
+                ProfilerLog();
+            }
+
             Console.WriteLine(new string('\n', 3));
-            Console.WriteLine("执行时间：" + watch.ElapsedMilliseconds + "ms");
+            Console.WriteLine("总执行时间：" + watch.ElapsedMilliseconds + "ms");
+
         }
 
-        /*
+        private void ProfilerLog()
+        {
+            Dictionary<int, List<long>> lineToTicksList = new Dictionary<int, List<long>>();
+            for (int i = 0; i < timeList.Count; ++i)
+            {
+                int line = lineList[i];
+                long time = timeList[i];
 
-         */
+                if (lineToTicksList.ContainsKey(line) == false)
+                    lineToTicksList[line] = new List<long>(100);
+
+                lineToTicksList[line].Add(time);
+            }
+
+
+            List<KeyValuePair<int, double>> line_Time_List = new List<KeyValuePair<int, double>>();
+            foreach (var k in lineToTicksList.Keys)
+            {
+                var avg = lineToTicksList[k].Average();
+                line_Time_List.Add(new KeyValuePair<int, double>(k, avg));
+            }
+
+            line_Time_List.Sort((kv1, kv2) => (int)kv1.Value - (int)kv2.Value);
+
+            foreach (var kv in line_Time_List)
+            {
+                Console.WriteLine("line:" + kv.Key + "[" + ir.codes[kv.Key].ToExpression(false) + "]" + "  avgTicks:" + kv.Value);
+            }
+        }
 
         private void Interpret(TAC tac)
         {
-            //设置符号表链（用于解析符号）  
+            //DEBUG信息  
+            if(debug)
             {
-                if (this.ir.NeedRefreshStack(previous, current))
-                {
-                    ResetEnv();
-                }
-                previous = current;
+                lineList.Add(prev);
+                timeList.Add(watch.ElapsedTicks - prevTicks);
+                prevTicks = watch.ElapsedTicks;
+
             }
+
+            //设置符号表链（用于解析符号）  
+            if (this.ir.NeedResetStack(current, prev))
+            {
+                this.envStack = this.ir.GetEnvStack(current);
+            }
+            prev = current;
             
 
             //开始指向本条指令  
-            EngineLog(new string('>', 10) + tac.ToExpression(showlabel:false));
+            if(enableLog) 
+                EngineLog(new string('>', 10) + tac.ToExpression(showlabel:false));
+            
             switch(tac.op)
             {
                 case "": break;
@@ -256,10 +263,10 @@ namespace FanLang.ScriptEngine
                     }
                 case "EXTERN_IMPL":
                     {
-                        List<object> arguments = callStack[callStack.Top].args.ToList();
+                        List<Value> arguments = callStack[callStack.Top].args.ToList();
                         arguments.Reverse();
 
-                        var result = ExternCall(tac.arg1, arguments);
+                        Value result = ExternCall(tac.arg1, arguments);
 
                         retRegister = result;
 
@@ -277,7 +284,7 @@ namespace FanLang.ScriptEngine
                     break;
                 case "PARAM":
                     {
-                        object arg = GetValue(tac.arg1); if (arg == null) throw new Exception("null实参");
+                        Value arg = GetValue(tac.arg1); if (arg.Type == FanType.Void) throw new Exception("null实参");
                         this.callStack[this.callStack.Top + 1].args.Push(arg);
                     }
                     break;
@@ -368,14 +375,12 @@ namespace FanLang.ScriptEngine
                 case "ALLOC":
                     {
                         FanObject newfanObj = new FanObject();
-                        this.heap.data["1"] = newfanObj;
-
                         SetValue(tac.arg1, newfanObj);
                     }
                     break;
                 case "IF_FALSE_JUMP":
                     {
-                        bool conditionTrue = (bool)GetValue(tac.arg1);
+                        bool conditionTrue = GetValue(tac.arg1).AsBool;
                         if(conditionTrue == false)
                         {
                             current = ir.labelDic[tac.arg2];
@@ -418,12 +423,12 @@ namespace FanLang.ScriptEngine
                     break;
                 case "++":
                     {
-                        SetValue(tac.arg1, (int)GetValue(tac.arg1) + 1);
+                        SetValue(tac.arg1, GetValue(tac.arg1) + 1);
                     }
                     break;
                 case "--":
                     {
-                        SetValue(tac.arg1, (int)GetValue(tac.arg1) - 1);
+                        SetValue(tac.arg1, GetValue(tac.arg1) - 1);
                     }
                     break;
                 case "CAST":
@@ -438,16 +443,6 @@ namespace FanLang.ScriptEngine
         }
 
 
-        private void ResetEnv()
-        {
-            this.ir.EnvHits(current, this.envsHitTemp);
-            this.envsHitTemp.Sort((e1, e2) => e1.depth - e2.depth);
-            this.envStack.Clear();
-            foreach (var env in this.envsHitTemp)
-            {
-                this.envStack.Push(env);
-            }
-        }
 
         private SymbolTable.Record Query(string symbolName, out SymbolTable tableFound)
         {
@@ -465,16 +460,16 @@ namespace FanLang.ScriptEngine
             return null;
         }
 
-        private object GetValue(string str)
+        private Value GetValue(string str)
         {
             return AccessData(str, write:false);
         }
-        private void SetValue(string str, object v)
+        private void SetValue(string str, Value v)
         {
             AccessData(str, write: true, value: v);
         }
 
-        private object AccessData(string str, bool write, object value = null)
+        private Value AccessData(string str, bool write, Value value = default)
         {
             //虚拟寄存器  
             if(str == "RET")
@@ -499,31 +494,33 @@ namespace FanLang.ScriptEngine
                 if (isAccess == false)
                 {
                     string name = expr;
-
-                    return AccessVariable(name, write:write, value);
+                    var varible = AccessVariable(name, write:write, value);
+                    return varible;
                 }
                 //对象成员访问  
                 else
                 {
+
                     string name = expr.Split('.')[0];
 
-                    object obj = AccessVariable(name, write:false);
+                    Value obj = AccessVariable(name, write:false);
 
                     string fieldName = expr.Split('.')[1];
 
-                    if (obj == null) throw new Exception("找不到对象" + name + "！");
-                    if ((obj is FanObject) == false) throw new Exception("对象" + name + "不是FanObject类型！而是" + obj.GetType().Name);
+                    if ((obj.IsVoid)) throw new Exception("找不到对象" + name + "！");
+                    if (obj.Type != FanType.FanObject) throw new Exception("对象" + name + "不是FanObject类型！而是" + obj.GetType().Name);
+
 
                     if (write)
                     {
-                        (obj as FanObject).fields[fieldName] = value;
-                        EngineLog("对象" + name + "(InstanceID:" + (obj as FanObject).instanceID + ")字段" + fieldName + "写入：" + (value != null ? value : "null"));
-                        return null;
+                        (obj.AsObject as FanObject).fields[fieldName] = value;
+                        if(enableLog) EngineLog("对象" + name + "(InstanceID:" + (obj.AsObject as FanObject).instanceID + ")字段" + fieldName + "写入：" + value.ToString());
+                        return Value.Void;
                     }
                     else
                     {
-                        if ((obj as FanObject).fields.ContainsKey(fieldName) == false) throw new Exception("对象" + name + "字段未初始化" + fieldName);
-                        return (obj as FanObject).fields[fieldName];
+                        if ((obj.AsObject as FanObject).fields.ContainsKey(fieldName) == false) throw new Exception("对象" + name + "字段未初始化" + fieldName);
+                        return (obj.AsObject as FanObject).fields[fieldName];
                     }
                 }
             }
@@ -546,7 +543,7 @@ namespace FanLang.ScriptEngine
             throw new Exception("无法识别：" + str);
         }
 
-        private object AccessVariable(string varname, bool write, object value = null)
+        private Value AccessVariable(string varname, bool write, Value value = default)
         {
             string name = varname;
 
@@ -554,6 +551,14 @@ namespace FanLang.ScriptEngine
             var currentFrame = this.callStack[this.callStack.Top];
 
             SymbolTable envFount;
+
+            bool logt = false;
+            if(value.Type == FanType.FanObject && write)
+            {
+                ProfileBegin(""); ProfileEnd();
+                logt = true;
+            }
+
             var rec = Query(name, out envFount);
 
             //查找局部符号表  
@@ -569,8 +574,8 @@ namespace FanLang.ScriptEngine
                     if (write)
                     {
                         currentFrame.args[currentFrame.args.Top - idxInParams] = value;
-                        EngineLog("参数" + name + "写入：" + (value != null ? value : "null"));
-                        return null;
+                        if (enableLog) EngineLog("参数" + name + "写入：" + value.ToString());
+                        return Value.Void;
                     }
                     else
                     {
@@ -583,8 +588,8 @@ namespace FanLang.ScriptEngine
                     if (write)
                     {
                         currentFrame.localVariables[name] = value;
-                        EngineLog("局部变量" + name + "写入：" + (value != null ? value : "null"));
-                        return null;
+                        if (enableLog) EngineLog("局部变量" + name + "写入：" + value.ToString());
+                        return Value.Void;
                     }
                     else
                     {
@@ -600,15 +605,26 @@ namespace FanLang.ScriptEngine
                 }
             }
             //查找全局符号表  
-            else if (compilerContext.globalSymbolTable.ContainRecordName(name))
+            else if (this.ir.globalScope.env.ContainRecordName(name))
             {
-                var gloabalRec = compilerContext.globalSymbolTable.GetRecord(name);
+                if (logt)
+                {
+                    ProfileBegin("GetRecord");
+                }
+                var gloabalRec = this.ir.globalScope.env.GetRecord(name);
+
+                if (logt)
+                {
+                    ProfileEnd();
+                }
+
 
                 if (write)
                 {
                     globalMemory.data[name] = value;
-                    EngineLog("全局变量" + name + "写入：" + (value != null ? value : "null"));
-                    return null;
+
+                    if (enableLog) EngineLog("全局变量" + name + "写入：" + value.ToString());
+                    return Value.Void;
                 }
                 else
                 {
@@ -659,7 +675,7 @@ namespace FanLang.ScriptEngine
 
         private static void EngineLog(object content)
         {
-            return;
+            if (!enableLog) return;
             Console.WriteLine("ScriptEngine >>" + content);
         }
 
@@ -668,10 +684,13 @@ namespace FanLang.ScriptEngine
             Console.WriteLine("FanLang >>" + content);
         }
 
-        private static object ExternCall(string funcName, List<object> argments)
+        private static Value ExternCall(string funcName, List<Value> argments)
         {
+            object[] argumentsBoxed = argments.Select(a => a.Box()).ToArray();
+
+
             //静态方法调用  
-            if(funcName.Contains('_'))
+            if (funcName.Contains('_'))
             {
                 int idx = funcName.IndexOf('_');
                 string className = funcName.Substring(0, idx);
@@ -722,7 +741,7 @@ namespace FanLang.ScriptEngine
                         }
                         if (nextOverload) continue;
 
-                        return overload.Invoke(null, argments.ToArray());
+                        return Value.UnBox(overload.Invoke(null, argumentsBoxed));
                     }
                 }
                 else
@@ -737,11 +756,24 @@ namespace FanLang.ScriptEngine
                     .FirstOrDefault(m => m.Name == funcName);
                 if (funcInfo != null)
                 {
-                    return funcInfo.Invoke(null, argments.ToArray());
+                    return Value.UnBox(funcInfo.Invoke(null, argumentsBoxed));
                 }
             }
 
-            return null;
+            return Value.Void;
+        }
+
+        private System.Diagnostics.Stopwatch profileW = new System.Diagnostics.Stopwatch();
+        private string profileName = "";
+        private void ProfileBegin(string name)
+        {
+            profileName = name;
+            profileW.Restart();
+        }
+        private void ProfileEnd()
+        {
+            profileW.Stop();
+            Console.WriteLine(profileName + ": " + profileW.ElapsedTicks);
         }
 
         private void PrintCallStack()
@@ -770,84 +802,16 @@ namespace FanLang.ScriptEngine
         private static string[] arithmeticOperators = new string[] { "+", "-", "*", "/", "%" };
         private static string[] comparisonOperators = new string[] { ">", "<", ">=", "<=", "==", "!=" };
 
-        private static bool IsNumberType(Type type)
+        public static Value CalNegtive(Value v)
         {
-            if (type == typeof(int) || type == typeof(float))
-                return true;
-
-            return false;
-        }
-        public static object CalNegtive(object v)
-        {
-            Type t = v.GetType();
-            if (IsNumberType(t))
+            switch(v.Type)
             {
-                if (t == typeof(float))
-                {
-                    return -(float)v;
-                }
-                else if (t == typeof(int))
-                {
-                    return -(int)v;
-                }
-            }
-            return null;
-        }
-        public static object CalBinary(string op, object v1, object v2)
-        {
-            Type t1 = v1.GetType();
-            Type t2 = v2.GetType();
-
-            if (t1 != t2) throw new Exception("类型不同的值不能进行二元运算！");
-
-            //数字计算  
-            if (IsNumberType(t1))
-            {
-                //算数运算 
-                if(arithmeticOperators.Contains(op))
-                {
-                    if (t1 == typeof(float))
-                    {
-                        return CalBinaryFloat(op, (float)v1, (float)v2);
-                    } 
-                    else if (t1 == typeof(int))
-                    {
-                        return CalBinaryInt(op, (int)v1, (int)v2);
-                    }
-                }
-                //布尔运算 
-                else if (comparisonOperators.Contains(op))
-                {
-                    if (t1 == typeof(float))
-                    {
-                        return CalCompareFloat(op, (float)v1, (float)v2);
-                    }
-                    else if (t1 == typeof(int))
-                    {
-                        return CalCompareInt(op, (int)v1, (int)v2);
-                    }
-                }
-            }
-            else if ((t1 == typeof(string) || t2 == typeof(string)) && op == "+")
-            {
-                return v1.ToString() + v2.ToString();
-            }
-            return null;
-        }
-
-        public static object CalBinaryInt(string op, int v1, int v2)
-        {
-            switch(op)
-            {
-                case "+": return v1 + v2;
-                case "-": return v1 - v2;
-                case "*": return v1 * v2;
-                case "/": return v1 / v2;
-                case "%": return v1 % v2;
-                default: return null;
+                case FanType.Int: return -(v.AsInt);
+                case FanType.Float: return -(v.AsFloat);
+                default: throw new Exception("错误类型");
             }
         }
-        public static object CalBinaryFloat(string op, float v1, float v2)
+        public static Value CalBinary(string op, Value v1, Value v2)
         {
             switch (op)
             {
@@ -856,47 +820,38 @@ namespace FanLang.ScriptEngine
                 case "*": return v1 * v2;
                 case "/": return v1 / v2;
                 case "%": return v1 % v2;
-                default: return null;
-            }
-        }
 
-
-        public static object CalCompareInt(string op, int v1, int v2)
-        {
-            switch (op)
-            {
                 case ">": return v1 > v2;
                 case "<": return v1 < v2;
                 case ">=": return v1 >= v2;
                 case "<=": return v1 <= v2;
                 case "==": return v1 == v2;
                 case "!=": return v1 != v2;
-                default: return null;
-            }
-        }
-        public static object CalCompareFloat(string op, float v1, float v2)
-        {
-            switch (op)
-            {
-                case ">": return v1 > v2;
-                case "<": return v1 < v2;
-                case ">=": return v1 >= v2;
-                case "<=": return v1 <= v2;
-                case "==": return v1 == v2;
-                case "!=": return v1 != v2;
-                default: return null;
+
+                default: return Value.Void;
             }
         }
 
-        public static object Cast(string toType, object val)
+        public static Value Cast(string toType, Value val)
         {
             switch (toType)
             {
-                case "bool": return System.Convert.ToBoolean(val);
-                case "int": return System.Convert.ToInt32(val);
-                case "float": return System.Convert.ToSingle(val);
-                case "string": return val.ToString();
-                default:return null;
+                case "bool":
+                    {
+                        if(val.Type == FanType.Bool)
+                        {
+                            return val.AsBool;
+                        }
+                        throw new Exception("错误的转换：" + val.Type + "  ->  " + toType);
+                    }
+                case "int": return System.Convert.ToInt32(val.Box());
+                case "float": return System.Convert.ToSingle(val.Box());
+                case "string": return val.Box().ToString();
+                default:
+                    {
+                        //类转换...里氏替换  
+                    }
+                    return Value.Void;
             }
         }
     }

@@ -8,6 +8,16 @@ using System.Collections.Generic;
 
 namespace FanLang
 {
+    public enum FanType : byte
+    {
+        Void,
+        Int,
+        Float,
+        Bool,
+        String,
+        FanObject,
+    }
+
     /// <summary>
     /// 模式  
     /// </summary>
@@ -591,7 +601,7 @@ namespace FanLang
         /// <summary>
         /// 编译  
         /// </summary>
-        public void Compile(string source)
+        public IR.IntermediateCodes Compile(string source)
         {
             //词法分析  
             Scanner scanner = new Scanner();
@@ -616,14 +626,9 @@ namespace FanLang
             //中间代码生成    
             FanLang.IR.ILGenerator ilGenerator = new IR.ILGenerator(this.syntaxTree, this);
             ilGenerator.Generate();
-            
 
 
-            //脚本引擎  
-            ScriptEngine.ScriptEngine engine = new ScriptEngine.ScriptEngine(this, ilGenerator.il);
-            engine.Execute();
-
-            Compiler.Pause("执行完毕");
+            return ilGenerator.il;
         }
     }
 
