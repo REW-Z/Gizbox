@@ -1,59 +1,43 @@
-﻿
-extern void Log(string text);
-extern void Console_WriteLine(string text);
+﻿import <"F:\Legacy\MyProjects\FanLang\FanLangTest\bin\Debug\lib.txt">
 
-class Person
-{
-	string name = "AAA";
-	int age = 0;
-
-	int AgeAdd(int year)
-	{
-		this.age += year;
-		return this.age;
-	}
-	int Birthday()
-	{
-		int newage = this.AgeAdd(1);
-		return newage;
-	}
-}
 
 Person sam = new Person();
 int newAge = sam.Birthday();
 
+Log(newAge);
+
 int result = 0;
 sam.age = 0;
 
-for(int i = 0; i < 99; i++)
+for(int i = 0; i < 5; i++)
 {
 	int j = 0;
-	while(j < 99)
+	while(j < 999)
 	{
 		sam.age  = sam.age + 1;
 		j++;
 
-		if(j >= 11) break;
+		if(j >= 10) break;
 	}
 }
 
 result = sam.age;
 
-Log(result);
+Log("sam年龄" + (string)result);
 
 result += (int)2.0f;
 
-Log(result);
+Log("过了2年后");
 
-if(result > 2000)
+if(result > 100)
 {
-	Log("多于 2000 !");
+	Log("多于 100 !");
 }
-else if(result > 1000)
+else if(result > 50)
 {
-	Log((string)result + "多于 1000 !");
+	Log((string)result + "多于 50 !");
 }
 else
 {
-	Log("少于 1000 !");
+	Log("少于等于 50 !");
 }

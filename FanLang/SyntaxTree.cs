@@ -156,9 +156,17 @@ namespace FanLang
 
         public class ProgramNode : Node
         {
+            public List<ImportNode> importNodes;
             public StatementsNode statementsNode;
         }
 
+
+        // ******************** IMPT NODES ******************************
+
+        public class ImportNode : Node
+        {
+            public string uri;
+        }
 
         // ******************** STMT NODES ******************************
 

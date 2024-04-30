@@ -1,0 +1,20 @@
+﻿
+extern void Log(string text);
+extern void Console_WriteLine(string text);
+
+class Person
+{
+	string name = "AAA";
+	int age = 18;
+
+	int AgeAdd(int year)
+	{
+		this.age += year;
+		return this.age;
+	}
+	int Birthday()
+	{
+		int newage = this.AgeAdd(1);
+		return newage;
+	}
+}

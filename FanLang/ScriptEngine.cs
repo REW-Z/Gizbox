@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Runtime.InteropServices;
 using FanLang;
-using FanLang.IR;
+using FanLang.IL;
 
 
 namespace FanLang.ScriptEngine
@@ -20,7 +20,7 @@ namespace FanLang.ScriptEngine
     public class Frame
     {
         public FanLang.Stack<Value> args = new FanLang.Stack<Value>();//由Caller压栈(从后往前)  
-        public int returnPtr;//返回地址  
+        public Tuple<int,int> returnPtr;//返回地址  
         public Dictionary<string, Value> localVariables = new Dictionary<string, Value>();//局部变量和临时变量  
     }
 
@@ -68,8 +68,7 @@ namespace FanLang.ScriptEngine
 
 
         //中间代码  
-        public FanLang.IR.IntermediateCodes ir;
-        private int current;
+        public FanLang.IL.ILUnit mainUnit;
 
         //全局内存  
         private GlobalMemory globalMemory = new GlobalMemory();
@@ -84,6 +83,9 @@ namespace FanLang.ScriptEngine
         private static Dictionary<string, Type> typeCache = new Dictionary<string, Type>();
 
         //临时数据  
+        private int currUnit = -1;
+        private int curr = 0;
+        private int prevUnit = -1;
         private int prev = 0;
 
         //DEBUG    
@@ -104,28 +106,35 @@ namespace FanLang.ScriptEngine
             Value data = "str";
         }
 
-        public void Execute(FanLang.IR.IntermediateCodes ir)
+        public void Execute(FanLang.IL.ILUnit ir)
         {
-            this.ir = ir;
-
+            this.mainUnit = ir;
 
             //调用堆栈  
             this.callStack = new CallStack();
             
             //入口
-            this.current = ir.codeEntry;
+            this.curr = ir.codeEntry;
 
             //符号栈  
-            this.envStack = ir.GetEnvStack(0);
+            this.envStack = ir.GetEnvStack(-1 , 0);
 
             //留空  
+            Console.WriteLine("开始执行");
             Console.WriteLine(new string('\n', 20));
 
             watch.Start();
 
-            while (this.current < ir.codes.Count)
+            while ((this.currUnit == -1 && this.curr >= ir.codes.Count) == false)
             {
-                Interpret(ir.codes[this.current]);
+                if(this.currUnit == -1)
+                {
+                    Interpret(ir.codes[this.curr]);
+                }
+                else
+                {
+                    Interpret(ir.dependencies[this.currUnit].codes[this.curr]);
+                }
             }
 
             watch.Stop();
@@ -142,6 +151,9 @@ namespace FanLang.ScriptEngine
 
         private void ProfilerLog()
         {
+            Console.WriteLine(new string('\n', 3));
+            Console.WriteLine(" ---- 性能剖析 ---- ");
+
             Dictionary<int, List<long>> lineToTicksList = new Dictionary<int, List<long>>();
             for (int i = 0; i < timeList.Count; ++i)
             {
@@ -166,31 +178,33 @@ namespace FanLang.ScriptEngine
 
             foreach (var kv in line_Time_List)
             {
-                Console.WriteLine("line:" + kv.Key + "[" + ir.codes[kv.Key].ToExpression(false) + "]" + "  avgTicks:" + kv.Value);
+                Console.WriteLine("line:" + kv.Key + "[" + mainUnit.codes[kv.Key].ToExpression(false) + "]" + "  avgTicks:" + kv.Value);
             }
         }
 
         private void Interpret(TAC tac)
         {
             //DEBUG信息  
-            if(debug)
+            if (debug)
             {
+                //Console.WriteLine("Exe:  " + currUnit + " {" + curr + "}" + tac.ToExpression(false));
+                //Console.ReadKey();
                 lineList.Add(prev);
                 timeList.Add(watch.ElapsedTicks - prevTicks);
                 prevTicks = watch.ElapsedTicks;
-
             }
 
             //设置符号表链（用于解析符号）  
-            if (this.ir.NeedResetStack(current, prev))
+            if (this.mainUnit.NeedResetStack(this.currUnit, this.curr, this.prevUnit, this.prev))
             {
-                this.envStack = this.ir.GetEnvStack(current);
+                this.envStack = this.mainUnit.GetEnvStack(this.currUnit, this.curr);
             }
-            prev = current;
-            
+            prev = curr;
+            prevUnit = currUnit;
+
 
             //开始指向本条指令  
-            if(enableLog) 
+            if (enableLog) 
                 EngineLog(new string('>', 10) + tac.ToExpression(showlabel:false));
             
             switch(tac.op)
@@ -198,7 +212,9 @@ namespace FanLang.ScriptEngine
                 case "": break;
                 case "JUMP":
                     {
-                        this.current = ir.labelDic[tac.arg1];
+                        var jaddr = mainUnit.QueryLabel(tac.arg1);
+                        this.currUnit = jaddr.Item1;
+                        this.curr = jaddr.Item2;
                         return;
                     } 
                 case "FUNC_BEGIN": 
@@ -210,7 +226,8 @@ namespace FanLang.ScriptEngine
                 case "FUNC_END":
                     {
                         //返回地址  
-                        current = this.callStack[callStack.Top].returnPtr;
+                        this.currUnit = this.callStack[callStack.Top].returnPtr.Item1;
+                        this.curr = this.callStack[callStack.Top].returnPtr.Item2;
 
                         //返回原栈帧  
                         this.callStack.Top -= 1;
@@ -233,7 +250,8 @@ namespace FanLang.ScriptEngine
                 case "METHOD_END":
                     {
                         //返回地址  
-                        current = this.callStack[callStack.Top].returnPtr;
+                        this.currUnit = this.callStack[callStack.Top].returnPtr.Item1;
+                        this.curr = this.callStack[callStack.Top].returnPtr.Item2;
 
                         //返回原栈帧  
                         this.callStack.Top -= 1;
@@ -250,14 +268,17 @@ namespace FanLang.ScriptEngine
                         {
                             retRegister = GetValue(tac.arg1);
                         }
-                        int exitLine = ir.labelDic["exit:" + envStack.Peek().name];
+                        var jumpAddr = mainUnit.QueryLabel("exit:" + envStack.Peek().name);
+                        int exitLine = jumpAddr.Item2;
                         int endLine = exitLine - 1;    
                         
-                        if(ir.codes[endLine].op != "METHOD_END" && ir.codes[endLine].op != "FUNC_END")
-                        {
-                            throw new Exception("函数或方法的END没有紧接exit标签");  
-                        }
-                        this.current = endLine;
+                        //不能使用ir判断
+                        //if(ir.codes[endLine].op != "METHOD_END" && ir.codes[endLine].op != "FUNC_END")
+                        //{
+                        //    throw new Exception("函数或方法的END没有紧接exit标签");  
+                        //}
+                        this.curr = endLine;
+                        this.currUnit = jumpAddr.Item1;
 
                         return;
                     }
@@ -270,18 +291,19 @@ namespace FanLang.ScriptEngine
 
                         retRegister = result;
 
-                        int exitLine = ir.labelDic["exit:" + envStack.Peek().name];
+                        var jumpAddr = mainUnit.QueryLabel("exit:" + envStack.Peek().name); 
+                        int exitLine = jumpAddr.Item2;
                         int endLine = exitLine - 1;
 
-                        if (ir.codes[endLine].op != "METHOD_END" && ir.codes[endLine].op != "FUNC_END")
-                        {
-                            throw new Exception("函数或方法的END没有紧接exit标签");
-                        }
-                        this.current = endLine;
+                        //if (ir.codes[endLine].op != "METHOD_END" && ir.codes[endLine].op != "FUNC_END")
+                        //{
+                        //    throw new Exception("函数或方法的END没有紧接exit标签");
+                        //}
+                        this.curr = endLine;
+                        this.currUnit = jumpAddr.Item1;
 
                         return;
                     }
-                    break;
                 case "PARAM":
                     {
                         Value arg = GetValue(tac.arg1); if (arg.Type == FanType.Void) throw new Exception("null实参");
@@ -293,15 +315,13 @@ namespace FanLang.ScriptEngine
                         string funcFullName = TrimName(tac.arg1);
                         int argCount = int.Parse(tac.arg2);
 
-                        this.callStack[this.callStack.Top + 1].returnPtr = (current + 1);
-
+                        this.callStack[this.callStack.Top + 1].returnPtr = new Tuple<int, int>(this.currUnit, (this.curr + 1));
+                        
                         string label = "entry:" + funcFullName;
 
-                        if (ir.labelDic.ContainsKey(label))
-                        {
-                            current = ir.labelDic[label];
-                        }
-                        
+                        var jumpAddr = mainUnit.QueryLabel(label);
+                        this.curr = jumpAddr.Item2;
+                        this.currUnit = jumpAddr.Item1;
 
                         return;
                     }
@@ -383,7 +403,10 @@ namespace FanLang.ScriptEngine
                         bool conditionTrue = GetValue(tac.arg1).AsBool;
                         if(conditionTrue == false)
                         {
-                            current = ir.labelDic[tac.arg2];
+                            var jumpAddr = mainUnit.QueryLabel(tac.arg2);
+                            
+                            this.curr = jumpAddr.Item2;
+                            this.currUnit = jumpAddr.Item1;
                             return;
                         }
                         else
@@ -439,7 +462,7 @@ namespace FanLang.ScriptEngine
             }
 
 
-            this.current++;
+            this.curr++;
         }
 
 
@@ -455,7 +478,7 @@ namespace FanLang.ScriptEngine
                 }
             }
 
-            Console.WriteLine("在符号表链中未找到：" + symbolName + "符号表链：" + string.Concat(envStack.ToList().Select(e => e.name + " - ")) + " 当前行数：" + current);
+            Console.WriteLine("在符号表链中未找到：" + symbolName + "符号表链：" + string.Concat(envStack.ToList().Select(e => e.name + " - ")) + " 当前行数：" + curr);
             tableFound = null;
             return null;
         }
@@ -552,13 +575,6 @@ namespace FanLang.ScriptEngine
 
             SymbolTable envFount;
 
-            bool logt = false;
-            if(value.Type == FanType.FanObject && write)
-            {
-                ProfileBegin(""); ProfileEnd();
-                logt = true;
-            }
-
             var rec = Query(name, out envFount);
 
             //查找局部符号表  
@@ -605,19 +621,9 @@ namespace FanLang.ScriptEngine
                 }
             }
             //查找全局符号表  
-            else if (this.ir.globalScope.env.ContainRecordName(name))
+            else if (this.mainUnit.globalScope.env.ContainRecordName(name))
             {
-                if (logt)
-                {
-                    ProfileBegin("GetRecord");
-                }
-                var gloabalRec = this.ir.globalScope.env.GetRecord(name);
-
-                if (logt)
-                {
-                    ProfileEnd();
-                }
-
+                var gloabalRec = this.mainUnit.globalScope.env.GetRecord(name);
 
                 if (write)
                 {

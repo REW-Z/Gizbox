@@ -21,11 +21,14 @@ namespace FanLangTest
             FanLang.Compiler compiler = new Compiler();
             var il = compiler.Compile(source);
 
+
+            Compiler.Pause("Compile End");
+
             //Interpret  
             ScriptEngine engine = new ScriptEngine();
             engine.Execute(il);
 
-            Compiler.Pause("End");
+            Compiler.Pause("Execute End");
         }
     }
 }

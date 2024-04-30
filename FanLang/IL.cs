@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using FanLang;
 
-namespace FanLang.IR
+namespace FanLang.IL
 {
     public class TAC
     {
@@ -55,16 +55,49 @@ namespace FanLang.IR
         public SymbolTable env;
     }
 
-    public class IntermediateCodes
+
+    public class ILUnit
     {
         //中间代码信息  
-        public Dictionary<string, int> labelDic = new Dictionary<string, int>();
+        public List<ILUnit> dependencies = new List<ILUnit>();
+        private Dictionary<string, int> label2Line = new Dictionary<string, int>(); 
         public List<TAC> codes = new List<TAC>();
         public int[] scopeStatusArr;
         public int codeEntry;
         public List<Scope> scopes = new List<Scope>();
-        public Scope globalScope = new Scope();
+        public Scope globalScope;
         public Dictionary<int, FanLang.Stack<SymbolTable>> stackDic;
+
+        public ILUnit()
+        {
+            var globalSymbolTable = new SymbolTable("global", SymbolTable.TableCatagory.GlobalScope);
+            this.globalScope = new Scope() { env = globalSymbolTable };
+        }
+
+        public Tuple<int, int> QueryLabel(string label)
+        {
+            if (label2Line.ContainsKey(label) == true)
+            {
+                return new Tuple<int, int>(-1, label2Line[label]);
+            }
+            else
+            {
+                for (int i = 0; i < dependencies.Count; ++i)
+                {
+                    if (dependencies[i].label2Line.ContainsKey(label))
+                    {
+                        return new Tuple<int, int>(i, dependencies[i].label2Line[label]);
+                    }
+                }
+            }
+            throw new Exception("本单元和库中找不到标签" + label);
+        }
+
+        //添加依赖  
+        public void AddDependency(ILUnit dep)
+        {
+            this.dependencies.Add(dep);
+        }
 
         //完成构建  
         public void Complete()
@@ -77,15 +110,32 @@ namespace FanLang.IR
             CacheEnvStack();
         }
         //刷新  
-        public bool NeedResetStack(int prev, int curr)
+        public bool NeedResetStack(int prevUnit, int prev, int currUnit, int curr)
         {
-            return scopeStatusArr[curr] != scopeStatusArr[prev];
+            if (prevUnit != currUnit) return true;
+
+            if(currUnit == -1)
+            {
+                return scopeStatusArr[curr] != scopeStatusArr[prev];
+            }
+            else
+            {
+                return this.dependencies[currUnit].scopeStatusArr[curr] != this.dependencies[currUnit].scopeStatusArr[prev];
+            }
         }
         // 获取堆栈  
-        public FanLang.Stack<SymbolTable> GetEnvStack(int currentLine)
+        public FanLang.Stack<SymbolTable> GetEnvStack(int currentUnit, int currentLine)
         {
-            var status = this.scopeStatusArr[currentLine];
-            return stackDic[status];
+            if(currentUnit == -1)
+            {
+                var status = this.scopeStatusArr[currentLine];
+                return stackDic[status];
+            }
+            else
+            {
+                var extStatus = this.dependencies[currentUnit].scopeStatusArr[currentLine];
+                return this.dependencies[currentUnit].stackDic[extStatus];
+            }
         }
 
         //填充作用域标记  
@@ -115,7 +165,7 @@ namespace FanLang.IR
             {
                 if (string.IsNullOrEmpty(codes[i].label) == false)
                 {
-                    labelDic[codes[i].label] = i;
+                    label2Line[codes[i].label] = i;
                 }
             }
         }
@@ -162,6 +212,25 @@ namespace FanLang.IR
                 }
             }
         }
+
+
+        public void Print()
+        {
+            Console.WriteLine("中间代码输出：(" + this.codes.Count + "行)");
+            Console.WriteLine(new string('-', 50));
+            for (int i = 0; i < this.codes.Count; ++i)
+            {
+                Console.WriteLine($"{i.ToString().PadRight(4)}|status {this.scopeStatusArr[i].ToString().PadRight(3)}|{this.codes[i].ToExpression()}");
+            }
+            Console.WriteLine(new string('-', 50));
+
+
+            Console.WriteLine("作用域：");
+            foreach (var scope in this.scopes)
+            {
+                Console.WriteLine("scope:" + scope.env.name + ":  " + scope.lineFrom + " ~ " + scope.lineTo);
+            }
+        }
     }
 
 
@@ -171,11 +240,9 @@ namespace FanLang.IR
     public class ILGenerator
     {
         //public  
-        public Compiler complierContext; 
-
         public SyntaxTree ast;
 
-        public IntermediateCodes il;
+        public ILUnit ilUnit;
 
         //log  
         private static bool enableLog = false;
@@ -188,28 +255,31 @@ namespace FanLang.IR
         private Stack<string> loopExitStack = new Stack<string>();
 
 
-        public ILGenerator(SyntaxTree ast, Compiler compilerContext)
+        public ILGenerator(SyntaxTree ast, ILUnit ilUnit)
         {
-            this.complierContext = compilerContext;
+            this.ilUnit = ilUnit;
             this.ast = ast;
         }
         
         public void Generate()
         {
-            this.il = new IntermediateCodes();
-
-            this.il.globalScope = new Scope() { env = complierContext.globalSymbolTable };
+            //依赖库  
+            foreach(var importNode in ast.rootNode.importNodes)
+            {
+                var lib = (ILUnit)importNode.attributes["lib"];
+                this.ilUnit.AddDependency(lib);
+            }
 
             this.tmpCounter = 0;
 
-            this.envStack.Push(complierContext.globalSymbolTable);
+            this.envStack.Push(ilUnit.globalScope.env);
 
             GenNode(ast.rootNode);
 
-            this.il.Complete();
+            this.ilUnit.Complete();
 
 
-            if(enableLog) complierContext.globalSymbolTable.Print();
+            if(enableLog) ilUnit.globalScope.env.Print();
             Compiler.Pause("符号表建立完毕");
 
             this.PrintCodes();
@@ -723,7 +793,7 @@ namespace FanLang.IR
         {
             var newCode = new TAC() { op = op, arg1 = arg1?.ToString(), arg2 = arg2?.ToString(), arg3 = arg3?.ToString() };
 
-            il.codes.Add(newCode);
+            ilUnit.codes.Add(newCode);
 
             return newCode;
         }
@@ -741,20 +811,21 @@ namespace FanLang.IR
 
         public void EnvBegin(SymbolTable env)
         {
-            Scope newScope = new Scope() { env = env , lineFrom = il.codes.Count - 1 + 1 };
+            Scope newScope = new Scope() { env = env , lineFrom = ilUnit.codes.Count - 1 + 1 };
             scopesTemp.Add(newScope);
         }
         public void EnvEnd(SymbolTable env)
         {
             var scope = scopesTemp.FirstOrDefault(s => s.env == env);
-            scope.lineTo = il.codes.Count - 1;
+            scope.lineTo = ilUnit.codes.Count - 1;
             scopesTemp.Remove(scope);
-            il.scopes.Add(scope);
+            ilUnit.scopes.Add(scope);
         }
 
 
         public SymbolTable.Record Query(string id)
         {
+            //本编译单元查找  
             for (int i = envStack.Count - 1; i >= 0; --i)
             {
                 if (envStack[i].ContainRecordName(id))
@@ -765,13 +836,52 @@ namespace FanLang.IR
                 }
                 //Log("在" + envStack[i].name + "中查询：" + id + "失败");
             }
+
+            //导入库查找  
+            foreach(var lib in ilUnit.dependencies)
+            {
+                var rec = lib.globalScope.env.GetRecord(id);
+                if(rec != null)
+                {
+                    return rec;
+                }
+            }
+
             throw new Exception("查询不到" + id + "的类型！");
         }
         public SymbolTable.Record Query(string className, string id)
         {
-            var classEnv = complierContext.globalSymbolTable.children.FirstOrDefault(c => c.name == className);
-            if(classEnv == null) throw new Exception("查询不到" + id + "的类型！");
-            return classEnv.GetRecord(id);
+            //本编译单元查找  
+            if (ilUnit.globalScope.env.ContainRecordName(className))
+            {
+                var classEnv = ilUnit.globalScope.env.GetTableInChildren(className);
+                if (classEnv != null)
+                { 
+                    if(classEnv.ContainRecordName(id))
+                    {
+                        return classEnv.GetRecord(id);
+                    }
+                }
+            }
+
+            //导入库查找  
+            foreach (var lib in ilUnit.dependencies)
+            {
+                if(lib.globalScope.env.ContainRecordName(className))
+                {
+                    var classEnv = lib.globalScope.env.GetTableInChildren(className);
+                    if (classEnv != null)
+                    {
+                        if(classEnv .ContainRecordName(id))
+                        {
+                            Console.WriteLine("库中找到：" + className + "." + id);
+                            return classEnv.GetRecord(id);
+                        }
+                    }
+                }
+            }
+
+            throw new Exception("找不到" + className + "." + id);
         }
 
 
@@ -784,25 +894,7 @@ namespace FanLang.IR
 
         public void PrintCodes()
         {
-            Log("中间代码输出：(" + il.codes.Count + "行)");
-            Log(new string('-', 50));
-            for (int i = 0; i < il.codes.Count; ++i)
-            {
-                Log($"{i.ToString().PadRight(4)}|status {il.scopeStatusArr[i].ToString().PadRight(3)}|{il.codes[i].ToExpression()}");
-            }
-            Log(new string('-', 50));
-
-
-            Log("作用域：");
-            foreach(var scope in il.scopes)
-            {
-                Log("scope:" + scope.env.name + ":  " + scope.lineFrom + " ~ "  + scope.lineTo);
-            }
-            Log("未封口：");
-            foreach (var scope in scopesTemp)
-            {
-                Log("scope:" + scope.env.name + ":  " + scope.lineFrom + " ~  ???");
-            }
+            if (enableLog) ilUnit.Print();
         }
 
         public static void Log(object content)

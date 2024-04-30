@@ -16,6 +16,10 @@ namespace FanLang
             //起始符  
             "S",
 
+            //导入  
+            "importations",
+            "importation",
+
             //语句容器  
             "statements",
             "statementblock",
@@ -61,13 +65,18 @@ namespace FanLang
         };
 
         public List<string> productionExpressions = new List<string>() {
-            "S -> statements",
+            "S -> importations statements",
 
-            "statementblock -> { statements }",
+            "importations -> importations importation",
+            "importations -> importation",
+            "importations -> ε",
+            "importation -> import < LITSTRING >",
 
             "statements -> statements stmt",
             "statements -> stmt",
             "statements -> ε",
+
+            "statementblock -> { statements }",
 
             "declstatements -> declstatements declstmt",
             "declstatements -> declstmt",

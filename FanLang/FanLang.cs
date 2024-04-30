@@ -523,23 +523,13 @@ namespace FanLang
     /// </summary>
     public class Compiler
     {
-        //Symbol Tables (Env)  
-        public SymbolTable globalSymbolTable;
 
-        //Constant Value Pool  
-        public ConstantValueTable constantValueTable;
 
-        //AST  
-        public SyntaxTree syntaxTree;
+
 
         //CTOR  
         public Compiler()
         {
-            //全局符号表    
-            globalSymbolTable = new SymbolTable("global", SymbolTable.TableCatagory.GlobalScope);
-
-            //全局常量池  
-            constantValueTable = new ConstantValueTable();
         }
 
 
@@ -601,8 +591,10 @@ namespace FanLang
         /// <summary>
         /// 编译  
         /// </summary>
-        public IR.IntermediateCodes Compile(string source)
+        public IL.ILUnit Compile(string source)
         {
+            IL.ILUnit ilUnit = new IL.ILUnit();
+
             //词法分析  
             Scanner scanner = new Scanner();
             List<Token> tokens = scanner.Scan(source);
@@ -615,20 +607,20 @@ namespace FanLang
             //语法分析  
             LRParse.LRParser parser = new LRParse.LRParser(data, this);
             parser.Parse(tokens);
-            this.syntaxTree = parser.syntaxTree;
+            var syntaxTree = parser.syntaxTree;
 
 
             //语义分析  
-            SemanticRule.SemanticAnalyzer semanticAnalyzer = new SemanticRule.SemanticAnalyzer(this.syntaxTree, this);
+            SemanticRule.SemanticAnalyzer semanticAnalyzer = new SemanticRule.SemanticAnalyzer(syntaxTree, ilUnit);
             semanticAnalyzer.Analysis();
 
 
             //中间代码生成    
-            FanLang.IR.ILGenerator ilGenerator = new IR.ILGenerator(this.syntaxTree, this);
+            FanLang.IL.ILGenerator ilGenerator = new IL.ILGenerator(syntaxTree, ilUnit);
             ilGenerator.Generate();
 
 
-            return ilGenerator.il;
+            return ilUnit;
         }
     }
 

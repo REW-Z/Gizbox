@@ -24,6 +24,7 @@ namespace FanLang
             //词法分析器初始化    
             keywords = new List<TokenPattern>();
 
+            keywords.Add(new TokenPattern("import", "import\\W", 1));
             keywords.Add(new TokenPattern("extern", "extern\\W", 1));
 
             keywords.Add(new TokenPattern("var", "var\\W", 1));

@@ -214,3 +214,5 @@ F:\Legacy\MyProjects\FanLang\FanLangTest\bin\Debug\test.txt
 C:\Users\Administrator\Desktop\笔记\FanLang\FanLangTest\bin\Debug\example.txt
 C:\Users\Administrator\Desktop\笔记\FanLang\FanLangTest\bin\Debug\test.txt
 F:\Legacy\MyProjects\FanLang\FanLangTest\bin\Debug\example.txt
+C:\Users\Administrator\Desktop\笔记\FanLang\FanLangTest\bin\Debug\lib.txt
+F:\Legacy\MyProjects\FanLang\FanLangTest\bin\Debug\lib.txt

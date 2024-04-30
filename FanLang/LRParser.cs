@@ -397,12 +397,13 @@ namespace FanLang.SemanticRule
             }
 
             //构建抽象语法树(AST)的语义动作   
-            AddActionAtTail("S -> statements", (psr, production) =>
+            AddActionAtTail("S -> importations statements", (psr, production) =>
             {
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.ProgramNode()
                 {
-
+                    importNodes = (List<SyntaxTree.ImportNode>)psr.stack[psr.stack.Top - 1].attributes["import_list"],
                     statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top].attributes["ast_node"],
+
 
                     attributes = psr.newElement.attributes,
                 };
@@ -410,16 +411,36 @@ namespace FanLang.SemanticRule
                 this.syntaxRootNode = (SyntaxTree.ProgramNode) psr.newElement.attributes["ast_node"];
             });
 
-
-            AddActionAtTail("statementblock -> { statements }", (psr, production) => {
-                psr.newElement.attributes["ast_node"] = new SyntaxTree.StatementBlockNode()
-                {
-
-                    statements = ((SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"]).statements,
+            AddActionAtTail("importations -> importations importation", (psr, production) =>
+            {
+                psr.newElement.attributes["import_list"] = psr.stack[psr.stack.Top - 1].attributes["import_list"];
+                ((List<SyntaxTree.ImportNode>)psr.newElement.attributes["import_list"]).Add(
+                    (SyntaxTree.ImportNode)psr.stack[psr.stack.Top].attributes["ast_node"]
+                ); ;
+            });
+            AddActionAtTail("importations -> importation", (psr, production) =>
+            {
+                psr.newElement.attributes["import_list"] = new List<SyntaxTree.ImportNode>();
+                ((List<SyntaxTree.ImportNode>)psr.newElement.attributes["import_list"]).Add(
+                    (SyntaxTree.ImportNode)psr.stack[psr.stack.Top].attributes["ast_node"]
+                ); ;
+            });
+            AddActionAtTail("importations -> ε", (psr, production) =>
+            {
+                psr.newElement.attributes["import_list"] = new List<SyntaxTree.ImportNode>();
+            });
+            AddActionAtTail("importation -> import < LITSTRING >", (psr, production) =>
+            {
+                string uriRaw = (psr.stack[psr.stack.Top - 1].attributes["token"] as Token).attribute;
+                string uri = uriRaw.Substring(1, uriRaw.Length - 2);
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.ImportNode() {
+                    uri = uri,
 
                     attributes = psr.newElement.attributes,
                 };
             });
+
+
 
             AddActionAtTail("statements -> statements stmt", (psr, production) => {
 
@@ -446,6 +467,18 @@ namespace FanLang.SemanticRule
                     attributes = psr.newElement.attributes,
                 };
             });
+
+
+            AddActionAtTail("statementblock -> { statements }", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.StatementBlockNode()
+                {
+
+                    statements = ((SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"]).statements,
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
+
 
 
             AddActionAtTail("declstatements -> declstatements declstmt", (psr, production) => {
@@ -1177,7 +1210,7 @@ namespace FanLang.SemanticRule
     {
         public SyntaxTree ast;
 
-        public Compiler compilerContext;
+        public IL.ILUnit ilUnit;
 
         private FanLang.Stack<SymbolTable> envStack;
 
@@ -1193,11 +1226,34 @@ namespace FanLang.SemanticRule
         /// <summary>
         /// 构造  
         /// </summary>
-        public SemanticAnalyzer(SyntaxTree ast, Compiler compilerContext)
+        public SemanticAnalyzer(SyntaxTree ast, IL.ILUnit ilUnit)
         {
             this.ast = ast;
-            this.compilerContext = compilerContext;
+            this.ilUnit = ilUnit;
+
+            foreach(var importNode in ast.rootNode.importNodes)
+            {
+                if (importNode == null) throw new Exception("空节点");
+                importNode.attributes["lib"] = LoadLib(importNode.uri);
+            }
         }
+
+        /// <summary>
+        /// 载入库  
+        /// </summary>
+        public FanLang.IL.ILUnit LoadLib(string path)
+        {
+            if(System.IO.File.Exists(path) == false)
+            {
+                throw new Exception("找不到库文件：" + path);
+            }
+
+            var libSource = System.IO.File.ReadAllText(path);
+            Compiler libCompiler = new Compiler();
+            var il = libCompiler.Compile(libSource);
+            return il;
+        }
+
 
         /// <summary>
         /// 开始语义分析  
@@ -1205,11 +1261,11 @@ namespace FanLang.SemanticRule
         public void Analysis()
         {
             envStack = new Stack<SymbolTable>();
-            envStack.Push(compilerContext.globalSymbolTable);
+            envStack.Push(ilUnit.globalScope.env);
             CollectSymbols(ast.rootNode);
 
             envStack.Clear();
-            envStack.Push(compilerContext.globalSymbolTable);
+            envStack.Push(ilUnit.globalScope.env);
             AnalysisNode(ast.rootNode);
         }
 
@@ -1374,7 +1430,6 @@ namespace FanLang.SemanticRule
                         //新的作用域  
                         var newEnv = new SymbolTable(classDeclNode.classNameNode.token.attribute, SymbolTable.TableCatagory.ClassScope, envStack.Peek());
                         classDeclNode.attributes["env"] = newEnv;
-
 
                         //添加条目-类名    
                         var newRec = envStack.Peek().NewRecord(
@@ -1650,7 +1705,7 @@ namespace FanLang.SemanticRule
             {
                 case SyntaxTree.IdentityNode idNode:
                     {
-                        var result = QueryRecord_In_EnvStack(idNode.token.attribute);
+                        var result = QueryRecord(idNode.token.attribute);
                         if (result == null) throw new Exception("找不到标识符:" + idNode.token.attribute);
 
                         nodeTypeExprssion = result.typeExpression;
@@ -1698,7 +1753,7 @@ namespace FanLang.SemanticRule
                     {
                         var className = AnalyzeTypeExpression(accessNode.objectNode);
 
-                        var classRec = compilerContext.globalSymbolTable.GetRecord(className);
+                        var classRec = QueryRecord(className);
                         if (classRec == null) throw new Exception("找不到类名：" + className);
 
                         var classEnv = classRec.envPtr;
@@ -1726,7 +1781,7 @@ namespace FanLang.SemanticRule
                         {
                             Log("is NOT MemberAccessFunction");
                             var funcId = (callNode.funcNode as SyntaxTree.IdentityNode);
-                            var idRec = QueryRecord_In_EnvStack(funcId.token.attribute);
+                            var idRec = QueryRecord(funcId.token.attribute);
                             if (idRec == null) throw new Exception("函数：" + funcId.token.attribute + "未找到！");
 
                             string typeExpr = idRec.typeExpression.Split(' ').LastOrDefault();
@@ -1737,7 +1792,9 @@ namespace FanLang.SemanticRule
                     break;
                 case SyntaxTree.NewObjectNode newObjNode:
                     {
-                        nodeTypeExprssion = newObjNode.className.token.attribute;
+                        string className = newObjNode.className.token.attribute;
+                        if (QueryRecord(className) == null) throw new Exception("找不到类定义：" + className);
+                        nodeTypeExprssion = className;
                     }
                     break;
                 case SyntaxTree.BinaryOpNode binaryOp:
@@ -1800,23 +1857,30 @@ namespace FanLang.SemanticRule
             return AnalyzeTypeExpression(exprNode1) == AnalyzeTypeExpression(exprNode2);
         }
 
-        private SymbolTable.Record QueryRecord_In_EnvStack(string name)
+        private SymbolTable.Record QueryRecord(string name)
         {
-            Log("开始查找符号：" + name + "当前所在作用域：" + envStack.Peek().name);
+            Log("开始在本编译单元查找符号：" + name + "当前所在作用域：" + envStack.Peek().name);
             var toList = envStack.ToList();
             for (int i = toList.Count - 1; i > -1; --i)
             {
                 if (toList[i].ContainRecordName(name))
                 {
-                    Log(toList[i].name + "找到符号：" + name);
                     return toList[i].GetRecord(name);
                 }
-                else
+            }
+
+            Log("本编译单元未找到" + name + "开始在引用的库中查找中");
+            foreach(var importNode in ast.rootNode.importNodes)
+            {
+                var lib = (FanLang.IL.ILUnit)importNode.attributes["lib"]; if (lib == null) throw new Exception("查找" + name + "时库为空！");
+                var rec = lib.globalScope.env.GetRecord(name);
+                if(rec != null)
                 {
-                    Log(toList[i].name + "中找不到符号：" + name);
+                    return rec;
                 }
             }
-            return null;
+
+            throw new Exception("库中也未找到记录：" + name);
         }
 
         public static void Log(object content)

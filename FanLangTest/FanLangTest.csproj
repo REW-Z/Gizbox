@@ -61,6 +61,9 @@
     <Content Include="example.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Content Include="lib.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="test.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
