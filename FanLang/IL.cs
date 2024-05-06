@@ -679,7 +679,7 @@ namespace FanLang.IL
                     break;
                 case SyntaxTree.UnaryOpNode unaryOp:
                     {
-                        GenNode(unaryOp.exprNode);
+                        GenNode(unaryOp.exprNode);2
 
                         //表达式的返回变量  
                         unaryOp.attributes["ret"] = NewTemp((string)unaryOp.exprNode.attributes["type"]);
