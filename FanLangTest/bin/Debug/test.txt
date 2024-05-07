@@ -1,4 +1,6 @@
-﻿import <"F:\Legacy\MyProjects\FanLang\FanLangTest\bin\Debug\lib.txt">
+﻿import <"lib.txt">
+
+
 
 
 Person sam = new Person();
@@ -40,4 +42,15 @@ else if(result > 50)
 else
 {
 	Log("少于等于 50 !");
+}
+
+
+int[] arr = new int[3];
+for(int i = 0 ; i < 3 ; ++i)
+{
+	arr[i] = i * 10;
+}
+for(int i = 0 ; i < 3 ; ++i)
+{
+	Log((string)arr[i]);
 }

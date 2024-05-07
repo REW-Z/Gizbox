@@ -39,11 +39,15 @@ namespace FanLang
             "stmtexpr",//特殊的表达式（不属于expr）(仅作为几种特殊表达式的集合)
             "assign",
             "call",
+            "indexaccess",
             "newobj",
+            "newarr",
             "incdec",//++\--
 
             //类型  
             "type",
+            "stype",
+            "arrtype",
             "primitive",
 
             //表达式
@@ -62,10 +66,18 @@ namespace FanLang
             //函数过程  
             "params",
             "args",
+
+            
+            //其他辅助符号
+            "stype_and_bracket",
+            "id_and_bracket",
+            "primitive_and_bracket",
+            "optidx",
         };
 
         public List<string> productionExpressions = new List<string>() {
             "S -> importations statements",
+
 
             "importations -> importations importation",
             "importations -> importation",
@@ -112,15 +124,20 @@ namespace FanLang
 
             "lvalue -> ID",
             "lvalue -> memberaccess",
+            "lvalue -> indexaccess",
 
 
-            "type -> primitive",
-            "type -> ID",
+            "type -> arrtype",
+            "type -> stype",
+            "arrtype -> stype_and_bracket",
+            "stype -> primitive",
+            "stype -> ID",
             "primitive -> void",
             "primitive -> bool",
             "primitive -> int",
             "primitive -> float",
             "primitive -> string",
+
 
             "expr -> assign",
             "expr -> nexpr",
@@ -162,17 +179,25 @@ namespace FanLang
             "primary -> ( expr )",
             "primary -> ID",
             "primary -> memberaccess",
+            "primary -> indexaccess",
             "primary -> call",
             "primary -> newobj",
+            "primary -> newarr",
             "primary -> lit",
 
             "incdec -> ++ ID",
             "incdec -> -- ID",
             "incdec -> ID ++",
             "incdec -> ID --",
+
             "call -> ID ( args )",
             "call -> memberaccess ( args )",
+
+            "indexaccess -> id_and_bracket",
+            "indexaccess -> memberaccess [ aexpr ]",
+
             "newobj -> new ID ( )",
+            "newarr -> new stype_and_bracket",
 
             "cast -> ( type ) factor",
 
@@ -193,6 +218,22 @@ namespace FanLang
             "args -> ε",
             "args -> expr",
             "args -> args , expr",
+
+
+            "stype_and_bracket -> id_and_bracket",
+            "stype_and_bracket -> primitive_and_bracket",
+            "id_and_bracket -> ID [ optidx ]",
+            "primitive_and_bracket -> primitive [ optidx ]",
+            "optidx -> aexpr",
+            "optidx -> ε",
         };
     }
 }
+
+
+
+//注意事项：
+//注意避免"错误"/"提前"归约。
+//  （lookahead符号的限制有用但是作用有限，不能跨越一个以上符号限制归约动作）        
+//  （如果当前状态有两个规约项，它们lookahead是一样的，就会发生归约冲突）    
+//  （REW：所以应该防止同一终结符多次出现在多个产生式）    

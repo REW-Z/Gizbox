@@ -130,14 +130,73 @@ namespace FanLang.LRParse
             return strb.ToString();
         }
 
-        public static string ToExpression(this LR1ItemSet set)
+        public static string ToExpression(this CompressedItem item)
         {
             StringBuilder strb = new StringBuilder();
+
+            strb.Append(item.production.head.name);
+            strb.Append(" ->");
+            for (int i = 0; i < item.production.body.Length; ++i)
+            {
+                if (i == item.iDot)
+                {
+                    strb.Append(' ');
+                    strb.Append('·');
+                }
+
+                strb.Append(' ');
+                strb.Append(item.production.body[i] != null ? item.production.body[i].name : "ε");
+            }
+            if (item.iDot == item.production.body.Length)
+            {
+                strb.Append(' ');
+                strb.Append("·");
+            }
+
+            strb.Append(", ");
+
+            foreach(var lookahead in item.lookaheadList)
+            {
+                strb.Append("," + (lookahead != null ? lookahead.name : "ε"));
+            }
+
+            return strb.ToString();
+        }
+
+
+        public class CompressedItem
+        {
+            public Production production;
+            public int iDot;
+            public List<Terminal> lookaheadList = new List<Terminal>();
+        }
+        public static string ToExpression(this LR1ItemSet set)
+        {
+            List<CompressedItem> compressedItems = new List<CompressedItem>();
+            foreach(var itm in set.ToArray())
+            {
+                var citem = compressedItems.FirstOrDefault(citm => citm.production == itm.production && citm.iDot == itm.iDot);
+                if(citem == null)
+                {
+                    var newCitem = new CompressedItem() { production = itm.production, iDot = itm.iDot };
+                    newCitem.lookaheadList.Add(itm.lookahead);
+                    compressedItems.Add(newCitem);
+                }
+                else 
+                {
+                    if(citem.lookaheadList.Contains(itm.lookahead) == false)
+                    {
+                        citem.lookaheadList.Add(itm.lookahead);
+                    }
+                }
+            }
+
+            StringBuilder strb = new StringBuilder();
             strb.AppendLine(" ----------------");
-            foreach (var itm in set.ToArray())
+            foreach (var citm in compressedItems.ToArray())
             {
                 strb.Append("| ");
-                strb.Append(itm.ToExpression());
+                strb.Append(citm.ToExpression());
                 strb.Append('\n');
             }
             strb.AppendLine(" ----------------");
@@ -750,6 +809,7 @@ namespace FanLang.LALRGenerator
                 outputData.table.nonterminals = outputData.nonterminals.Select(nont => nont.name).ToList();
 
                 outputData.table.Deserialize(strTable);
+
             }
         }
 
@@ -1147,9 +1207,6 @@ namespace FanLang.LALRGenerator
                     Console.WriteLine(outputData.lalrStates[i].set.ToExpression());
                 }
             }
-
-            //Pause
-            Compiler.Pause("合并后的项集族输出完毕");
         }
 
         /// <summary>
@@ -1728,8 +1785,8 @@ namespace FanLang.LALRGenerator
                             var itemtarget = GetOrCreateLR1Item(production, 0, b);
                             if (I.AnyRepeat(itemtarget) == false)
                             {
-                                anyAdded = true;
                                 I.AddDistinct(itemtarget);
+                                anyAdded = true;
                             }
                         }
                     }
@@ -1775,7 +1832,8 @@ namespace FanLang.LALRGenerator
                 }
             }
 
-            return CLOSURE(J);
+            var closure = CLOSURE(J);
+            return closure;
         }
 
 

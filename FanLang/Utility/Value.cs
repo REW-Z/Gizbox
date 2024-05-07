@@ -71,12 +71,23 @@ namespace FanLang
             }
         }
 
+        public static Value Array(Value[] array)
+        {
+            if(array != null)
+            {
+                return new Value() { type = FanType.FanArray, AsObject = array };
+            }
+            else
+            {
+                return Void;
+            }
+        }
 
 
         // ---------- OPERATOR --------------
         public static Value operator +(Value v1, Value v2)
         {
-            if (v1.type != v2.type) throw new Exception("运算类型错误! " + v1.type + " vs " + v2.type);
+            if (v1.type != v2.type) throw new Exception("运算类型错误! " + v1.type + " + " + v2.type);
             switch (v1.type)
             {
                 case FanType.Bool: throw new Exception("运算类型错误!");

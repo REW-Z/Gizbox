@@ -398,6 +398,12 @@ namespace FanLang.ScriptEngine
                         SetValue(tac.arg1, newfanObj);
                     }
                     break;
+                case "ALLOC_ARRAY":
+                    {
+                        Value[] arr = new Value[GetValue(tac.arg2).AsInt];
+                        SetValue(tac.arg1, Value.Array(arr));
+                    }
+                    break;
                 case "IF_FALSE_JUMP":
                     {
                         bool conditionTrue = GetValue(tac.arg1).AsBool;
@@ -485,14 +491,14 @@ namespace FanLang.ScriptEngine
 
         private Value GetValue(string str)
         {
-            return AccessData(str, write:false);
+            return Access(str, write:false);
         }
         private void SetValue(string str, Value v)
         {
-            AccessData(str, write: true, value: v);
+            Access(str, write: true, value: v);
         }
 
-        private Value AccessData(string str, bool write, Value value = default)
+        private Value Access(string str, bool write, Value value = default)
         {
             //虚拟寄存器  
             if(str == "RET")
@@ -512,18 +518,42 @@ namespace FanLang.ScriptEngine
             {
                 string expr = TrimName(str);
                 bool isAccess = expr.Contains('.');
+                bool isIndexer = expr[expr.Length - 1] == ']';
 
                 //普通变量访问  
-                if (isAccess == false)
+                if (isAccess == false && isIndexer == false)
                 {
                     string name = expr;
                     var varible = AccessVariable(name, write:write, value);
                     return varible;
                 }
-                //对象成员访问  
-                else
+                //数组元素访问    
+                else if (isIndexer == true)
                 {
+                    int lbracket = expr.IndexOf('[');
+                    int rbracket = expr.IndexOf(']');
 
+                    string arrName = expr.Substring(0, lbracket);
+                    var arrVar = AccessVariable(arrName, write: false);
+                    string idxStr = expr.Substring(lbracket, (rbracket - lbracket) + 1);
+
+                    int idx = GetValue(idxStr).AsInt;
+
+                    if (write)
+                    {
+                        var arr = (Value[])(arrVar.AsObject);
+                        arr[idx] = value;
+                        return Value.Void;
+                    }
+                    else
+                    {
+                        var arr = (Value[])(arrVar.AsObject);
+                        return arr[idx];
+                    }
+                }
+                //对象成员访问  
+                else if(isAccess == true)
+                {
                     string name = expr.Split('.')[0];
 
                     Value obj = AccessVariable(name, write:false);
@@ -645,6 +675,7 @@ namespace FanLang.ScriptEngine
                 throw new Exception("栈帧和全局符号都不包含：" + name);
             }
         }
+
 
 
         private string TrimName(string input)

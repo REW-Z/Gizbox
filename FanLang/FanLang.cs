@@ -16,6 +16,7 @@ namespace FanLang
         Bool,
         String,
         FanObject,
+        FanArray,
     }
 
     /// <summary>
@@ -156,6 +157,9 @@ namespace FanLang
         //查询信息  
         public Record GetRecord(string symbolName)
         {
+            if (records.ContainsKey(symbolName) == false)
+                throw new Exception("表中获取不到记录：" + symbolName);
+
             return records[symbolName];
         }
 
@@ -193,6 +197,7 @@ namespace FanLang
                 envPtr = envPtr,
             };
             records[synbolName] = newRec;
+
             return newRec;
         }
 

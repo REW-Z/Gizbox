@@ -338,6 +338,7 @@ namespace FanLang
         }
 
 
+
         public class IncDecNode : SpecialExprNode//自增自减表达式（低优先级）
         {
             public bool isOperatorFront;//操作符在标识符前
@@ -350,12 +351,28 @@ namespace FanLang
             public IdentityNode className;
         }
 
+        public class NewArrayNode : SpecialExprNode
+        {
+            public TypeNode typeNode;
+
+            public ExprNode lengthNode;
+        }
 
         public class CastNode : ExprNode
         {
             public TypeNode typeNode;
             public ExprNode factorNode;
         }
+
+        public class IndexAccessNode : ExprNode
+        {
+            public bool isMemberAccessContainer;
+
+            public ExprNode containerNode;//id or memberaccesss  
+
+            public ExprNode indexNode;
+        }
+
 
         public abstract class MemberAccessNode : ExprNode { }
 
@@ -372,6 +389,17 @@ namespace FanLang
         // ******************** TYPE NODES ******************************
 
         public abstract class TypeNode : Node { public abstract string ToExpression(); }
+
+        public class ArrayTypeNode : TypeNode
+        {
+            public TypeNode baseType;
+
+            public override string ToExpression()
+            {
+                return baseType.ToExpression() + "[]";
+            }
+        }
+
         public class ClassTypeNode : TypeNode
         {
             public IdentityNode classname;
@@ -415,6 +443,11 @@ namespace FanLang
             public IdentityNode identifierNode;
         }
 
+
+        public class IndexerNode : Node
+        {
+            public ExprNode indexNode;
+        }
 
         // ******************** Instance Members ******************************
         public ProgramNode rootNode;

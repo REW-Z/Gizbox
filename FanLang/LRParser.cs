@@ -82,7 +82,7 @@ namespace FanLang.LRParse
 
 
         //log  
-        private const bool enableLog = false;
+        private const bool enableLog = true;
 
         //输出  
         public ParseTree parseTree;
@@ -211,7 +211,6 @@ namespace FanLang.LRParse
                             this.newElement = null;
                             Log(goTo.stateId + "状态入栈");
                             // *********************
-
 
                             Log("当前栈状态：" + string.Concat(stack.ToList().Select(s => "\n" + s.state.idx + ": \"" + s.state.name + "\"")) + "\n");
                         }
@@ -395,6 +394,8 @@ namespace FanLang.SemanticRule
             {
                 this.AddActionAtTail(p, parseTreeBuilder.BuildAction);
             }
+
+            //return; //不附加其他语义规则-仅语法分析
 
             //构建抽象语法树(AST)的语义动作   
             AddActionAtTail("S -> importations statements", (psr, production) =>
@@ -734,8 +735,27 @@ namespace FanLang.SemanticRule
                 psr.newElement.attributes["ast_node"] = (SyntaxTree.MemberAccessNode)psr.stack[psr.stack.Top].attributes["ast_node"];
             });
 
+            AddActionAtTail("lvalue -> indexaccess", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = (SyntaxTree.IndexAccessNode)psr.stack[psr.stack.Top].attributes["ast_node"];
+            });
 
-            AddActionAtTail("type -> ID", (psr, production) => {
+            AddActionAtTail("type -> arrtype", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = (SyntaxTree.ArrayTypeNode)psr.stack[psr.stack.Top].attributes["ast_node"];
+            });
+            AddActionAtTail("type -> stype", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes["ast_node"];
+            });
+
+
+            AddActionAtTail("arrtype -> stype_and_bracket", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.ArrayTypeNode() { 
+                    baseType = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes["stype"],
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
+
+            AddActionAtTail("stype -> ID", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.ClassTypeNode() {
 
                     classname = new SyntaxTree.IdentityNode() { 
@@ -747,7 +767,7 @@ namespace FanLang.SemanticRule
                 };
             });
 
-            AddActionAtTail("type -> primitive", (psr, production) => {
+            AddActionAtTail("stype -> primitive", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = (SyntaxTree.PrimitiveNode)psr.stack[psr.stack.Top].attributes["ast_node"];
             });
 
@@ -932,10 +952,18 @@ namespace FanLang.SemanticRule
             AddActionAtTail("primary -> newobj", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes["ast_node"];
             });
+            AddActionAtTail("primary -> newarr", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes["ast_node"];
+            });
+
+            AddActionAtTail("primary -> indexaccess", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = (SyntaxTree.IndexAccessNode)psr.stack[psr.stack.Top].attributes["ast_node"];
+            });
 
             AddActionAtTail("primary -> call", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = (SyntaxTree.SpecialExprNode)psr.stack[psr.stack.Top].attributes["ast_node"];
             });
+
 
             AddActionAtTail("primary -> lit", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes["ast_node"];
@@ -1036,6 +1064,34 @@ namespace FanLang.SemanticRule
                 };
             });
 
+
+            AddActionAtTail("indexaccess -> id_and_bracket", (psr, production) => {
+
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.IndexAccessNode()
+                {
+                    isMemberAccessContainer = false,
+                    containerNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes["id"],
+                    indexNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes["optidx"],
+
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
+
+            AddActionAtTail("indexaccess -> memberaccess [ aexpr ]", (psr, production) => {
+
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.IndexAccessNode()
+                {
+                    isMemberAccessContainer = true,
+                    containerNode = (SyntaxTree.MemberAccessNode)psr.stack[psr.stack.Top - 3].attributes["ast_node"],
+                    indexNode = ((SyntaxTree.IndexerNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"]).indexNode,
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
+
+
+
             AddActionAtTail("cast -> ( type ) factor", (psr, production) => {
 
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.CastNode()
@@ -1061,6 +1117,16 @@ namespace FanLang.SemanticRule
                 };
             });
 
+            AddActionAtTail("newarr -> new stype_and_bracket", (psr, production) => {
+
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.NewArrayNode()
+                {
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes["stype"],
+                    lengthNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes["optidx"],
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
 
             AddActionAtTail("memberaccess -> primary . ID", (psr, production) => {
 
@@ -1166,6 +1232,35 @@ namespace FanLang.SemanticRule
                     (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes["ast_node"]
                 );
             });
+
+
+            AddActionAtTail("stype_and_bracket -> id_and_bracket", (psr, production) => {
+                psr.newElement.attributes["stype"] = psr.stack[psr.stack.Top].attributes["id"];
+                psr.newElement.attributes["optidx"] = psr.stack[psr.stack.Top].attributes["optidx"];
+            });
+
+            AddActionAtTail("stype_and_bracket -> primitive_and_bracket", (psr, production) => {
+                psr.newElement.attributes["stype"] = psr.stack[psr.stack.Top].attributes["primitive"];
+                psr.newElement.attributes["optidx"] = psr.stack[psr.stack.Top].attributes["optidx"];
+            });
+            AddActionAtTail("id_and_bracket -> ID [ optidx ]", (psr, production) => {
+
+                psr.newElement.attributes["id"] = new SyntaxTree.IdentityNode() { 
+                    attributes = psr.stack[psr.stack.Top - 3].attributes,
+                    token = psr.stack[psr.stack.Top - 3].attributes["token"] as Token,
+                };
+                psr.newElement.attributes["optidx"] = psr.stack[psr.stack.Top - 1].attributes["ast_node"];
+            });
+            AddActionAtTail("primitive_and_bracket -> primitive [ optidx ]", (psr, production) => {
+                psr.newElement.attributes["primitive"] = psr.stack[psr.stack.Top - 3].attributes["ast_node"];
+                psr.newElement.attributes["optidx"] = psr.stack[psr.stack.Top - 1].attributes["ast_node"];
+            });
+            AddActionAtTail("optidx -> aexpr", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = psr.stack[psr.stack.Top].attributes["ast_node"];
+            });
+            AddActionAtTail("optidx -> ε", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = null;
+            });
         }
 
         // 插入语义动作
@@ -1241,14 +1336,28 @@ namespace FanLang.SemanticRule
         /// <summary>
         /// 载入库  
         /// </summary>
-        public FanLang.IL.ILUnit LoadLib(string path)
+        public FanLang.IL.ILUnit LoadLib(string libname)
         {
-            if(System.IO.File.Exists(path) == false)
+            string libSource;
+
+            //在当前目录查找  
+            if (System.IO.File.Exists(AppDomain.CurrentDomain.BaseDirectory + "\\" + libname))
             {
-                throw new Exception("找不到库文件：" + path);
+                libSource =  System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\" + libname);
+            }
+            //物理地址查找  
+            else
+            {
+                if (System.IO.File.Exists(libname))
+                {
+                    libSource = System.IO.File.ReadAllText(libname);
+                }
+                else
+                {
+                    throw new Exception("找不到库文件：" + libname);
+                }
             }
 
-            var libSource = System.IO.File.ReadAllText(path);
             Compiler libCompiler = new Compiler();
             var il = libCompiler.Compile(libSource);
             return il;
@@ -1497,7 +1606,7 @@ namespace FanLang.SemanticRule
                         CollectSymbols(forNode.stmtNode);
 
                         //离开FOR循环作用域  
-                        envStack.Push(newEnv);
+                        envStack.Pop();
                     }
                     break;
                 default:
@@ -1512,7 +1621,6 @@ namespace FanLang.SemanticRule
         /// </summary>
         private void AnalysisNode(SyntaxTree.Node node)
         {
-
             switch (node)
             {
                 case SyntaxTree.ProgramNode programNode:
@@ -1683,6 +1791,12 @@ namespace FanLang.SemanticRule
                         }
                     }
                     break;
+                case SyntaxTree.IndexAccessNode indexAccessNode:
+                    {
+                        string argTypeExpr = AnalyzeTypeExpression(indexAccessNode.indexNode);
+                        //暂不限制索引类型...      
+                    }
+                    break;
                 default:
                     //do nothing
                     break;
@@ -1768,6 +1882,32 @@ namespace FanLang.SemanticRule
                         nodeTypeExprssion = memberRec.typeExpression;
                     }
                     break;
+                case SyntaxTree.IndexAccessNode indexAccessNode:
+                    {
+                        string containerTypeExpr;
+                        if (indexAccessNode.isMemberAccessContainer)
+                        {
+                            containerTypeExpr = AnalyzeTypeExpression(indexAccessNode.containerNode as SyntaxTree.MemberAccessNode);
+                        }
+                        else
+                        {
+                            var funcId = (indexAccessNode.containerNode as SyntaxTree.IdentityNode);
+                            var idRec = QueryRecord(funcId.token.attribute);
+                            if (idRec == null) throw new Exception("函数：" + funcId.token.attribute + "未找到！");
+
+                            containerTypeExpr = idRec.typeExpression;    
+                        }
+
+                        if(containerTypeExpr.EndsWith("[]"))
+                        {
+                            nodeTypeExprssion = containerTypeExpr.Substring(0, containerTypeExpr.Length - 2);
+                        }
+                        else
+                        {
+                            throw new Exception("未实现非数组的索引！");
+                        }
+                    }
+                    break;
                 case SyntaxTree.CallNode callNode:
                     {
                         Log("Call Node:" + callNode.funcNode.GetType().ToString());
@@ -1795,6 +1935,11 @@ namespace FanLang.SemanticRule
                         string className = newObjNode.className.token.attribute;
                         if (QueryRecord(className) == null) throw new Exception("找不到类定义：" + className);
                         nodeTypeExprssion = className;
+                    }
+                    break;
+                case SyntaxTree.NewArrayNode newArrNode:
+                    {
+                        nodeTypeExprssion = newArrNode.typeNode.ToExpression() + "[]";
                     }
                     break;
                 case SyntaxTree.BinaryOpNode binaryOp:
@@ -1873,19 +2018,18 @@ namespace FanLang.SemanticRule
             foreach(var importNode in ast.rootNode.importNodes)
             {
                 var lib = (FanLang.IL.ILUnit)importNode.attributes["lib"]; if (lib == null) throw new Exception("查找" + name + "时库为空！");
-                var rec = lib.globalScope.env.GetRecord(name);
-                if(rec != null)
+                if(lib.globalScope.env.ContainRecordName(name))
                 {
-                    return rec;
+                    return lib.globalScope.env.GetRecord(name);
                 }
             }
 
+            
             throw new Exception("库中也未找到记录：" + name);
         }
 
         public static void Log(object content)
         {
-            return;
             Console.WriteLine("SematicAnalyzer >>>>" + content);
         }
     }

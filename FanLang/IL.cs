@@ -245,7 +245,7 @@ namespace FanLang.IL
         public ILUnit ilUnit;
 
         //log  
-        private static bool enableLog = false;
+        private static bool enableLog = true;
 
         //temp info  
         private FanLang.Stack<SymbolTable> envStack = new Stack<SymbolTable>();
@@ -679,7 +679,7 @@ namespace FanLang.IL
                     break;
                 case SyntaxTree.UnaryOpNode unaryOp:
                     {
-                        GenNode(unaryOp.exprNode);2
+                        GenNode(unaryOp.exprNode);
 
                         //表达式的返回变量  
                         unaryOp.attributes["ret"] = NewTemp((string)unaryOp.exprNode.attributes["type"]);
@@ -756,6 +756,25 @@ namespace FanLang.IL
                         GeneratorCode("=", callNode.attributes["ret"], "RET");
                     }
                     break;
+                case SyntaxTree.IndexAccessNode indexAccessNode:
+                    {
+                        GenNode(indexAccessNode.indexNode);
+
+                        string rightval;
+                        if(indexAccessNode.isMemberAccessContainer == true)
+                        {
+                            GenNode(indexAccessNode.containerNode);
+                            rightval = "[" + TrimName((string)indexAccessNode.containerNode.attributes["ret"]) + "[" + TrimName((string)indexAccessNode.indexNode.attributes["ret"]) + "]" + "]";
+                        }
+                        else
+                        {
+                            GenNode(indexAccessNode.containerNode);
+                            rightval = "[" + TrimName((string)indexAccessNode.containerNode.attributes["ret"]) + "[" + TrimName((string)indexAccessNode.indexNode.attributes["ret"]) + "]" + "]";
+                        }
+
+                        indexAccessNode.attributes["ret"] = rightval;
+                    }
+                    break;
                 case SyntaxTree.NewObjectNode newObjNode:
                     {
                         string className = newObjNode.className.token.attribute;
@@ -766,6 +785,17 @@ namespace FanLang.IL
                         GeneratorCode("ALLOC", newObjNode.attributes["ret"]);
                         GeneratorCode("PARAM", newObjNode.attributes["ret"]);
                         GeneratorCode("CALL", "[" + className + ".ctor]", 0);
+                    }
+                    break;
+                case SyntaxTree.NewArrayNode newArrNode:
+                    {
+                        //长度计算  
+                        GenNode(newArrNode.lengthNode);
+
+                        //表达式的返回变量  
+                        newArrNode.attributes["ret"] = NewTemp(newArrNode.typeNode.ToExpression() + "[]");
+
+                        GeneratorCode("ALLOC_ARRAY", newArrNode.attributes["ret"], newArrNode.lengthNode.attributes["ret"]);
                     }
                     break;
                 case SyntaxTree.IncDecNode incDecNode:
