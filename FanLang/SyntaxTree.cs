@@ -364,7 +364,7 @@ namespace FanLang
             public ExprNode factorNode;
         }
 
-        public class IndexAccessNode : ExprNode
+        public class ElementAccessNode : ExprNode
         {
             public bool isMemberAccessContainer;
 

@@ -81,9 +81,6 @@ namespace FanLang.LRParse
         public Compiler compilerContext;
 
 
-        //log  
-        private const bool enableLog = true;
-
         //输出  
         public ParseTree parseTree;
         public SyntaxTree syntaxTree;
@@ -255,8 +252,8 @@ namespace FanLang.LRParse
 
         private static void Log(object content)
         {
-            if (!enableLog) return;
-            Console.WriteLine(content);
+            if (!Compiler.enableLogParser) return;
+            Console.WriteLine("Parser >>>" + content);
         }
     }
 }
@@ -736,7 +733,7 @@ namespace FanLang.SemanticRule
             });
 
             AddActionAtTail("lvalue -> indexaccess", (psr, production) => {
-                psr.newElement.attributes["ast_node"] = (SyntaxTree.IndexAccessNode)psr.stack[psr.stack.Top].attributes["ast_node"];
+                psr.newElement.attributes["ast_node"] = (SyntaxTree.ElementAccessNode)psr.stack[psr.stack.Top].attributes["ast_node"];
             });
 
             AddActionAtTail("type -> arrtype", (psr, production) => {
@@ -746,8 +743,10 @@ namespace FanLang.SemanticRule
                 psr.newElement.attributes["ast_node"] = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes["ast_node"];
             });
 
-
             AddActionAtTail("arrtype -> stype_and_bracket", (psr, production) => {
+
+                var node = psr.stack[psr.stack.Top].attributes["stype"];
+
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.ArrayTypeNode() { 
                     baseType = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes["stype"],
 
@@ -957,7 +956,7 @@ namespace FanLang.SemanticRule
             });
 
             AddActionAtTail("primary -> indexaccess", (psr, production) => {
-                psr.newElement.attributes["ast_node"] = (SyntaxTree.IndexAccessNode)psr.stack[psr.stack.Top].attributes["ast_node"];
+                psr.newElement.attributes["ast_node"] = (SyntaxTree.ElementAccessNode)psr.stack[psr.stack.Top].attributes["ast_node"];
             });
 
             AddActionAtTail("primary -> call", (psr, production) => {
@@ -1067,7 +1066,7 @@ namespace FanLang.SemanticRule
 
             AddActionAtTail("indexaccess -> id_and_bracket", (psr, production) => {
 
-                psr.newElement.attributes["ast_node"] = new SyntaxTree.IndexAccessNode()
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.ElementAccessNode()
                 {
                     isMemberAccessContainer = false,
                     containerNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes["id"],
@@ -1080,7 +1079,7 @@ namespace FanLang.SemanticRule
 
             AddActionAtTail("indexaccess -> memberaccess [ aexpr ]", (psr, production) => {
 
-                psr.newElement.attributes["ast_node"] = new SyntaxTree.IndexAccessNode()
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.ElementAccessNode()
                 {
                     isMemberAccessContainer = true,
                     containerNode = (SyntaxTree.MemberAccessNode)psr.stack[psr.stack.Top - 3].attributes["ast_node"],
@@ -1235,7 +1234,11 @@ namespace FanLang.SemanticRule
 
 
             AddActionAtTail("stype_and_bracket -> id_and_bracket", (psr, production) => {
-                psr.newElement.attributes["stype"] = psr.stack[psr.stack.Top].attributes["id"];
+                psr.newElement.attributes["stype"] = new SyntaxTree.ClassTypeNode() {
+                    classname = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes["id"],
+
+                    attributes = psr.newElement.attributes
+                };
                 psr.newElement.attributes["optidx"] = psr.stack[psr.stack.Top].attributes["optidx"];
             });
 
@@ -1791,7 +1794,7 @@ namespace FanLang.SemanticRule
                         }
                     }
                     break;
-                case SyntaxTree.IndexAccessNode indexAccessNode:
+                case SyntaxTree.ElementAccessNode indexAccessNode:
                     {
                         string argTypeExpr = AnalyzeTypeExpression(indexAccessNode.indexNode);
                         //暂不限制索引类型...      
@@ -1882,7 +1885,7 @@ namespace FanLang.SemanticRule
                         nodeTypeExprssion = memberRec.typeExpression;
                     }
                     break;
-                case SyntaxTree.IndexAccessNode indexAccessNode:
+                case SyntaxTree.ElementAccessNode indexAccessNode:
                     {
                         string containerTypeExpr;
                         if (indexAccessNode.isMemberAccessContainer)
@@ -2030,6 +2033,7 @@ namespace FanLang.SemanticRule
 
         public static void Log(object content)
         {
+            if (!Compiler.enableLogSemanticAnalyzer) return;
             Console.WriteLine("SematicAnalyzer >>>>" + content);
         }
     }

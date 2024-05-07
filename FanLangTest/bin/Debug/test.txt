@@ -54,3 +54,9 @@ for(int i = 0 ; i < 3 ; ++i)
 {
 	Log((string)arr[i]);
 }
+
+
+Person[] persons = new Person[3];
+persons[0] = new Person();
+persons[0].age = 99;
+Log((string)persons[0].age);

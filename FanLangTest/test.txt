@@ -1,56 +1,12 @@
 ﻿import <"lib.txt">
 
-
-
-
-Person sam = new Person();
-int newAge = sam.Birthday();
-
-Log(newAge);
-
-int result = 0;
-sam.age = 0;
-
-for(int i = 0; i < 5; i++)
+class IntPtr
 {
-	int j = 0;
-	while(j < 999)
-	{
-		sam.age  = sam.age + 1;
-		j++;
-
-		if(j >= 10) break;
-	}
+	
 }
 
-result = sam.age;
+extern void Person_Say(Person p, string text);
 
-Log("sam年龄" + (string)result);
-
-result += (int)2.0f;
-
-Log("过了2年后");
-
-if(result > 100)
+class Person
 {
-	Log("多于 100 !");
-}
-else if(result > 50)
-{
-	Log((string)result + "多于 50 !");
-}
-else
-{
-	Log("少于等于 50 !");
-}
-
-
-int[] arr = new int[3];
-for(int i = 0 ; i < 3 ; ++i)
-{
-	arr[i] = i * 10;
-}
-for(int i = 0 ; i < 3 ; ++i)
-{
-	Log((string)arr[i]);
 }

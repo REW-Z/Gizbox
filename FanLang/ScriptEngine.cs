@@ -89,7 +89,6 @@ namespace FanLang.ScriptEngine
         private int prev = 0;
 
         //DEBUG    
-        private static bool enableLog = false;
         private static bool debug = true;
         private System.Diagnostics.Stopwatch watch = new System.Diagnostics.Stopwatch();
         private long prevTicks;
@@ -139,13 +138,24 @@ namespace FanLang.ScriptEngine
 
             watch.Stop();
 
-            if(debug)
+            if(debug == true)
             {
-                ProfilerLog();
-            }
+                if(Compiler.enableLogScriptEngine == false)
+                {
 
-            Console.WriteLine(new string('\n', 3));
-            Console.WriteLine("总执行时间：" + watch.ElapsedMilliseconds + "ms");
+                    Console.WriteLine(new string('\n', 3));
+                    Console.WriteLine("总执行时间：" + watch.ElapsedMilliseconds + "ms");
+
+                    Console.ReadKey();
+                    ProfilerLog();
+                }
+                else
+                {
+
+                    Console.WriteLine(new string('\n', 3));
+                    Console.WriteLine("总执行时间：(由于开启log无法预估)");
+                }
+            }
 
         }
 
@@ -204,7 +214,7 @@ namespace FanLang.ScriptEngine
 
 
             //开始指向本条指令  
-            if (enableLog) 
+            if (Compiler.enableLogScriptEngine) 
                 EngineLog(new string('>', 10) + tac.ToExpression(showlabel:false));
             
             switch(tac.op)
@@ -473,26 +483,16 @@ namespace FanLang.ScriptEngine
 
 
 
-        private SymbolTable.Record Query(string symbolName, out SymbolTable tableFound)
-        {
-            for (int i = envStack.Count - 1; i > -1; --i)
-            {
-                if(envStack[i].ContainRecordName(symbolName))
-                {
-                    tableFound = envStack[i];
-                    return envStack[i].GetRecord(symbolName);
-                }
-            }
 
-            Console.WriteLine("在符号表链中未找到：" + symbolName + "符号表链：" + string.Concat(envStack.ToList().Select(e => e.name + " - ")) + " 当前行数：" + curr);
-            tableFound = null;
-            return null;
-        }
+
+
+
 
         private Value GetValue(string str)
         {
             return Access(str, write:false);
         }
+
         private void SetValue(string str, Value v)
         {
             Access(str, write: true, value: v);
@@ -517,65 +517,7 @@ namespace FanLang.ScriptEngine
             else if (str[0] == '[')
             {
                 string expr = TrimName(str);
-                bool isAccess = expr.Contains('.');
-                bool isIndexer = expr[expr.Length - 1] == ']';
-
-                //普通变量访问  
-                if (isAccess == false && isIndexer == false)
-                {
-                    string name = expr;
-                    var varible = AccessVariable(name, write:write, value);
-                    return varible;
-                }
-                //数组元素访问    
-                else if (isIndexer == true)
-                {
-                    int lbracket = expr.IndexOf('[');
-                    int rbracket = expr.IndexOf(']');
-
-                    string arrName = expr.Substring(0, lbracket);
-                    var arrVar = AccessVariable(arrName, write: false);
-                    string idxStr = expr.Substring(lbracket, (rbracket - lbracket) + 1);
-
-                    int idx = GetValue(idxStr).AsInt;
-
-                    if (write)
-                    {
-                        var arr = (Value[])(arrVar.AsObject);
-                        arr[idx] = value;
-                        return Value.Void;
-                    }
-                    else
-                    {
-                        var arr = (Value[])(arrVar.AsObject);
-                        return arr[idx];
-                    }
-                }
-                //对象成员访问  
-                else if(isAccess == true)
-                {
-                    string name = expr.Split('.')[0];
-
-                    Value obj = AccessVariable(name, write:false);
-
-                    string fieldName = expr.Split('.')[1];
-
-                    if ((obj.IsVoid)) throw new Exception("找不到对象" + name + "！");
-                    if (obj.Type != FanType.FanObject) throw new Exception("对象" + name + "不是FanObject类型！而是" + obj.GetType().Name);
-
-
-                    if (write)
-                    {
-                        (obj.AsObject as FanObject).fields[fieldName] = value;
-                        if(enableLog) EngineLog("对象" + name + "(InstanceID:" + (obj.AsObject as FanObject).instanceID + ")字段" + fieldName + "写入：" + value.ToString());
-                        return Value.Void;
-                    }
-                    else
-                    {
-                        if ((obj.AsObject as FanObject).fields.ContainsKey(fieldName) == false) throw new Exception("对象" + name + "字段未初始化" + fieldName);
-                        return (obj.AsObject as FanObject).fields[fieldName];
-                    }
-                }
+                return AccessExprRecursive(expr, write, value);
             }
             //常量(只读)  
             else if(str.Contains(':') && write == false)
@@ -594,6 +536,105 @@ namespace FanLang.ScriptEngine
             }
 
             throw new Exception("无法识别：" + str);
+        }
+
+        private Value AccessExprRecursive(string expr, bool write, Value value = default)
+        {
+            bool isLiterial = false;
+            bool isMemberAccess = false;
+            bool isElementAccess = false;
+            if(expr[expr.Length - 1] == ']')
+            {
+                isElementAccess = true;
+            }
+            else if(expr.Contains('.'))
+            {
+                isMemberAccess = true;
+            }
+            else if(expr.Contains(':'))
+            {
+                isLiterial = true;
+            }
+
+            //字面量访问  
+            if(isLiterial)
+            {
+                if(write)
+                {
+                    throw new Exception("不能对常量赋值！");
+                }
+                else
+                {
+                    string baseType = expr.Split(':')[0];
+                    string lex = expr.Split(':')[1];
+                    switch (baseType)
+                    {
+                        case "LITBOOL": return bool.Parse(lex);
+                        case "LITINT": return int.Parse(lex);
+                        case "LITFLOAT": return float.Parse(lex.Substring(0, lex.Length - 1));//去除F标记  
+                        case "LITSTRING": return lex.Substring(1, lex.Length - 2);//去除双引号
+                    }
+
+                    throw new Exception("未知的参数：" + expr);
+                }
+            }
+            //普通变量访问  
+            else if (isMemberAccess == false && isElementAccess == false)
+            {
+                string name = expr;
+                var varible = AccessVariable(name, write: write, value);
+                return varible;
+            }
+            //数组元素访问    
+            else if (isElementAccess == true)
+            {
+                int lbracket = expr.IndexOf('[');
+                int rbracket = expr.IndexOf(']');
+
+                string arrVarExpr = expr.Substring(0, lbracket);
+                var array = AccessExprRecursive(arrVarExpr, write: false);
+                string idxStr = expr.Substring(lbracket, (rbracket - lbracket) + 1);
+
+                int idx = GetValue(idxStr).AsInt;
+
+                if (write)
+                {
+                    var arr = (Value[])(array.AsObject);
+                    arr[idx] = value;
+                    return Value.Void;
+                }
+                else
+                {
+                    var arr = (Value[])(array.AsObject);
+                    return arr[idx];
+                }
+            }
+            //对象成员访问  
+            else if (isMemberAccess == true)
+            {
+                int lDot = expr.LastIndexOf('.');
+                var variableExpr = expr.Substring(0, lDot);
+                Value obj = AccessExprRecursive(variableExpr, write: false);
+
+                string fieldName = expr.Split('.')[1];
+
+                if ((obj.IsVoid)) throw new Exception("找不到对象" + variableExpr + "！");
+                if (obj.Type != FanType.FanObject) throw new Exception("对象" + variableExpr + "不是FanObject类型！而是" + obj.GetType().Name);
+
+
+                if (write)
+                {
+                    (obj.AsObject as FanObject).fields[fieldName] = value;
+                    if (Compiler.enableLogScriptEngine) EngineLog("对象" + variableExpr + "(InstanceID:" + (obj.AsObject as FanObject).instanceID + ")字段" + fieldName + "写入：" + value.ToString());
+                    return Value.Void;
+                }
+                else
+                {
+                    if ((obj.AsObject as FanObject).fields.ContainsKey(fieldName) == false) throw new Exception("对象" + variableExpr + "字段未初始化" + fieldName);
+                    return (obj.AsObject as FanObject).fields[fieldName];
+                }
+            }
+            return Value.Void;
         }
 
         private Value AccessVariable(string varname, bool write, Value value = default)
@@ -620,7 +661,7 @@ namespace FanLang.ScriptEngine
                     if (write)
                     {
                         currentFrame.args[currentFrame.args.Top - idxInParams] = value;
-                        if (enableLog) EngineLog("参数" + name + "写入：" + value.ToString());
+                        if (Compiler.enableLogScriptEngine) EngineLog("参数" + name + "写入：" + value.ToString());
                         return Value.Void;
                     }
                     else
@@ -634,7 +675,7 @@ namespace FanLang.ScriptEngine
                     if (write)
                     {
                         currentFrame.localVariables[name] = value;
-                        if (enableLog) EngineLog("局部变量" + name + "写入：" + value.ToString());
+                        if (Compiler.enableLogScriptEngine) EngineLog("局部变量" + name + "写入：" + value.ToString());
                         return Value.Void;
                     }
                     else
@@ -659,7 +700,7 @@ namespace FanLang.ScriptEngine
                 {
                     globalMemory.data[name] = value;
 
-                    if (enableLog) EngineLog("全局变量" + name + "写入：" + value.ToString());
+                    if (Compiler.enableLogScriptEngine) EngineLog("全局变量" + name + "写入：" + value.ToString());
                     return Value.Void;
                 }
                 else
@@ -676,6 +717,29 @@ namespace FanLang.ScriptEngine
             }
         }
 
+
+
+
+
+
+
+
+
+        private SymbolTable.Record Query(string symbolName, out SymbolTable tableFound)
+        {
+            for (int i = envStack.Count - 1; i > -1; --i)
+            {
+                if (envStack[i].ContainRecordName(symbolName))
+                {
+                    tableFound = envStack[i];
+                    return envStack[i].GetRecord(symbolName);
+                }
+            }
+
+            Console.WriteLine("在符号表链中未找到：" + symbolName + "符号表链：" + string.Concat(envStack.ToList().Select(e => e.name + " - ")) + " 当前行数：" + curr);
+            tableFound = null;
+            return null;
+        }
 
 
         private string TrimName(string input)
@@ -712,7 +776,7 @@ namespace FanLang.ScriptEngine
 
         private static void EngineLog(object content)
         {
-            if (!enableLog) return;
+            if (!Compiler.enableLogScriptEngine) return;
             Console.WriteLine("ScriptEngine >>" + content);
         }
 

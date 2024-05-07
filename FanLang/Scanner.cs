@@ -16,9 +16,6 @@ namespace FanLang
         public TokenPattern whitespace;
 
 
-        //log  
-        private static bool enableLog = false;
-
         public Scanner()
         {
             //词法分析器初始化    
@@ -283,7 +280,7 @@ namespace FanLang
 
         private static void Log(object content)
         {
-            if(!enableLog) return;
+            if(!Compiler.enableLogScanner) return;
             Console.WriteLine("Scanner >>>" + content);
         }
     }

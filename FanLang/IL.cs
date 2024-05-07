@@ -244,8 +244,6 @@ namespace FanLang.IL
 
         public ILUnit ilUnit;
 
-        //log  
-        private static bool enableLog = true;
 
         //temp info  
         private FanLang.Stack<SymbolTable> envStack = new Stack<SymbolTable>();
@@ -279,7 +277,7 @@ namespace FanLang.IL
             this.ilUnit.Complete();
 
 
-            if(enableLog) ilUnit.globalScope.env.Print();
+            if(Compiler.enableLogILGenerator) ilUnit.globalScope.env.Print();
             Compiler.Pause("符号表建立完毕");
 
             this.PrintCodes();
@@ -333,8 +331,8 @@ namespace FanLang.IL
                 case SyntaxTree.ClassDeclareNode classDeclNode:
                     {
                         string className = classDeclNode.classNameNode.token.attribute;
-                        GeneratorCode("JUMP", "exit:" + className);
-                        GeneratorCode(" ").label = className;
+                        GenerateCode("JUMP", "exit:" + className);
+                        GenerateCode(" ").label = className;
                         //GeneratorCode("CLASS_BEGIN", classDeclNode.classNameNode.token.attribute);
                         envStack.Push(classDeclNode.attributes["env"] as SymbolTable);
                         EnvBegin(classDeclNode.attributes["env"] as SymbolTable);
@@ -345,12 +343,12 @@ namespace FanLang.IL
                             string funcFullName = classDeclNode.classNameNode.token.attribute + ".ctor";
 
                             //跳过声明  
-                            GeneratorCode("JUMP", "exit:" + funcFullName);
+                            GenerateCode("JUMP", "exit:" + funcFullName);
 
                             //函数开始    
-                            GeneratorCode(" ").label = "entry:" + funcFullName;
+                            GenerateCode(" ").label = "entry:" + funcFullName;
                             EnvBegin(envStack.Peek().GetTableInChildren(classDeclNode.classNameNode.token.attribute + ".ctor"));
-                            GeneratorCode("METHOD_BEGIN", funcFullName);
+                            GenerateCode("METHOD_BEGIN", funcFullName);
 
 
                             //成员变量初始化
@@ -361,18 +359,18 @@ namespace FanLang.IL
                                     var fieldDecl = memberDecl as SyntaxTree.VarDeclareNode;
 
                                     GenNode(fieldDecl.initializerNode);
-                                    GeneratorCode("=", "[this." + fieldDecl.identifierNode.token.attribute + "]", fieldDecl.initializerNode.attributes["ret"]);
+                                    GenerateCode("=", "[this." + fieldDecl.identifierNode.token.attribute + "]", fieldDecl.initializerNode.attributes["ret"]);
                                 }
                             }
 
                             //其他语句(Not Implement)  
                             //...  
 
-                            GeneratorCode("RETURN");
+                            GenerateCode("RETURN");
 
-                            GeneratorCode("METHOD_END");
+                            GenerateCode("METHOD_END");
                             EnvEnd(envStack.Peek().GetTableInChildren(classDeclNode.classNameNode.token.attribute + ".ctor"));
-                            GeneratorCode(" ").label = "exit:" + funcFullName;
+                            GenerateCode(" ").label = "exit:" + funcFullName;
                         }
 
                         //成员函数
@@ -388,7 +386,7 @@ namespace FanLang.IL
                         EnvEnd(classDeclNode.attributes["env"] as SymbolTable);
                         envStack.Pop();
                         //GeneratorCode("CLASS_END");
-                        GeneratorCode(" ").label = "exit:" + className;
+                        GenerateCode(" ").label = "exit:" + className;
                     }
                     break;
                 //函数声明
@@ -405,19 +403,19 @@ namespace FanLang.IL
                             funcFullName = funcDeclNode.identifierNode.token.attribute;
 
                         //跳过声明  
-                        GeneratorCode("JUMP", "exit:" + funcFullName);
+                        GenerateCode("JUMP", "exit:" + funcFullName);
 
 
                         //函数开始    
-                        GeneratorCode(" ").label = "entry:" + funcFullName;
+                        GenerateCode(" ").label = "entry:" + funcFullName;
 
                         envStack.Push(funcDeclNode.attributes["env"] as SymbolTable);
                         EnvBegin(funcDeclNode.attributes["env"] as SymbolTable);
 
                         if (isMethod)
-                            GeneratorCode("METHOD_BEGIN", funcFullName);
+                            GenerateCode("METHOD_BEGIN", funcFullName);
                         else
-                            GeneratorCode("FUNC_BEGIN", funcFullName);
+                            GenerateCode("FUNC_BEGIN", funcFullName);
 
 
                         //语句  
@@ -428,19 +426,19 @@ namespace FanLang.IL
 
 
                         if(funcDeclNode.statementsNode.statements.Any(s => s is SyntaxTree.ReturnStmtNode) == false)
-                            GeneratorCode("RETURN");
+                            GenerateCode("RETURN");
 
 
                         if (isMethod)
-                            GeneratorCode("METHOD_END", funcFullName);
+                            GenerateCode("METHOD_END", funcFullName);
                         else
-                            GeneratorCode("FUNC_END", funcFullName);
+                            GenerateCode("FUNC_END", funcFullName);
 
 
                         EnvEnd(funcDeclNode.attributes["env"] as SymbolTable);
                         envStack.Pop();
 
-                        GeneratorCode(" ").label = "exit:" + funcFullName;
+                        GenerateCode(" ").label = "exit:" + funcFullName;
                     }
                     break;
                 case SyntaxTree.ExternFuncDeclareNode externFuncDeclNode:
@@ -450,27 +448,27 @@ namespace FanLang.IL
                         
 
                         //跳过声明  
-                        GeneratorCode("JUMP", "exit:" + funcFullName);
+                        GenerateCode("JUMP", "exit:" + funcFullName);
 
                         //函数开始    
-                        GeneratorCode(" ").label = "entry:" + funcFullName;
+                        GenerateCode(" ").label = "entry:" + funcFullName;
 
                         envStack.Push(externFuncDeclNode.attributes["env"] as SymbolTable);
                         EnvBegin(externFuncDeclNode.attributes["env"] as SymbolTable);
 
-                        GeneratorCode("FUNC_BEGIN", funcFullName);
+                        GenerateCode("FUNC_BEGIN", funcFullName);
 
 
-                        GeneratorCode("EXTERN_IMPL", externFuncDeclNode.identifierNode.token.attribute);
+                        GenerateCode("EXTERN_IMPL", externFuncDeclNode.identifierNode.token.attribute);
 
 
-                        GeneratorCode("FUNC_END", funcFullName);
+                        GenerateCode("FUNC_END", funcFullName);
 
 
                         EnvEnd(externFuncDeclNode.attributes["env"] as SymbolTable);
                         envStack.Pop();
 
-                        GeneratorCode(" ").label = "exit:" + funcFullName;
+                        GenerateCode(" ").label = "exit:" + funcFullName;
                     }
                     break;
                 //变量声明
@@ -484,7 +482,7 @@ namespace FanLang.IL
                             throw new Exception("子表达式节点无返回变量：" + varDeclNode.identifierNode.token.attribute);
                         }
 
-                        GeneratorCode("=", (string)varDeclNode.identifierNode.attributes["ret"], (string)varDeclNode.initializerNode.attributes["ret"]);
+                        GenerateCode("=", (string)varDeclNode.identifierNode.attributes["ret"], (string)varDeclNode.initializerNode.attributes["ret"]);
                     }
                     break;
 
@@ -493,11 +491,11 @@ namespace FanLang.IL
                         if(returnNode.returnExprNode != null)
                         {
                             GenNode(returnNode.returnExprNode);
-                            GeneratorCode("RETURN", returnNode.returnExprNode.attributes["ret"]);
+                            GenerateCode("RETURN", returnNode.returnExprNode.attributes["ret"]);
                         }
                         else
                         {
-                            GeneratorCode("RETURN");
+                            GenerateCode("RETURN");
                         }
                     }
                     break;
@@ -512,7 +510,7 @@ namespace FanLang.IL
                     {
                         int ifCounter = (int)ifNode.attributes["uid"];
 
-                        GeneratorCode(" ").label = ("If_" + ifCounter);
+                        GenerateCode(" ").label = ("If_" + ifCounter);
 
                         var elseClause = ifNode.elseClause;
 
@@ -537,37 +535,37 @@ namespace FanLang.IL
                                 }
                             }
 
-                            GeneratorCode(" ").label = "IfCondition_" + ifCounter + "_" + i;
+                            GenerateCode(" ").label = "IfCondition_" + ifCounter + "_" + i;
 
                             GenNode(clause.conditionNode);
-                            GeneratorCode("IF_FALSE_JUMP", clause.conditionNode.attributes["ret"], falseGotoLabel);
+                            GenerateCode("IF_FALSE_JUMP", clause.conditionNode.attributes["ret"], falseGotoLabel);
 
-                            GeneratorCode(" ").label = ("IfStmt_" + ifCounter + "_" + i);
+                            GenerateCode(" ").label = ("IfStmt_" + ifCounter + "_" + i);
 
                             GenNode(clause.thenNode);
 
-                            GeneratorCode("JUMP", ("EndIf_" + ifCounter));
+                            GenerateCode("JUMP", ("EndIf_" + ifCounter));
                         }
 
                         if(elseClause != null)
                         {
-                            GeneratorCode(" ").label = ("ElseStmt_" + ifCounter);
+                            GenerateCode(" ").label = ("ElseStmt_" + ifCounter);
                             GenNode(elseClause.stmt);
                         }
 
 
-                        GeneratorCode(" ").label = ("EndIf_" + ifCounter);
+                        GenerateCode(" ").label = ("EndIf_" + ifCounter);
                     }
                     break;
                 case SyntaxTree.WhileStmtNode whileNode:
                     {
                         int whileCounter = (int)whileNode.attributes["uid"];
 
-                        GeneratorCode(" ").label = ("While_" + whileCounter);
+                        GenerateCode(" ").label = ("While_" + whileCounter);
 
                         GenNode(whileNode.conditionNode);
 
-                        GeneratorCode("IF_FALSE_JUMP", whileNode.conditionNode.attributes["ret"], "EndWhile_" + whileCounter);
+                        GenerateCode("IF_FALSE_JUMP", whileNode.conditionNode.attributes["ret"], "EndWhile_" + whileCounter);
 
                         loopExitStack.Push("EndWhile_" + whileCounter);
 
@@ -575,9 +573,9 @@ namespace FanLang.IL
 
                         loopExitStack.Pop();
 
-                        GeneratorCode("JUMP", ("While_" + whileCounter));
+                        GenerateCode("JUMP", ("While_" + whileCounter));
 
-                        GeneratorCode(" ").label = "EndWhile_" + whileCounter;
+                        GenerateCode(" ").label = "EndWhile_" + whileCounter;
                     }
                     break;
                 case SyntaxTree.ForStmtNode forNode:
@@ -591,11 +589,11 @@ namespace FanLang.IL
                         GenNode(forNode.initializerNode);
 
                         //start loop  
-                        GeneratorCode(" ").label = ("For_" + forCounter);
+                        GenerateCode(" ").label = ("For_" + forCounter);
 
                         //condition  
                         GenNode(forNode.conditionNode);
-                        GeneratorCode("IF_FALSE_JUMP", forNode.conditionNode.attributes["ret"], "EndFor_" + forCounter);
+                        GenerateCode("IF_FALSE_JUMP", forNode.conditionNode.attributes["ret"], "EndFor_" + forCounter);
 
                         loopExitStack.Push("EndFor_" + forCounter);
 
@@ -607,9 +605,9 @@ namespace FanLang.IL
 
                         loopExitStack.Pop();
 
-                        GeneratorCode("JUMP", ("For_" + forCounter));
+                        GenerateCode("JUMP", ("For_" + forCounter));
 
-                        GeneratorCode(" ").label = "EndFor_" + forCounter;
+                        GenerateCode(" ").label = "EndFor_" + forCounter;
 
                         EnvEnd(forNode.attributes["env"] as SymbolTable);
                         envStack.Pop();
@@ -618,7 +616,7 @@ namespace FanLang.IL
 
                 case SyntaxTree.BreakStmtNode breakNode:
                     {
-                        GeneratorCode("JUMP", loopExitStack.Peek());
+                        GenerateCode("JUMP", loopExitStack.Peek());
                     }
                     break;
 
@@ -639,8 +637,8 @@ namespace FanLang.IL
                         GenNode(objMemberAccess.objectNode);
 
                         //成员表达式的返回变量(X.Y格式)  
-                        string objName = TrimName((string)objMemberAccess.objectNode.attributes["ret"]);
-                        objMemberAccess.attributes["ret"] = "[" + objName + "." + objMemberAccess.memberNode.token.attribute + "]";
+                        string obj = TrimName((string)objMemberAccess.objectNode.attributes["ret"]);
+                        objMemberAccess.attributes["ret"] = "[" + obj + "." + objMemberAccess.memberNode.token.attribute + "]";
                     }
                     break;
                 case SyntaxTree.ThisMemberAccessNode thisMemberAccess:
@@ -662,7 +660,7 @@ namespace FanLang.IL
                         //表达式的返回变量  
                         castNode.attributes["ret"] = NewTemp(castNode.typeNode.ToExpression());
 
-                        GeneratorCode("CAST", castNode.attributes["ret"], castNode.typeNode.ToExpression(), castNode.factorNode.attributes["ret"]);
+                        GenerateCode("CAST", castNode.attributes["ret"], castNode.typeNode.ToExpression(), castNode.factorNode.attributes["ret"]);
                     }
                     break;
                 case SyntaxTree.BinaryOpNode binaryOp:
@@ -674,7 +672,7 @@ namespace FanLang.IL
                         //表达式的返回变量  
                         binaryOp.attributes["ret"] = NewTemp((string)binaryOp.leftNode.attributes["type"]);
 
-                        GeneratorCode(binaryOp.op, (string)binaryOp.attributes["ret"], (string)binaryOp.leftNode.attributes["ret"], (string)binaryOp.rightNode.attributes["ret"]);
+                        GenerateCode(binaryOp.op, (string)binaryOp.attributes["ret"], (string)binaryOp.leftNode.attributes["ret"], (string)binaryOp.rightNode.attributes["ret"]);
                     }
                     break;
                 case SyntaxTree.UnaryOpNode unaryOp:
@@ -684,7 +682,7 @@ namespace FanLang.IL
                         //表达式的返回变量  
                         unaryOp.attributes["ret"] = NewTemp((string)unaryOp.exprNode.attributes["type"]);
 
-                        GeneratorCode(unaryOp.op, (string)unaryOp.attributes["ret"], (string)unaryOp.exprNode.attributes["ret"]);
+                        GenerateCode(unaryOp.op, (string)unaryOp.attributes["ret"], (string)unaryOp.exprNode.attributes["ret"]);
                     }
                     break;
                 case SyntaxTree.AssignNode assignNode:
@@ -693,7 +691,7 @@ namespace FanLang.IL
                         GenNode(assignNode.rvalueNode);
 
                         //复合赋值表达式的返回变量为左值    
-                        GeneratorCode(assignNode.op, (string)assignNode.lvalueNode.attributes["ret"], (string)assignNode.rvalueNode.attributes["ret"]);
+                        GenerateCode(assignNode.op, (string)assignNode.lvalueNode.attributes["ret"], (string)assignNode.rvalueNode.attributes["ret"]);
                     }
                     break;
                 case SyntaxTree.CallNode callNode:
@@ -734,7 +732,7 @@ namespace FanLang.IL
                         {
                             //计算参数表达式的值  
                             GenNode(callNode.argumantsNode.arguments[i]);
-                            GeneratorCode("PARAM", (string)callNode.argumantsNode.arguments[i].attributes["ret"]);
+                            GenerateCode("PARAM", (string)callNode.argumantsNode.arguments[i].attributes["ret"]);
                         }
 
                         //隐藏的参数  -  对象指针  
@@ -744,35 +742,35 @@ namespace FanLang.IL
                             {
                                 var objNode = (callNode.funcNode as SyntaxTree.ObjectMemberAccessNode).objectNode;
                                 GenNode(objNode);
-                                GeneratorCode("PARAM", (string)objNode.attributes["ret"]);
+                                GenerateCode("PARAM", (string)objNode.attributes["ret"]);
                             }
                             else
                             {
-                                GeneratorCode("PARAM", "[this]");
+                                GenerateCode("PARAM", "[this]");
                             }
                         }
 
-                        GeneratorCode("CALL", "[" + funcFullName + "]", argCount);
-                        GeneratorCode("=", callNode.attributes["ret"], "RET");
+                        GenerateCode("CALL", "[" + funcFullName + "]", argCount);
+                        GenerateCode("=", callNode.attributes["ret"], "RET");
                     }
                     break;
-                case SyntaxTree.IndexAccessNode indexAccessNode:
+                case SyntaxTree.ElementAccessNode eleAccessNode:
                     {
-                        GenNode(indexAccessNode.indexNode);
+                        GenNode(eleAccessNode.indexNode);
 
                         string rightval;
-                        if(indexAccessNode.isMemberAccessContainer == true)
+                        if(eleAccessNode.isMemberAccessContainer == true)
                         {
-                            GenNode(indexAccessNode.containerNode);
-                            rightval = "[" + TrimName((string)indexAccessNode.containerNode.attributes["ret"]) + "[" + TrimName((string)indexAccessNode.indexNode.attributes["ret"]) + "]" + "]";
+                            GenNode(eleAccessNode.containerNode);
+                            rightval = "[" + TrimName((string)eleAccessNode.containerNode.attributes["ret"]) + "[" + TrimName((string)eleAccessNode.indexNode.attributes["ret"]) + "]" + "]";
                         }
                         else
                         {
-                            GenNode(indexAccessNode.containerNode);
-                            rightval = "[" + TrimName((string)indexAccessNode.containerNode.attributes["ret"]) + "[" + TrimName((string)indexAccessNode.indexNode.attributes["ret"]) + "]" + "]";
+                            GenNode(eleAccessNode.containerNode);
+                            rightval = "[" + TrimName((string)eleAccessNode.containerNode.attributes["ret"]) + "[" + TrimName((string)eleAccessNode.indexNode.attributes["ret"]) + "]" + "]";
                         }
 
-                        indexAccessNode.attributes["ret"] = rightval;
+                        eleAccessNode.attributes["ret"] = rightval;
                     }
                     break;
                 case SyntaxTree.NewObjectNode newObjNode:
@@ -782,9 +780,9 @@ namespace FanLang.IL
                         //表达式的返回变量  
                         newObjNode.attributes["ret"] = NewTemp(className);
 
-                        GeneratorCode("ALLOC", newObjNode.attributes["ret"]);
-                        GeneratorCode("PARAM", newObjNode.attributes["ret"]);
-                        GeneratorCode("CALL", "[" + className + ".ctor]", 0);
+                        GenerateCode("ALLOC", newObjNode.attributes["ret"]);
+                        GenerateCode("PARAM", newObjNode.attributes["ret"]);
+                        GenerateCode("CALL", "[" + className + ".ctor]", 0);
                     }
                     break;
                 case SyntaxTree.NewArrayNode newArrNode:
@@ -795,7 +793,7 @@ namespace FanLang.IL
                         //表达式的返回变量  
                         newArrNode.attributes["ret"] = NewTemp(newArrNode.typeNode.ToExpression() + "[]");
 
-                        GeneratorCode("ALLOC_ARRAY", newArrNode.attributes["ret"], newArrNode.lengthNode.attributes["ret"]);
+                        GenerateCode("ALLOC_ARRAY", newArrNode.attributes["ret"], newArrNode.lengthNode.attributes["ret"]);
                     }
                     break;
                 case SyntaxTree.IncDecNode incDecNode:
@@ -803,14 +801,14 @@ namespace FanLang.IL
                         string identifierName = incDecNode.identifierNode.token.attribute;
                         if (incDecNode.isOperatorFront)//++i
                         {
-                            GeneratorCode(incDecNode.op, "[" + identifierName + "]");
+                            GenerateCode(incDecNode.op, "[" + identifierName + "]");
                             incDecNode.attributes["ret"] = "[" + identifierName + "]";
                         }
                         else//i++
                         {
                             incDecNode.attributes["ret"] = NewTemp(Query(identifierName).typeExpression);
-                            GeneratorCode("=", incDecNode.attributes["ret"], "[" + identifierName + "]");
-                            GeneratorCode(incDecNode.op, "[" + identifierName + "]");
+                            GenerateCode("=", incDecNode.attributes["ret"], "[" + identifierName + "]");
+                            GenerateCode(incDecNode.op, "[" + identifierName + "]");
                         }
                     }
                     break;
@@ -819,7 +817,7 @@ namespace FanLang.IL
             }
         }
 
-        public TAC GeneratorCode(string op, object arg1 = null, object arg2 = null, object arg3 = null)
+        public TAC GenerateCode(string op, object arg1 = null, object arg2 = null, object arg3 = null)
         {
             var newCode = new TAC() { op = op, arg1 = arg1?.ToString(), arg2 = arg2?.ToString(), arg3 = arg3?.ToString() };
 
@@ -916,20 +914,27 @@ namespace FanLang.IL
 
 
 
+        public bool IsAccess(string retExpr)//是数组元素访问或者对象访问  
+        {
+            if (retExpr.Contains('.')) return true;
+            if (retExpr[retExpr.Length - 1] == ']' && retExpr[retExpr.Length - 2] == ']') return true;
+            return false;
+        }
+
         public string TrimName(string input)
         {
-            if (input[0] != '[') throw new Exception("无法Trim:" + input);
+            if (input[0] != '[') return input;
             return input.Substring(1, input.Length - 2);
         }
 
         public void PrintCodes()
         {
-            if (enableLog) ilUnit.Print();
+            if (Compiler.enableLogILGenerator) ilUnit.Print();
         }
 
         public static void Log(object content)
         {
-            if(!enableLog) return;
+            if(!Compiler.enableLogILGenerator) return;
             Console.WriteLine("ILGen >>>" + content);
         }
 

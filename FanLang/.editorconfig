@@ -1,0 +1,4 @@
+﻿[*.cs]
+
+# CS0626: 方法、运算符或访问器标记为外部对象并且上面没有任何特性
+dotnet_diagnostic.CS0626.severity = suggestion
