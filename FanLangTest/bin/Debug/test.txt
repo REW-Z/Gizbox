@@ -1,62 +1,25 @@
 ﻿import <"lib.txt">
 
+extern void Person_Say(Person p, string text);
+extern void Person_set_name(Person p, string text);
+extern string Person_get_name(Person p);
 
-
-
-Person sam = new Person();
-int newAge = sam.Birthday();
-
-Log(newAge);
-
-int result = 0;
-sam.age = 0;
-
-for(int i = 0; i < 5; i++)
+class Person
 {
-	int j = 0;
-	while(j < 999)
+	void set_name(string newname)
 	{
-		sam.age  = sam.age + 1;
-		j++;
-
-		if(j >= 10) break;
+		Person_set_name(this, newname);
+	}
+	string get_name()
+	{
+		return Person_get_name(this);
+	}
+	void Say(string text)
+	{
+		Person_Say(this, text);
 	}
 }
 
-result = sam.age;
-
-Log("sam年龄" + (string)result);
-
-result += (int)2.0f;
-
-Log("过了2年后");
-
-if(result > 100)
-{
-	Log("多于 100 !");
-}
-else if(result > 50)
-{
-	Log((string)result + "多于 50 !");
-}
-else
-{
-	Log("少于等于 50 !");
-}
-
-
-int[] arr = new int[3];
-for(int i = 0 ; i < 3 ; ++i)
-{
-	arr[i] = i * 10;
-}
-for(int i = 0 ; i < 3 ; ++i)
-{
-	Log((string)arr[i]);
-}
-
-
-Person[] persons = new Person[3];
-persons[0] = new Person();
-persons[0].age = 99;
-Log((string)persons[0].age);
+Person p = new Person();
+p.set_name("Creedon" + "Zhou");
+p.Say("Fuck");

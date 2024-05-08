@@ -1,11 +1,11 @@
 {
   "version": 2,
-  "dgSpecHash": "BLXw8eFhyMFHHBWQO1k6Vv5G2h+JV4luxQzPzsL4Xaxs3DYcHPc2Oeek3JLabdTU8zN813C1Ud02DUgsxhY9Jg==",
+  "dgSpecHash": "fjkc7XaaVzPjQKN/XpL7iH7iOIKfCykYnA55vRr5DI8LBgJt1NJAJFkx4B4XAnwc5el/Kho8mJ47k0G9qVNzSg==",
   "success": true,
-  "projectFilePath": "C:\\Users\\Administrator\\Desktop\\笔记\\FanLang\\FanLang\\FanLang.csproj",
+  "projectFilePath": "F:\\Legacy\\MyProjects\\FanLang\\FanLang\\FanLang.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\Administrator\\.nuget\\packages\\microsoft.netcore.platforms\\1.1.0\\microsoft.netcore.platforms.1.1.0.nupkg.sha512",
-    "C:\\Users\\Administrator\\.nuget\\packages\\netstandard.library\\2.0.3\\netstandard.library.2.0.3.nupkg.sha512"
+    "C:\\Users\\leona\\.nuget\\packages\\microsoft.netcore.platforms\\1.1.0\\microsoft.netcore.platforms.1.1.0.nupkg.sha512",
+    "C:\\Users\\leona\\.nuget\\packages\\netstandard.library\\2.0.3\\netstandard.library.2.0.3.nupkg.sha512"
   ],
   "logs": []
 }

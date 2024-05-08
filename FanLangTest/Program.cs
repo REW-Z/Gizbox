@@ -12,17 +12,6 @@ using FanLang.ScriptEngine;
 
 namespace FanLangTest
 {
-    public class Person
-    {
-        public string name;
-
-        public void Say(string text)
-        {
-            Console.WriteLine(name + ":" + text);
-        }
-    }
-
-
     class Program
     {
         static void Main(string[] args)

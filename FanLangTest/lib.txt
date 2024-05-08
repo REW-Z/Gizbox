@@ -1,3 +1,2 @@
 ﻿
 extern void Log(string text);
-extern void Console_WriteLine(string text);

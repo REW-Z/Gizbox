@@ -1,12 +1,25 @@
 ﻿import <"lib.txt">
 
-class IntPtr
-{
-	
-}
-
 extern void Person_Say(Person p, string text);
+extern void Person_set_name(Person p, string text);
+extern string Person_get_name(Person p);
 
 class Person
 {
+	void set_name(string newname)
+	{
+		Person_set_name(this, newname);
+	}
+	string get_name()
+	{
+		return Person_get_name(this);
+	}
+	void Say(string text)
+	{
+		Person_Say(this, text);
+	}
 }
+
+Person p = new Person();
+p.set_name("Creedon" + "Zhou");
+p.Say("Fuck");

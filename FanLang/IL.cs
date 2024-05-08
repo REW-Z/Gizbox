@@ -632,6 +632,17 @@ namespace FanLang.IL
                         idNode.attributes["ret"] = "[" + idNode.token.attribute + "]";
                     }
                     break;
+                case SyntaxTree.ThisNode thisnode:
+                    {
+                        thisnode.attributes["ret"] = "[this]";
+                    }
+                    break;
+                case SyntaxTree.LiteralNode literalNode:
+                    {
+                        //表达式的返回变量  
+                        literalNode.attributes["ret"] = literalNode.token.name + ":" + literalNode.token.attribute;
+                    }
+                    break;
                 case SyntaxTree.ObjectMemberAccessNode objMemberAccess:
                     {
                         GenNode(objMemberAccess.objectNode);
@@ -639,18 +650,6 @@ namespace FanLang.IL
                         //成员表达式的返回变量(X.Y格式)  
                         string obj = TrimName((string)objMemberAccess.objectNode.attributes["ret"]);
                         objMemberAccess.attributes["ret"] = "[" + obj + "." + objMemberAccess.memberNode.token.attribute + "]";
-                    }
-                    break;
-                case SyntaxTree.ThisMemberAccessNode thisMemberAccess:
-                    {
-                        //表达式的返回变量  
-                        thisMemberAccess.attributes["ret"] = "[this." + thisMemberAccess.memberNode.token.attribute + "]";
-                    }
-                    break;
-                case SyntaxTree.LiteralNode literalNode:
-                    {
-                        //表达式的返回变量  
-                        literalNode.attributes["ret"] = literalNode.token.name + ":" + literalNode.token.attribute;
                     }
                     break;
                 case SyntaxTree.CastNode castNode:
@@ -690,6 +689,7 @@ namespace FanLang.IL
                         GenNode(assignNode.lvalueNode);
                         GenNode(assignNode.rvalueNode);
 
+
                         //复合赋值表达式的返回变量为左值    
                         GenerateCode(assignNode.op, (string)assignNode.lvalueNode.attributes["ret"], (string)assignNode.rvalueNode.attributes["ret"]);
                     }
@@ -701,8 +701,8 @@ namespace FanLang.IL
                         string returnType;
                         if(callNode.isMemberAccessFunction == true)
                         {
-                            string className = (string)(callNode.funcNode as SyntaxTree.MemberAccessNode).attributes["class"];
-                            string funcName = (string)(callNode.funcNode as SyntaxTree.MemberAccessNode).attributes["member_name"];
+                            string className = (string)(callNode.funcNode as SyntaxTree.ObjectMemberAccessNode).attributes["class"];
+                            string funcName = (string)(callNode.funcNode as SyntaxTree.ObjectMemberAccessNode).attributes["member_name"];
                             funcFullName = className + "." + funcName;
 
                             var funcRec = Query(className, funcName);
@@ -780,7 +780,7 @@ namespace FanLang.IL
                         //表达式的返回变量  
                         newObjNode.attributes["ret"] = NewTemp(className);
 
-                        GenerateCode("ALLOC", newObjNode.attributes["ret"]);
+                        GenerateCode("ALLOC", newObjNode.attributes["ret"], className);
                         GenerateCode("PARAM", newObjNode.attributes["ret"]);
                         GenerateCode("CALL", "[" + className + ".ctor]", 0);
                     }

@@ -5,6 +5,20 @@ using System.Runtime.InteropServices;
 
 namespace FanLang
 {
+    public enum FanType : byte
+    {
+        Void,
+        Int,
+        Float,
+        Bool,
+        String,
+        FanObject,
+        FanArray,
+    }
+
+
+
+
     //Fan值类型    
     [StructLayout(LayoutKind.Explicit)]
     public struct Value
@@ -71,7 +85,8 @@ namespace FanLang
             }
         }
 
-        public static Value Array(Value[] array)
+
+        public static Value FromArray(Value[] array)
         {
             if(array != null)
             {
@@ -272,10 +287,14 @@ namespace FanLang
         private static int currentMaxId = 0;
 
         public int instanceID = 0;
+
+        public string name;
+
         public Dictionary<string, Value> fields = new Dictionary<string, Value>();
 
-        public FanObject()
+        public FanObject(string classname)
         {
+            this.name = classname;
             this.instanceID = currentMaxId++;
         }
         public override string ToString()

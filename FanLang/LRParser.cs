@@ -729,7 +729,7 @@ namespace FanLang.SemanticRule
             });
 
             AddActionAtTail("lvalue -> memberaccess", (psr, production) => {
-                psr.newElement.attributes["ast_node"] = (SyntaxTree.MemberAccessNode)psr.stack[psr.stack.Top].attributes["ast_node"];
+                psr.newElement.attributes["ast_node"] = (SyntaxTree.ObjectMemberAccessNode)psr.stack[psr.stack.Top].attributes["ast_node"];
             });
 
             AddActionAtTail("lvalue -> indexaccess", (psr, production) => {
@@ -743,7 +743,7 @@ namespace FanLang.SemanticRule
                 psr.newElement.attributes["ast_node"] = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes["ast_node"];
             });
 
-            AddActionAtTail("arrtype -> stype_and_bracket", (psr, production) => {
+            AddActionAtTail("arrtype -> stypeBracket", (psr, production) => {
 
                 var node = psr.stack[psr.stack.Top].attributes["stype"];
 
@@ -944,6 +944,13 @@ namespace FanLang.SemanticRule
                     token = psr.stack[psr.stack.Top].attributes["token"] as Token,
                 };
             });
+            AddActionAtTail("primary -> this", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.ThisNode()
+                {
+                    attributes = psr.stack[psr.stack.Top].attributes,
+                    token = psr.stack[psr.stack.Top].attributes["token"] as Token,
+                };
+            });
             AddActionAtTail("primary -> memberaccess", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes["ast_node"];
             });
@@ -1055,7 +1062,7 @@ namespace FanLang.SemanticRule
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.CallNode()
                 {
                     isMemberAccessFunction = true,
-                    funcNode = (SyntaxTree.MemberAccessNode)psr.stack[psr.stack.Top - 3].attributes["ast_node"],
+                    funcNode = (SyntaxTree.ObjectMemberAccessNode)psr.stack[psr.stack.Top - 3].attributes["ast_node"],
                     argumantsNode = (SyntaxTree.ArgumentListNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"],
 
 
@@ -1064,7 +1071,7 @@ namespace FanLang.SemanticRule
             });
 
 
-            AddActionAtTail("indexaccess -> id_and_bracket", (psr, production) => {
+            AddActionAtTail("indexaccess -> idBracket", (psr, production) => {
 
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.ElementAccessNode()
                 {
@@ -1082,7 +1089,7 @@ namespace FanLang.SemanticRule
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.ElementAccessNode()
                 {
                     isMemberAccessContainer = true,
-                    containerNode = (SyntaxTree.MemberAccessNode)psr.stack[psr.stack.Top - 3].attributes["ast_node"],
+                    containerNode = (SyntaxTree.ObjectMemberAccessNode)psr.stack[psr.stack.Top - 3].attributes["ast_node"],
                     indexNode = ((SyntaxTree.IndexerNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"]).indexNode,
 
                     attributes = psr.newElement.attributes,
@@ -1116,7 +1123,7 @@ namespace FanLang.SemanticRule
                 };
             });
 
-            AddActionAtTail("newarr -> new stype_and_bracket", (psr, production) => {
+            AddActionAtTail("newarr -> new stypeBracket", (psr, production) => {
 
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.NewArrayNode()
                 {
@@ -1133,20 +1140,6 @@ namespace FanLang.SemanticRule
                 {
                     objectNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes["ast_node"],
                     memberNode = new SyntaxTree.IdentityNode() {
-                        attributes = psr.stack[psr.stack.Top].attributes,
-                        token = psr.stack[psr.stack.Top].attributes["token"] as Token,
-                    },
-
-                    attributes = psr.newElement.attributes,
-                };
-            });
-
-            AddActionAtTail("memberaccess -> this . ID", (psr, production) => {
-
-                psr.newElement.attributes["ast_node"] = new SyntaxTree.ThisMemberAccessNode()
-                {
-                    memberNode = new SyntaxTree.IdentityNode()
-                    {
                         attributes = psr.stack[psr.stack.Top].attributes,
                         token = psr.stack[psr.stack.Top].attributes["token"] as Token,
                     },
@@ -1233,7 +1226,7 @@ namespace FanLang.SemanticRule
             });
 
 
-            AddActionAtTail("stype_and_bracket -> id_and_bracket", (psr, production) => {
+            AddActionAtTail("stypeBracket -> idBracket", (psr, production) => {
                 psr.newElement.attributes["stype"] = new SyntaxTree.ClassTypeNode() {
                     classname = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes["id"],
 
@@ -1242,11 +1235,11 @@ namespace FanLang.SemanticRule
                 psr.newElement.attributes["optidx"] = psr.stack[psr.stack.Top].attributes["optidx"];
             });
 
-            AddActionAtTail("stype_and_bracket -> primitive_and_bracket", (psr, production) => {
+            AddActionAtTail("stypeBracket -> primitiveBracket", (psr, production) => {
                 psr.newElement.attributes["stype"] = psr.stack[psr.stack.Top].attributes["primitive"];
                 psr.newElement.attributes["optidx"] = psr.stack[psr.stack.Top].attributes["optidx"];
             });
-            AddActionAtTail("id_and_bracket -> ID [ optidx ]", (psr, production) => {
+            AddActionAtTail("idBracket -> ID [ optidx ]", (psr, production) => {
 
                 psr.newElement.attributes["id"] = new SyntaxTree.IdentityNode() { 
                     attributes = psr.stack[psr.stack.Top - 3].attributes,
@@ -1254,7 +1247,7 @@ namespace FanLang.SemanticRule
                 };
                 psr.newElement.attributes["optidx"] = psr.stack[psr.stack.Top - 1].attributes["ast_node"];
             });
-            AddActionAtTail("primitive_and_bracket -> primitive [ optidx ]", (psr, production) => {
+            AddActionAtTail("primitiveBracket -> primitive [ optidx ]", (psr, production) => {
                 psr.newElement.attributes["primitive"] = psr.stack[psr.stack.Top - 3].attributes["ast_node"];
                 psr.newElement.attributes["optidx"] = psr.stack[psr.stack.Top - 1].attributes["ast_node"];
             });
@@ -1786,6 +1779,9 @@ namespace FanLang.SemanticRule
                     break;
                 case SyntaxTree.CallNode callNode:
                     {
+                        //Func分析  
+                        AnalyzeTypeExpression(callNode); 
+
                         //参数个数检查暂无...
                         foreach (var argNode in callNode.argumantsNode.arguments)
                         {
@@ -1840,32 +1836,40 @@ namespace FanLang.SemanticRule
                         }
                     }
                     break;
-                case SyntaxTree.ThisMemberAccessNode accessNode:
+                case SyntaxTree.ThisNode thisnode:
                     {
-                        bool inClass = false;
-                        for (int i = envStack.Count - 1; i > -1; i--)
-                        {
-                            if(envStack[i].tableCatagory == SymbolTable.TableCatagory.ClassScope)
-                            {
-                                var classEnv = envStack[i];
-                                var memberRec = classEnv.GetRecord(accessNode.memberNode.token.attribute);
+                        var result = QueryRecord("this");
+                        if (result == null) throw new Exception("找不到'this'");
 
-                                accessNode.attributes["class"] = classEnv.name;//记录memberAccess节点的点左边类型
-                                accessNode.attributes["member_name"] = accessNode.memberNode.token.attribute;//记录memberAccess节点的点右边名称
-
-                                nodeTypeExprssion = memberRec.typeExpression;
-                                inClass = true;
-                                break;
-                            }
-
-                        }
-
-                        if(inClass == false)
-                        {
-                            throw new Exception("类作用域外的this指针无效！");
-                        }
+                        nodeTypeExprssion = result.typeExpression;
                     }
                     break;
+                //case SyntaxTree.ThisMemberAccessNode accessNode:
+                //    {
+                //        bool inClass = false;
+                //        for (int i = envStack.Count - 1; i > -1; i--)
+                //        {
+                //            if(envStack[i].tableCatagory == SymbolTable.TableCatagory.ClassScope)
+                //            {
+                //                var classEnv = envStack[i];
+                //                var memberRec = classEnv.GetRecord(accessNode.memberNode.token.attribute);
+
+                //                accessNode.attributes["class"] = classEnv.name;//记录memberAccess节点的点左边类型
+                //                accessNode.attributes["member_name"] = accessNode.memberNode.token.attribute;//记录memberAccess节点的点右边名称
+
+                //                nodeTypeExprssion = memberRec.typeExpression;
+                //                inClass = true;
+                //                break;
+                //            }
+
+                //        }
+
+                //        if(inClass == false)
+                //        {
+                //            throw new Exception("类作用域外的this指针无效！");
+                //        }
+                //    }
+                //    break;
                 case SyntaxTree.ObjectMemberAccessNode accessNode:
                     {
                         var className = AnalyzeTypeExpression(accessNode.objectNode);
@@ -1885,16 +1889,16 @@ namespace FanLang.SemanticRule
                         nodeTypeExprssion = memberRec.typeExpression;
                     }
                     break;
-                case SyntaxTree.ElementAccessNode indexAccessNode:
+                case SyntaxTree.ElementAccessNode eleAccessNode:
                     {
                         string containerTypeExpr;
-                        if (indexAccessNode.isMemberAccessContainer)
+                        if (eleAccessNode.isMemberAccessContainer)
                         {
-                            containerTypeExpr = AnalyzeTypeExpression(indexAccessNode.containerNode as SyntaxTree.MemberAccessNode);
+                            containerTypeExpr = AnalyzeTypeExpression(eleAccessNode.containerNode as SyntaxTree.ObjectMemberAccessNode);
                         }
                         else
                         {
-                            var funcId = (indexAccessNode.containerNode as SyntaxTree.IdentityNode);
+                            var funcId = (eleAccessNode.containerNode as SyntaxTree.IdentityNode);
                             var idRec = QueryRecord(funcId.token.attribute);
                             if (idRec == null) throw new Exception("函数：" + funcId.token.attribute + "未找到！");
 
@@ -1916,7 +1920,7 @@ namespace FanLang.SemanticRule
                         Log("Call Node:" + callNode.funcNode.GetType().ToString());
                         if(callNode.isMemberAccessFunction)
                         {
-                            var typeExpr = AnalyzeTypeExpression(callNode.funcNode as SyntaxTree.MemberAccessNode);
+                            var typeExpr = AnalyzeTypeExpression(callNode.funcNode as SyntaxTree.ObjectMemberAccessNode);
                             if (typeExpr.Contains("->") == false) throw new Exception($"对象的成员类型{typeExpr}不是函数！");
                             nodeTypeExprssion = typeExpr.Split(' ').LastOrDefault();
                         }

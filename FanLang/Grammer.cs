@@ -69,9 +69,9 @@ namespace FanLang
 
             
             //其他辅助符号
-            "stype_and_bracket",
-            "id_and_bracket",
-            "primitive_and_bracket",
+            "stypeBracket",
+            "idBracket",
+            "primitiveBracket",
             "optidx",
         };
 
@@ -129,7 +129,7 @@ namespace FanLang
 
             "type -> arrtype",
             "type -> stype",
-            "arrtype -> stype_and_bracket",
+            "arrtype -> stypeBracket",
             "stype -> primitive",
             "stype -> ID",
             "primitive -> void",
@@ -178,6 +178,7 @@ namespace FanLang
             
             "primary -> ( expr )",
             "primary -> ID",
+            "primary -> this",
             "primary -> memberaccess",
             "primary -> indexaccess",
             "primary -> call",
@@ -193,16 +194,15 @@ namespace FanLang
             "call -> ID ( args )",
             "call -> memberaccess ( args )",
 
-            "indexaccess -> id_and_bracket",
+            "indexaccess -> idBracket",
             "indexaccess -> memberaccess [ aexpr ]",
 
             "newobj -> new ID ( )",
-            "newarr -> new stype_and_bracket",
+            "newarr -> new stypeBracket",
 
             "cast -> ( type ) factor",
 
             "memberaccess -> primary . ID",
-            "memberaccess -> this . ID",
 
             "lit -> LITINT",
             "lit -> LITFLOAT",
@@ -220,10 +220,10 @@ namespace FanLang
             "args -> args , expr",
 
 
-            "stype_and_bracket -> id_and_bracket",
-            "stype_and_bracket -> primitive_and_bracket",
-            "id_and_bracket -> ID [ optidx ]",
-            "primitive_and_bracket -> primitive [ optidx ]",
+            "stypeBracket -> idBracket",
+            "stypeBracket -> primitiveBracket",
+            "idBracket -> ID [ optidx ]",
+            "primitiveBracket -> primitive [ optidx ]",
             "optidx -> aexpr",
             "optidx -> ε",
         };

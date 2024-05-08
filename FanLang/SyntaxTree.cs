@@ -146,6 +146,20 @@ namespace FanLang
                 return nodes.ToArray();
             }
 
+            public Token FirstToken()
+            {
+                var tokenField = this.GetType()
+                    .GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
+                    .FirstOrDefault(f => f.FieldType == typeof(Token));
+
+                if (tokenField != null)
+                {
+                    return (Token)tokenField.GetValue(this);
+                }
+
+                return GetChildren().FirstOrDefault().FirstToken();
+            }
+
             public override string ToString()
             {
                 return this.GetType().Name.ToString();
@@ -374,17 +388,18 @@ namespace FanLang
         }
 
 
-        public abstract class MemberAccessNode : ExprNode { }
-
-        public class ObjectMemberAccessNode : MemberAccessNode
+        public class ObjectMemberAccessNode : ExprNode
         {
+            //attributes: memberType func/var/property
             public ExprNode objectNode;
             public IdentityNode memberNode;
         }
-        public class ThisMemberAccessNode : MemberAccessNode
+
+        public class ThisNode : ExprNode
         {
-            public IdentityNode memberNode;
+            public Token token;
         }
+
 
         // ******************** TYPE NODES ******************************
 

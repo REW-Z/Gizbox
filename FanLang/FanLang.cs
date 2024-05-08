@@ -8,17 +8,6 @@ using System.Collections.Generic;
 
 namespace FanLang
 {
-    public enum FanType : byte
-    {
-        Void,
-        Int,
-        Float,
-        Bool,
-        String,
-        FanObject,
-        FanArray,
-    }
-
     /// <summary>
     /// 模式  
     /// </summary>
@@ -530,7 +519,7 @@ namespace FanLang
     {
         //Settings  
         public static bool enableLogScanner = false;
-        public static bool enableLogParser = false;
+        public static bool enableLogParser = true;
         public static bool enableLogSemanticAnalyzer = false;
         public static bool enableLogILGenerator = false;
         public static bool enableLogScriptEngine = false;
