@@ -88,7 +88,7 @@ namespace FanLang.ScriptEngine
         private int prev = 0;
 
         //DEBUG    
-        private static bool debug = true;
+        private static bool analysisTime = false;
         private System.Diagnostics.Stopwatch watch = new System.Diagnostics.Stopwatch();
         private long prevTicks;
         private List<long> timeList = new List<long>(10000);
@@ -137,7 +137,7 @@ namespace FanLang.ScriptEngine
 
             watch.Stop();
 
-            if(debug == true)
+            if(analysisTime == true)
             {
                 if(Compiler.enableLogScriptEngine == false)
                 {
@@ -194,7 +194,7 @@ namespace FanLang.ScriptEngine
         private void Interpret(TAC tac)
         {
             //DEBUG信息  
-            if (debug)
+            if (analysisTime)
             {
                 //Console.WriteLine("Exe:  " + currUnit + " {" + curr + "}" + tac.ToExpression(false));
                 //Console.ReadKey();

@@ -287,6 +287,13 @@ namespace FanLang.IL
 
         public void GenNode(SyntaxTree.Node node)
         {
+            if(node.replacement != null)
+            {
+                GenNode(node.replacement);
+                return;
+            }
+
+
             //节点代码生成  
             switch (node)
             {
@@ -394,28 +401,30 @@ namespace FanLang.IL
                     {
                         //是否是实例成员函数  
                         bool isMethod = envStack.Peek().tableCatagory == SymbolTable.TableCatagory.ClassScope;
-
-                        //函数全名    
-                        string funcFullName;
-                        if (isMethod)
-                            funcFullName = envStack.Peek().name + "." + funcDeclNode.identifierNode.token.attribute;
+  
+                        //函数全名(修饰)    
+                        string funcFinalName;
+                        if(isMethod)
+                            funcFinalName = envStack.Peek().name + "." + (string)funcDeclNode.attributes["mangled_name"];
                         else
-                            funcFullName = funcDeclNode.identifierNode.token.attribute;
+                            funcFinalName = (string)funcDeclNode.attributes["mangled_name"];
+
+
 
                         //跳过声明  
-                        GenerateCode("JUMP", "exit:" + funcFullName);
+                        GenerateCode("JUMP", "exit:" + funcFinalName);
 
 
                         //函数开始    
-                        GenerateCode(" ").label = "entry:" + funcFullName;
+                        GenerateCode(" ").label = "entry:" + funcFinalName;
 
                         envStack.Push(funcDeclNode.attributes["env"] as SymbolTable);
                         EnvBegin(funcDeclNode.attributes["env"] as SymbolTable);
 
                         if (isMethod)
-                            GenerateCode("METHOD_BEGIN", funcFullName);
+                            GenerateCode("METHOD_BEGIN", funcFinalName);
                         else
-                            GenerateCode("FUNC_BEGIN", funcFullName);
+                            GenerateCode("FUNC_BEGIN", funcFinalName);
 
 
                         //语句  
@@ -430,21 +439,21 @@ namespace FanLang.IL
 
 
                         if (isMethod)
-                            GenerateCode("METHOD_END", funcFullName);
+                            GenerateCode("METHOD_END", funcFinalName);
                         else
-                            GenerateCode("FUNC_END", funcFullName);
+                            GenerateCode("FUNC_END", funcFinalName);
 
 
                         EnvEnd(funcDeclNode.attributes["env"] as SymbolTable);
                         envStack.Pop();
 
-                        GenerateCode(" ").label = "exit:" + funcFullName;
+                        GenerateCode(" ").label = "exit:" + funcFinalName;
                     }
                     break;
                 case SyntaxTree.ExternFuncDeclareNode externFuncDeclNode:
                     {
                         //函数全名    
-                        string funcFullName = externFuncDeclNode.identifierNode.token.attribute; 
+                        string funcFullName = (string)externFuncDeclNode.attributes["mangled_name"]; 
                         
 
                         //跳过声明  
@@ -697,24 +706,28 @@ namespace FanLang.IL
                 case SyntaxTree.CallNode callNode:
                     {
                         //函数全名  
-                        string funcFullName;
-                        string returnType;
-                        if(callNode.isMemberAccessFunction == true)
-                        {
-                            string className = (string)(callNode.funcNode as SyntaxTree.ObjectMemberAccessNode).attributes["class"];
-                            string funcName = (string)(callNode.funcNode as SyntaxTree.ObjectMemberAccessNode).attributes["member_name"];
-                            funcFullName = className + "." + funcName;
+                        string funcFinalName = (string)callNode.attributes["final_name"];
+                        //函数返回类型    
+                        string returnType = (string)callNode.attributes["type"];
+                        //if(callNode.isMemberAccessFunction == true)
+                        //{
+                        //    string className = (string)(callNode.funcNode as SyntaxTree.ObjectMemberAccessNode).attributes["class"];
+                        //    string funcName = (string)(callNode.funcNode as SyntaxTree.ObjectMemberAccessNode).attributes["member_name"];
 
-                            var funcRec = Query(className, funcName);
-                            returnType = funcRec.typeExpression.Split(' ').LastOrDefault();
-                        }
-                        else
-                        {
-                            funcFullName = (callNode.funcNode as SyntaxTree.IdentityNode).token.attribute;
+                        //    var argTypeArr = callNode.argumantsNode.arguments.Select(argN => (string)argN.attributes["type"]).ToArray();
+                        //    funcFinalName = className + "." + Utils.Mangle(funcName, argTypeArr);
 
-                            var funcRec = Query(funcFullName);
-                            returnType = funcRec.typeExpression.Split(' ').LastOrDefault();
-                        }
+                        //    var funcRec = Query(className, funcName);
+                        //    returnType = funcRec.typeExpression.Split(' ').LastOrDefault();
+                        //}
+                        //else
+                        //{
+                        //    var argTypeArr = callNode.argumantsNode.arguments.Select(argN => (string)argN.attributes["type"]).ToArray();
+                        //    funcFinalName = Utils.Mangle((callNode.funcNode as SyntaxTree.IdentityNode).token.attribute, argTypeArr);
+
+                        //    var funcRec = Query(funcFinalName);
+                        //    returnType = funcRec.typeExpression.Split(' ').LastOrDefault();
+                        //}
 
                         //表达式的返回变量  
                         callNode.attributes["ret"] = NewTemp(returnType);
@@ -750,7 +763,7 @@ namespace FanLang.IL
                             }
                         }
 
-                        GenerateCode("CALL", "[" + funcFullName + "]", argCount);
+                        GenerateCode("CALL", "[" + funcFinalName + "]", argCount);
                         GenerateCode("=", callNode.attributes["ret"], "RET");
                     }
                     break;

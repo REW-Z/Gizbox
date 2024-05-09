@@ -80,6 +80,8 @@ namespace FanLang
 
             operators.Add(new TokenPattern("!", "![^=]", 1));
 
+            operators.Add(new TokenPattern(":", "\\:[^\\:]", 1));
+
             operators.Add(new TokenPattern("?", "\\?[^=]", 1));
 
             operators.Add(new TokenPattern(".", "\\.[\\w]", 1));

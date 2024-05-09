@@ -147,7 +147,11 @@ namespace FanLang
         public Record GetRecord(string symbolName)
         {
             if (records.ContainsKey(symbolName) == false)
-                throw new Exception("表中获取不到记录：" + symbolName);
+            {
+                this.Print();
+                throw new Exception(this.name + "表中获取不到记录：" + symbolName);
+            }
+                
 
             return records[symbolName];
         }
@@ -519,7 +523,7 @@ namespace FanLang
     {
         //Settings  
         public static bool enableLogScanner = false;
-        public static bool enableLogParser = true;
+        public static bool enableLogParser = false;
         public static bool enableLogSemanticAnalyzer = false;
         public static bool enableLogILGenerator = false;
         public static bool enableLogScriptEngine = false;
@@ -621,4 +625,22 @@ namespace FanLang
         }
     }
 
+
+
+
+
+
+    public static class Utils
+    {
+        public static string Mangle(string funcname, params string[] paramTypes)
+        {
+            string result = funcname + "_@";
+            foreach (var paramType in paramTypes)
+            {
+                result += '_';
+                result += paramType;
+            }
+            return result;
+        }
+    }
 }

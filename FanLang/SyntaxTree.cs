@@ -92,6 +92,8 @@ namespace FanLang
 
             private Node parent;
 
+            public Node replacement = null;
+
             public int depth = -1;
 
             public Dictionary<string, object> attributes;
@@ -130,7 +132,11 @@ namespace FanLang
                 {
                     if(field.FieldType .IsSubclassOf(typeof(Node)))
                     {
-                        nodes.Add(field.GetValue(this) as Node);
+                        var n = field.GetValue(this);
+                        if (n != null)
+                        {
+                            nodes.Add(n as Node);
+                        }
                     }
 
                     if (field.FieldType.IsGenericType && field.FieldType.GetGenericTypeDefinition() == typeof(List<>))
@@ -225,6 +231,7 @@ namespace FanLang
         public class ClassDeclareNode : DeclareNode
         {
             public IdentityNode classNameNode;
+            public IdentityNode baseClassNameNode;
             public List<DeclareNode> memberDelareNodes;
         }
 

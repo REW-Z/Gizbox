@@ -637,17 +637,27 @@ namespace FanLang.SemanticRule
                 };
             });
 
-            AddActionAtTail("declstmt -> class ID { declstatements }", (psr, production) => {
+            AddActionAtTail("declstmt -> class ID inherit { declstatements }", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.ClassDeclareNode() {
                     classNameNode = new SyntaxTree.IdentityNode() {
-                        attributes = psr.stack[psr.stack.Top - 3].attributes,
-                        token = psr.stack[psr.stack.Top - 3].attributes["token"] as Token,
+                        attributes = psr.stack[psr.stack.Top - 4].attributes,
+                        token = psr.stack[psr.stack.Top - 4].attributes["token"] as Token,
                     },
 
                     memberDelareNodes = new List<SyntaxTree.DeclareNode>(),
 
                     attributes = psr.newElement.attributes,
                 };
+
+                
+                if(psr.stack[psr.stack.Top - 3].attributes.ContainsKey("ast_node"))
+                {
+                    ((SyntaxTree.ClassDeclareNode)psr.newElement.attributes["ast_node"]).baseClassNameNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top - 3].attributes["ast_node"];
+                }
+                else
+                {
+                    ((SyntaxTree.ClassDeclareNode)psr.newElement.attributes["ast_node"]).baseClassNameNode = null;
+                }
 
                 ((SyntaxTree.ClassDeclareNode)psr.newElement.attributes["ast_node"]).memberDelareNodes.AddRange(
                     (List<SyntaxTree.DeclareNode>)psr.stack[psr.stack.Top - 1].attributes["decl_stmts"]
@@ -1257,6 +1267,17 @@ namespace FanLang.SemanticRule
             AddActionAtTail("optidx -> ε", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = null;
             });
+
+
+
+            AddActionAtTail("inherit -> : ID", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.IdentityNode() {
+                    attributes = psr.stack[psr.stack.Top].attributes,
+                    token = psr.stack[psr.stack.Top].attributes["token"] as Token,
+                };
+            });
+            AddActionAtTail("inherit -> ε", (psr, production) => {
+            });
         }
 
         // 插入语义动作
@@ -1441,17 +1462,21 @@ namespace FanLang.SemanticRule
                         }
                         typeExpr += (" -> " + funcDeclNode.returnTypeNode.ToExpression());
 
+                        //函数修饰名称  
+                        var paramTypeArr = funcDeclNode.parametersNode.parameterNodes.Select(n => n.typeNode.ToExpression()).ToArray();
+                        var funcMangledName = Utils.Mangle(funcDeclNode.identifierNode.token.attribute, paramTypeArr);
+                        funcDeclNode.attributes["mangled_name"] = funcMangledName;
 
 
                         //新的作用域  
-                        string envName = isMethod ? envStack.Peek().name + "." + funcDeclNode.identifierNode.token.attribute : funcDeclNode.identifierNode.token.attribute;
+                        string envName = isMethod ? envStack.Peek().name + "." + funcMangledName : funcMangledName;
 
                         var newEnv = new SymbolTable( envName, SymbolTable.TableCatagory.FuncScope, envStack.Peek());
                         funcDeclNode.attributes["env"] = newEnv;
 
                         //添加条目  
                         var newRec = envStack.Peek().NewRecord(
-                            funcDeclNode.identifierNode.token.attribute,
+                            funcMangledName,
                             SymbolTable.RecordCatagory.Function,
                             typeExpr,
                             newEnv
@@ -1493,9 +1518,13 @@ namespace FanLang.SemanticRule
                         }
                         typeExpr += (" -> " + externFuncDeclNode.returnTypeNode.ToExpression());
 
+                        //函数修饰名称  
+                        var paramTypeArr = externFuncDeclNode.parametersNode.parameterNodes.Select(n => n.typeNode.ToExpression()).ToArray();
+                        var funcMangledName = Utils.Mangle(externFuncDeclNode.identifierNode.token.attribute, paramTypeArr);
+                        externFuncDeclNode.attributes["mangled_name"] = funcMangledName;
 
                         //新的作用域  
-                        string envName = externFuncDeclNode.identifierNode.token.attribute;
+                        string envName = funcMangledName;
 
                         var newEnv = new SymbolTable(envName, SymbolTable.TableCatagory.FuncScope, envStack.Peek());
                         externFuncDeclNode.attributes["env"] = newEnv;
@@ -1503,7 +1532,7 @@ namespace FanLang.SemanticRule
 
                         //添加条目  
                         var newRec = envStack.Peek().NewRecord(
-                            externFuncDeclNode.identifierNode.token.attribute,
+                            funcMangledName,
                             SymbolTable.RecordCatagory.Function,
                             typeExpr,
                             newEnv
@@ -1660,6 +1689,19 @@ namespace FanLang.SemanticRule
                         //进入作用域    
                         envStack.Push(funcDeclNode.attributes["env"] as SymbolTable);
 
+
+                        //分析形参定义  
+                        foreach (var paramNode in funcDeclNode.parametersNode.parameterNodes)
+                        {
+                            AnalysisNode(paramNode);
+                        }
+
+                        //分析局部语句  
+                        foreach (var stmtNode in funcDeclNode.statementsNode.statements)
+                        {
+                            AnalysisNode(stmtNode);
+                        }
+
                         //返回值类型检查（仅限非void的函数）  
                         if (!(funcDeclNode.returnTypeNode is SyntaxTree.PrimitiveNode && (funcDeclNode.returnTypeNode as SyntaxTree.PrimitiveNode).token.name == "void"))
                         {
@@ -1671,16 +1713,6 @@ namespace FanLang.SemanticRule
                             if (!valid) throw new Exception("返回类型错误！");
                         }
 
-
-                        //分析形参定义和局部语句  
-                        foreach (var paramNode in funcDeclNode.parametersNode.parameterNodes)
-                        {
-                            AnalysisNode(paramNode);
-                        }
-                        foreach (var stmtNode in funcDeclNode.statementsNode.statements)
-                        {
-                            AnalysisNode(stmtNode);
-                        }
 
 
                         //离开作用域  
@@ -1706,7 +1738,7 @@ namespace FanLang.SemanticRule
                         //进入作用域    
                         envStack.Push(classdeclNode.attributes["env"] as SymbolTable);
 
-                        //成员字段分析  
+                        //成员分析  
                         foreach (var declNode in classdeclNode.memberDelareNodes)
                         {
                             AnalysisNode(declNode);
@@ -1768,8 +1800,66 @@ namespace FanLang.SemanticRule
 
 
                 // ********************* 表达式检查 *********************************8
+                //需要检查的表达式  
+                case SyntaxTree.CallNode callNode:
+                    {
+                        //实参分析  
+                        foreach (var argNode in callNode.argumantsNode.arguments)
+                        {
+                            AnalysisNode(argNode);
+                        }
+
+                        //Func分析  
+                        AnalyzeTypeExpression(callNode);
+
+                        //参数个数检查暂无...
+
+                        //参数重载对应检查暂无...
+                    }
+                    break;
                 case SyntaxTree.AssignNode assignNode:
                     {
+                        //!!setter属性替换  
+                        if (assignNode.lvalueNode is SyntaxTree.ObjectMemberAccessNode)
+                        {
+                            var memberAccess = assignNode.lvalueNode as SyntaxTree.ObjectMemberAccessNode;
+
+                            var className = AnalyzeTypeExpression(memberAccess.objectNode);
+
+                            var classRec = QueryRecord(className);
+                            if (classRec == null) throw new Exception("类符号表:" + className + "不存在");
+
+                            var classEnv = classRec.envPtr;
+
+                            var memberName = memberAccess.memberNode.token.attribute;
+
+                            if(classEnv.ContainRecordName(memberName) == false) //不存在同名字段  
+                            {
+                                var rvalType = AnalyzeTypeExpression(assignNode.rvalueNode);
+                                if(classEnv.ContainRecordName(Utils.Mangle(memberName, rvalType)))//存在setter函数  
+                                {
+                                    //替换节点  
+                                    assignNode.replacement = new SyntaxTree.CallNode() {
+
+                                        isMemberAccessFunction = true,
+                                        funcNode = memberAccess,
+                                        argumantsNode = new SyntaxTree.ArgumentListNode() {
+                                            arguments = new List<SyntaxTree.ExprNode>() { 
+                                                assignNode.rvalueNode
+                                            },
+                                        },
+                                        
+                                        attributes = assignNode.attributes,
+                                    };
+
+                                    AnalysisNode(assignNode.replacement);
+
+                                    break;
+                                }
+                            }
+                        }
+
+
                         //类型检查（赋值）  
                         {
                             bool valid = CheckType(assignNode.lvalueNode, assignNode.rvalueNode);
@@ -1777,27 +1867,67 @@ namespace FanLang.SemanticRule
                         }
                     }
                     break;
-                case SyntaxTree.CallNode callNode:
+                case SyntaxTree.ObjectMemberAccessNode objMemberAccessNode:
                     {
-                        //Func分析  
-                        AnalyzeTypeExpression(callNode); 
-
-                        //参数个数检查暂无...
-                        foreach (var argNode in callNode.argumantsNode.arguments)
+                        //!!getter属性替换  
                         {
-                            string argTypeExpr = AnalyzeTypeExpression(argNode);
-                            //参数类型检查暂无...
+                            
+                            var className = AnalyzeTypeExpression(objMemberAccessNode.objectNode);
+
+                            var classRec = QueryRecord(className);
+                            if (classRec == null) throw new Exception("类符号表:" + className + "不存在");
+
+                            var classEnv = classRec.envPtr;
+
+                            var memberName = objMemberAccessNode.memberNode.token.attribute;
+
+                            if (classEnv.ContainRecordName(memberName) == false) //不存在同名字段  
+                            {
+                                
+                                if (classEnv.ContainRecordName(Utils.Mangle(memberName)))//存在getter函数  
+                                {
+                                    
+                                    //替换节点  
+                                    objMemberAccessNode.replacement = new SyntaxTree.CallNode()
+                                    {
+
+                                        isMemberAccessFunction = true,
+                                        funcNode = objMemberAccessNode,
+                                        argumantsNode = new SyntaxTree.ArgumentListNode()
+                                        {
+                                            arguments = new List<SyntaxTree.ExprNode>() {
+                                            },
+                                        },
+
+                                        attributes = objMemberAccessNode.attributes,
+                                    };
+
+                                    AnalysisNode(objMemberAccessNode.replacement);
+
+                                    break;
+                                }
+                            }
                         }
                     }
                     break;
-                case SyntaxTree.ElementAccessNode indexAccessNode:
-                    {
-                        string argTypeExpr = AnalyzeTypeExpression(indexAccessNode.indexNode);
-                        //暂不限制索引类型...      
-                    }
-                    break;
+                //其他表达式 -> 直接计算类型  
                 default:
-                    //do nothing
+                    {
+                        if (node is SyntaxTree.ExprNode)
+                        {
+                            if(node.Children.Length > 0)
+                            {
+                                foreach(var child in node.Children)
+                                {
+                                    AnalysisNode(child); 
+                                }
+                            }
+                            else
+                            {
+                                AnalyzeTypeExpression(node as SyntaxTree.ExprNode);
+                            }
+                        }
+                    }
                     break;
             }
         }
@@ -1844,32 +1974,8 @@ namespace FanLang.SemanticRule
                         nodeTypeExprssion = result.typeExpression;
                     }
                     break;
-                //case SyntaxTree.ThisMemberAccessNode accessNode:
-                //    {
-                //        bool inClass = false;
-                //        for (int i = envStack.Count - 1; i > -1; i--)
-                //        {
-                //            if(envStack[i].tableCatagory == SymbolTable.TableCatagory.ClassScope)
-                //            {
-                //                var classEnv = envStack[i];
-                //                var memberRec = classEnv.GetRecord(accessNode.memberNode.token.attribute);
 
-                //                accessNode.attributes["class"] = classEnv.name;//记录memberAccess节点的点左边类型
-                //                accessNode.attributes["member_name"] = accessNode.memberNode.token.attribute;//记录memberAccess节点的点右边名称
 
-                //                nodeTypeExprssion = memberRec.typeExpression;
-                //                inClass = true;
-                //                break;
-                //            }
-
-                //        }
-
-                //        if(inClass == false)
-                //        {
-                //            throw new Exception("类作用域外的this指针无效！");
-                //        }
-                //    }
-                //    break;
                 case SyntaxTree.ObjectMemberAccessNode accessNode:
                     {
                         var className = AnalyzeTypeExpression(accessNode.objectNode);
@@ -1917,24 +2023,49 @@ namespace FanLang.SemanticRule
                     break;
                 case SyntaxTree.CallNode callNode:
                     {
-                        Log("Call Node:" + callNode.funcNode.GetType().ToString());
-                        if(callNode.isMemberAccessFunction)
+                        var argTypeArr = callNode.argumantsNode.arguments.Select(argN => AnalyzeTypeExpression(argN) ).ToArray();
+                        string funcFinalName;
+
+                        if (callNode.isMemberAccessFunction)
                         {
-                            var typeExpr = AnalyzeTypeExpression(callNode.funcNode as SyntaxTree.ObjectMemberAccessNode);
+                            var funcAccess = (callNode.funcNode as SyntaxTree.ObjectMemberAccessNode);
+                            string funcName = funcAccess.memberNode.token.attribute;
+
+                            var className = AnalyzeTypeExpression(funcAccess.objectNode);
+
+                            var classRec = QueryRecord(className);
+                            if (classRec == null) throw new Exception("找不到类名：" + className);
+
+                            var classEnv = classRec.envPtr;
+                            if (classEnv == null) throw new Exception("类作用域不存在！");
+
+                            string mangledName = Utils.Mangle(funcName, argTypeArr);
+                            funcFinalName = className + "." + mangledName;
+
+                            var memberRec = classEnv.GetRecord(mangledName);
+                            if (memberRec == null) throw new Exception("字段" + funcAccess.memberNode.token.attribute + "不存在！");
+
+                            var typeExpr = memberRec.typeExpression;
+
                             if (typeExpr.Contains("->") == false) throw new Exception($"对象的成员类型{typeExpr}不是函数！");
                             nodeTypeExprssion = typeExpr.Split(' ').LastOrDefault();
                         }
                         else
                         {
-                            Log("is NOT MemberAccessFunction");
                             var funcId = (callNode.funcNode as SyntaxTree.IdentityNode);
-                            var idRec = QueryRecord(funcId.token.attribute);
+
+                            funcFinalName = Utils.Mangle(funcId.token.attribute, argTypeArr);
+
+                            var idRec = QueryRecord(funcFinalName);
+
                             if (idRec == null) throw new Exception("函数：" + funcId.token.attribute + "未找到！");
 
                             string typeExpr = idRec.typeExpression.Split(' ').LastOrDefault();
 
                             nodeTypeExprssion = typeExpr;
                         }
+
+                        callNode.attributes["final_name"] = funcFinalName;
                     }
                     break;
                 case SyntaxTree.NewObjectNode newObjNode:
@@ -2042,3 +2173,5 @@ namespace FanLang.SemanticRule
         }
     }
 }
+
+

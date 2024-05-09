@@ -73,6 +73,8 @@ namespace FanLang
             "idBracket",
             "primitiveBracket",
             "optidx",
+
+            "inherit",
         };
 
         public List<string> productionExpressions = new List<string>() {
@@ -107,7 +109,7 @@ namespace FanLang
             "declstmt -> type ID = expr ;",
             "declstmt -> type ID ( params ) { statements }",
             "declstmt -> extern type ID ( params ) ;",
-            "declstmt -> class ID { declstatements }",
+            "declstmt -> class ID inherit { declstatements }",
 
             "elifclauselist -> ε",
             "elifclauselist -> elifclauselist elifclause",
@@ -226,6 +228,10 @@ namespace FanLang
             "primitiveBracket -> primitive [ optidx ]",
             "optidx -> aexpr",
             "optidx -> ε",
+
+
+            "inherit -> : ID",
+            "inherit -> ε",
         };
     }
 }
