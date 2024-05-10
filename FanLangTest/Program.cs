@@ -12,10 +12,16 @@ using FanLang.ScriptEngine;
 
 namespace FanLangTest
 {
+    using FanLang.Interop.CSharp;
     class Program
     {
         static void Main(string[] args)
         {
+            //InteropWrapGenerator generator = new InteropWrapGenerator();
+            //generator.GenerateAssembly(typeof());
+            //Console.ReadLine();
+            //return;
+
             string source = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\test.txt");
 
             //Compile  

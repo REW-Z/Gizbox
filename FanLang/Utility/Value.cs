@@ -286,16 +286,28 @@ namespace FanLang
     {
         private static int currentMaxId = 0;
 
+        // ***** Header *****
         public int instanceID = 0;
+        public string truetype;
+        public SymbolTable classEnv;
+        public VTable vtable;
 
-        public string name;
-
+        // ***** Data *****
         public Dictionary<string, Value> fields = new Dictionary<string, Value>();
 
-        public FanObject(string classname)
+        public FanObject(string classname, ScriptEngine.ScriptEngine engineContext)
         {
-            this.name = classname;
             this.instanceID = currentMaxId++;
+            this.truetype = classname;
+            this.classEnv = engineContext.mainUnit.QueryClass(classname).envPtr;
+            this.vtable = engineContext.mainUnit.vtables[classname];
+        }
+        public FanObject(string classname, SymbolTable classEnv, VTable vtable)
+        {
+            this.instanceID = currentMaxId++;
+            this.truetype = classname;
+            this.classEnv = classEnv;
+            this.vtable = vtable;
         }
         public override string ToString()
         {

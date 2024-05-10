@@ -65,7 +65,6 @@ namespace FanLang.ScriptEngine
         //符号表堆栈  
         public Stack<SymbolTable> envStack;
 
-
         //中间代码  
         public FanLang.IL.ILUnit mainUnit;
 
@@ -101,7 +100,7 @@ namespace FanLang.ScriptEngine
 
         public ScriptEngine()
         {
-            csharpInteropContext = new Interop.CSharp.InteropContext();
+            csharpInteropContext = new Interop.CSharp.InteropContext(this);
         }
 
         public void Execute(FanLang.IL.ILUnit ir)
@@ -296,6 +295,7 @@ namespace FanLang.ScriptEngine
                         List<Value> arguments = callStack[callStack.Top].args.ToList();
                         arguments.Reverse();
 
+
                         Value result = ExternCall(tac.arg1, arguments);
 
                         retRegister = result;
@@ -321,12 +321,70 @@ namespace FanLang.ScriptEngine
                     break;
                 case "CALL":
                     {
-                        string funcFullName = TrimName(tac.arg1);
+                        string funcMangledName = TrimName(tac.arg1);
                         int argCount = int.Parse(tac.arg2);
 
                         this.callStack[this.callStack.Top + 1].returnPtr = new Tuple<int, int>(this.currUnit, (this.curr + 1));
-                        
-                        string label = "entry:" + funcFullName;
+
+                        string funcFinalName = funcMangledName;
+
+                        string label = "entry:" + funcFinalName;
+
+                        var jumpAddr = mainUnit.QueryLabel(label);
+                        this.curr = jumpAddr.Item2;
+                        this.currUnit = jumpAddr.Item1;
+
+                        return;
+                    }
+                case "MCALL":
+                    {
+                        string funcMangledName = TrimName(tac.arg1);
+                        int argCount = int.Parse(tac.arg2);
+
+                        this.callStack[this.callStack.Top + 1].returnPtr = new Tuple<int, int>(this.currUnit, (this.curr + 1));
+
+
+                        //运行时多态  
+                        //获取this参数  
+                        if (this.callStack[this.callStack.Top + 1].args.Count == 0) throw new Exception("成员方法调用没有this参数！");
+                        var arg_this = this.callStack[this.callStack.Top + 1].args.Peek();
+                        if (arg_this.Type != FanType.FanObject) throw new Exception("成员方法调用没有this参数！(第一个参数不是this参数)");
+                        string trueType = (arg_this.AsObject as FanObject).truetype;
+
+
+                        //新方法：虚函数表vtable    
+                        var vrec = (arg_this.AsObject as FanObject).vtable.Query(funcMangledName);
+                        string funcFinalName = vrec.funcfullname;
+
+                        ////查找对应方法 (旧方法) 
+                        //SymbolTable envFound;
+                        //var classRec = Query(trueType, out envFound);
+
+                        //string funcFinalName = null;
+
+                        //var currentEnv = classRec.envPtr;
+                        //while(currentEnv != null)
+                        //{
+                        //    if(currentEnv.ContainRecordName(funcMangledName))
+                        //    {
+                        //        funcFinalName = currentEnv.name + "." + funcMangledName;
+                        //        break;
+                        //    }
+
+                        //    if(currentEnv.ContainRecordName("base"))
+                        //    {
+                        //        currentEnv = currentEnv.GetRecord("base").envPtr;
+                        //        continue;
+                        //    }
+                        //    else
+                        //    {
+                        //        currentEnv = null;
+                        //    }
+                        //}
+                        //if (funcFinalName == null) throw new Exception("运行时没有找到对应实例方法！");
+
+
+                        string label = "entry:" + funcFinalName;
 
                         var jumpAddr = mainUnit.QueryLabel(label);
                         this.curr = jumpAddr.Item2;
@@ -403,7 +461,10 @@ namespace FanLang.ScriptEngine
                     break;
                 case "ALLOC":
                     {
-                        FanObject newfanObj = new FanObject(tac.arg2);
+                        string className = tac.arg2;
+                        SymbolTable tableFound; 
+                        var rec = Query(className, out tableFound);
+                        FanObject newfanObj = new FanObject(className, rec.envPtr, mainUnit.vtables[className]);
                         SetValue(tac.arg1, newfanObj);
                     }
                     break;
@@ -486,7 +547,6 @@ namespace FanLang.ScriptEngine
 
 
 
-
         private Value GetValue(string str)
         {
             return Access(str, write:false);
@@ -519,10 +579,11 @@ namespace FanLang.ScriptEngine
                 return AccessExprRecursive(expr, write, value);
             }
             //常量(只读)  
-            else if(str.Contains(':') && write == false)
+            else if(str.StartsWith("LIT") && str.Contains(':') && write == false)
             {
-                string baseType = str.Split(':')[0];
-                string lex = str.Split(':')[1];
+                int splitIndex = str.IndexOf(':');
+                string baseType = str.Substring(0, splitIndex);
+                string lex = str.Substring(splitIndex + 1);
                 switch (baseType)
                 {
                     case "LITBOOL": return bool.Parse(lex);
@@ -721,6 +782,7 @@ namespace FanLang.ScriptEngine
 
         private SymbolTable.Record Query(string symbolName, out SymbolTable tableFound)
         {
+            //本编译单元查找  
             for (int i = envStack.Count - 1; i > -1; --i)
             {
                 if (envStack[i].ContainRecordName(symbolName))
@@ -729,6 +791,18 @@ namespace FanLang.ScriptEngine
                     return envStack[i].GetRecord(symbolName);
                 }
             }
+
+            //导入库查找  
+            foreach (var lib in this.mainUnit.dependencies)
+            {
+                var rec = lib.globalScope.env.GetRecord(symbolName);
+                if (rec != null)
+                {
+                    tableFound = lib.globalScope.env;
+                    return rec;
+                }
+            }
+
 
             Console.WriteLine("在符号表链中未找到：" + symbolName + "符号表链：" + string.Concat(envStack.ToList().Select(e => e.name + " - ")) + " 当前行数：" + curr);
             tableFound = null;
@@ -776,8 +850,7 @@ namespace FanLang.ScriptEngine
         {
             object[] argumentsBoxed = argments.Select(a => csharpInteropContext.Marshal2CSharp(a)).ToArray();
 
-            var funcInfo = typeof(FanLang.Interop.CSharp.ExterCalls).GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
-                .FirstOrDefault(m => m.Name == funcName);
+            var funcInfo = csharpInteropContext.QueryFunc(funcName);
             if (funcInfo != null)
             {
                 var ret = funcInfo.Invoke(null, argumentsBoxed);
@@ -878,9 +951,9 @@ namespace FanLang.ScriptEngine
                 case "string": return val.Box().ToString();
                 default:
                     {
-                        //类转换...里氏替换  
+                        //里氏替换  
+                        return val;
                     }
-                    return Value.Void;
             }
         }
     }
@@ -888,169 +961,3 @@ namespace FanLang.ScriptEngine
 
 
 
-
-
-namespace FanLang.Interop.CSharp
-{
-    public class Person
-    {
-        public string name;
-
-        public void Say(string text)
-        {
-            Console.WriteLine(name + " : " + text);
-        }
-    }
-
-
-    public class ObjectBinding
-    {
-        public FanObject fanObj;
-        public object csObj;
-    }
-
-    public class InteropContext
-    {
-        //类型缓存    
-        private  Dictionary<string, Type> typeCache = new Dictionary<string, Type>();
-
-        //绑定表  
-        public List<ObjectBinding> bindingTable = new List<ObjectBinding>();
-        private Dictionary<int, ObjectBinding> idToBind = new Dictionary<int, ObjectBinding>();
-        private Dictionary<object, ObjectBinding> objToBind = new Dictionary<object, ObjectBinding>();
-
-
-
-        public void NewBinding(FanObject fObj, object csObj)
-        {
-            int id = fObj.instanceID;
-            var bd = new ObjectBinding() { fanObj = fObj, csObj = csObj };
-            bindingTable.Add(bd);
-            idToBind[id] = bd;
-            objToBind[csObj] = bd;
-        }
-
-        public Type FindType(string typename)
-        {
-            if (typeCache.ContainsKey(typename))
-            {
-                return typeCache[typename];
-            }
-            else
-            {
-                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-                {
-                    foreach (var t in asm.GetTypes())
-                    {
-                        if (t.Name == typename)
-                        {
-                            typeCache[typename] = t;
-                            return t;
-                        }
-                    }
-                }
-
-                throw new Exception("没有在所有Assembly中找到类：" + typename);
-            }
-        }
-
-        public object Marshal2CSharp(Value val)
-        {
-            if (val.Type == FanType.FanObject)
-            {
-                var fanobj = ((FanObject)val.AsObject);
-
-                //存在已绑定对象  
-                if (idToBind.ContainsKey(fanobj.instanceID))
-                {
-                    return idToBind[fanobj.instanceID].csObj;
-                }
-                //没有绑定的对象-新建  
-                else
-                {
-                    var newobj = Activator.CreateInstance(FindType(fanobj.name));
-                    NewBinding(fanobj, newobj);
-                    return newobj;
-                }
-            }
-            else if (val.Type == FanType.FanArray)
-            {
-                return val.Box();
-                //TODO:对象数组...
-            }
-            else
-            {
-                return val.Box();
-            }
-        }
-
-        public  Value Marshal2Fan(object val)
-        {
-            if (val == null)
-            {
-                return Value.Void;
-            }
-
-            switch (val)
-            {
-                case string str:
-                case int i:
-                case float f:
-                case bool b:
-                    return Value.UnBox(val);
-                default: break;
-            }
-
-            Type type = val.GetType();
-
-            if (type.IsArray)
-            {
-                //TODO:对象数组处理  
-                return Value.UnBox(val);
-            }
-            else
-            {
-                if (objToBind.ContainsKey(val))
-                {
-                    return objToBind[val].fanObj;
-                }
-                else
-                {
-                    var newfanobj = new FanObject(type.Name);
-                    NewBinding(newfanobj, val);
-                    return newfanobj;
-                }
-            }
-
-            throw new Exception("封送错误");
-        }
-
-
-
-        public void Bind(FanObject fanobj, object obj)
-        {
-        }
-    }
-
-    public static class ExterCalls
-    {
-        public static void Log(string text)
-        {
-            Console.WriteLine("FanLang >>>" + text);
-        }
-
-        public static void Person_Say(Person p, string text)
-        {
-            p.Say(text);
-        }
-
-        public static void Person_set_name(Person p, string text)
-        {
-            p.name = text;
-        }
-        public static string Person_get_name(Person p)
-        {
-            return p.name;
-        }
-    }
-}

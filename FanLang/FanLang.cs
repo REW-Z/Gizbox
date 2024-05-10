@@ -80,6 +80,8 @@ namespace FanLang
     }
 
 
+
+
     /// <summary>
     /// 符号表  
     /// </summary>
@@ -90,7 +92,8 @@ namespace FanLang
             Var,
             Param,
             Function,
-            Class
+            Class,
+            Other
         }
         public enum TableCatagory
         {
@@ -156,6 +159,29 @@ namespace FanLang
             return records[symbolName];
         }
 
+        //在本符号表和基类符号表中查找  
+        public Record GetMemberRecordInChain(string symbolName)
+        {
+            if (this.tableCatagory != TableCatagory.ClassScope) throw new Exception("进类的符号表支持基类查找");
+
+            if (records.ContainsKey(symbolName))
+            {
+                return records[symbolName];
+            }
+            else
+            {
+                if(records.ContainsKey("base") == true)
+                {
+                    return records["base"].envPtr.GetMemberRecordInChain(symbolName);
+                }
+                else
+                {
+                    return null;
+                }
+            }
+        }
+
+
         //包含信息  
         public bool ContainRecordName(string name)
         {
@@ -178,7 +204,7 @@ namespace FanLang
             return result;
         }
 
-        //记录符号  
+        //新的条目  
         public Record NewRecord(string synbolName, RecordCatagory catagory, string typeExpr, SymbolTable envPtr = null)
         {
             int variableAddr = 99999;//TODO:地址存放  
@@ -192,6 +218,12 @@ namespace FanLang
             records[synbolName] = newRec;
 
             return newRec;
+        }
+
+        //添加已有的条目  
+        public void AddRecord(string key, Record rec)
+        {
+            this.records[key] = rec;
         }
 
         //获取子表  
@@ -236,6 +268,49 @@ namespace FanLang
             }
         }
     }
+
+
+    /// <summary>
+    /// 虚函数表  
+    /// </summary>
+    public class VTable
+    {
+        public class Record
+        {
+            public string funcName;
+            public string className;
+            public string funcfullname;
+        }
+
+        public string name;
+
+        public Dictionary<string, Record> data;
+
+        public VTable(string name)
+        {
+            this.name = name;
+            this.data = new Dictionary<string, Record>();
+        }
+
+        public Record Query(string funcName)
+        {
+            return data[funcName];
+        }
+        public void NewRecord(string fname, string cname)
+        {
+            data[fname] = new Record() { funcName = fname, className = cname, funcfullname = cname + "." + fname };
+        }
+
+        public void CloneDataTo(VTable table)
+        {
+            foreach(var kv in this.data)
+            {
+                table.data[kv.Key] = new Record() { funcName = kv.Key, className = kv.Value.className, funcfullname = kv.Value.className + "." + kv.Key };
+            }
+        }
+    }
+
+
 
     /// <summary>
     /// 常量池  
@@ -521,6 +596,7 @@ namespace FanLang
     /// </summary>
     public class Compiler
     {
+        public int ttt;
         //Settings  
         public static bool enableLogScanner = false;
         public static bool enableLogParser = false;

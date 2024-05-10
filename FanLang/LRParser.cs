@@ -1474,6 +1474,19 @@ namespace FanLang.SemanticRule
                         var newEnv = new SymbolTable( envName, SymbolTable.TableCatagory.FuncScope, envStack.Peek());
                         funcDeclNode.attributes["env"] = newEnv;
 
+                        //如果是成员方法  
+                        if(isMethod)
+                        {
+                            //类符号表同名方法去重    
+                            if (envStack.Peek().ContainRecordName(funcMangledName))
+                            {
+                                envStack.Peek().records.Remove(funcMangledName);
+                            }
+
+                            //添加到虚函数表    
+                            this.ilUnit.vtables[className].NewRecord(funcMangledName, className);
+                        }
+
                         //添加条目  
                         var newRec = envStack.Peek().NewRecord(
                             funcMangledName,
@@ -1573,11 +1586,36 @@ namespace FanLang.SemanticRule
                             newEnv
                             );
 
+                        //新建虚函数表  
+                        string classname = classDeclNode.classNameNode.token.attribute;
+                        var vtable = ilUnit.vtables[classname] = new VTable(classname);
 
                         //进入类作用域  
                         envStack.Push(newEnv);
 
-                        //成员字段加入符号表
+                        //有基类  
+                        if(classDeclNode.baseClassNameNode != null)
+                        {
+                            //基类标记  
+                            var baseClassName = classDeclNode.baseClassNameNode.token.attribute;
+                            var baseRec = QueryRecord(baseClassName);
+                            var baseEnv = baseRec.envPtr;
+                            newEnv.NewRecord("base", SymbolTable.RecordCatagory.Other, "(inherit)", baseEnv);
+
+                            //基类符号表条目并入//仅字段  
+                            foreach (var reckv in baseEnv.records)
+                            {
+                                if(reckv.Value.category == SymbolTable.RecordCatagory.Var)
+                                {
+                                    newEnv.AddRecord(reckv.Key, reckv.Value);
+                                }
+                            }
+                            //虚函数表克隆  
+                            this.ilUnit.vtables[baseClassName].CloneDataTo(vtable);
+                        }
+
+
+                        //新定义的成员字段加入符号表
                         foreach (var declNode in classDeclNode.memberDelareNodes)
                         {
                             CollectSymbols(declNode);
@@ -1833,10 +1871,13 @@ namespace FanLang.SemanticRule
 
                             var memberName = memberAccess.memberNode.token.attribute;
 
-                            if(classEnv.ContainRecordName(memberName) == false) //不存在同名字段  
+                            var memberRec = classEnv.GetMemberRecordInChain(memberName);
+                            if (memberRec == null) //不存在同名字段  
                             {
                                 var rvalType = AnalyzeTypeExpression(assignNode.rvalueNode);
-                                if(classEnv.ContainRecordName(Utils.Mangle(memberName, rvalType)))//存在setter函数  
+
+                                var setterMethod = classEnv.GetMemberRecordInChain(Utils.Mangle(memberName, rvalType));
+                                if (setterMethod != null)//存在setter函数  
                                 {
                                     //替换节点  
                                     assignNode.replacement = new SyntaxTree.CallNode() {
@@ -1881,10 +1922,11 @@ namespace FanLang.SemanticRule
 
                             var memberName = objMemberAccessNode.memberNode.token.attribute;
 
-                            if (classEnv.ContainRecordName(memberName) == false) //不存在同名字段  
+                            var memberRec = classEnv.GetMemberRecordInChain(memberName);
+                            if (memberRec == null) //不存在同名字段  
                             {
-                                
-                                if (classEnv.ContainRecordName(Utils.Mangle(memberName)))//存在getter函数  
+                                var getterRec = classEnv.GetMemberRecordInChain(Utils.Mangle(memberName));
+                                if (getterRec != null)//存在getter函数  
                                 {
                                     
                                     //替换节点  
@@ -2024,7 +2066,7 @@ namespace FanLang.SemanticRule
                 case SyntaxTree.CallNode callNode:
                     {
                         var argTypeArr = callNode.argumantsNode.arguments.Select(argN => AnalyzeTypeExpression(argN) ).ToArray();
-                        string funcFinalName;
+                        string mangledName;
 
                         if (callNode.isMemberAccessFunction)
                         {
@@ -2039,11 +2081,10 @@ namespace FanLang.SemanticRule
                             var classEnv = classRec.envPtr;
                             if (classEnv == null) throw new Exception("类作用域不存在！");
 
-                            string mangledName = Utils.Mangle(funcName, argTypeArr);
-                            funcFinalName = className + "." + mangledName;
+                            mangledName = Utils.Mangle(funcName, argTypeArr);
 
-                            var memberRec = classEnv.GetRecord(mangledName);
-                            if (memberRec == null) throw new Exception("字段" + funcAccess.memberNode.token.attribute + "不存在！");
+                            var memberRec = classEnv.GetMemberRecordInChain(mangledName);
+                            if (memberRec == null) throw new Exception("函数成员" + funcAccess.memberNode.token.attribute + "不存在！");
 
                             var typeExpr = memberRec.typeExpression;
 
@@ -2054,9 +2095,9 @@ namespace FanLang.SemanticRule
                         {
                             var funcId = (callNode.funcNode as SyntaxTree.IdentityNode);
 
-                            funcFinalName = Utils.Mangle(funcId.token.attribute, argTypeArr);
+                            mangledName = Utils.Mangle(funcId.token.attribute, argTypeArr);
 
-                            var idRec = QueryRecord(funcFinalName);
+                            var idRec = QueryRecord(mangledName);
 
                             if (idRec == null) throw new Exception("函数：" + funcId.token.attribute + "未找到！");
 
@@ -2065,7 +2106,7 @@ namespace FanLang.SemanticRule
                             nodeTypeExprssion = typeExpr;
                         }
 
-                        callNode.attributes["final_name"] = funcFinalName;
+                        callNode.attributes["mangled_name"] = mangledName;
                     }
                     break;
                 case SyntaxTree.NewObjectNode newObjNode:
@@ -2117,6 +2158,7 @@ namespace FanLang.SemanticRule
                 case SyntaxTree.CastNode castNode:
                     {
                         nodeTypeExprssion = castNode.typeNode.ToExpression();
+                        Console.WriteLine("分析第" + castNode.FirstToken().line + "行的转换表达式，类型为" + nodeTypeExprssion);
                     }
                     break;
                 default:

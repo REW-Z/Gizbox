@@ -58,14 +58,25 @@ namespace FanLang.IL
 
     public class ILUnit
     {
-        //中间代码信息  
+        // *** 中间代码信息 ***  
+        //依赖库
         public List<ILUnit> dependencies = new List<ILUnit>();
-        private Dictionary<string, int> label2Line = new Dictionary<string, int>(); 
+        //代码  
         public List<TAC> codes = new List<TAC>();
+        //标号 -> 行数 查询表  
+        private Dictionary<string, int> label2Line = new Dictionary<string, int>(); 
+        //作用域状态数组  
         public int[] scopeStatusArr;
+        //代码入口  
         public int codeEntry;
+        //作用域列表  
         public List<Scope> scopes = new List<Scope>();
+        //全局作用域  
         public Scope globalScope;
+        //虚函数表  
+        public Dictionary<string, VTable> vtables = new Dictionary<string, VTable>();
+
+        //行数 -> 符号表链 查询表
         public Dictionary<int, FanLang.Stack<SymbolTable>> stackDic;
 
         public ILUnit()
@@ -214,6 +225,25 @@ namespace FanLang.IL
         }
 
 
+        // 查询类  
+        public SymbolTable.Record QueryClass(string className)
+        {
+            if(globalScope.env.ContainRecordName(className))
+            {
+                return globalScope.env.GetRecord(className);
+            }
+
+            foreach(var dep in dependencies)
+            {
+                if(dep.globalScope.env.ContainRecordName(className))
+                {
+                    return dep.globalScope.env.GetRecord(className);
+                }
+            }
+
+            return null;
+        }
+
         public void Print()
         {
             Console.WriteLine("中间代码输出：(" + this.codes.Count + "行)");
@@ -348,6 +378,7 @@ namespace FanLang.IL
                         {
                             //构造函数全名    
                             string funcFullName = classDeclNode.classNameNode.token.attribute + ".ctor";
+                            //string funcFullName = "ctor";
 
                             //跳过声明  
                             GenerateCode("JUMP", "exit:" + funcFullName);
@@ -357,7 +388,17 @@ namespace FanLang.IL
                             EnvBegin(envStack.Peek().GetTableInChildren(classDeclNode.classNameNode.token.attribute + ".ctor"));
                             GenerateCode("METHOD_BEGIN", funcFullName);
 
+                            //基类构造函数调用  
+                            if (classDeclNode.baseClassNameNode != null)
+                            {
+                                var baseClassName = classDeclNode.baseClassNameNode.token.attribute;
+                                var baseRec = Query(baseClassName);
+                                var baseEnv = baseRec.envPtr;
 
+                                GenerateCode("PARAM", "[this]");
+                                GenerateCode("CALL", "[" + baseClassName + ".ctor]", 1);
+                            }
+                            
                             //成员变量初始化
                             foreach (var memberDecl in classDeclNode.memberDelareNodes)
                             {
@@ -706,28 +747,9 @@ namespace FanLang.IL
                 case SyntaxTree.CallNode callNode:
                     {
                         //函数全名  
-                        string funcFinalName = (string)callNode.attributes["final_name"];
+                        string mangledName = (string)callNode.attributes["mangled_name"];
                         //函数返回类型    
                         string returnType = (string)callNode.attributes["type"];
-                        //if(callNode.isMemberAccessFunction == true)
-                        //{
-                        //    string className = (string)(callNode.funcNode as SyntaxTree.ObjectMemberAccessNode).attributes["class"];
-                        //    string funcName = (string)(callNode.funcNode as SyntaxTree.ObjectMemberAccessNode).attributes["member_name"];
-
-                        //    var argTypeArr = callNode.argumantsNode.arguments.Select(argN => (string)argN.attributes["type"]).ToArray();
-                        //    funcFinalName = className + "." + Utils.Mangle(funcName, argTypeArr);
-
-                        //    var funcRec = Query(className, funcName);
-                        //    returnType = funcRec.typeExpression.Split(' ').LastOrDefault();
-                        //}
-                        //else
-                        //{
-                        //    var argTypeArr = callNode.argumantsNode.arguments.Select(argN => (string)argN.attributes["type"]).ToArray();
-                        //    funcFinalName = Utils.Mangle((callNode.funcNode as SyntaxTree.IdentityNode).token.attribute, argTypeArr);
-
-                        //    var funcRec = Query(funcFinalName);
-                        //    returnType = funcRec.typeExpression.Split(' ').LastOrDefault();
-                        //}
 
                         //表达式的返回变量  
                         callNode.attributes["ret"] = NewTemp(returnType);
@@ -735,10 +757,14 @@ namespace FanLang.IL
                         //参数数量  
                         int argCount;
                         if (callNode.isMemberAccessFunction == true)
+                        {
                             argCount = callNode.argumantsNode.arguments.Count + 1;
+                        }
                         else
+                        {
                             argCount = callNode.argumantsNode.arguments.Count;
-
+                        }
+                        
 
                         //显式定义的参数（倒序压栈）    
                         for(int i = callNode.argumantsNode.arguments.Count - 1; i >= 0 ; --i)
@@ -761,10 +787,20 @@ namespace FanLang.IL
                             {
                                 GenerateCode("PARAM", "[this]");
                             }
+
+
                         }
 
-                        GenerateCode("CALL", "[" + funcFinalName + "]", argCount);
-                        GenerateCode("=", callNode.attributes["ret"], "RET");
+                        if(callNode.isMemberAccessFunction == true)
+                        {
+                            GenerateCode("MCALL", "[" + mangledName + "]", argCount);
+                            GenerateCode("=", callNode.attributes["ret"], "RET");
+                        }
+                        else
+                        {
+                            GenerateCode("CALL", "[" + mangledName + "]", argCount);
+                            GenerateCode("=", callNode.attributes["ret"], "RET");
+                        }
                     }
                     break;
                 case SyntaxTree.ElementAccessNode eleAccessNode:
@@ -795,7 +831,7 @@ namespace FanLang.IL
 
                         GenerateCode("ALLOC", newObjNode.attributes["ret"], className);
                         GenerateCode("PARAM", newObjNode.attributes["ret"]);
-                        GenerateCode("CALL", "[" + className + ".ctor]", 0);
+                        GenerateCode("CALL", "[" + className + ".ctor]", 1);
                     }
                     break;
                 case SyntaxTree.NewArrayNode newArrNode:
@@ -890,40 +926,42 @@ namespace FanLang.IL
 
             throw new Exception("查询不到" + id + "的类型！");
         }
-        public SymbolTable.Record Query(string className, string id)
-        {
-            //本编译单元查找  
-            if (ilUnit.globalScope.env.ContainRecordName(className))
-            {
-                var classEnv = ilUnit.globalScope.env.GetTableInChildren(className);
-                if (classEnv != null)
-                { 
-                    if(classEnv.ContainRecordName(id))
-                    {
-                        return classEnv.GetRecord(id);
-                    }
-                }
-            }
 
-            //导入库查找  
-            foreach (var lib in ilUnit.dependencies)
-            {
-                if(lib.globalScope.env.ContainRecordName(className))
-                {
-                    var classEnv = lib.globalScope.env.GetTableInChildren(className);
-                    if (classEnv != null)
-                    {
-                        if(classEnv .ContainRecordName(id))
-                        {
-                            Console.WriteLine("库中找到：" + className + "." + id);
-                            return classEnv.GetRecord(id);
-                        }
-                    }
-                }
-            }
 
-            throw new Exception("找不到" + className + "." + id);
-        }
+        //public SymbolTable.Record Query(string className, string id)
+        //{
+        //    //本编译单元查找  
+        //    if (ilUnit.globalScope.env.ContainRecordName(className))
+        //    {
+        //        var classEnv = ilUnit.globalScope.env.GetTableInChildren(className);
+        //        if (classEnv != null)
+        //        { 
+        //            if(classEnv.ContainRecordName(id))
+        //            {
+        //                return classEnv.GetRecord(id);
+        //            }
+        //        }
+        //    }
+
+        //    //导入库查找  
+        //    foreach (var lib in ilUnit.dependencies)
+        //    {
+        //        if(lib.globalScope.env.ContainRecordName(className))
+        //        {
+        //            var classEnv = lib.globalScope.env.GetTableInChildren(className);
+        //            if (classEnv != null)
+        //            {
+        //                if(classEnv .ContainRecordName(id))
+        //                {
+        //                    Console.WriteLine("库中找到：" + className + "." + id);
+        //                    return classEnv.GetRecord(id);
+        //                }
+        //            }
+        //        }
+        //    }
+
+        //    throw new Exception("找不到" + className + "." + id);
+        //}
 
 
 
