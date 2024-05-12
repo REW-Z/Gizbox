@@ -1,62 +1,62 @@
-﻿import <"lib.txt">
+﻿import <"lib">
 
-extern string Car_get_name(Car car);
-extern void Car_set_name(Car car, string newv);
-extern void Car_MoveTo(Car arg0, string arg1);
-class Car
+using Console;
+using GizTest;
+
+namespace GizTest
 {
-        string name()
-        {
-                return Car_get_name(this);
-        }
-        void name(string newv)
-        {
-                Car_set_name(this, newv);
-        }
-        void MoveTo(string arg1)
-        {
-                Car_MoveTo(this, arg1);
-        }
-}
-
-extern void RaceCar_MoveTo(RaceCar arg0, string arg1);
-class RaceCar:Car
-{
-        void MoveTo(string arg1)
-        {
-                RaceCar_MoveTo(this, arg1);
-        }
-}
-
-
-
-class Person
-{
-	int age = 18;
-
-	void Test()
+	class Person
 	{
-		Log("my true type is person");
-	}
-}
-
-class Student : Person
-{
-	int score = 99;
+		int age = 18;
 	
-	void Test()
-	{
-		Log("my true type is student");
+		void Test()
+		{
+			Log("my true type is person");
+		}
 	}
+	
+	class Student : Person
+	{
+		int score = 99;
+
+		Person father = null;
+
+		Person mother = null;
+		
+		void Test()
+		{
+			Log("my true type is student");
+		}
+	}
+
 }
+
+Log("----------------------------");
 
 Student stu = new Student();
 Person p = (Person)stu;
+p.Test();
+
+Log("----------------------------");
+
+stu.mother = new Person();
+stu.father = null;
+
+stu.mother.age = 50;
+Log("mother age" + (string)stu.mother.age);
+
+Log("----------------------------");
 
 Log("age  " + (string)stu.age);
 Log("score " + (string)stu.score);
-p.Test();
 
-RaceCar raceCar = new RaceCar();
-raceCar.name = "s:s";
-raceCar.MoveTo("AAA");
+Log("----------------------------");
+
+
+string[] arrTest = new string[2];
+arrTest[0] = "Hello";
+arrTest[1] = "Gizbox";
+Log(arrTest[0] + arrTest[1]);
+delete arrTest;
+
+Log("----------------------------");

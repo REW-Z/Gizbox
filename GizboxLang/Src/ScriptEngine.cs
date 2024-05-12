@@ -18,7 +18,7 @@ namespace Gizbox.ScriptEngine
     //虚拟栈帧（活动记录）  
     public class Frame
     {
-        public Gizbox.Stack<Value> args = new Gizbox.Stack<Value>();//由Caller压栈(从后往前)  
+        public Gizbox.GStack<Value> args = new Gizbox.GStack<Value>();//由Caller压栈(从后往前)  
         public Tuple<int,int> returnPtr;//返回地址  
         public Dictionary<string, Value> localVariables = new Dictionary<string, Value>();//局部变量和临时变量  
     }
@@ -63,7 +63,7 @@ namespace Gizbox.ScriptEngine
     public class ScriptEngine
     {
         //符号表堆栈  
-        public Stack<SymbolTable> envStack;
+        public GStack<SymbolTable> envStack;
 
         //中间代码  
         public Gizbox.IL.ILUnit mainUnit;
@@ -295,8 +295,7 @@ namespace Gizbox.ScriptEngine
                         List<Value> arguments = callStack[callStack.Top].args.ToList();
                         arguments.Reverse();
 
-
-                        Value result = ExternCall(tac.arg1, arguments);
+                        Value result = csharpInteropContext.ExternCall(tac.arg1, arguments);
 
                         retRegister = result;
 
@@ -355,33 +354,6 @@ namespace Gizbox.ScriptEngine
                         //新方法：虚函数表vtable    
                         var vrec = (arg_this.AsObject as GizObject).vtable.Query(funcMangledName);
                         string funcFinalName = vrec.funcfullname;
-
-                        ////查找对应方法 (旧方法) 
-                        //SymbolTable envFound;
-                        //var classRec = Query(trueType, out envFound);
-
-                        //string funcFinalName = null;
-
-                        //var currentEnv = classRec.envPtr;
-                        //while(currentEnv != null)
-                        //{
-                        //    if(currentEnv.ContainRecordName(funcMangledName))
-                        //    {
-                        //        funcFinalName = currentEnv.name + "." + funcMangledName;
-                        //        break;
-                        //    }
-
-                        //    if(currentEnv.ContainRecordName("base"))
-                        //    {
-                        //        currentEnv = currentEnv.GetRecord("base").envPtr;
-                        //        continue;
-                        //    }
-                        //    else
-                        //    {
-                        //        currentEnv = null;
-                        //    }
-                        //}
-                        //if (funcFinalName == null) throw new Exception("运行时没有找到对应实例方法！");
 
 
                         string label = "entry:" + funcFinalName;
@@ -466,6 +438,11 @@ namespace Gizbox.ScriptEngine
                         var rec = Query(className, out tableFound);
                         GizObject newfanObj = new GizObject(className, rec.envPtr, mainUnit.vtables[className]);
                         SetValue(tac.arg1, newfanObj);
+                    }
+                    break;
+                case "DEL":
+                    {
+                        SetValue(tac.arg1, Value.Void);
                     }
                     break;
                 case "ALLOC_ARRAY":
@@ -586,6 +563,7 @@ namespace Gizbox.ScriptEngine
                 string lex = str.Substring(splitIndex + 1);
                 switch (baseType)
                 {
+                    case "LITNULL": return Value.Void;
                     case "LITBOOL": return bool.Parse(lex);
                     case "LITINT": return int.Parse(lex);
                     case "LITFLOAT": return float.Parse(lex.Substring(0, lex.Length - 1));//去除F标记  
@@ -778,8 +756,6 @@ namespace Gizbox.ScriptEngine
         }
 
 
-
-
         private SymbolTable.Record Query(string symbolName, out SymbolTable tableFound)
         {
             //本编译单元查找  
@@ -845,24 +821,6 @@ namespace Gizbox.ScriptEngine
             if (!Compiler.enableLogScriptEngine) return;
             Console.WriteLine("ScriptEngine >>" + content);
         }
-
-        private Value ExternCall(string funcName, List<Value> argments)
-        {
-            object[] argumentsBoxed = argments.Select(a => csharpInteropContext.Marshal2CSharp(a)).ToArray();
-
-            var funcInfo = csharpInteropContext.QueryFunc(funcName);
-            if (funcInfo != null)
-            {
-                var ret = funcInfo.Invoke(null, argumentsBoxed);
-                return csharpInteropContext.Marshal2Giz(ret);
-            }
-            else
-            {
-                throw new Exception("找不到对应函数实现：" + funcName);
-            }
-        }
-
-
 
 
         private System.Diagnostics.Stopwatch profileW = new System.Diagnostics.Stopwatch();

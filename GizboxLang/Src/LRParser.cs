@@ -10,8 +10,6 @@ using Gizbox.LALRGenerator;
 using Gizbox.SemanticRule;
 
 
-
-
 namespace Gizbox.LRParse
 {
     /// <summary>
@@ -40,6 +38,7 @@ namespace Gizbox.LRParse
         {
             data.Add(ele);
         }
+
         public ParseStackElement Pop()
         {
             var result = data[Top];
@@ -241,6 +240,7 @@ namespace Gizbox.LRParse
                 }
             }
 
+            Console.ReadKey();
 
             Log("\n\n语法分析树：");
             Log(this.parseTree.Serialize());
@@ -248,6 +248,7 @@ namespace Gizbox.LRParse
             Log("\n\n抽象语法树：");
             Log(this.syntaxTree.Serialize());
             Compiler.Pause("抽象语法树生成完成");
+            Console.ReadKey();
         }
 
         private static void Log(object content)
@@ -395,11 +396,12 @@ namespace Gizbox.SemanticRule
             //return; //不附加其他语义规则-仅语法分析
 
             //构建抽象语法树(AST)的语义动作   
-            AddActionAtTail("S -> importations statements", (psr, production) =>
+            AddActionAtTail("S -> importations namespaceusings statements", (psr, production) =>
             {
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.ProgramNode()
                 {
-                    importNodes = (List<SyntaxTree.ImportNode>)psr.stack[psr.stack.Top - 1].attributes["import_list"],
+                    importNodes = (List<SyntaxTree.ImportNode>)psr.stack[psr.stack.Top - 2].attributes["import_list"],
+                    usingNamespaceNodes = (List<SyntaxTree.UsingNode>)psr.stack[psr.stack.Top - 1].attributes["using_list"],
                     statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top].attributes["ast_node"],
 
 
@@ -438,6 +440,36 @@ namespace Gizbox.SemanticRule
                 };
             });
 
+            AddActionAtTail("namespaceusings -> namespaceusings namespaceusing", (psr, production) =>
+            {
+                psr.newElement.attributes["using_list"] = psr.stack[psr.stack.Top - 1].attributes["using_list"];
+                ((List<SyntaxTree.UsingNode>)psr.newElement.attributes["using_list"]).Add(
+                    (SyntaxTree.UsingNode)psr.stack[psr.stack.Top].attributes["ast_node"]
+                ); ;
+            });
+            AddActionAtTail("namespaceusings -> namespaceusing", (psr, production) =>
+            {
+                psr.newElement.attributes["using_list"] = new List<SyntaxTree.UsingNode>();
+                ((List<SyntaxTree.UsingNode>)psr.newElement.attributes["using_list"]).Add(
+                    (SyntaxTree.UsingNode)psr.stack[psr.stack.Top].attributes["ast_node"]
+                ); ;
+            });
+            AddActionAtTail("namespaceusings -> ε", (psr, production) =>
+            {
+                psr.newElement.attributes["using_list"] = new List<SyntaxTree.UsingNode>();
+            });
+
+            AddActionAtTail("namespaceusing -> using ID ;", (psr, production) =>
+            {
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.UsingNode() { 
+                    namespaceNameNode = new SyntaxTree.IdentityNode() { 
+                        attributes = psr.stack[psr.stack.Top - 1].attributes,
+                        token = psr.stack[psr.stack.Top - 1].attributes["token"] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.Namespace,
+                    }
+                };
+            });
+
 
 
             AddActionAtTail("statements -> statements stmt", (psr, production) => {
@@ -466,6 +498,20 @@ namespace Gizbox.SemanticRule
                 };
             });
 
+
+            AddActionAtTail("namespaceblock -> namespace ID { statements }", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.NamespaceNode()
+                {
+                    namepsaceNode = new SyntaxTree.IdentityNode() { 
+                        attributes = psr.stack[psr.stack.Top - 3].attributes,
+                        token = psr.stack[psr.stack.Top - 3].attributes["token"] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.Namespace,
+                    },
+                    stmtsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"],
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
 
             AddActionAtTail("statementblock -> { statements }", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.StatementBlockNode()
@@ -498,6 +544,10 @@ namespace Gizbox.SemanticRule
             AddActionAtTail("declstatements -> ε", (psr, production) => {
 
                 psr.newElement.attributes["decl_stmts"] = new List<SyntaxTree.DeclareNode>() { };
+            });
+
+            AddActionAtTail("stmt -> namespaceblock", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top].attributes["ast_node"];
             });
 
             AddActionAtTail("stmt -> statementblock", (psr, production) => {
@@ -543,6 +593,14 @@ namespace Gizbox.SemanticRule
                 };
             });
 
+            AddActionAtTail("stmt -> delete expr ;", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.DeleteStmtNode()
+                {
+                    objToDelete = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"],
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
             AddActionAtTail("stmt -> while ( expr ) stmt", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.WhileStmtNode() {
 
@@ -597,7 +655,8 @@ namespace Gizbox.SemanticRule
                     identifierNode = new SyntaxTree.IdentityNode()
                     {
                         attributes = psr.stack[psr.stack.Top - 3].attributes,
-                        token = psr.stack[psr.stack.Top - 3].attributes["token"] as Token
+                        token = psr.stack[psr.stack.Top - 3].attributes["token"] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField,
                     },
                     initializerNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"],
 
@@ -613,6 +672,7 @@ namespace Gizbox.SemanticRule
                     {
                         attributes = psr.stack[psr.stack.Top - 6].attributes,
                         token = psr.stack[psr.stack.Top - 6].attributes["token"] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
                     },
                     parametersNode = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes["ast_node"],
                     statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"],
@@ -630,6 +690,7 @@ namespace Gizbox.SemanticRule
                     {
                         attributes = psr.stack[psr.stack.Top - 4].attributes,
                         token = psr.stack[psr.stack.Top - 4].attributes["token"] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
                     },
                     parametersNode = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 2].attributes["ast_node"],
 
@@ -642,6 +703,7 @@ namespace Gizbox.SemanticRule
                     classNameNode = new SyntaxTree.IdentityNode() {
                         attributes = psr.stack[psr.stack.Top - 4].attributes,
                         token = psr.stack[psr.stack.Top - 4].attributes["token"] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.Class,
                     },
 
                     memberDelareNodes = new List<SyntaxTree.DeclareNode>(),
@@ -735,6 +797,7 @@ namespace Gizbox.SemanticRule
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.IdentityNode() { 
                     attributes = psr.stack[psr.stack.Top].attributes,
                     token = psr.stack[psr.stack.Top].attributes["token"] as Token,
+                    identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
                 };
             });
 
@@ -758,7 +821,7 @@ namespace Gizbox.SemanticRule
                 var node = psr.stack[psr.stack.Top].attributes["stype"];
 
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.ArrayTypeNode() { 
-                    baseType = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes["stype"],
+                    elemtentType = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes["stype"],
 
                     attributes = psr.newElement.attributes,
                 };
@@ -770,6 +833,7 @@ namespace Gizbox.SemanticRule
                     classname = new SyntaxTree.IdentityNode() { 
                         attributes = psr.stack[psr.stack.Top].attributes,
                         token = psr.stack[psr.stack.Top].attributes["token"] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.Class,
                     },
 
                     attributes = psr.newElement.attributes,
@@ -777,14 +841,14 @@ namespace Gizbox.SemanticRule
             });
 
             AddActionAtTail("stype -> primitive", (psr, production) => {
-                psr.newElement.attributes["ast_node"] = (SyntaxTree.PrimitiveNode)psr.stack[psr.stack.Top].attributes["ast_node"];
+                psr.newElement.attributes["ast_node"] = (SyntaxTree.PrimitiveTypeNode)psr.stack[psr.stack.Top].attributes["ast_node"];
             });
 
             string[] primiveProductions = new string[] { "void", "bool", "int", "float", "string" };
             foreach(var t in primiveProductions)
             {
                 AddActionAtTail("primitive -> " + t, (psr, production) => {
-                    psr.newElement.attributes["ast_node"] = new SyntaxTree.PrimitiveNode()
+                    psr.newElement.attributes["ast_node"] = new SyntaxTree.PrimitiveTypeNode()
                     {
                         attributes = psr.stack[psr.stack.Top].attributes,
                         token = psr.stack[psr.stack.Top].attributes["token"] as Token,
@@ -952,6 +1016,7 @@ namespace Gizbox.SemanticRule
                 {
                     attributes = psr.stack[psr.stack.Top].attributes,
                     token = psr.stack[psr.stack.Top].attributes["token"] as Token,
+                    identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
                 };
             });
             AddActionAtTail("primary -> this", (psr, production) => {
@@ -996,6 +1061,7 @@ namespace Gizbox.SemanticRule
                     {
                         attributes = psr.stack[psr.stack.Top].attributes,
                         token = psr.stack[psr.stack.Top].attributes["token"] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
                     },
 
                     attributes = psr.newElement.attributes,
@@ -1012,6 +1078,7 @@ namespace Gizbox.SemanticRule
                     {
                         attributes = psr.stack[psr.stack.Top].attributes,
                         token = psr.stack[psr.stack.Top].attributes["token"] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
                     },
 
                     attributes = psr.newElement.attributes,
@@ -1028,6 +1095,7 @@ namespace Gizbox.SemanticRule
                     {
                         attributes = psr.stack[psr.stack.Top - 1].attributes,
                         token = psr.stack[psr.stack.Top - 1].attributes["token"] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
                     },
 
                     attributes = psr.newElement.attributes,
@@ -1044,6 +1112,7 @@ namespace Gizbox.SemanticRule
                     {
                         attributes = psr.stack[psr.stack.Top - 1].attributes,
                         token = psr.stack[psr.stack.Top - 1].attributes["token"] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
                     },
 
                     attributes = psr.newElement.attributes,
@@ -1059,6 +1128,7 @@ namespace Gizbox.SemanticRule
                     {
                         attributes = psr.stack[psr.stack.Top - 3].attributes,
                         token = psr.stack[psr.stack.Top - 3].attributes["token"] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod
                     },
                     argumantsNode = (SyntaxTree.ArgumentListNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"],
 
@@ -1083,15 +1153,17 @@ namespace Gizbox.SemanticRule
 
             AddActionAtTail("indexaccess -> idBracket", (psr, production) => {
 
+                ((SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes["id"]).identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField;
+
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.ElementAccessNode()
                 {
                     isMemberAccessContainer = false,
                     containerNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes["id"],
                     indexNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes["optidx"],
 
-
                     attributes = psr.newElement.attributes,
                 };
+
             });
 
             AddActionAtTail("indexaccess -> memberaccess [ aexpr ]", (psr, production) => {
@@ -1127,6 +1199,7 @@ namespace Gizbox.SemanticRule
                     className = new SyntaxTree.IdentityNode() { 
                         attributes = psr.stack[psr.stack.Top - 2].attributes,
                         token = psr.stack[psr.stack.Top - 2].attributes["token"] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.Class
                     },
 
                     attributes = psr.newElement.attributes,
@@ -1152,13 +1225,15 @@ namespace Gizbox.SemanticRule
                     memberNode = new SyntaxTree.IdentityNode() {
                         attributes = psr.stack[psr.stack.Top].attributes,
                         token = psr.stack[psr.stack.Top].attributes["token"] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField,
+                        isMemberIdentifier = true,
                     },
 
                     attributes = psr.newElement.attributes,
                 };
             });
 
-            string[] litTypes = new string[] { "LITINT", "LITFLOAT", "LITSTRING", "LITBOOL" };
+            string[] litTypes = new string[] { "null", "LITINT", "LITFLOAT", "LITSTRING", "LITBOOL" };
             foreach (var litType in litTypes)
             {
 
@@ -1189,6 +1264,7 @@ namespace Gizbox.SemanticRule
                             identifierNode = new SyntaxTree.IdentityNode(){
                                 attributes = psr.stack[psr.stack.Top].attributes,
                                 token = psr.stack[psr.stack.Top].attributes["token"] as Token,
+                                identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
                             },
                         }
                     }
@@ -1206,6 +1282,7 @@ namespace Gizbox.SemanticRule
                         {
                             attributes = psr.stack[psr.stack.Top].attributes,
                             token = psr.stack[psr.stack.Top].attributes["token"] as Token,
+                            identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
                         },
                     }
                 );
@@ -1237,11 +1314,15 @@ namespace Gizbox.SemanticRule
 
 
             AddActionAtTail("stypeBracket -> idBracket", (psr, production) => {
+
+                ((SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes["id"]).identiferType = SyntaxTree.IdentityNode.IdType.Class;
+
                 psr.newElement.attributes["stype"] = new SyntaxTree.ClassTypeNode() {
                     classname = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes["id"],
 
                     attributes = psr.newElement.attributes
                 };
+
                 psr.newElement.attributes["optidx"] = psr.stack[psr.stack.Top].attributes["optidx"];
             });
 
@@ -1254,6 +1335,7 @@ namespace Gizbox.SemanticRule
                 psr.newElement.attributes["id"] = new SyntaxTree.IdentityNode() { 
                     attributes = psr.stack[psr.stack.Top - 3].attributes,
                     token = psr.stack[psr.stack.Top - 3].attributes["token"] as Token,
+                    identiferType = SyntaxTree.IdentityNode.IdType.Undefined
                 };
                 psr.newElement.attributes["optidx"] = psr.stack[psr.stack.Top - 1].attributes["ast_node"];
             });
@@ -1274,6 +1356,7 @@ namespace Gizbox.SemanticRule
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.IdentityNode() {
                     attributes = psr.stack[psr.stack.Top].attributes,
                     token = psr.stack[psr.stack.Top].attributes["token"] as Token,
+                    identiferType = SyntaxTree.IdentityNode.IdType.Class
                 };
             });
             AddActionAtTail("inherit -> ε", (psr, production) => {
@@ -1320,11 +1403,13 @@ namespace Gizbox.SemanticRule
     /// </summary>
     public class SemanticAnalyzer//（补充的语义分析器，自底向上规约已经进行了部分语义分析）  
     {
+        public Compiler compilerContext;
+
         public SyntaxTree ast;
 
         public IL.ILUnit ilUnit;
 
-        private Gizbox.Stack<SymbolTable> envStack;
+        private Gizbox.GStack<SymbolTable> envStack;
 
 
         //temp  
@@ -1333,51 +1418,26 @@ namespace Gizbox.SemanticRule
         private int whileCounter = 0;//while语句标号自增  
         private int forCounter = 0;//for语句标号自增  
 
+        //temp  
+        private string currentNamespace = "";
+        private List<string> namespaceUsings = new List<string>();
 
 
         /// <summary>
         /// 构造  
         /// </summary>
-        public SemanticAnalyzer(SyntaxTree ast, IL.ILUnit ilUnit)
+        public SemanticAnalyzer(SyntaxTree ast, IL.ILUnit ilUnit, Compiler compilerContext)
         {
+            this.compilerContext = compilerContext;
+
             this.ast = ast;
             this.ilUnit = ilUnit;
 
             foreach(var importNode in ast.rootNode.importNodes)
             {
                 if (importNode == null) throw new Exception("空节点");
-                importNode.attributes["lib"] = LoadLib(importNode.uri);
+                importNode.attributes["lib"] = compilerContext.LoadLib(importNode.uri);
             }
-        }
-
-        /// <summary>
-        /// 载入库  
-        /// </summary>
-        public Gizbox.IL.ILUnit LoadLib(string libname)
-        {
-            string libSource;
-
-            //在当前目录查找  
-            if (System.IO.File.Exists(AppDomain.CurrentDomain.BaseDirectory + "\\" + libname))
-            {
-                libSource =  System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\" + libname);
-            }
-            //物理地址查找  
-            else
-            {
-                if (System.IO.File.Exists(libname))
-                {
-                    libSource = System.IO.File.ReadAllText(libname);
-                }
-                else
-                {
-                    throw new Exception("找不到库文件：" + libname);
-                }
-            }
-
-            Compiler libCompiler = new Compiler();
-            var il = libCompiler.Compile(libSource);
-            return il;
         }
 
 
@@ -1386,36 +1446,255 @@ namespace Gizbox.SemanticRule
         /// </summary>
         public void Analysis()
         {
-            envStack = new Stack<SymbolTable>();
+            envStack = new GStack<SymbolTable>();
             envStack.Push(ilUnit.globalScope.env);
-            CollectSymbols(ast.rootNode);
+            Pass1_CollectGlobalSymbols(ast.rootNode);
+
 
             envStack.Clear();
             envStack.Push(ilUnit.globalScope.env);
-            AnalysisNode(ast.rootNode);
+            Pass2_CollectOtherSymbols(ast.rootNode);
+
+            if(Compiler.enableLogSemanticAnalyzer)
+            {
+                ilUnit.globalScope.env.Print();
+                Log("符号表初步收集完毕");
+                Compiler.Pause("符号表初步收集完毕");
+            }
+
+            envStack.Clear();
+            envStack.Push(ilUnit.globalScope.env);
+            Pass3_AnalysisNode(ast.rootNode);
         }
 
         /// <summary>
-        /// PASS1:递归向下收集符号信息    
+        /// PASS1:递归向下顶层定义信息(静态变量、静态函数名、类名)      
         /// </summary>
-        private void CollectSymbols(SyntaxTree.Node node)
+        private void Pass1_CollectGlobalSymbols(SyntaxTree.Node node)
         {
             ///很多编译器从语法分析阶段甚至词法分析阶段开始初始化和管理符号表    
             ///为了降低复杂性、实现低耦合和模块化，在语义分析阶段和中间代码生成阶段管理符号表  
+
+            bool isTopLevelAtNamespace = false;
+            if(node.Parent != null && node.Parent.Parent != null)
+            {
+                if (node.Parent is SyntaxTree.StatementsNode && node.Parent.Parent is SyntaxTree.NamespaceNode)
+                {
+                    isTopLevelAtNamespace = true;
+                }
+            }
+            bool isGlobalOrTopNamespace = isTopLevelAtNamespace || envStack.Peek().tableCatagory == SymbolTable.TableCatagory.GlobalScope; ;
             
             switch (node)
             {
                 case SyntaxTree.ProgramNode programNode:
                     {
-                        CollectSymbols(programNode.statementsNode);
+                        Pass1_CollectGlobalSymbols(programNode.statementsNode);
                     }
                     break;
                 case SyntaxTree.StatementsNode stmtsNode:
                     {
                         foreach(var stmtNode in stmtsNode.statements)
                         {
-                            CollectSymbols(stmtNode);
+                            Pass1_CollectGlobalSymbols(stmtNode);
                         }
+                    }
+                    break;
+                case SyntaxTree.NamespaceNode namespaceNode:
+                    {
+                        currentNamespace = namespaceNode.namepsaceNode.token.attribute;
+                        foreach (var stmtNode in namespaceNode.stmtsNode.statements)
+                        {
+                            Pass1_CollectGlobalSymbols(stmtNode);
+                        }
+                        currentNamespace = "";
+                    }
+                    break;
+                //顶级变量声明语句
+                case SyntaxTree.VarDeclareNode varDeclNode:
+                    {
+                        if(isGlobalOrTopNamespace)
+                        {
+                            //附加命名空间名  
+                            if(isTopLevelAtNamespace)
+                                varDeclNode.identifierNode.SetPrefix(currentNamespace);
+
+                            //新建符号表条目  
+                            var newRec = envStack.Peek().NewRecord(
+                                varDeclNode.identifierNode.FullName,
+                                SymbolTable.RecordCatagory.Var,
+                                varDeclNode.typeNode.ToExpression()
+                                );
+                        }
+                    }
+                    break;
+                //顶级函数声明语句
+                case SyntaxTree.FuncDeclareNode funcDeclNode:
+                    {
+                        //（静态函数）    
+                        if (isGlobalOrTopNamespace)
+                        {
+
+                            bool isMethod = envStack.Peek().tableCatagory == SymbolTable.TableCatagory.ClassScope;
+                            if (isMethod) throw new Exception();
+
+                            //附加命名空间名  
+                            if(isTopLevelAtNamespace)
+                                funcDeclNode.identifierNode.SetPrefix(currentNamespace);
+
+
+                            //符号的类型表达式  
+                            string typeExpr = "";
+                            for (int i = 0; i < funcDeclNode.parametersNode.parameterNodes.Count; ++i)
+                            {
+                                if (i != 0) typeExpr += ",";
+                                var paramNode = funcDeclNode.parametersNode.parameterNodes[i];
+                                typeExpr += (paramNode.typeNode.ToExpression());
+                            }
+                            typeExpr += (" -> " + funcDeclNode.returnTypeNode.ToExpression());
+
+
+                            //函数修饰名称  
+                            var paramTypeArr = funcDeclNode.parametersNode.parameterNodes.Select(n => n.typeNode.ToExpression()).ToArray();
+                            var funcMangledName = Utils.Mangle(funcDeclNode.identifierNode.FullName, paramTypeArr);
+                            funcDeclNode.attributes["mangled_name"] = funcMangledName;
+
+                            //新的作用域  
+                            string envName = isMethod ? envStack.Peek().name + "." + funcMangledName : funcMangledName;
+
+                            var newEnv = new SymbolTable(envName, SymbolTable.TableCatagory.FuncScope, envStack.Peek());
+                            funcDeclNode.attributes["env"] = newEnv;
+
+
+                            //添加条目  
+                            var newRec = envStack.Peek().NewRecord(
+                                funcMangledName,
+                                SymbolTable.RecordCatagory.Function,
+                                typeExpr,
+                                newEnv
+                                );
+                            newRec.rawname = funcDeclNode.identifierNode.FullName;
+
+                        }
+                    }
+                    break;
+
+                case SyntaxTree.ExternFuncDeclareNode externFuncDeclNode:
+                    {
+                        //附加命名空间名称    
+                        if(isGlobalOrTopNamespace)
+                        {
+                            //附加命名空间  
+                            if (isTopLevelAtNamespace)
+                                externFuncDeclNode.identifierNode.SetPrefix(currentNamespace);
+
+
+                            //符号的类型表达式  
+                            string typeExpr = "";
+                            for (int i = 0; i < externFuncDeclNode.parametersNode.parameterNodes.Count; ++i)
+                            {
+                                if (i != 0) typeExpr += ",";
+                                var paramNode = externFuncDeclNode.parametersNode.parameterNodes[i];
+                                typeExpr += (paramNode.typeNode.ToExpression());
+                            }
+                            typeExpr += (" -> " + externFuncDeclNode.returnTypeNode.ToExpression());
+
+                            //函数修饰名称  
+                            var paramTypeArr = externFuncDeclNode.parametersNode.parameterNodes.Select(n => n.typeNode.ToExpression()).ToArray();
+                            var funcMangledName = Utils.Mangle(externFuncDeclNode.identifierNode.FullName, paramTypeArr);
+                            externFuncDeclNode.attributes["mangled_name"] = funcMangledName;
+
+                            //新的作用域  
+                            string envName = funcMangledName;
+
+                            var newEnv = new SymbolTable(envName, SymbolTable.TableCatagory.FuncScope, envStack.Peek());
+                            externFuncDeclNode.attributes["env"] = newEnv;
+
+
+                            //添加条目  
+                            var newRec = envStack.Peek().NewRecord(
+                                funcMangledName,
+                                SymbolTable.RecordCatagory.Function,
+                                typeExpr,
+                                newEnv
+                                );
+                            newRec.rawname = externFuncDeclNode.identifierNode.FullName;
+                        }
+                        else
+                        {
+                            throw new Exception("");
+                        }
+                    }
+                    break;
+
+                case SyntaxTree.ClassDeclareNode classDeclNode:
+                    {
+                        //附加命名空间名称    
+                        if(isTopLevelAtNamespace)
+                        {
+                            classDeclNode.classNameNode.SetPrefix(currentNamespace);
+
+                            //新的作用域  
+                            var newEnv = new SymbolTable(classDeclNode.classNameNode.FullName, SymbolTable.TableCatagory.ClassScope, envStack.Peek());
+                            classDeclNode.attributes["env"] = newEnv;
+
+                            //添加条目-类名    
+                            var newRec = envStack.Peek().NewRecord(
+                                classDeclNode.classNameNode.FullName,
+                                SymbolTable.RecordCatagory.Class,
+                                "",
+                                newEnv
+                                );
+                        }
+                        else
+                        {
+                            throw new Exception("类定义只能全局定义或者嵌套在命名空间顶层！");
+                        }
+                    }
+                    break;
+                default:
+                    break;
+            }
+
+        }
+
+        /// <summary>
+        /// PASS2:递归向下收集其他符号信息    
+        /// </summary>
+        private void Pass2_CollectOtherSymbols(SyntaxTree.Node node)
+        {
+            bool isTopLevelAtNamespace = false;
+            if (node.Parent != null && node.Parent.Parent != null)
+            {
+                if (node.Parent is SyntaxTree.StatementsNode && node.Parent.Parent is SyntaxTree.NamespaceNode)
+                {
+                    isTopLevelAtNamespace = true;
+                }
+            }
+
+            switch (node)
+            {
+                case SyntaxTree.ProgramNode programNode:
+                    {
+                        Pass2_CollectOtherSymbols(programNode.statementsNode);
+                    }
+                    break;
+                case SyntaxTree.StatementsNode stmtsNode:
+                    {
+                        foreach (var stmtNode in stmtsNode.statements)
+                        {
+                            Pass2_CollectOtherSymbols(stmtNode);
+                        }
+                    }
+                    break;
+                case SyntaxTree.NamespaceNode namespaceNode:
+                    {
+                        currentNamespace = namespaceNode.namepsaceNode.token.attribute;
+                        foreach (var stmtNode in namespaceNode.stmtsNode.statements)
+                        {
+                            Pass2_CollectOtherSymbols(stmtNode);
+                        }
+                        currentNamespace = "";
                     }
                     break;
                 case SyntaxTree.StatementBlockNode stmtBlockNode:
@@ -1427,7 +1706,7 @@ namespace Gizbox.SemanticRule
 
                         foreach (var stmtNode in stmtBlockNode.statements)
                         {
-                            CollectSymbols(stmtNode);
+                            Pass2_CollectOtherSymbols(stmtNode);
                         }
 
                         //离开作用域  
@@ -1436,12 +1715,21 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.VarDeclareNode varDeclNode:
                     {
-                        //新建符号表条目  
-                        var newRec = envStack.Peek().NewRecord(
-                            varDeclNode.identifierNode.token.attribute, 
-                            SymbolTable.RecordCatagory.Var,
-                            varDeclNode.typeNode.ToExpression()
-                            );
+                        //（非全局变量）成员字段或者局部变量  
+                        if (isTopLevelAtNamespace == false)
+                        {
+                            varDeclNode.identifierNode.SetPrefix(null);
+
+                            //补全类型  
+                            TryCompleteType(varDeclNode.typeNode);
+
+                            //新建符号表条目  
+                            var newRec = envStack.Peek().NewRecord(
+                                varDeclNode.identifierNode.FullName,
+                                SymbolTable.RecordCatagory.Var,
+                                varDeclNode.typeNode.ToExpression()
+                                );
+                        }
                     }
                     break;
                 case SyntaxTree.FuncDeclareNode funcDeclNode:
@@ -1450,112 +1738,111 @@ namespace Gizbox.SemanticRule
                         bool isMethod = envStack.Peek().tableCatagory == SymbolTable.TableCatagory.ClassScope;
                         string className = null;
                         if (isMethod) className = envStack.Peek().name;
+                        if (isMethod && isTopLevelAtNamespace) throw new Exception("命名空间顶层只能定义全局函数！");
 
 
-                        //符号的类型表达式  
-                        string typeExpr = "";
-                        for (int i = 0; i < funcDeclNode.parametersNode.parameterNodes.Count; ++i)
+                        //如果是成员函数 - 加入符号表  
+                        if (isTopLevelAtNamespace == false && isMethod == true)
                         {
-                            if (i != 0) typeExpr += ",";
-                            var paramNode = funcDeclNode.parametersNode.parameterNodes[i];
-                            typeExpr += (paramNode.typeNode.ToExpression());
-                        }
-                        typeExpr += (" -> " + funcDeclNode.returnTypeNode.ToExpression());
-
-                        //函数修饰名称  
-                        var paramTypeArr = funcDeclNode.parametersNode.parameterNodes.Select(n => n.typeNode.ToExpression()).ToArray();
-                        var funcMangledName = Utils.Mangle(funcDeclNode.identifierNode.token.attribute, paramTypeArr);
-                        funcDeclNode.attributes["mangled_name"] = funcMangledName;
+                            //使用原名（成员函数）  
+                            funcDeclNode.identifierNode.SetPrefix(null);
 
 
-                        //新的作用域  
-                        string envName = isMethod ? envStack.Peek().name + "." + funcMangledName : funcMangledName;
+                            //符号的类型表达式（成员函数）  
+                            string typeExpr = "";
+                            for (int i = 0; i < funcDeclNode.parametersNode.parameterNodes.Count; ++i)
+                            {
+                                if (i != 0) typeExpr += ",";
+                                var paramNode = funcDeclNode.parametersNode.parameterNodes[i];
+                                typeExpr += (paramNode.typeNode.ToExpression());
+                            }
+                            typeExpr += (" -> " + funcDeclNode.returnTypeNode.ToExpression());
 
-                        var newEnv = new SymbolTable( envName, SymbolTable.TableCatagory.FuncScope, envStack.Peek());
-                        funcDeclNode.attributes["env"] = newEnv;
+                            //函数修饰名称（成员函数）  
+                            var paramTypeArr = funcDeclNode.parametersNode.parameterNodes.Select(n => n.typeNode.ToExpression()).ToArray();
+                            var funcMangledName = Utils.Mangle(funcDeclNode.identifierNode.FullName, paramTypeArr);
+                            funcDeclNode.attributes["mangled_name"] = funcMangledName;
 
-                        //如果是成员方法  
-                        if(isMethod)
-                        {
-                            //类符号表同名方法去重    
+
+                            //新的作用域（成员函数）  
+                            string envName = isMethod ? envStack.Peek().name + "." + funcMangledName : funcMangledName;
+
+                            var newEnv = new SymbolTable(envName, SymbolTable.TableCatagory.FuncScope, envStack.Peek());
+                            funcDeclNode.attributes["env"] = newEnv;
+
+                            //类符号表同名方法去重（成员函数）    
                             if (envStack.Peek().ContainRecordName(funcMangledName))
                             {
                                 envStack.Peek().records.Remove(funcMangledName);
                             }
 
-                            //添加到虚函数表    
+                            //添加到虚函数表（成员函数）    
                             this.ilUnit.vtables[className].NewRecord(funcMangledName, className);
+
+
+                            //添加条目（成员函数）  
+                            var newRec = envStack.Peek().NewRecord(
+                                funcMangledName,
+                                SymbolTable.RecordCatagory.Function,
+                                typeExpr,
+                                newEnv
+                                );
+                            newRec.rawname = funcDeclNode.identifierNode.FullName;
+
                         }
 
-                        //添加条目  
-                        var newRec = envStack.Peek().NewRecord(
-                            funcMangledName,
-                            SymbolTable.RecordCatagory.Function,
-                            typeExpr,
-                            newEnv
-                            );
 
-                        //进入函数作用域  
-                        envStack.Push(newEnv);
-
-                        //隐藏的this参数加入符号表    
-                        if(isMethod)
-                            newEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, className);
-                        //形参加入符号表    
-                        foreach (var paramNode in funcDeclNode.parametersNode.parameterNodes)
+                        //对于全局和成员函数  
                         {
-                            CollectSymbols(paramNode);
+                            SymbolTable funcEnv = (SymbolTable)funcDeclNode.attributes["env"]; 
+
+                            //进入函数作用域  
+                            envStack.Push(funcEnv);
+
+                            //返回值类型补全    
+                            TryCompleteType(funcDeclNode.returnTypeNode);
+
+
+
+                            //隐藏的this参数加入符号表    
+                            if (isMethod)
+                            {
+                                funcEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, className);
+                            }
+
+                            //形参加入符号表    
+                            foreach (var paramNode in funcDeclNode.parametersNode.parameterNodes)
+                            {
+                                Pass2_CollectOtherSymbols(paramNode);
+                            }
+
+                            //局部变量加入符号表    
+                            foreach (var stmtNode in funcDeclNode.statementsNode.statements)
+                            {
+                                Pass2_CollectOtherSymbols(stmtNode);
+                            }
+
+
+                            //离开函数作用域  
+                            envStack.Pop();
                         }
-
-                        //局部变量加入符号表    
-                        foreach (var stmtNode in funcDeclNode.statementsNode.statements)
-                        {
-                            CollectSymbols(stmtNode);
-                        }
-
-
-                        //离开函数作用域  
-                        envStack.Pop();
                     }
                     break;
 
                 case SyntaxTree.ExternFuncDeclareNode externFuncDeclNode:
-                    {                        
-                        //符号的类型表达式  
-                        string typeExpr = "";
-                        for (int i = 0; i < externFuncDeclNode.parametersNode.parameterNodes.Count; ++i)
-                        {
-                            if (i != 0) typeExpr += ",";
-                            var paramNode = externFuncDeclNode.parametersNode.parameterNodes[i];
-                            typeExpr += (paramNode.typeNode.ToExpression());
-                        }
-                        typeExpr += (" -> " + externFuncDeclNode.returnTypeNode.ToExpression());
+                    {
+                        //PASS1止于添加符号条目  
+                        
+                        //Env  
+                        var funcEnv = (SymbolTable)externFuncDeclNode.attributes["env"];
 
-                        //函数修饰名称  
-                        var paramTypeArr = externFuncDeclNode.parametersNode.parameterNodes.Select(n => n.typeNode.ToExpression()).ToArray();
-                        var funcMangledName = Utils.Mangle(externFuncDeclNode.identifierNode.token.attribute, paramTypeArr);
-                        externFuncDeclNode.attributes["mangled_name"] = funcMangledName;
-
-                        //新的作用域  
-                        string envName = funcMangledName;
-
-                        var newEnv = new SymbolTable(envName, SymbolTable.TableCatagory.FuncScope, envStack.Peek());
-                        externFuncDeclNode.attributes["env"] = newEnv;
-
-
-                        //添加条目  
-                        var newRec = envStack.Peek().NewRecord(
-                            funcMangledName,
-                            SymbolTable.RecordCatagory.Function,
-                            typeExpr,
-                            newEnv
-                            );
                         //进入函数作用域  
-                        envStack.Push(newEnv);
+                        envStack.Push(funcEnv);
+
                         //形参加入符号表    
                         foreach (var paramNode in externFuncDeclNode.parametersNode.parameterNodes)
                         {
-                            CollectSymbols(paramNode);
+                            Pass2_CollectOtherSymbols(paramNode);
                         }
                         //离开函数作用域  
                         envStack.Pop();
@@ -1564,9 +1851,12 @@ namespace Gizbox.SemanticRule
 
                 case SyntaxTree.ParameterNode paramNode:
                     {
+                        //形参类型补全  
+                        TryCompleteType(paramNode.typeNode);
+
                         //形参加入函数作用域的符号表  
                         var newRec = envStack.Peek().NewRecord(
-                            paramNode.identifierNode.token.attribute,
+                            paramNode.identifierNode.FullName,
                             SymbolTable.RecordCatagory.Param,
                             paramNode.typeNode.ToExpression()
                             );
@@ -1574,56 +1864,53 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.ClassDeclareNode classDeclNode:
                     {
-                        //新的作用域  
-                        var newEnv = new SymbolTable(classDeclNode.classNameNode.token.attribute, SymbolTable.TableCatagory.ClassScope, envStack.Peek());
-                        classDeclNode.attributes["env"] = newEnv;
+                        //PASS1止于添加符号条目  
 
-                        //添加条目-类名    
-                        var newRec = envStack.Peek().NewRecord(
-                            classDeclNode.classNameNode.token.attribute,
-                            SymbolTable.RecordCatagory.Class,
-                            "",
-                            newEnv
-                            );
+                        //ENV  
+                        var newEnv = (SymbolTable)classDeclNode.attributes["env"];
 
                         //新建虚函数表  
-                        string classname = classDeclNode.classNameNode.token.attribute;
+                        string classname = classDeclNode.classNameNode.FullName;
                         var vtable = ilUnit.vtables[classname] = new VTable(classname);
 
                         //进入类作用域  
                         envStack.Push(newEnv);
 
                         //有基类  
-                        if(classDeclNode.baseClassNameNode != null)
+                        if (classDeclNode.baseClassNameNode != null)
                         {
+                            //尝试补全基类标记  
+                            TryCompleteIdenfier(classDeclNode.baseClassNameNode);
+
                             //基类标记  
-                            var baseClassName = classDeclNode.baseClassNameNode.token.attribute;
-                            var baseRec = QueryRecord(baseClassName);
+                            var baseClassFullName = classDeclNode.baseClassNameNode.FullName;
+
+                            var baseRec = Query(baseClassFullName); if (baseRec == null) throw new Exception("未找到基类" + baseClassFullName);
                             var baseEnv = baseRec.envPtr;
                             newEnv.NewRecord("base", SymbolTable.RecordCatagory.Other, "(inherit)", baseEnv);
 
                             //基类符号表条目并入//仅字段  
                             foreach (var reckv in baseEnv.records)
                             {
-                                if(reckv.Value.category == SymbolTable.RecordCatagory.Var)
+                                if (reckv.Value.category == SymbolTable.RecordCatagory.Var)
                                 {
                                     newEnv.AddRecord(reckv.Key, reckv.Value);
                                 }
                             }
                             //虚函数表克隆  
-                            this.ilUnit.vtables[baseClassName].CloneDataTo(vtable);
+                            this.ilUnit.vtables[baseClassFullName].CloneDataTo(vtable);
                         }
 
 
                         //新定义的成员字段加入符号表
                         foreach (var declNode in classDeclNode.memberDelareNodes)
                         {
-                            CollectSymbols(declNode);
+                            Pass2_CollectOtherSymbols(declNode);
                         }
 
                         //默认隐藏构造函数的符号表  
-                        var ctorEnv = new SymbolTable(classDeclNode.classNameNode.token.attribute + ".ctor", SymbolTable.TableCatagory.FuncScope, newEnv);
-                        ctorEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, classDeclNode.classNameNode.token.attribute);
+                        var ctorEnv = new SymbolTable(classDeclNode.classNameNode.FullName + ".ctor", SymbolTable.TableCatagory.FuncScope, newEnv);
+                        ctorEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, classDeclNode.classNameNode.FullName);
 
 
                         //离开类作用域  
@@ -1636,11 +1923,11 @@ namespace Gizbox.SemanticRule
 
                         foreach (var clause in ifNode.conditionClauseList)
                         {
-                            CollectSymbols(clause.thenNode);
+                            Pass2_CollectOtherSymbols(clause.thenNode);
                         }
-                        if(ifNode.elseClause != null)
+                        if (ifNode.elseClause != null)
                         {
-                            CollectSymbols(ifNode.elseClause.stmt);
+                            Pass2_CollectOtherSymbols(ifNode.elseClause.stmt);
                         }
                     }
                     break;
@@ -1648,7 +1935,7 @@ namespace Gizbox.SemanticRule
                     {
                         whileNode.attributes["uid"] = whileCounter++;
 
-                        CollectSymbols(whileNode.stmtNode);
+                        Pass2_CollectOtherSymbols(whileNode.stmtNode);
                     }
                     break;
                 case SyntaxTree.ForStmtNode forNode:
@@ -1663,10 +1950,10 @@ namespace Gizbox.SemanticRule
                         envStack.Push(newEnv);
 
                         //收集初始化语句中的符号  
-                        CollectSymbols(forNode.initializerNode);
+                        Pass2_CollectOtherSymbols(forNode.initializerNode);
 
                         //收集语句中符号  
-                        CollectSymbols(forNode.stmtNode);
+                        Pass2_CollectOtherSymbols(forNode.stmtNode);
 
                         //离开FOR循环作用域  
                         envStack.Pop();
@@ -1678,24 +1965,39 @@ namespace Gizbox.SemanticRule
 
         }
 
-
         /// <summary>
-        /// PASS2:语法分析（类型检查等）      
+        /// PASS3:语义分析（类型检查等）      
         /// </summary>
-        private void AnalysisNode(SyntaxTree.Node node)
+        private void Pass3_AnalysisNode(SyntaxTree.Node node)
         {
+
+
             switch (node)
             {
                 case SyntaxTree.ProgramNode programNode:
                     {
-                        AnalysisNode(programNode.statementsNode);
+                        Pass3_AnalysisNode(programNode.statementsNode);
+                    }
+                    break;
+                case SyntaxTree.UsingNode usingNode:
+                    {
+                        namespaceUsings.Add(usingNode.namespaceNameNode.token.name);
+                    }
+                    break;
+                case SyntaxTree.NamespaceNode namespaceNode:
+                    {
+                        currentNamespace = namespaceNode.namepsaceNode.token.attribute;
+
+                        Pass3_AnalysisNode(namespaceNode.stmtsNode);
+
+                        currentNamespace = "";
                     }
                     break;
                 case SyntaxTree.StatementsNode stmtsNode:
                     {
                         foreach (var stmtNode in stmtsNode.statements)
                         {
-                            AnalysisNode(stmtNode);
+                            Pass3_AnalysisNode(stmtNode);
                         }
                     }
                     break;
@@ -1707,7 +2009,7 @@ namespace Gizbox.SemanticRule
                         foreach (var stmtNode in stmtBlockNode.statements)
                         {
                             //分析块中的语句  
-                            AnalysisNode(stmtNode);
+                            Pass3_AnalysisNode(stmtNode);
                         }
 
                         //离开作用域  
@@ -1716,10 +2018,12 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.VarDeclareNode varDeclNode:
                     {
+                        //分析初始化表达式  
+                        Pass3_AnalysisNode(varDeclNode.initializerNode);
+
                         //类型检查（初始值）  
                         bool valid = CheckType(varDeclNode.typeNode.ToExpression(), varDeclNode.initializerNode);
-                        if (!valid) throw new Exception($"变量{varDeclNode.typeNode.ToExpression()} {varDeclNode.identifierNode.token.attribute}类型声明错误！初始值类型：{AnalyzeTypeExpression(varDeclNode.initializerNode)}");
-
+                        if (!valid) throw new Exception($"变量{varDeclNode.typeNode.ToExpression()} {varDeclNode.identifierNode.FullName}类型声明错误！初始值类型：{AnalyzeTypeExpression(varDeclNode.initializerNode)}");
                     }
                     break;
                 case SyntaxTree.FuncDeclareNode funcDeclNode:
@@ -1731,17 +2035,17 @@ namespace Gizbox.SemanticRule
                         //分析形参定义  
                         foreach (var paramNode in funcDeclNode.parametersNode.parameterNodes)
                         {
-                            AnalysisNode(paramNode);
+                            Pass3_AnalysisNode(paramNode);
                         }
 
                         //分析局部语句  
                         foreach (var stmtNode in funcDeclNode.statementsNode.statements)
                         {
-                            AnalysisNode(stmtNode);
+                            Pass3_AnalysisNode(stmtNode);
                         }
 
                         //返回值类型检查（仅限非void的函数）  
-                        if (!(funcDeclNode.returnTypeNode is SyntaxTree.PrimitiveNode && (funcDeclNode.returnTypeNode as SyntaxTree.PrimitiveNode).token.name == "void"))
+                        if (!(funcDeclNode.returnTypeNode is SyntaxTree.PrimitiveTypeNode && (funcDeclNode.returnTypeNode as SyntaxTree.PrimitiveTypeNode).token.name == "void"))
                         {
                             //检查返回语句和返回表达式    
                             var returnStmt = funcDeclNode.statementsNode.statements.FirstOrDefault(s => s is SyntaxTree.ReturnStmtNode);
@@ -1765,7 +2069,7 @@ namespace Gizbox.SemanticRule
                         //分析形参定义
                         foreach (var paramNode in externFuncDeclNode.parametersNode.parameterNodes)
                         {
-                            AnalysisNode(paramNode);
+                            Pass3_AnalysisNode(paramNode);
                         }
                         //离开作用域  
                         envStack.Pop();
@@ -1779,7 +2083,7 @@ namespace Gizbox.SemanticRule
                         //成员分析  
                         foreach (var declNode in classdeclNode.memberDelareNodes)
                         {
-                            AnalysisNode(declNode);
+                            Pass3_AnalysisNode(declNode);
                         }
 
                         //离开作用域  
@@ -1789,7 +2093,7 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.SingleExprStmtNode singleStmtNode:
                     {
                         //单语句语义分析  
-                        AnalysisNode(singleStmtNode.exprNode);
+                        Pass3_AnalysisNode(singleStmtNode.exprNode);
                     }
                     break;
                 case SyntaxTree.IfStmtNode ifNode:
@@ -1799,11 +2103,11 @@ namespace Gizbox.SemanticRule
                             //检查条件是否为布尔类型  
                             CheckType("bool", clause.conditionNode);
                             //检查语句节点  
-                            AnalysisNode(clause.thenNode);
+                            Pass3_AnalysisNode(clause.thenNode);
                         }
 
                         //检查语句  
-                        if(ifNode.elseClause != null) AnalysisNode(ifNode.elseClause.stmt);
+                        if(ifNode.elseClause != null) Pass3_AnalysisNode(ifNode.elseClause.stmt);
                     }
                     break;
                 case SyntaxTree.WhileStmtNode whileNode:
@@ -1812,7 +2116,7 @@ namespace Gizbox.SemanticRule
                         CheckType("bool", whileNode.conditionNode);
 
                         //检查语句节点  
-                        AnalysisNode(whileNode.stmtNode);
+                        Pass3_AnalysisNode(whileNode.stmtNode);
                     }
                     break;
                 case SyntaxTree.ForStmtNode forNode:
@@ -1821,31 +2125,90 @@ namespace Gizbox.SemanticRule
                         envStack.Push(forNode.attributes["env"] as SymbolTable);
 
                         //检查初始化器和迭代器  
-                        AnalysisNode(forNode.initializerNode);
+                        Pass3_AnalysisNode(forNode.initializerNode);
                         AnalyzeTypeExpression(forNode.iteratorNode);
 
                         //检查条件是否为布尔类型    
                         CheckType("bool", forNode.conditionNode);
 
                         //检查语句节点  
-                        AnalysisNode(forNode.stmtNode);
+                        Pass3_AnalysisNode(forNode.stmtNode);
 
                         //离开FOR循环作用域  
                         envStack.Pop();
                     }
                     break;
+                case SyntaxTree.DeleteStmtNode delNode:
+                    {
+                        //检查要删除的对象    
+                        Pass3_AnalysisNode(delNode.objToDelete);
+                        string objTypeExpr =  (string)delNode.objToDelete.attributes["type"];
+
+                        if (Utils.IsArrayType(objTypeExpr) == false)
+                        {
+                            if (this.ilUnit.QueryClass(objTypeExpr) == null)
+                            {
+                                throw new Exception("delete error!");
+                            }
+                        }
+                    }
+                    break;
 
 
 
-                // ********************* 表达式检查 *********************************8
-                //需要检查的表达式  
+                // ********************* 表达式检查 *********************************
+
+
+                case SyntaxTree.IdentityNode idNode:
+                    {
+                        AnalyzeTypeExpression(idNode);
+                    }
+                    break;
+                case SyntaxTree.LiteralNode litNode:
+                    {
+                        AnalyzeTypeExpression(litNode);
+                    }
+                    break;
+                case SyntaxTree.UnaryOpNode unaryNode:
+                    {
+                        AnalyzeTypeExpression(unaryNode);
+                    }
+                    break;
+                case SyntaxTree.BinaryOpNode binaryNode:
+                    {
+                        AnalyzeTypeExpression(binaryNode);
+                    }
+                    break;
+                case SyntaxTree.IncDecNode incDecNode:
+                    {
+                        AnalyzeTypeExpression(incDecNode);
+                    }
+                    break;
+                case SyntaxTree.CastNode castNode:
+                    {
+                        TryCompleteType(castNode.typeNode);
+                        AnalyzeTypeExpression(castNode);
+                    }
+                    break;
+                case SyntaxTree.ElementAccessNode eleAccessNode:
+                    {
+                        AnalyzeTypeExpression(eleAccessNode);
+                    }
+                    break;
                 case SyntaxTree.CallNode callNode:
                     {
                         //实参分析  
                         foreach (var argNode in callNode.argumantsNode.arguments)
                         {
-                            AnalysisNode(argNode);
+                            Pass3_AnalysisNode(argNode);
                         }
+
+                        //名称分析补全  
+                        if (callNode.isMemberAccessFunction == false && callNode.funcNode is SyntaxTree.IdentityNode)
+                        {
+                            TryCompleteIdenfier((callNode.funcNode as SyntaxTree.IdentityNode));
+                        }
+
 
                         //Func分析  
                         AnalyzeTypeExpression(callNode);
@@ -1864,12 +2227,12 @@ namespace Gizbox.SemanticRule
 
                             var className = AnalyzeTypeExpression(memberAccess.objectNode);
 
-                            var classRec = QueryRecord(className);
+                            var classRec = Query(className);
                             if (classRec == null) throw new Exception("类符号表:" + className + "不存在");
 
                             var classEnv = classRec.envPtr;
 
-                            var memberName = memberAccess.memberNode.token.attribute;
+                            var memberName = memberAccess.memberNode.FullName;
 
                             var memberRec = classEnv.GetMemberRecordInChain(memberName);
                             if (memberRec == null) //不存在同名字段  
@@ -1893,7 +2256,7 @@ namespace Gizbox.SemanticRule
                                         attributes = assignNode.attributes,
                                     };
 
-                                    AnalysisNode(assignNode.replacement);
+                                    Pass3_AnalysisNode(assignNode.replacement);
 
                                     break;
                                 }
@@ -1903,6 +2266,9 @@ namespace Gizbox.SemanticRule
 
                         //类型检查（赋值）  
                         {
+                            Pass3_AnalysisNode(assignNode.lvalueNode);
+                            Pass3_AnalysisNode(assignNode.rvalueNode);
+
                             bool valid = CheckType(assignNode.lvalueNode, assignNode.rvalueNode);
                             if (!valid) throw new Exception("赋值类型错误！");
                         }
@@ -1912,15 +2278,14 @@ namespace Gizbox.SemanticRule
                     {
                         //!!getter属性替换  
                         {
-                            
                             var className = AnalyzeTypeExpression(objMemberAccessNode.objectNode);
 
-                            var classRec = QueryRecord(className);
+                            var classRec = Query(className);
                             if (classRec == null) throw new Exception("类符号表:" + className + "不存在");
 
                             var classEnv = classRec.envPtr;
 
-                            var memberName = objMemberAccessNode.memberNode.token.attribute;
+                            var memberName = objMemberAccessNode.memberNode.FullName;
 
                             var memberRec = classEnv.GetMemberRecordInChain(memberName);
                             if (memberRec == null) //不存在同名字段  
@@ -1944,7 +2309,7 @@ namespace Gizbox.SemanticRule
                                         attributes = objMemberAccessNode.attributes,
                                     };
 
-                                    AnalysisNode(objMemberAccessNode.replacement);
+                                    Pass3_AnalysisNode(objMemberAccessNode.replacement);
 
                                     break;
                                 }
@@ -1952,23 +2317,39 @@ namespace Gizbox.SemanticRule
                         }
                     }
                     break;
-                //其他表达式 -> 直接计算类型  
+                case SyntaxTree.ThisNode thisObjNode:
+                    {
+                        AnalyzeTypeExpression(thisObjNode);
+                    }
+                    break;
+                case SyntaxTree.NewObjectNode newobjNode:
+                    {
+                        TryCompleteIdenfier(newobjNode.className);
+                    }
+                    break;
+                case SyntaxTree.NewArrayNode newArrNode:
+                    {
+                        TryCompleteType(newArrNode.typeNode);
+                    }
+                    break;
+                //其他节点     
                 default:
                     {
-                        if (node is SyntaxTree.ExprNode)
+                        //类型节点  --> 补全类型
+                        if (node is SyntaxTree.TypeNode)
                         {
-                            if(node.Children.Length > 0)
-                            {
-                                foreach(var child in node.Children)
-                                {
-                                    AnalysisNode(child); 
-                                }
-                            }
-                            else
-                            {
-                                AnalyzeTypeExpression(node as SyntaxTree.ExprNode);
-                            }
+                            TryCompleteType(node as SyntaxTree.TypeNode);
                         }
+                        //else if(node is SyntaxTree.ArgumentListNode)
+                        //{
+                        //}
+                        //else if (node is SyntaxTree.ParameterListNode)
+                        //{
+                        //}
+                        //else
+                        //{
+                        //    throw new Exception("未实现节点分析：" + node.GetType().Name);
+                        //}
                     }
                     break;
             }
@@ -1978,8 +2359,6 @@ namespace Gizbox.SemanticRule
         /// <summary>
         /// 获取表达式的类型表达式  
         /// </summary>
-        /// <param name="exprNode"></param>
-        /// <returns></returns>
         private string AnalyzeTypeExpression(SyntaxTree.ExprNode exprNode)
         {
             if (exprNode.attributes.ContainsKey("type")) return (string)exprNode.attributes["type"];
@@ -1990,8 +2369,8 @@ namespace Gizbox.SemanticRule
             {
                 case SyntaxTree.IdentityNode idNode:
                     {
-                        var result = QueryRecord(idNode.token.attribute);
-                        if (result == null) throw new Exception("找不到标识符:" + idNode.token.attribute);
+                        var result = Query(idNode.FullName);
+                        if (result == null) throw new Exception("找不到标识符:" + idNode.FullName);
 
                         nodeTypeExprssion = result.typeExpression;
                     }
@@ -2000,6 +2379,7 @@ namespace Gizbox.SemanticRule
                     {
                         switch(litNode.token.name)
                         {
+                            case "null": nodeTypeExprssion = "null"; break;
                             case "LITBOOL": nodeTypeExprssion = "bool"; break;
                             case "LITINT": nodeTypeExprssion = "int"; break;
                             case "LITFLOAT": nodeTypeExprssion = "float"; break;
@@ -2010,7 +2390,7 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.ThisNode thisnode:
                     {
-                        var result = QueryRecord("this");
+                        var result = Query("this");
                         if (result == null) throw new Exception("找不到'this'");
 
                         nodeTypeExprssion = result.typeExpression;
@@ -2022,17 +2402,17 @@ namespace Gizbox.SemanticRule
                     {
                         var className = AnalyzeTypeExpression(accessNode.objectNode);
 
-                        var classRec = QueryRecord(className);
+                        var classRec = Query(className);
                         if (classRec == null) throw new Exception("找不到类名：" + className);
 
                         var classEnv = classRec.envPtr;
                         if (classEnv == null) throw new Exception("类作用域不存在！");
 
-                        var memberRec = classEnv.GetRecord(accessNode.memberNode.token.attribute);
-                        if (memberRec == null) throw new Exception("字段" + accessNode.memberNode.token.attribute + "不存在！");
+                        var memberRec = classEnv.GetRecord(accessNode.memberNode.FullName);
+                        if (memberRec == null) throw new Exception("字段" + accessNode.memberNode.FullName + "不存在！");
 
                         accessNode.attributes["class"] = className;//记录memberAccess节点的点左边类型
-                        accessNode.attributes["member_name"] = accessNode.memberNode.token.attribute;//记录memberAccess节点的点右边名称
+                        accessNode.attributes["member_name"] = accessNode.memberNode.FullName;//记录memberAccess节点的点右边名称
 
                         nodeTypeExprssion = memberRec.typeExpression;
                     }
@@ -2047,8 +2427,8 @@ namespace Gizbox.SemanticRule
                         else
                         {
                             var funcId = (eleAccessNode.containerNode as SyntaxTree.IdentityNode);
-                            var idRec = QueryRecord(funcId.token.attribute);
-                            if (idRec == null) throw new Exception("函数：" + funcId.token.attribute + "未找到！");
+                            var idRec = Query(funcId.FullName);
+                            if (idRec == null) throw new Exception("函数：" + funcId.FullName + "未找到！");
 
                             containerTypeExpr = idRec.typeExpression;    
                         }
@@ -2071,11 +2451,11 @@ namespace Gizbox.SemanticRule
                         if (callNode.isMemberAccessFunction)
                         {
                             var funcAccess = (callNode.funcNode as SyntaxTree.ObjectMemberAccessNode);
-                            string funcName = funcAccess.memberNode.token.attribute;
+                            string funcName = funcAccess.memberNode.FullName;
 
                             var className = AnalyzeTypeExpression(funcAccess.objectNode);
 
-                            var classRec = QueryRecord(className);
+                            var classRec = Query(className);
                             if (classRec == null) throw new Exception("找不到类名：" + className);
 
                             var classEnv = classRec.envPtr;
@@ -2084,7 +2464,7 @@ namespace Gizbox.SemanticRule
                             mangledName = Utils.Mangle(funcName, argTypeArr);
 
                             var memberRec = classEnv.GetMemberRecordInChain(mangledName);
-                            if (memberRec == null) throw new Exception("函数成员" + funcAccess.memberNode.token.attribute + "不存在！");
+                            if (memberRec == null) throw new Exception("函数成员" + funcAccess.memberNode.FullName + "不存在！");
 
                             var typeExpr = memberRec.typeExpression;
 
@@ -2095,11 +2475,11 @@ namespace Gizbox.SemanticRule
                         {
                             var funcId = (callNode.funcNode as SyntaxTree.IdentityNode);
 
-                            mangledName = Utils.Mangle(funcId.token.attribute, argTypeArr);
+                            mangledName = Utils.Mangle(funcId.FullName, argTypeArr);
 
-                            var idRec = QueryRecord(mangledName);
+                            var idRec = Query(mangledName);
 
-                            if (idRec == null) throw new Exception("函数：" + funcId.token.attribute + "未找到！");
+                            if (idRec == null) throw new Exception("函数：" + funcId.FullName + "未找到！");
 
                             string typeExpr = idRec.typeExpression.Split(' ').LastOrDefault();
 
@@ -2111,8 +2491,8 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.NewObjectNode newObjNode:
                     {
-                        string className = newObjNode.className.token.attribute;
-                        if (QueryRecord(className) == null) throw new Exception("找不到类定义：" + className);
+                        string className = newObjNode.className.FullName;
+                        if (Query(className) == null) throw new Exception("找不到类定义：" + className);
                         nodeTypeExprssion = className;
                     }
                     break;
@@ -2158,7 +2538,6 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.CastNode castNode:
                     {
                         nodeTypeExprssion = castNode.typeNode.ToExpression();
-                        Console.WriteLine("分析第" + castNode.FirstToken().line + "行的转换表达式，类型为" + nodeTypeExprssion);
                     }
                     break;
                 default:
@@ -2175,37 +2554,135 @@ namespace Gizbox.SemanticRule
         /// </summary>
         private bool CheckType(string typeExpr, SyntaxTree.ExprNode exprNode)
         {
-            return typeExpr == AnalyzeTypeExpression(exprNode);
+            return CheckType(typeExpr, AnalyzeTypeExpression(exprNode));
         }
         private bool CheckType(SyntaxTree.ExprNode exprNode1, SyntaxTree.ExprNode exprNode2)
         {
-            return AnalyzeTypeExpression(exprNode1) == AnalyzeTypeExpression(exprNode2);
+            return CheckType(AnalyzeTypeExpression(exprNode1), AnalyzeTypeExpression(exprNode2));
+        }
+        private bool CheckType(string typeExpr1, string typeExpr2)
+        {
+            if(typeExpr1 == "null" && Utils.IsPrimitiveType(typeExpr2) == false)
+            {
+                return true;
+            }
+            else if(typeExpr2 == "null" && Utils.IsPrimitiveType(typeExpr1) == false)
+            {
+                return true;
+            }
+
+            return typeExpr1 == typeExpr2;
         }
 
-        private SymbolTable.Record QueryRecord(string name)
+        private SymbolTable.Record Query(string name)
         {
-            Log("开始在本编译单元查找符号：" + name + "当前所在作用域：" + envStack.Peek().name);
+            Log("Query:开始在本编译单元查找符号：" + name + "从作用域：" + envStack.Peek().name + "开始");
             var toList = envStack.ToList();
             for (int i = toList.Count - 1; i > -1; --i)
             {
                 if (toList[i].ContainRecordName(name))
                 {
+                    Log("在符号表:" + toList[i].name + "中成功找到：" + name);
                     return toList[i].GetRecord(name);
                 }
             }
 
-            Log("本编译单元未找到" + name + "开始在引用的库中查找中");
             foreach(var importNode in ast.rootNode.importNodes)
             {
                 var lib = (Gizbox.IL.ILUnit)importNode.attributes["lib"]; if (lib == null) throw new Exception("查找" + name + "时库为空！");
                 if(lib.globalScope.env.ContainRecordName(name))
                 {
+                    Log("Query:库中成功找到:" + name);
                     return lib.globalScope.env.GetRecord(name);
                 }
             }
 
-            
-            throw new Exception("库中也未找到记录：" + name);
+            Log("Query:库中也未找到:" + name);
+            return null;
+        }
+
+        private bool TryQueryIgnoreMangle(string name)
+        {
+            Log("TryQuery  查找符号：" + name + "从作用域：" + envStack.Peek().name + "开始");
+            var toList = envStack.ToList();
+            for (int i = toList.Count - 1; i > -1; --i)
+            {
+                if (toList[i].ContainRecordName(name, true))
+                {
+                    Log("TryQuery  在符号表:" + toList[i].name + "中成功找到：" + name);
+                    return true;
+                }
+            }
+
+            foreach (var importNode in ast.rootNode.importNodes)
+            {
+                var lib = (Gizbox.IL.ILUnit)importNode.attributes["lib"]; if (lib == null) throw new Exception("查找" + name + "时库为空！");
+                if (lib.globalScope.env.ContainRecordName(name, true))
+                {
+                    Log("TryQuery  库中成功找到:" + name);
+                    return true;
+                }
+            }
+
+            Log("TryQuery  库中未找到:" + name);
+            return false;
+        }
+
+        private bool TryCompleteIdenfier(SyntaxTree.IdentityNode idNode)
+        {
+            bool found = false;
+            string namevalid = null;
+            //原名查找 
+            {
+                if (TryQueryIgnoreMangle(idNode.token.attribute))
+                {
+                    found = true;
+                    namevalid = idNode.token.attribute;
+                }
+            }
+
+            //尝试命名空间前缀   
+            foreach (var namespaceUsing in ast.rootNode.usingNamespaceNodes)
+            {
+                string newname = namespaceUsing.namespaceNameNode.token.attribute + "::" + idNode.token.attribute;
+                if (TryQueryIgnoreMangle(newname))
+                {
+                    if(found == true)
+                    {
+                        throw new Exception("标识符" + idNode.token.attribute + "是" + newname + "和" + namevalid + "之间的不明确引用1");
+                    }
+                    found = true;
+                    idNode.SetPrefix(namespaceUsing.namespaceNameNode.token.attribute);
+                }
+            }
+
+            if(found)
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        private void TryCompleteType(SyntaxTree.TypeNode typeNode)
+        {
+            switch(typeNode)
+            {
+                case SyntaxTree.PrimitiveTypeNode primitiveTypeNode:
+                    break;
+                case SyntaxTree.ClassTypeNode classTypeNode:
+                    {
+                        TryCompleteIdenfier(classTypeNode.classname);
+                    }
+                    break;
+                case SyntaxTree.ArrayTypeNode arrayTypeNpde:
+                    {
+                        TryCompleteType(arrayTypeNpde.elemtentType);
+                    }
+                    break;
+            }
         }
 
         public static void Log(object content)

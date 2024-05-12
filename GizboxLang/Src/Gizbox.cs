@@ -106,6 +106,7 @@ namespace Gizbox
         public class Record
         {
             public string name;
+            public string rawname;
             public RecordCatagory category;
             public string typeExpression;
             public int addr;
@@ -146,6 +147,24 @@ namespace Gizbox
         }
 
 
+
+        //包含信息  
+        public bool ContainRecordName(string name, bool ignoreMangle = false)
+        {
+            if(ignoreMangle == false)
+            {
+                return records.ContainsKey(name);
+            }
+            else
+            {
+                if (records.ContainsKey(name)) return true;
+                foreach(var val in records.Values)
+                {
+                    if(val.rawname == name) return true ;
+                }
+                return false;
+            }
+        }
         //查询信息  
         public Record GetRecord(string symbolName)
         {
@@ -154,8 +173,6 @@ namespace Gizbox
                 this.Print();
                 throw new Exception(this.name + "表中获取不到记录：" + symbolName);
             }
-                
-
             return records[symbolName];
         }
 
@@ -182,12 +199,6 @@ namespace Gizbox
         }
 
 
-        //包含信息  
-        public bool ContainRecordName(string name)
-        {
-            return records.ContainsKey(name);
-        }
-
         //获取某类型记录  
         public List<Record> GetByCategory(RecordCatagory catagory)
         {
@@ -210,6 +221,7 @@ namespace Gizbox
             int variableAddr = 99999;//TODO:地址存放  
             var newRec = new Record() {
                 name = synbolName, 
+                rawname = synbolName,
                 category = catagory,
                 addr = variableAddr,
                 typeExpression = typeExpr ,
@@ -249,14 +261,14 @@ namespace Gizbox
             int pad = 16;
             Console.WriteLine();
             Console.WriteLine($"|{new string('-', pad)}-{new string('-', pad)}-{ this.name.PadRight(pad) + (this.parent != null ? ("(parent:" + this.parent.name + ")") : "") }-{new string('-', pad)}-{new string('-', pad)}|");
-            Console.WriteLine($"|{"NAME".PadRight(pad)}|{"CATAGORY".PadRight(pad)}|{"TYPE".PadRight(pad)}|{"ADDR".PadRight(pad)}|{"SubTable".PadRight(pad)}|");
-            Console.WriteLine($"|{new string('-', pad * 5 + 4)}|");
+            Console.WriteLine($"|{"NAME".PadRight(pad)}|{"RAW".PadRight(pad)}|{"CATAGORY".PadRight(pad)}|{"TYPE".PadRight(pad)}|{"ADDR".PadRight(pad)}|{"SubTable".PadRight(pad)}|");
+            Console.WriteLine($"|{new string('-', pad * 6 + 4)}|");
             foreach (var key in records.Keys)
             {
                 var rec = records[key];
-                Console.WriteLine($"|{rec.name.PadRight(pad)}|{rec.category.ToString().PadRight(pad)}|{rec.typeExpression.PadRight(pad)}|{rec.addr.ToString().PadRight(pad)}|{(rec.envPtr != null ? "hasSubTable" : "").PadRight(pad)}|");
+                Console.WriteLine($"|{rec.name.PadRight(pad)}|{rec.rawname.PadRight(pad)}|{rec.category.ToString().PadRight(pad)}|{rec.typeExpression.PadRight(pad)}|{rec.addr.ToString().PadRight(pad)}|{(rec.envPtr != null ? "hasSubTable" : "").PadRight(pad)}|");
             }
-            Console.WriteLine($"|{new string('-', pad * 5 + 4)}|");
+            Console.WriteLine($"|{new string('-', pad * 6 + 4)}|");
             Console.WriteLine();
 
             if(this.children .Count > 0)
@@ -596,13 +608,20 @@ namespace Gizbox
     /// </summary>
     public class Compiler
     {
-        public int ttt;
         //Settings  
         public static bool enableLogScanner = false;
         public static bool enableLogParser = false;
         public static bool enableLogSemanticAnalyzer = false;
         public static bool enableLogILGenerator = false;
         public static bool enableLogScriptEngine = false;
+
+        //parser data  
+        private bool parserDataHardcode;
+        public string parserDataPath;
+
+        //lib info  
+        public Dictionary<string, Gizbox.IL.ILUnit> libs = new Dictionary<string, IL.ILUnit>();
+        public List<string> libPathFindList = new List<string>();
 
         //CTOR  
         public Compiler()
@@ -665,21 +684,112 @@ namespace Gizbox
             Console.ReadKey();
         }
 
+        public void AddLib(string libname, Gizbox.IL.ILUnit lib)
+        {
+            this.libs[libname] = lib;
+        }
+        public void AddLibPath(string path)
+        {
+            this.libPathFindList.Add(path);
+        }
+
+        /// <summary>
+        /// 载入库  
+        /// </summary>
+        public Gizbox.IL.ILUnit LoadLib(string libname)
+        {
+            //编译器中查找  
+            if (this.libs.ContainsKey(libname))
+            {
+                return this.libs[libname];
+            }
+            //路径查找  
+            else
+            {
+                foreach (var dir in this.libPathFindList)
+                {
+                    System.IO.DirectoryInfo dirInfo = new System.IO.DirectoryInfo(dir);
+                    foreach(var f in dirInfo.GetFiles())
+                    {
+                        if (System.IO.Path.GetFileNameWithoutExtension(f.Name) == libname)
+                        {
+                            if(System.IO.Path.GetExtension(f.Name).EndsWith("gzblib"))
+                            {
+                                throw new Exception("库反序列未实现！");
+                            }
+                            else
+                            {
+                                return this.Compile(System.IO.File.ReadAllText(f.FullName));
+                            }
+                        }
+                    }
+                }
+            }
+
+            return null;
+        }
+
+
+        /// <summary>
+        /// 配置分析器来源方式  
+        /// </summary>
+        public void ConfigParserDataSource(bool hardcode)
+        {
+            this.parserDataHardcode = hardcode;
+        }
+
+        /// <summary>
+        /// 配置分析器文件读取为止  
+        /// </summary>
+        public void ConfigParserDataPath(string path)
+        {
+            this.parserDataPath = path;
+        }
+
+        /// <summary>
+        /// 硬编码保存到桌面      
+        /// </summary>
+        public void SaveParserHardcodeToDesktop()
+        {
+            Scanner scanner = new Scanner();
+
+            LALRGenerator.ParserData data;
+            var grammer = new Grammer() { terminalNames = scanner.GetTokenNames() };
+            LALRGenerator.LALRGenerator generator = new Gizbox.LALRGenerator.LALRGenerator(grammer, this.parserDataPath);
+            data = generator.GetResult();
+
+            string codepath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop) + "\\cs_parse_hardcode.cs";
+            string csStr = Utility.ParserHardcoder.GenerateHardcode(data);
+            System.IO.File.WriteAllText(codepath, csStr);
+        }
+
         /// <summary>
         /// 编译  
         /// </summary>
         public IL.ILUnit Compile(string source)
         {
+            if (string.IsNullOrEmpty(this.parserDataPath) && parserDataHardcode == false) throw new Exception("语法分析器数据源没有设置");
+
             IL.ILUnit ilUnit = new IL.ILUnit();
 
             //词法分析  
             Scanner scanner = new Scanner();
             List<Token> tokens = scanner.Scan(source);
 
-            //生成语法分析器    
-            var grammer = new Grammer() { terminalNames = scanner.GetTokenNames() };
-            LALRGenerator.LALRGenerator generator = new Gizbox.LALRGenerator.LALRGenerator(grammer);
-            var data = generator.GetResult();
+
+            //硬编码生成语法分析器    
+            Gizbox.LALRGenerator.ParserData data;
+            if (parserDataHardcode)
+            {
+                data = Gizbox.Utility.ParserHardcoder.GenerateParser();
+            }
+            //文件系统读取语法分析器    
+            else
+            {
+                var grammer = new Grammer() { terminalNames = scanner.GetTokenNames() };
+                LALRGenerator.LALRGenerator generator = new Gizbox.LALRGenerator.LALRGenerator(grammer, this.parserDataPath);
+                data = generator.GetResult();
+            }
 
             //语法分析  
             LRParse.LRParser parser = new LRParse.LRParser(data, this);
@@ -688,7 +798,7 @@ namespace Gizbox
 
 
             //语义分析  
-            SemanticRule.SemanticAnalyzer semanticAnalyzer = new SemanticRule.SemanticAnalyzer(syntaxTree, ilUnit);
+            SemanticRule.SemanticAnalyzer semanticAnalyzer = new SemanticRule.SemanticAnalyzer(syntaxTree, ilUnit, this);
             semanticAnalyzer.Analysis();
 
 
@@ -710,13 +820,35 @@ namespace Gizbox
     {
         public static string Mangle(string funcname, params string[] paramTypes)
         {
-            string result = funcname + "_@";
+            string result = funcname + "@";
             foreach (var paramType in paramTypes)
             {
                 result += '_';
                 result += paramType;
             }
             return result;
+        }
+
+        public static bool IsPrimitiveType(string typeExpr)
+        {
+            switch(typeExpr)
+            {
+                case "bool": return true;
+                case "int": return true;
+                case "float": return true;
+                case "string": return true;
+                default: return false;
+            }
+        }
+
+        public static bool IsArrayType(string typeExpr)
+        {
+            return typeExpr.EndsWith("[]");
+        }
+
+        public static bool IsFunType(string typeExpr)
+        {
+            return typeExpr.Contains("->");
         }
     }
 }

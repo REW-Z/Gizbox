@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "F:\\Legacy\\MyProjects\\FanLang\\GizboxLang\\GizboxLang.csproj": {}
+    "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj": {}
   },
   "projects": {
-    "F:\\Legacy\\MyProjects\\FanLang\\GizboxLang\\GizboxLang.csproj": {
+    "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "F:\\Legacy\\MyProjects\\FanLang\\GizboxLang\\GizboxLang.csproj",
+        "projectUniqueName": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj",
         "projectName": "GizboxLang",
-        "projectPath": "F:\\Legacy\\MyProjects\\FanLang\\GizboxLang\\GizboxLang.csproj",
+        "projectPath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj",
         "packagesPath": "C:\\Users\\leona\\.nuget\\packages\\",
-        "outputPath": "F:\\Legacy\\MyProjects\\FanLang\\GizboxLang\\obj\\",
+        "outputPath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft\\Xamarin\\NuGet\\"

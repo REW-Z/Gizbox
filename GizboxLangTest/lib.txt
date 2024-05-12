@@ -1,2 +1,5 @@
 ﻿
-extern void Log(string text);
+namespace Console
+{
+	extern void Log(string text);
+}

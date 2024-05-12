@@ -22,6 +22,9 @@ namespace Gizbox
             keywords = new List<TokenPattern>();
 
             keywords.Add(new TokenPattern("import", "import\\W", 1));
+            keywords.Add(new TokenPattern("using", "using\\W", 1));
+
+            keywords.Add(new TokenPattern("namespace", "namespace\\W", 1));
             keywords.Add(new TokenPattern("extern", "extern\\W", 1));
 
             keywords.Add(new TokenPattern("var", "var\\W", 1));
@@ -31,10 +34,12 @@ namespace Gizbox
             keywords.Add(new TokenPattern("int", "int\\W", 1));
             keywords.Add(new TokenPattern("float", "float\\W", 1));
             keywords.Add(new TokenPattern("string", "string\\W", 1));
+            keywords.Add(new TokenPattern("null", "null\\W", 1));
 
             keywords.Add(new TokenPattern(",", ",", 0));
             keywords.Add(new TokenPattern(";", ";[\\s|\\t|\\n]", 1));
             keywords.Add(new TokenPattern("new", "new\\W", 1));
+            keywords.Add(new TokenPattern("delete", "delete\\W", 1));
             keywords.Add(new TokenPattern("while", "while\\W", 1));
             keywords.Add(new TokenPattern("for", "for\\W", 1));
             keywords.Add(new TokenPattern("if", "if\\W", 1));
@@ -93,7 +98,7 @@ namespace Gizbox
             literals.Add(new TokenPattern("LITFLOAT", "[0-9]+\\.[0-9]+[F|f]\\D", 1));
             literals.Add(new TokenPattern("LITSTRING", "\\\"[^\\\"]*\\\"[^\\\"]", 1));
 
-            identifierPattern = new TokenPattern("ID", "[a-z|A-Z|_][a-z|A-Z|_|0-9]*\\W", 1);
+            identifierPattern = new TokenPattern("ID", "[A-Z|a-z][A-Z|a-z|0-9|_]*(\\:\\:[A-Z|a-z|0-9|_]+)*[^A-Za-z0-9_\\:]", 1);
 
             whitespace = new TokenPattern("space", "[\\n|\\s|\\t]+");
         }

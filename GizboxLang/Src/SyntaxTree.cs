@@ -177,6 +177,7 @@ namespace Gizbox
         public class ProgramNode : Node
         {
             public List<ImportNode> importNodes;
+            public List<UsingNode> usingNamespaceNodes;
             public StatementsNode statementsNode;
         }
 
@@ -203,6 +204,17 @@ namespace Gizbox
 
         public abstract class StmtNode : Node { }
 
+
+        public class UsingNode: Node
+        {
+            public IdentityNode namespaceNameNode;
+        }
+
+        public class NamespaceNode : StmtNode
+        {
+            public IdentityNode namepsaceNode;
+            public StatementsNode stmtsNode;
+        }
 
         public abstract class DeclareNode : StmtNode { }
 
@@ -248,6 +260,11 @@ namespace Gizbox
         public class ReturnStmtNode : StmtNode
         {
             public ExprNode returnExprNode;
+        }
+
+        public class DeleteStmtNode : StmtNode
+        {
+            public ExprNode objToDelete;
         }
 
         public class WhileStmtNode : StmtNode
@@ -308,7 +325,45 @@ namespace Gizbox
 
         public class IdentityNode : ExprNode
         {
+            public enum IdType
+            {
+                Undefined,
+                Namespace,
+                Class,
+                VariableOrField,
+                FunctionOrMethod,
+            }
+
             public Token token;
+
+            public IdType identiferType = IdType.Undefined;
+
+            public bool isMemberIdentifier = false;
+
+            private string fullname = null;
+
+            public string FullName
+            {
+                get 
+                {
+                    if (fullname == null)
+                        return token.attribute;
+                    else
+                        return fullname;
+                }
+            }
+
+            public void SetPrefix(string prefix)
+            {
+                if(string.IsNullOrEmpty(prefix) == false)
+                {
+                    this.fullname = prefix + "::" + token.attribute;
+                }
+                else
+                {
+                    this.fullname = token.attribute;
+                }
+            }
 
             public override string ToString()
             {
@@ -407,18 +462,17 @@ namespace Gizbox
             public Token token;
         }
 
-
         // ******************** TYPE NODES ******************************
 
         public abstract class TypeNode : Node { public abstract string ToExpression(); }
 
         public class ArrayTypeNode : TypeNode
         {
-            public TypeNode baseType;
+            public TypeNode elemtentType;
 
             public override string ToExpression()
             {
-                return baseType.ToExpression() + "[]";
+                return elemtentType.ToExpression() + "[]";
             }
         }
 
@@ -428,10 +482,10 @@ namespace Gizbox
 
             public override string ToExpression()
             {
-                return classname.token.attribute;
+                return classname.FullName;
             }
         }
-        public class PrimitiveNode : TypeNode
+        public class PrimitiveTypeNode : TypeNode
         {
             public Token token;
 

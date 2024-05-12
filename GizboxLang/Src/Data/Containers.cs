@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Gizbox
 {
-    public class Stack<T>
+    public class GStack<T>
     {
         private List<T> data = new List<T>();
 

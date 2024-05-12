@@ -77,7 +77,7 @@ namespace Gizbox.IL
         public Dictionary<string, VTable> vtables = new Dictionary<string, VTable>();
 
         //行数 -> 符号表链 查询表
-        public Dictionary<int, Gizbox.Stack<SymbolTable>> stackDic;
+        public Dictionary<int, Gizbox.GStack<SymbolTable>> stackDic;
 
         public ILUnit()
         {
@@ -135,7 +135,7 @@ namespace Gizbox.IL
             }
         }
         // 获取堆栈  
-        public Gizbox.Stack<SymbolTable> GetEnvStack(int currentUnit, int currentLine)
+        public Gizbox.GStack<SymbolTable> GetEnvStack(int currentUnit, int currentLine)
         {
             if(currentUnit == -1)
             {
@@ -184,7 +184,7 @@ namespace Gizbox.IL
         //缓存符号表栈  
         private void CacheEnvStack()
         {
-            this.stackDic = new Dictionary<int, Stack<SymbolTable>>();
+            this.stackDic = new Dictionary<int, GStack<SymbolTable>>();
 
             List<SymbolTable> tempList = new List<SymbolTable>();
 
@@ -198,7 +198,7 @@ namespace Gizbox.IL
                     {
                         EnvHits(i, tempList);
                         tempList.Sort((e1, e2) => e1.depth - e2.depth);
-                        var newEnvStack = new Stack<SymbolTable>();
+                        var newEnvStack = new GStack<SymbolTable>();
                         foreach (var env in tempList)
                         {
                             newEnvStack.Push(env);
@@ -276,11 +276,11 @@ namespace Gizbox.IL
 
 
         //temp info  
-        private Gizbox.Stack<SymbolTable> envStack = new Stack<SymbolTable>();
+        private Gizbox.GStack<SymbolTable> envStack = new GStack<SymbolTable>();
 
         //status  
         private int tmpCounter = 0;//临时变量自增    
-        private Stack<string> loopExitStack = new Stack<string>();
+        private GStack<string> loopExitStack = new GStack<string>();
 
 
         public ILGenerator(SyntaxTree ast, ILUnit ilUnit)
@@ -332,6 +332,11 @@ namespace Gizbox.IL
                         GenNode(programNode.statementsNode);
                     }
                     break;
+                case SyntaxTree.NamespaceNode namespaceNode:
+                    {
+                        GenNode(namespaceNode.stmtsNode);
+                    }
+                    break;
                 case SyntaxTree.StatementsNode stmtsNode:
                     {
                         foreach(var stmt in stmtsNode.statements)
@@ -367,7 +372,7 @@ namespace Gizbox.IL
                 //类声明  
                 case SyntaxTree.ClassDeclareNode classDeclNode:
                     {
-                        string className = classDeclNode.classNameNode.token.attribute;
+                        string className = classDeclNode.classNameNode.FullName;
                         GenerateCode("JUMP", "exit:" + className);
                         GenerateCode(" ").label = className;
                         //GeneratorCode("CLASS_BEGIN", classDeclNode.classNameNode.token.attribute);
@@ -377,7 +382,7 @@ namespace Gizbox.IL
                         //构造函数（默认）  
                         {
                             //构造函数全名    
-                            string funcFullName = classDeclNode.classNameNode.token.attribute + ".ctor";
+                            string funcFullName = classDeclNode.classNameNode.FullName + ".ctor";
                             //string funcFullName = "ctor";
 
                             //跳过声明  
@@ -385,13 +390,13 @@ namespace Gizbox.IL
 
                             //函数开始    
                             GenerateCode(" ").label = "entry:" + funcFullName;
-                            EnvBegin(envStack.Peek().GetTableInChildren(classDeclNode.classNameNode.token.attribute + ".ctor"));
+                            EnvBegin(envStack.Peek().GetTableInChildren(classDeclNode.classNameNode.FullName + ".ctor"));
                             GenerateCode("METHOD_BEGIN", funcFullName);
 
                             //基类构造函数调用  
                             if (classDeclNode.baseClassNameNode != null)
                             {
-                                var baseClassName = classDeclNode.baseClassNameNode.token.attribute;
+                                var baseClassName = classDeclNode.baseClassNameNode.FullName;
                                 var baseRec = Query(baseClassName);
                                 var baseEnv = baseRec.envPtr;
 
@@ -407,7 +412,7 @@ namespace Gizbox.IL
                                     var fieldDecl = memberDecl as SyntaxTree.VarDeclareNode;
 
                                     GenNode(fieldDecl.initializerNode);
-                                    GenerateCode("=", "[this." + fieldDecl.identifierNode.token.attribute + "]", fieldDecl.initializerNode.attributes["ret"]);
+                                    GenerateCode("=", "[this." + fieldDecl.identifierNode.FullName + "]", fieldDecl.initializerNode.attributes["ret"]);
                                 }
                             }
 
@@ -417,7 +422,7 @@ namespace Gizbox.IL
                             GenerateCode("RETURN");
 
                             GenerateCode("METHOD_END");
-                            EnvEnd(envStack.Peek().GetTableInChildren(classDeclNode.classNameNode.token.attribute + ".ctor"));
+                            EnvEnd(envStack.Peek().GetTableInChildren(classDeclNode.classNameNode.FullName + ".ctor"));
                             GenerateCode(" ").label = "exit:" + funcFullName;
                         }
 
@@ -509,7 +514,7 @@ namespace Gizbox.IL
                         GenerateCode("FUNC_BEGIN", funcFullName);
 
 
-                        GenerateCode("EXTERN_IMPL", externFuncDeclNode.identifierNode.token.attribute);
+                        GenerateCode("EXTERN_IMPL", externFuncDeclNode.identifierNode.FullName);
 
 
                         GenerateCode("FUNC_END", funcFullName);
@@ -529,7 +534,7 @@ namespace Gizbox.IL
 
                         if(varDeclNode.initializerNode.attributes.ContainsKey("ret") == false)
                         {
-                            throw new Exception("子表达式节点无返回变量：" + varDeclNode.identifierNode.token.attribute);
+                            throw new Exception("子表达式节点无返回变量：" + varDeclNode.identifierNode.FullName);
                         }
 
                         GenerateCode("=", (string)varDeclNode.identifierNode.attributes["ret"], (string)varDeclNode.initializerNode.attributes["ret"]);
@@ -547,6 +552,12 @@ namespace Gizbox.IL
                         {
                             GenerateCode("RETURN");
                         }
+                    }
+                    break;
+                case SyntaxTree.DeleteStmtNode deleteNode:
+                    {
+                        GenNode(deleteNode.objToDelete);
+                        GenerateCode("DEL", deleteNode.objToDelete.attributes["ret"]);
                     }
                     break;
 
@@ -679,7 +690,7 @@ namespace Gizbox.IL
                 case SyntaxTree.IdentityNode idNode:
                     {
                         //标识符表达式的返回变量（本身）    
-                        idNode.attributes["ret"] = "[" + idNode.token.attribute + "]";
+                        idNode.attributes["ret"] = "[" + idNode.FullName + "]";
                     }
                     break;
                 case SyntaxTree.ThisNode thisnode:
@@ -690,7 +701,14 @@ namespace Gizbox.IL
                 case SyntaxTree.LiteralNode literalNode:
                     {
                         //表达式的返回变量  
-                        literalNode.attributes["ret"] = literalNode.token.name + ":" + literalNode.token.attribute;
+                        string valStr;
+
+                        if(literalNode.token.name != "null")
+                            valStr = literalNode.token.name + ":" + literalNode.token.attribute;
+                        else
+                            valStr = "LITNULL:";
+
+                        literalNode.attributes["ret"] = valStr;
                     }
                     break;
                 case SyntaxTree.ObjectMemberAccessNode objMemberAccess:
@@ -699,7 +717,7 @@ namespace Gizbox.IL
 
                         //成员表达式的返回变量(X.Y格式)  
                         string obj = TrimName((string)objMemberAccess.objectNode.attributes["ret"]);
-                        objMemberAccess.attributes["ret"] = "[" + obj + "." + objMemberAccess.memberNode.token.attribute + "]";
+                        objMemberAccess.attributes["ret"] = "[" + obj + "." + objMemberAccess.memberNode.FullName + "]";
                     }
                     break;
                 case SyntaxTree.CastNode castNode:
@@ -824,7 +842,7 @@ namespace Gizbox.IL
                     break;
                 case SyntaxTree.NewObjectNode newObjNode:
                     {
-                        string className = newObjNode.className.token.attribute;
+                        string className = newObjNode.className.FullName;
 
                         //表达式的返回变量  
                         newObjNode.attributes["ret"] = NewTemp(className);
@@ -847,7 +865,7 @@ namespace Gizbox.IL
                     break;
                 case SyntaxTree.IncDecNode incDecNode:
                     {
-                        string identifierName = incDecNode.identifierNode.token.attribute;
+                        string identifierName = incDecNode.identifierNode.FullName;
                         if (incDecNode.isOperatorFront)//++i
                         {
                             GenerateCode(incDecNode.op, "[" + identifierName + "]");

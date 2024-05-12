@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "hx1LYnsNhYuMl4cvKz6elCkgTGUyvfZzwU7RR7uO6ghG44HVm8Q0OmpwyGaJIjYCc8cKEtlp89wgK/1BCERrVw==",
+  "dgSpecHash": "yWBABjM3rQqEbXF7Hp2IwIR6ftYZ2u6ntb01lwEk0pC9+oxSRmqm9Pnve7sUmFGz4QFUzxVL2H5qOvaCS1Rk5A==",
   "success": true,
-  "projectFilePath": "F:\\Legacy\\MyProjects\\FanLang\\GizboxLang\\GizboxLang.csproj",
+  "projectFilePath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\leona\\.nuget\\packages\\microsoft.netcore.platforms\\1.1.0\\microsoft.netcore.platforms.1.1.0.nupkg.sha512",
     "C:\\Users\\leona\\.nuget\\packages\\netstandard.library\\2.0.3\\netstandard.library.2.0.3.nupkg.sha512"

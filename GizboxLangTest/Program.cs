@@ -7,25 +7,41 @@ using System.Collections.Generic;
 using System.Text;
 using Gizbox;
 using Gizbox.ScriptEngine;
-
+using Gizbox.Interop.CSharp;
 
 
 namespace GizboxLangTest
 {
-    using Gizbox.Interop.CSharp;
     class Program
     {
         static void Main(string[] args)
         {
+            ////生成互操作Wrap代码      
             //InteropWrapGenerator generator = new InteropWrapGenerator();
-            //generator.GenerateAssembly(typeof());
+            //generator.GetClosure(new Type[] { typeof(Gizbox.GizObject), typeof(Gizbox.Vector3) } );
+            //foreach(var t in generator.closure)
+            //{
+            //    Console.WriteLine(t.Name);
+            //}
+            //generator.GenerateFile("AAA");
             //Console.ReadLine();
             //return;
+
+            ////生成分析器硬编码  
+            //Gizbox.Compiler compilerTest = new Compiler();
+            //compilerTest.ConfigParserDataSource(hardcode: false);
+            //compilerTest.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
+            //compilerTest.SaveParserHardcodeToDesktop();
+            //return;
+
 
             string source = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\test.txt");
 
             //Compile  
             Gizbox.Compiler compiler = new Compiler();
+            compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
+            compiler.ConfigParserDataSource(hardcode: false);
+            compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
             var il = compiler.Compile(source);
 
 

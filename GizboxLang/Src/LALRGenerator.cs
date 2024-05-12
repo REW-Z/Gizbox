@@ -409,6 +409,32 @@ namespace Gizbox.LRParse
             return default;
         }
 
+        //提取所有数据  
+        public List<Tuple<int, string, ACTION>> GetAllActions()
+        {
+            List<Tuple<int, string, ACTION>> result = new List<Tuple<int, string, ACTION>>();
+            foreach (var kv in actions)
+            {
+                foreach(var kv2 in actions[kv.Key])
+                {
+                    result.Add(new Tuple<int, string, ACTION>(kv.Key, kv2.Key, kv2.Value));
+                }
+            }
+            return result;
+        }
+        public List<Tuple<int, string, GOTO>> GetAllGotos()
+        {
+            List<Tuple<int, string, GOTO>> result = new List<Tuple<int, string, GOTO>>();
+            foreach (var kv in gotos)
+            {
+                foreach (var kv2 in gotos[kv.Key])
+                {
+                    result.Add(new Tuple<int, string, GOTO>(kv.Key, kv2.Key, kv2.Value));
+                }
+            }
+            return result;
+        }
+
         //序列化  
         public string Serialize()
         {
@@ -606,12 +632,14 @@ namespace Gizbox.LALRGenerator
     /// </summary>
     public class ParserData
     {
-        //文法信息  
+        //基本信息（语法分析器用不到）      
         public Nonterminal startSymbol = null;//开始符号  
         public Nonterminal augmentedStartSymbol = null; //增广后的开始符号  
         public List<Symbol> symbols = new List<Symbol>();//符号列表   
         public List<Nonterminal> nonterminals = new List<Nonterminal>();//非终结符列表  
-        public List<Terminal> terminals = new List<Terminal>();//终结符列表  
+        public List<Terminal> terminals = new List<Terminal>();//终结符列表
+                                                               
+        //产生式  
         public List<Production> productions = new List<Production>();  //产生式列表（索引代表产生式编号）  
 
         //分析表  
@@ -661,22 +689,21 @@ namespace Gizbox.LALRGenerator
 
 
         // ------------------------------------- 构造函数 ------------------------------------------
-        public LALRGenerator(Grammer input)
+        public LALRGenerator(Grammer input, string path)
         {
             //生成器输入  
             this.genratorInput = input;
 
 
             //判断是否分析器数据文件
-            string path = AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt";
             if (System.IO.File.Exists(path))
             {
                 if (CompareInfo(path) == true)//信息一致
                 {
                     Compiler.Pause("存在分析表： " + path);
                     
+                    ReadExistDataFromFile(path);
 
-                    ReadExistData(path);
                     return;
                 }
             }
@@ -693,6 +720,11 @@ namespace Gizbox.LALRGenerator
 
             //保存分析器数据  
             SaveData(path);
+        }
+        public LALRGenerator(string content)
+        {
+            ReadData(content);
+            return;
         }
 
         // ------------------------------------- 数据读写 ------------------------------------------
@@ -740,9 +772,14 @@ namespace Gizbox.LALRGenerator
             return true;
         }
 
-        public void ReadExistData(string path)
+        public void ReadExistDataFromFile(string path)
         {
-            using (StreamReader reader = new StreamReader(path))
+            string content = System.IO.File.ReadAllText(path);
+            ReadData(content);
+        }
+        public void ReadData(string content)
+        {
+            using (StringReader reader = new StringReader(content))
             {
                 while (true)
                 {
@@ -786,7 +823,7 @@ namespace Gizbox.LALRGenerator
                     LR1ItemSet itemset = new LR1ItemSet();
                     if (reader.ReadLine() != "***Set***") throw new Exception("not match ***Set***");
 
-                    while(true)
+                    while (true)
                     {
                         string line = reader.ReadLine();
                         if (line == "***EndSet***") break;
@@ -809,7 +846,6 @@ namespace Gizbox.LALRGenerator
                 outputData.table.nonterminals = outputData.nonterminals.Select(nont => nont.name).ToList();
 
                 outputData.table.Deserialize(strTable);
-
             }
         }
 

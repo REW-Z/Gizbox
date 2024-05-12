@@ -19,11 +19,16 @@ namespace Gizbox
             //导入  
             "importations",
             "importation",
+            
+            //命名空间    
+            "namespaceusings",
+            "namespaceusing",
+
 
             //语句容器  
             "statements",
+            "namespaceblock",
             "statementblock",
-
             "declstatements",
             
             //语句
@@ -78,17 +83,28 @@ namespace Gizbox
         };
 
         public List<string> productionExpressions = new List<string>() {
-            "S -> importations statements",
-
+            "S -> importations namespaceusings statements",
 
             "importations -> importations importation",
             "importations -> importation",
             "importations -> ε",
             "importation -> import < LITSTRING >",
 
+            "namespaceusings -> namespaceusings namespaceusing",
+            "namespaceusings -> namespaceusing",
+            "namespaceusings -> ε",
+
+            "namespaceusing -> using ID ;",
+
+
+
+
+
             "statements -> statements stmt",
             "statements -> stmt",
             "statements -> ε",
+
+            "namespaceblock -> namespace ID { statements }",
 
             "statementblock -> { statements }",
 
@@ -96,12 +112,14 @@ namespace Gizbox
             "declstatements -> declstmt",
             "declstatements -> ε",
 
+            "stmt -> namespaceblock",
             "stmt -> statementblock",
             "stmt -> declstmt",
             "stmt -> stmtexpr ;",
             "stmt -> break ;",
             "stmt -> return expr ;",
             "stmt -> return ;",
+            "stmt -> delete expr ;",
             "stmt -> while ( expr ) stmt",
             "stmt -> for ( stmt bexpr ; stmtexpr ) stmt",
             "stmt -> if ( expr ) stmt elifclauselist elseclause",
@@ -210,6 +228,7 @@ namespace Gizbox
             "lit -> LITFLOAT",
             "lit -> LITSTRING",
             "lit -> LITBOOL",
+            "lit -> null",
 
 
 
