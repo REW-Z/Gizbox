@@ -118,7 +118,7 @@ namespace Gizbox.IL
                     }
                 }
             }
-            throw new Exception("本单元和库中找不到标签" + label);
+            throw new GizboxException("本单元和库中找不到标签" + label);
         }
 
 
@@ -296,6 +296,20 @@ namespace Gizbox.IL
 
             return null;
         }
+
+        //查询代码  
+        public TAC QueryCode(int unitIdx, int line)
+        {
+            if (unitIdx == -1)
+            {
+                return this.codes[line];
+            }
+            else
+            {
+                return this.dependencies[unitIdx].codes[line];
+            }
+        }
+
         // 查询虚函数表  
         public VTable QueryVTable(string className)
         {
@@ -605,7 +619,7 @@ namespace Gizbox.IL
 
                         if(varDeclNode.initializerNode.attributes.ContainsKey("ret") == false)
                         {
-                            throw new Exception("子表达式节点无返回变量：" + varDeclNode.identifierNode.FullName);
+                            throw new SemanticException(varDeclNode, "子表达式节点无返回变量：" + varDeclNode.identifierNode.FullName);
                         }
 
                         GenerateCode("=", (string)varDeclNode.identifierNode.attributes["ret"], (string)varDeclNode.initializerNode.attributes["ret"]);
@@ -822,7 +836,11 @@ namespace Gizbox.IL
                         GenNode(binaryOp.rightNode);
 
                         if (binaryOp.leftNode.attributes.ContainsKey("type") == false)
-                            throw new Exception("type未设置：" + binaryOp.leftNode.FirstToken().line + " :" + binaryOp.leftNode.FirstToken().ToString());
+                            throw new SemanticException(binaryOp.leftNode, "type未设置!");
+
+                        //if (binaryOp.rightNode.attributes.ContainsKey("type") == false)
+                        //    throw new SemanticException(binaryOp.rightNode, "type未设置!");
+
                         //表达式的返回变量  
                         binaryOp.attributes["ret"] = NewTemp((string)binaryOp.leftNode.attributes["type"]);
 
@@ -852,7 +870,7 @@ namespace Gizbox.IL
                 case SyntaxTree.CallNode callNode:
                     {
                         if (callNode.attributes.ContainsKey("mangled_name") == false)
-                            throw new Exception("mangle name empty:" + callNode.FirstToken().line);
+                            throw new SemanticException(callNode, "函数未设置混淆名！");
                         //函数全名  
                         string mangledName = (string)callNode.attributes["mangled_name"];
                         //函数返回类型    
@@ -969,7 +987,7 @@ namespace Gizbox.IL
                     }
                     break;
                 default:
-                    throw new Exception("中间代码生成未实现:" + node.GetType().Name);
+                    throw new SemanticException(node, "节点的中间代码生成未实现:" + node.GetType().Name);
             }
         }
 
@@ -1031,7 +1049,7 @@ namespace Gizbox.IL
                 }
             }
 
-            throw new Exception("查询不到" + id + "的类型！");
+            throw new GizboxException("查询不到" + id + "的类型！");
         }
 
 

@@ -229,9 +229,6 @@ C:\Users\Administrator\Desktop\笔记\Gizbox\GizboxLangTest\obj\Debug\GizboxLang
 C:\Users\Administrator\Desktop\笔记\Gizbox\GizboxLangTest\obj\Debug\GizboxLangTest.csproj.CopyComplete
 C:\Users\Administrator\Desktop\笔记\Gizbox\GizboxLangTest\obj\Debug\FanLangTest.exe
 C:\Users\Administrator\Desktop\笔记\Gizbox\GizboxLangTest\obj\Debug\FanLangTest.pdb
-F:\Legacy\MyProjects\GizboxLang\GizboxLangTest\bin\Debug\example.txt
-F:\Legacy\MyProjects\GizboxLang\GizboxLangTest\bin\Debug\lib.txt
-F:\Legacy\MyProjects\GizboxLang\GizboxLangTest\bin\Debug\test.txt
 F:\Legacy\MyProjects\GizboxLang\GizboxLangTest\bin\Debug\FanLangTest.exe.config
 F:\Legacy\MyProjects\GizboxLang\GizboxLangTest\bin\Debug\FanLangTest.exe
 F:\Legacy\MyProjects\GizboxLang\GizboxLangTest\bin\Debug\FanLangTest.pdb
@@ -346,7 +343,9 @@ F:\Legacy\MyProjects\GizboxLang\GizboxLangTest\obj\Debug\GizboxLangTest.csproj.C
 F:\Legacy\MyProjects\GizboxLang\GizboxLangTest\obj\Debug\GizboxLangTest.csproj.CopyComplete
 F:\Legacy\MyProjects\GizboxLang\GizboxLangTest\obj\Debug\FanLangTest.exe
 F:\Legacy\MyProjects\GizboxLang\GizboxLangTest\obj\Debug\FanLangTest.pdb
-F:\Legacy\MyProjects\GizboxLang\GizboxLangTest\bin\Debug\test - 复制.txt
 C:\Users\Administrator\Desktop\笔记\Gizbox\GizboxLangTest\bin\Debug\example.gix
 C:\Users\Administrator\Desktop\笔记\Gizbox\GizboxLangTest\bin\Debug\test.gix
 C:\Users\Administrator\Desktop\笔记\Gizbox\GizboxLangTest\bin\Debug\stdlib.gix
+F:\Legacy\MyProjects\GizboxLang\GizboxLangTest\bin\Debug\example.gix
+F:\Legacy\MyProjects\GizboxLang\GizboxLangTest\bin\Debug\stdlib.gix
+F:\Legacy\MyProjects\GizboxLang\GizboxLangTest\bin\Debug\test.gix
