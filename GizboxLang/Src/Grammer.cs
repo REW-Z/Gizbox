@@ -224,12 +224,13 @@ namespace Gizbox
 
             "memberaccess -> primary . ID",
 
+            "lit -> LITBOOL",
             "lit -> LITINT",
             "lit -> LITFLOAT",
+            "lit -> LITDOUBLE",
+            "lit -> LITCHAR",
             "lit -> LITSTRING",
-            "lit -> LITBOOL",
             "lit -> null",
-
 
 
             "params -> ε",

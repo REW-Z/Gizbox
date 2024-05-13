@@ -244,6 +244,7 @@ namespace Gizbox.IL
             return null;
         }
 
+
         public void Print()
         {
             Console.WriteLine("中间代码输出：(" + this.codes.Count + "行)");
@@ -764,6 +765,8 @@ namespace Gizbox.IL
                     break;
                 case SyntaxTree.CallNode callNode:
                     {
+                        if (callNode.attributes.ContainsKey("mangled_name") == false)
+                            throw new Exception("mangle name empty:" + callNode.FirstToken().line);
                         //函数全名  
                         string mangledName = (string)callNode.attributes["mangled_name"];
                         //函数返回类型    

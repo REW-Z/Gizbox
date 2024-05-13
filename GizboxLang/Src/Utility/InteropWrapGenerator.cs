@@ -27,7 +27,7 @@ namespace Gizbox
         public Type[] closure;
         public List<Type> gizPrimitives = new List<Type>();
 
-        public void GetClosure(Type[] types)
+        public void IncludeTypes(params Type[] types)
         {
             List<string> namespaces = new List<string>();
             List<Type> closure = new List<Type>();
@@ -103,41 +103,70 @@ namespace Gizbox
             }
         }
 
-        public  void GenerateFile(string staticclassName)
+
+        public  void GenerateFile(string fileName)
         {
             StringBuilder codebuilderCs = new StringBuilder();
             StringBuilder codebuilderGiz = new StringBuilder();
 
-            codebuilderCs.AppendLine("public class " + staticclassName);
-            codebuilderCs.AppendLine("{");
-
-
-            foreach (var t in closure)
+            List<string> namespaceNameList = new List<string>();
+            closure = closure.OrderBy(GetInheritanceDepth).ToArray();
+            foreach(var t in closure)
             {
-                GenerateType(t, codebuilderCs, codebuilderGiz);
+                if(namespaceNameList.Contains(t.Namespace) == false)
+                {
+                    namespaceNameList.Add(t.Namespace);
+                }
             }
-            codebuilderCs.AppendLine("}");
+            List<Type>[] namespaceArr = new List<Type>[namespaceNameList.Count];
+            for (int i = 0; i < namespaceArr.Length; ++i)
+            {
+                string nspace = namespaceNameList[i];
+                namespaceArr[i] = closure.Where(t => t.Namespace == nspace).ToList();
+
+                GenNamspace(nspace, namespaceArr[i], codebuilderCs, codebuilderGiz);
+            }
+
 
             var desktop = System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop);
-            System.IO.File.WriteAllText(desktop + "\\warp.cs", codebuilderCs.ToString());
-            System.IO.File.WriteAllText(desktop + "\\warp.giz", codebuilderGiz.ToString());
+            System.IO.File.WriteAllText(desktop + "\\" + fileName + ".cs", codebuilderCs.ToString());
+            System.IO.File.WriteAllText(desktop + "\\" + fileName + ".gx", codebuilderGiz.ToString());
         }
 
-        public  void GenerateType(Type type, StringBuilder strbCs, StringBuilder strbGiz)
+        private void GenNamspace(string name, List<Type> types, StringBuilder strbCs, StringBuilder strbGiz)
+        {
+            //strbCs.AppendLine("namespace " + name);
+            //strbCs.AppendLine("{");
+
+            foreach (var t in types)
+            {
+                GenerateType(t, strbCs, strbGiz);
+            }
+
+            strbCs.AppendLine();
+
+            //strbCs.AppendLine("}");
+        }
+
+        private void GenerateType(Type type, StringBuilder strbCs, StringBuilder strbGiz)
         {
             if (gizPrimitives.Contains(type)) return;
 
-            string classname = type.Name;
+            string classnameGz = type.FullName.Replace("+", "::").Replace(".", "::");
+            string classnameCs = type.FullName.Replace("+", "__").Replace(".", "__");
 
             var fields = type.GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.DeclaredOnly)
                 .Where(f => IsInClosure(f))
+                .Where(f => IsMemberObsolete(f) == false)
                 .ToArray();
             var properties = type.GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.DeclaredOnly)
                 .Where(p => IsInClosure(p))
+                .Where(f => IsMemberObsolete(f) == false)
                 .ToArray();
             var methods = type.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.DeclaredOnly)
                 .Where(m => m.IsSpecialName == false)
                 .Where(m => IsInClosure(m))
+                .Where(f => IsMemberObsolete(f) == false)
                 .ToArray();
 
 
@@ -147,74 +176,81 @@ namespace Gizbox
             {
                 foreach (var f in fields)
                 {
-                    strbCs.AppendLine("\tpublic static " + ToCsType(f.FieldType) + " " + (classname + "_get_" + f.Name) + "(" + classname + " " + "obj" + ")");
+                    strbCs.AppendLine("\tpublic static " + ToCsType(f.FieldType) + " " + (classnameCs + "_get_" + f.Name) + "(" + type.FullName + " " + "obj" + ")");
                     strbCs.AppendLine("\t{");
                     strbCs.AppendLine("\t\t" + "return obj." + f.Name + ";");
                     strbCs.AppendLine("\t}");
 
-                    strbCs.AppendLine("\tpublic static " + "void" + " " + (classname + "_set_" + f.Name) + "(" + classname + " " + "obj" + ", " + f.FieldType.Name + " " + "newv" + ")");
+                    strbCs.AppendLine("\tpublic static " + "void" + " " + (classnameCs + "_set_" + f.Name) + "(" + type.FullName + " " + "obj" + ", " + f.FieldType.Name + " " + "newv" + ")");
                     strbCs.AppendLine("\t{");
                     strbCs.AppendLine("\t\t" + "obj" + "." + f.Name + " = newv;");
                     strbCs.AppendLine("\t}");
                 }
                 foreach (var property in properties)
                 {
-                    strbCs.AppendLine("\tpublic static " + ToCsType(property.PropertyType) + " " + (classname + "_get_" + property.Name) + "(" + classname + " " + "obj" + ")");
-                    strbCs.AppendLine("\t{");
-                    strbCs.AppendLine("\t\t" + "return obj." + property.Name + ";");
-                    strbCs.AppendLine("\t}");
+                    if(property.CanRead)
+                    {
+                        strbCs.AppendLine("\tpublic static " + ToCsType(property.PropertyType) + " " + (classnameCs + "_get_" + property.Name) + "(" + type.FullName + " " + "obj" + ")");
+                        strbCs.AppendLine("\t{");
+                        strbCs.AppendLine("\t\t" + "return obj." + property.Name + ";");
+                        strbCs.AppendLine("\t}");
+                    }
 
-                    strbCs.AppendLine("\tpublic static " + "void" + " " + (classname + "_set_" + property.Name) + "(" + classname + " " + "obj" + ", " + property.PropertyType.Name + " " + "newv" + ")");
-                    strbCs.AppendLine("\t{");
-                    strbCs.AppendLine("\t\t" + "obj" + "." + property.Name + " = newv;");
-                    strbCs.AppendLine("\t}");
+                    if(property.CanWrite)
+                    {
+                        strbCs.AppendLine("\tpublic static " + "void" + " " + (classnameCs + "_set_" + property.Name) + "(" + type.FullName + " " + "obj" + ", " + property.PropertyType.Name + " " + "newv" + ")");
+                        strbCs.AppendLine("\t{");
+                        strbCs.AppendLine("\t\t" + "obj" + "." + property.Name + " = newv;");
+                        strbCs.AppendLine("\t}");
+                    }
                 }
             }
             //结构体  
             else
             {
-                if(methods.Length > 0)
+                //无访问器  
+            }
+            if (methods.Length > 0)
+            {
+                foreach (var m in methods)
                 {
-                    foreach (var m in methods)
+                    List<string> paramList = new List<string>();
+                    paramList.Add(type.FullName);
+                    paramList.AddRange(m.GetParameters().Select(p => p.ParameterType.FullName));
+
+                    string paramsStr = "";
+                    string argsStr = "";
+                    int i = 0;
+                    foreach (var p in paramList)
                     {
-                        List<string> paramList = new List<string>();
-                        paramList.Add(classname);
-                        paramList.AddRange(m.GetParameters().Select(p => p.ParameterType.Name));
+                        if (i > 0) paramsStr += ", ";
+                        paramsStr += (p + " arg" + i.ToString());
 
-                        string paramsStr = "";
-                        string argsStr = "";
-                        int i = 0;
-                        foreach (var p in paramList)
+
+                        if (i > 1) argsStr += ", ";
+                        if (i != 0)
                         {
-                            if (i > 0) paramsStr += ", ";
-                            paramsStr += (p + " arg" + i.ToString());
-
-
-                            if (i > 1) argsStr += ", ";
-                            if (i != 0)
-                            {
-                                argsStr += ("arg" + i.ToString());
-                            }
-
-                            i++;
+                            argsStr += ("arg" + i.ToString());
                         }
 
-                        strbCs.AppendLine("\tpublic static " + ToCsType(m.ReturnType) + " " + (classname + "_" + m.Name) + "(" + paramsStr + ")");
-                        strbCs.AppendLine("\t{");
-
-                        if (m.ReturnType == typeof(void))
-                        {
-                            strbCs.AppendLine("\t\t" + "arg0." + m.Name + "(" + argsStr + ");");
-                        }
-                        else
-                        {
-                            strbCs.AppendLine("\t\t" + "return arg0." + m.Name + "(" + argsStr + ");");
-                        }
-
-                        strbCs.AppendLine("\t}");
+                        i++;
                     }
 
+                    strbCs.AppendLine("\tpublic static " + ToCsType(m.ReturnType) + " " + (classnameCs + "_" + m.Name) + "(" + paramsStr + ")");
+                    strbCs.AppendLine("\t{");
+
+                    if (m.ReturnType == typeof(void))
+                    {
+                        strbCs.AppendLine("\t\t" + "arg0." + m.Name + "(" + argsStr + ");");
+                    }
+                    else
+                    {
+                        strbCs.AppendLine("\t\t" + "return arg0." + m.Name + "(" + argsStr + ");");
+                    }
+
+                    strbCs.AppendLine("\t}");
                 }
+
             }
 
 
@@ -225,21 +261,23 @@ namespace Gizbox
                 foreach (var f in fields)
                 {
                     string gizTypename = ToGizType(f.FieldType);
-                    strbGiz.AppendLine("extern " + gizTypename + " " + (classname + "_get_" + f.Name) + "(" + classname + " " + classname.ToLower() + ");");
-                    strbGiz.AppendLine("extern " + "void" + " " + (classname + "_set_" + f.Name) + "(" + classname + " " + classname.ToLower() + ", " + gizTypename + " " + "newv" + ");");
+                    strbGiz.AppendLine("extern " + gizTypename + " " + (classnameGz + "_get_" + f.Name) + "(" + classnameGz + " " + classnameGz.ToLower() + ");");
+                    strbGiz.AppendLine("extern " + "void" + " " + (classnameGz + "_set_" + f.Name) + "(" + classnameGz + " " + classnameGz.ToLower() + ", " + gizTypename + " " + "newv" + ");");
                 }
                 foreach (var p in properties)
                 {
                     string gizTypename = ToGizType(p.PropertyType);
-                    strbGiz.AppendLine("extern " + gizTypename + " " + (classname + "_get_" + p.Name) + "(" + classname + " " + classname.ToLower() + ");");
-                    strbGiz.AppendLine("extern " + "void" + " " + (classname + "_set_" + p.Name) + "(" + classname + " " + classname.ToLower() + ", " + gizTypename + " " + "newv" + ");");
+                    if(p.CanRead)
+                        strbGiz.AppendLine("extern " + gizTypename + " " + (classnameGz + "_get_" + p.Name) + "(" + classnameGz + " " + classnameGz.ToLower() + ");");
+                    if(p.CanWrite)
+                        strbGiz.AppendLine("extern " + "void" + " " + (classnameGz + "_set_" + p.Name) + "(" + classnameGz + " " + classnameGz.ToLower() + ", " + gizTypename + " " + "newv" + ");");
                 }
             }
 
             foreach (var m in methods)
             {
                 List<string> paramList = new List<string>();
-                paramList.Add(classname);
+                paramList.Add(classnameGz);
                 paramList.AddRange(m.GetParameters().Select(p => ToGizType(p.ParameterType)));
 
                 string paramsStr = "";
@@ -251,7 +289,7 @@ namespace Gizbox
                     i++;
                 }
 
-                strbGiz.AppendLine("extern " + ToGizType(m.ReturnType) + " " + (classname + "_" + m.Name) + "(" + paramsStr + ")");
+                strbGiz.AppendLine("extern " + ToGizType(m.ReturnType) + " " + (classnameGz + "_" + m.Name) + "(" + paramsStr + ");");
             }
 
 
@@ -259,13 +297,14 @@ namespace Gizbox
             string inhertStr = "";
             if (type.IsValueType == false && this.closure.Contains(type.BaseType))
             {
-                inhertStr = ":" + type.BaseType.Name;
+                inhertStr = "  :  " + type.BaseType.FullName.Replace("+", "::").Replace(".", "::"); ;
             }
-            strbGiz.AppendLine("class " + classname + inhertStr);
+            strbGiz.AppendLine("class " + classnameGz + inhertStr);
             strbGiz.AppendLine("{");
 
+
             //类类型
-            if(type.IsValueType == false)
+            if (type.IsValueType == false)
             {
                 foreach (var f in fields)
                 {
@@ -273,12 +312,12 @@ namespace Gizbox
 
                     strbGiz.AppendLine("\t" + gizTypename + " " + f.Name + "()");
                     strbGiz.AppendLine("\t{");
-                    strbGiz.AppendLine("\t\t" + "return " + (classname + "_get_" + f.Name) + "(this);");
+                    strbGiz.AppendLine("\t\t" + "return " + (classnameGz + "_get_" + f.Name) + "(this);");
                     strbGiz.AppendLine("\t}");
 
                     strbGiz.AppendLine("\t" + "void " + f.Name + "(" + gizTypename + " " + "newv" + ")");
                     strbGiz.AppendLine("\t{");
-                    strbGiz.AppendLine("\t\t" + (classname + "_set_" + f.Name) + "(this, " + "newv" + ");");
+                    strbGiz.AppendLine("\t\t" + (classnameGz + "_set_" + f.Name) + "(this, " + "newv" + ");");
                     strbGiz.AppendLine("\t}");
                 }
 
@@ -286,15 +325,21 @@ namespace Gizbox
                 {
                     string gizTypename = ToGizType(p.PropertyType);
 
-                    strbGiz.AppendLine("\t" + gizTypename + " " + p.Name + "()");
-                    strbGiz.AppendLine("\t{");
-                    strbGiz.AppendLine("\t\t" + "return " + (classname + "_get_" + p.Name) + "(this);");
-                    strbGiz.AppendLine("\t}");
+                    if(p.CanRead)
+                    {
+                        strbGiz.AppendLine("\t" + gizTypename + " " + p.Name + "()");
+                        strbGiz.AppendLine("\t{");
+                        strbGiz.AppendLine("\t\t" + "return " + (classnameGz + "_get_" + p.Name) + "(this);");
+                        strbGiz.AppendLine("\t}");
+                    }
 
-                    strbGiz.AppendLine("\t" + "void " + p.Name + "(" + gizTypename + " " + "newv" + ")");
-                    strbGiz.AppendLine("\t{");
-                    strbGiz.AppendLine("\t\t" + (classname + "_set_" + p.Name) + "(this, " + "newv" + ");");
-                    strbGiz.AppendLine("\t}");
+                    if(p.CanWrite)
+                    {
+                        strbGiz.AppendLine("\t" + "void " + p.Name + "(" + gizTypename + " " + "newv" + ")");
+                        strbGiz.AppendLine("\t{");
+                        strbGiz.AppendLine("\t\t" + (classnameGz + "_set_" + p.Name) + "(this, " + "newv" + ");");
+                        strbGiz.AppendLine("\t}");
+                    }
                 }
 
             }
@@ -314,7 +359,7 @@ namespace Gizbox
             foreach (var method in methods)
             {
                 List<string> paramList = new List<string>();
-                paramList.Add(classname);
+                paramList.Add(classnameGz);
                 paramList.AddRange(method.GetParameters().Select(p => ToGizType(p.ParameterType)));
 
                 string paramsStr = "";
@@ -349,11 +394,11 @@ namespace Gizbox
 
                 if (ToGizType(method.ReturnType) == "void")
                 {
-                    strbGiz.AppendLine("\t\t" + (classname + "_" + method.Name) + "(" + argsStr + ");");
+                    strbGiz.AppendLine("\t\t" + (classnameGz + "_" + method.Name) + "(" + argsStr + ");");
                 }
                 else
                 {
-                    strbGiz.AppendLine("\t\t" + "return " + (classname + "_" + method.Name) + "(" + argsStr + ");");
+                    strbGiz.AppendLine("\t\t" + "return " + (classnameGz + "_" + method.Name) + "(" + argsStr + ");");
                 }
 
                 strbGiz.AppendLine("\t}");
@@ -364,7 +409,7 @@ namespace Gizbox
             strbGiz.AppendLine("");
         }
 
-        public static string GizTypeDefaultValueStr(string gizType)
+        private static string GizTypeDefaultValueStr(string gizType)
         {
             switch (gizType)
             {
@@ -380,15 +425,15 @@ namespace Gizbox
         }
 
 
-        public bool IsInClosure(FieldInfo field)
+        private bool IsInClosure(FieldInfo field)
         {
             return closure.Contains(field.FieldType);
         }
-        public bool IsInClosure(PropertyInfo p)
+        private bool IsInClosure(PropertyInfo p)
         {
             return closure.Contains(p.PropertyType);
         }
-        public bool IsInClosure(MethodInfo method)
+        private bool IsInClosure(MethodInfo method)
         {
             foreach (var p in method.GetParameters())
             {
@@ -406,10 +451,26 @@ namespace Gizbox
         }
 
 
-
-        public static string ToGizType(Type t)
+        private static int GetInheritanceDepth(Type type)
         {
-            Console.WriteLine("类型封送：" + t);
+            int depth = 0;
+            while (type.BaseType != null)
+            {
+                depth++;
+                type = type.BaseType;
+            }
+            return depth;
+        }
+
+        public static bool IsMemberObsolete(MemberInfo member)
+        {
+            // 检查该字段是否有ObsoleteAttribute
+            ObsoleteAttribute obsoleteAttr = member.GetCustomAttribute<ObsoleteAttribute>();
+            return obsoleteAttr != null;
+        }
+
+        private static string ToGizType(Type t)
+        {
             switch (t.Name)
             {
                 case "Void": return "void";
@@ -424,7 +485,7 @@ namespace Gizbox
             }
         }
 
-        public static string ToCsType(Type t)
+        private static string ToCsType(Type t)
         {
             if (t == typeof(void))
             {

@@ -235,7 +235,7 @@ namespace Gizbox.LRParse
                         }
                     //报错  
                     case ACTION_TYPE.Error:
-                        throw new Exception(" 查询到ACTION_TYPE.Error！\n接收格子：[" + data.table.accState + "," + data.table.accSymbol + "]\n当前符号:" + currentToken.name + "\n当前状态:\n" + stack.Peek().state.set.ToExpression());
+                        throw new Exception(" 查询到ACTION_TYPE.Error！行数：" + remainingInput.Peek().line + "\n接收格子：[" + data.table.accState + "," + data.table.accSymbol + "]\n当前符号:" + currentToken.name + "\n当前状态:\n" + stack.Peek().state.set.ToExpression());
 
                 }
             }
@@ -1630,9 +1630,10 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.ClassDeclareNode classDeclNode:
                     {
                         //附加命名空间名称    
-                        if(isTopLevelAtNamespace)
+                        if(isGlobalOrTopNamespace)
                         {
-                            classDeclNode.classNameNode.SetPrefix(currentNamespace);
+                            if(isTopLevelAtNamespace)
+                                classDeclNode.classNameNode.SetPrefix(currentNamespace);
 
                             //新的作用域  
                             var newEnv = new SymbolTable(classDeclNode.classNameNode.FullName, SymbolTable.TableCatagory.ClassScope, envStack.Peek());
@@ -1648,7 +1649,7 @@ namespace Gizbox.SemanticRule
                         }
                         else
                         {
-                            throw new Exception("类定义只能全局定义或者嵌套在命名空间顶层！");
+                            throw new Exception("类定义只能全局定义或者嵌套在命名空间顶层！行数：" + classDeclNode.FirstToken().line);
                         }
                     }
                     break;
@@ -1869,9 +1870,15 @@ namespace Gizbox.SemanticRule
                         //ENV  
                         var newEnv = (SymbolTable)classDeclNode.attributes["env"];
 
+
+                        //补全继承基类的类名    
+                        if (classDeclNode.baseClassNameNode != null)
+                            TryCompleteIdenfier(classDeclNode.baseClassNameNode);
+
                         //新建虚函数表  
                         string classname = classDeclNode.classNameNode.FullName;
                         var vtable = ilUnit.vtables[classname] = new VTable(classname);
+                        Console.WriteLine("新的虚函数表：" + classname);
 
                         //进入类作用域  
                         envStack.Push(newEnv);
@@ -1898,6 +1905,7 @@ namespace Gizbox.SemanticRule
                                 }
                             }
                             //虚函数表克隆  
+                            if (this.ilUnit.vtables.ContainsKey(baseClassFullName) == false) throw new Exception("找不到基类：" + baseClassFullName);
                             this.ilUnit.vtables[baseClassFullName].CloneDataTo(vtable);
                         }
 
@@ -2187,6 +2195,7 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.CastNode castNode:
                     {
                         TryCompleteType(castNode.typeNode);
+                        Pass3_AnalysisNode(castNode.factorNode);
                         AnalyzeTypeExpression(castNode);
                     }
                     break;
@@ -2357,6 +2366,25 @@ namespace Gizbox.SemanticRule
 
 
         /// <summary>
+        /// 完善继承信息（虚函数表并入、符号表字段复制）  
+        /// </summary>
+        [System.Obsolete]
+        private void Pass4_InheritInfoComplete()
+        {
+            List<SymbolTable.Record> classListApp = new List<SymbolTable.Record>();
+            List<SymbolTable.Record> classListThisUnit = this.ilUnit.globalScope.env.GetByCategory(SymbolTable.RecordCatagory.Class);
+            classListApp.AddRange(classListThisUnit);
+            foreach(var dep in this.ilUnit.dependencies)
+            {
+                classListApp.AddRange(dep.globalScope.env.GetByCategory(SymbolTable.RecordCatagory.Class));
+            }
+            foreach(var klass in classListThisUnit)
+            {
+            }
+        }
+
+
+        /// <summary>
         /// 获取表达式的类型表达式  
         /// </summary>
         private string AnalyzeTypeExpression(SyntaxTree.ExprNode exprNode)
@@ -2479,7 +2507,7 @@ namespace Gizbox.SemanticRule
 
                             var idRec = Query(mangledName);
 
-                            if (idRec == null) throw new Exception("函数：" + funcId.FullName + "未找到！");
+                            if (idRec == null) throw new Exception("函数：" + mangledName + "未找到！");
 
                             string typeExpr = idRec.typeExpression.Split(' ').LastOrDefault();
 
@@ -2576,13 +2604,11 @@ namespace Gizbox.SemanticRule
 
         private SymbolTable.Record Query(string name)
         {
-            Log("Query:开始在本编译单元查找符号：" + name + "从作用域：" + envStack.Peek().name + "开始");
             var toList = envStack.ToList();
             for (int i = toList.Count - 1; i > -1; --i)
             {
                 if (toList[i].ContainRecordName(name))
                 {
-                    Log("在符号表:" + toList[i].name + "中成功找到：" + name);
                     return toList[i].GetRecord(name);
                 }
             }
@@ -2592,12 +2618,10 @@ namespace Gizbox.SemanticRule
                 var lib = (Gizbox.IL.ILUnit)importNode.attributes["lib"]; if (lib == null) throw new Exception("查找" + name + "时库为空！");
                 if(lib.globalScope.env.ContainRecordName(name))
                 {
-                    Log("Query:库中成功找到:" + name);
                     return lib.globalScope.env.GetRecord(name);
                 }
             }
 
-            Log("Query:库中也未找到:" + name);
             return null;
         }
 

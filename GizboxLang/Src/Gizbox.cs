@@ -592,7 +592,7 @@ namespace Gizbox
             }
             return false;
         }
-
+        
         public Terminal[] ToArray()
         {
             return terminals.ToArray();

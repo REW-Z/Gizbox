@@ -349,3 +349,4 @@ F:\Legacy\MyProjects\GizboxLang\GizboxLangTest\obj\Debug\GizboxLangTest.csproj.C
 F:\Legacy\MyProjects\GizboxLang\GizboxLangTest\obj\Debug\GizboxLangTest.csproj.CopyComplete
 F:\Legacy\MyProjects\GizboxLang\GizboxLangTest\obj\Debug\FanLangTest.exe
 F:\Legacy\MyProjects\GizboxLang\GizboxLangTest\obj\Debug\FanLangTest.pdb
+F:\Legacy\MyProjects\GizboxLang\GizboxLangTest\bin\Debug\test - 复制.txt

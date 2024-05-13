@@ -1,62 +1,98 @@
 ﻿import <"lib">
 
 using Console;
-using GizTest;
 
-namespace GizTest
+class GizboxLang::Examples::Vector3
 {
-	class Person
-	{
-		int age = 18;
-	
-		void Test()
-		{
-			Log("my true type is person");
-		}
-	}
-	
-	class Student : Person
-	{
-		int score = 99;
-
-		Person father = null;
-
-		Person mother = null;
-		
-		void Test()
-		{
-			Log("my true type is student");
-		}
-	}
-
+	float x = 0.0f;
+	float y = 0.0f;
+	float z = 0.0f;
 }
 
-Log("----------------------------");
-
-Student stu = new Student();
-Person p = (Person)stu;
-p.Test();
-
-Log("----------------------------");
-
-stu.mother = new Person();
-stu.father = null;
-
-stu.mother.age = 50;
-Log("mother age" + (string)stu.mother.age);
-
-Log("----------------------------");
-
-Log("age  " + (string)stu.age);
-Log("score " + (string)stu.score);
-
-Log("----------------------------");
 
 
-string[] arrTest = new string[2];
-arrTest[0] = "Hello";
-arrTest[1] = "Gizbox";
-Log(arrTest[0] + arrTest[1]);
-delete arrTest;
+extern string GizboxLang::Examples::Person_get_name(GizboxLang::Examples::Person gizboxlang::examples::person);
+extern void GizboxLang::Examples::Person_set_name(GizboxLang::Examples::Person gizboxlang::examples::person, string newv);
+extern int GizboxLang::Examples::Person_get_age(GizboxLang::Examples::Person gizboxlang::examples::person);
+extern void GizboxLang::Examples::Person_set_age(GizboxLang::Examples::Person gizboxlang::examples::person, int newv);
+extern Vector3 GizboxLang::Examples::Person_get_Position(GizboxLang::Examples::Person gizboxlang::examples::person);
+extern void GizboxLang::Examples::Person_Say(GizboxLang::Examples::Person arg0, string arg1);
+class GizboxLang::Examples::Person
+{
+	string name()
+	{
+		return GizboxLang::Examples::Person_get_name(this);
+	}
+	void name(string newv)
+	{
+		GizboxLang::Examples::Person_set_name(this, newv);
+	}
+	int age()
+	{
+		return GizboxLang::Examples::Person_get_age(this);
+	}
+	void age(int newv)
+	{
+		GizboxLang::Examples::Person_set_age(this, newv);
+	}
+	Vector3 Position()
+	{
+		return GizboxLang::Examples::Person_get_Position(this);
+	}
+	void Say(string arg1)
+	{
+		GizboxLang::Examples::Person_Say(this, arg1);
+	}
+}
 
-Log("----------------------------");
+extern int GizboxLang::Examples::Student_get_score(GizboxLang::Examples::Student gizboxlang::examples::student);
+extern void GizboxLang::Examples::Student_set_score(GizboxLang::Examples::Student gizboxlang::examples::student, int newv);
+extern Person GizboxLang::Examples::Student_get_father(GizboxLang::Examples::Student gizboxlang::examples::student);
+extern void GizboxLang::Examples::Student_set_father(GizboxLang::Examples::Student gizboxlang::examples::student, Person newv);
+extern Person GizboxLang::Examples::Student_get_mother(GizboxLang::Examples::Student gizboxlang::examples::student);
+extern void GizboxLang::Examples::Student_set_mother(GizboxLang::Examples::Student gizboxlang::examples::student, Person newv);
+extern void GizboxLang::Examples::Student_Say(GizboxLang::Examples::Student arg0, string arg1);
+extern void GizboxLang::Examples::Student_SpeakTo(GizboxLang::Examples::Student arg0, Person arg1, string arg2);
+class GizboxLang::Examples::Student  :  GizboxLang::Examples::Person
+{
+	int score()
+	{
+		return GizboxLang::Examples::Student_get_score(this);
+	}
+	void score(int newv)
+	{
+		GizboxLang::Examples::Student_set_score(this, newv);
+	}
+	Person father()
+	{
+		return GizboxLang::Examples::Student_get_father(this);
+	}
+	void father(Person newv)
+	{
+		GizboxLang::Examples::Student_set_father(this, newv);
+	}
+	Person mother()
+	{
+		return GizboxLang::Examples::Student_get_mother(this);
+	}
+	void mother(Person newv)
+	{
+		GizboxLang::Examples::Student_set_mother(this, newv);
+	}
+	void Say(string arg1)
+	{
+		GizboxLang::Examples::Student_Say(this, arg1);
+	}
+	void SpeakTo(Person arg1, string arg2)
+	{
+		GizboxLang::Examples::Student_SpeakTo(this, arg1, arg2);
+	}
+}
+
+
+
+
+
+GizboxLang::Examples::Student stu = new GizboxLang::Examples::Student();
+stu.age = 18;
+Log((string)stu.age);

@@ -10,7 +10,9 @@ namespace Gizbox
         Void,
         Int,
         Float,
+        Double,
         Bool,
+        Char,
         String,
         GizObject,
         GizArray,
@@ -36,8 +38,21 @@ namespace Gizbox
         [FieldOffset(4)]
         public float AsFloat;
 
-        [FieldOffset(4 + 16)]
-        public object AsObject;
+        [FieldOffset(4)]
+        public double AsDouble;
+
+        [FieldOffset(4)]
+        public float AsChar;
+
+        [FieldOffset(4)]
+        public long AsPtr;
+
+
+        public object AsObject
+        {
+            get { return null; }
+        }
+
 
 
         // ---------- INTERFACE --------------
@@ -58,44 +73,33 @@ namespace Gizbox
         {
             return new Value() { type = GizType.Float, AsFloat = v };
         }
+        public static implicit operator Value(double v)
+        {
+            return new Value() { type = GizType.Double, AsDouble = v };
+        }
         public static implicit operator Value(bool v)
         {
             return new Value() { type = GizType.Bool, AsBool = v };
         }
-        public static implicit operator Value(string str)
+        public static implicit operator Value(char v)
         {
-            if (str != null)
-            {
-                return new Value() { type = GizType.String, AsObject = str };
-            }
-            else
-            {
-                return Void;
-            }
-        }
-        public static implicit operator Value(GizObject obj)
-        {
-            if (obj != null)
-            {
-                return new Value() { type = GizType.GizObject, AsObject = obj };
-            }
-            else
-            {
-                return Void;
-            }
+            return new Value() { type = GizType.Char, AsChar = v };
         }
 
 
-        public static Value FromArray(Value[] array)
+        public static Value FromStringPtr(long ptr)
         {
-            if(array != null)
-            {
-                return new Value() { type = GizType.GizArray, AsObject = array };
-            }
-            else
-            {
-                return Void;
-            }
+            return new Value() { type = GizType.String, AsPtr = ptr };
+        }
+
+        public static Value FromGizObjectPtr(long ptr)
+        {
+            return new Value() { type = GizType.GizObject, AsPtr = ptr };
+        }
+
+        public static Value FromArrayPtr(long arrayPtr)
+        {
+            return new Value() { type = GizType.GizArray, AsPtr = arrayPtr };
         }
 
 
@@ -108,7 +112,7 @@ namespace Gizbox
                 case GizType.Bool: throw new Exception("运算类型错误!");
                 case GizType.Int: return v1.AsInt + v2.AsInt;
                 case GizType.Float: return v1.AsFloat + v2.AsFloat;
-                case GizType.String: return (string)v1.AsObject + (string)v2.AsObject;
+                //case GizType.String: return (string)v1.AsObject + (string)v2.AsObject;
                 default: throw new Exception("运算类型错误!");
             }
         }
@@ -218,42 +222,7 @@ namespace Gizbox
             }
         }
 
-        // ---------- BOX --------------
-        public object Box()
-        {
-            switch (this.type)
-            {
-                case GizType.Void:
-                    return null;
-                case GizType.Int:
-                    return AsInt;
-                case GizType.Float:
-                    return AsFloat;
-                case GizType.Bool:
-                    return AsBool;
-                case GizType.String:
-                    return AsObject;
-                default:
-                    return null;
-            }
-        }
-        public static Value UnBox(object obj)
-        {
-            switch (obj)
-            {
-                case int i: return (int)obj;
-                case bool b: return (bool)obj;
-                case float f: return (float)obj;
-                case string s: return (string)obj;
-                case GizObject s: return (GizObject)obj;
-                default:
-                    {
-                        if (obj == null) return Value.Void;
-                        else throw new Exception();
-                    }
-                    break;
-            }
-        }
+
 
         // ----------TO STRING ----------
         public override string ToString()

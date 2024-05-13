@@ -1,64 +1,62 @@
-﻿void Foo()
+﻿import <"lib">
+
+using Console;
+using GizTest;
+
+namespace GizTest
 {
-    int tmp = 0;
+	class Person
+	{
+		int age = 18;
+	
+		void Test()
+		{
+			Log("my true type is person");
+		}
+	}
+	
+	class Student : Person
+	{
+		int score = 99;
+
+		Person father = null;
+
+		Person mother = null;
+		
+		void Test()
+		{
+			Log("my true type is student");
+		}
+	}
+
 }
 
-float Add(float x, float y)
-{
-    return x + y;
-}
-  
-bool IsPositive(float x)
-{
-    return true;
-}
-                    
-class Student
-{
-    string name = "ZZZ";
-    int age = 18;
-    void ChangeName(string newName)
-    {
-        this.name = newName;
-    }
-    void Speak(string txt)
-    {
-    }
-}
+Log("----------------------------");
 
-int a = 233 ;
-int b = (a + 111) * 222;
-float c = 123.0f;                  
-string d = "AAA";
-float e = Add(1.0f, 2.0f);
+Student stu = new Student();
+Person p = (Person)stu;
+p.Test();
 
-Student stu = new Student( );
+Log("----------------------------");
 
-bool isPositive = IsPositive(e);
+stu.mother = new Person();
+stu.father = null;
 
-if(isPositive)
-{
-    Foo();
-}
-else if(true)
-{
-    a = a + 1;
-}
-else
-{
-    b = b + 1;
-}
+stu.mother.age = 50;
+Log("mother age" + (string)stu.mother.age);
+
+Log("----------------------------");
+
+Log("age  " + (string)stu.age);
+Log("score " + (string)stu.score);
+
+Log("----------------------------");
 
 
-while(c < 999.0f)
-{
-    c = c + 1.0f;
-}
-for(int i = 0; i < 99; ++i)
-{
-    a *= 2;
-}
+string[] arrTest = new string[2];
+arrTest[0] = "Hello";
+arrTest[1] = "Gizbox";
+Log(arrTest[0] + arrTest[1]);
+delete arrTest;
 
-int fff = (float) a;
-
-b.aaa();
+Log("----------------------------");

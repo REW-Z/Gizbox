@@ -34,7 +34,7 @@ namespace Gizbox.Interop.CSharp
         private Dictionary<int, ObjectBinding> idToBind = new Dictionary<int, ObjectBinding>();
         private Dictionary<object, ObjectBinding> objToBind = new Dictionary<object, ObjectBinding>();
 
-        //类型缓存    
+        //类型缓存（从Giz类名到C#的类型）    
         private Dictionary<string, Type> typeCache = new Dictionary<string, Type>();
 
         //ctor  
@@ -73,27 +73,28 @@ namespace Gizbox.Interop.CSharp
         }
 
         //查询类型  
-        public Type FindType(string typename)
+        public Type FindType(string gzTypeName)
         {
-            if (typeCache.ContainsKey(typename))
+            if (typeCache.ContainsKey(gzTypeName))
             {
-                return typeCache[typename];
+                return typeCache[gzTypeName];
             }
             else
             {
+                string csTypeName = gzTypeName.Replace("::", ".");
                 foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
                 {
                     foreach (var t in asm.GetTypes())
                     {
-                        if (t.Name == typename)
+                        if (t.FullName == csTypeName)
                         {
-                            typeCache[typename] = t;
+                            typeCache[gzTypeName] = t;
                             return t;
                         }
                     }
                 }
 
-                throw new Exception("没有在所有Assembly中找到类：" + typename);
+                throw new Exception("没有在所有Assembly中找到类：" + csTypeName);
             }
         }
 
@@ -162,7 +163,7 @@ namespace Gizbox.Interop.CSharp
             }
             else
             {
-                return gzVal.Box();
+                return engine.Box(gzVal);
             }
         }
 
@@ -175,7 +176,7 @@ namespace Gizbox.Interop.CSharp
                 case int i:
                 case float f:
                 case bool b:
-                    return Value.UnBox(csVal);
+                    return engine.UnBox(csVal);
                 default: break;
             }
 
@@ -195,7 +196,8 @@ namespace Gizbox.Interop.CSharp
                     gzarr[i] = Marshal2Giz(csArr.GetValue(i));
                 }
 
-                return Value.FromArray(gzarr);
+                //return Value.FromArray(gzarr); //TODO: FromArray  
+                return Value.Void;
             }
             else
             {
@@ -204,13 +206,15 @@ namespace Gizbox.Interop.CSharp
                 {
                     if (objToBind.ContainsKey(csVal))
                     {
-                        return objToBind[csVal].gizObj;
+                        //return objToBind[csVal].gizObj; //TODO: ???
+                        return Value.Void;
                     }
                     else
                     {
                         var newgizobj = new GizObject(cstype.Name, engine);
                         NewBinding(newgizobj, csVal);
-                        return newgizobj;
+                        //return newgizobj; //TODO: ???????
+                        return Value.Void;
                     }
                 }
                 //值类型  
@@ -222,7 +226,8 @@ namespace Gizbox.Interop.CSharp
                     {
                         newgizobj.fields[field.Name] = Marshal2Giz(field.GetValue(csVal));   
                     }
-                    return newgizobj;
+                    //return newgizobj; //TODO: ????????????
+                    return Value.Void;
                 }
             }
 
@@ -260,4 +265,5 @@ namespace Gizbox.Interop.CSharp
             return obj.GetType().GetField(fieldName).GetValue(obj);
         }
     }
+
 }

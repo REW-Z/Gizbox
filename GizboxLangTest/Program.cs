@@ -18,14 +18,15 @@ namespace GizboxLangTest
         {
             ////生成互操作Wrap代码      
             //InteropWrapGenerator generator = new InteropWrapGenerator();
-            //generator.GetClosure(new Type[] { typeof(Gizbox.GizObject), typeof(Gizbox.Vector3) } );
-            //foreach(var t in generator.closure)
+            //generator.GetClosure(new Type[] { typeof(GizboxLang.Examples.Student) });
+            //foreach (var t in generator.closure)
             //{
             //    Console.WriteLine(t.Name);
             //}
             //generator.GenerateFile("AAA");
             //Console.ReadLine();
             //return;
+
 
             ////生成分析器硬编码  
             //Gizbox.Compiler compilerTest = new Compiler();
@@ -49,6 +50,7 @@ namespace GizboxLangTest
 
             //Interpret  
             ScriptEngine engine = new ScriptEngine();
+            engine.csharpInteropContext.ConfigExternCallClasses(typeof(GizboxLang.Examples.ExampleInterop));
             engine.Execute(il);
 
             Compiler.Pause("Execute End");
