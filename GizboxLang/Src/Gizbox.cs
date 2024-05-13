@@ -85,6 +85,7 @@ namespace Gizbox
     /// <summary>
     /// 符号表  
     /// </summary>
+    [Serializable]
     public class SymbolTable
     {
         public enum RecordCatagory
@@ -103,6 +104,7 @@ namespace Gizbox
             LoopScope,
             FuncScope,
         }
+        [Serializable]
         public class Record
         {
             public string name;
@@ -218,7 +220,7 @@ namespace Gizbox
         //新的条目  
         public Record NewRecord(string synbolName, RecordCatagory catagory, string typeExpr, SymbolTable envPtr = null)
         {
-            int variableAddr = 99999;//TODO:地址存放  
+            int variableAddr = 99999;
             var newRec = new Record() {
                 name = synbolName, 
                 rawname = synbolName,
@@ -285,8 +287,10 @@ namespace Gizbox
     /// <summary>
     /// 虚函数表  
     /// </summary>
+    [Serializable]
     public class VTable
     {
+        [Serializable]
         public class Record
         {
             public string funcName;
@@ -321,23 +325,6 @@ namespace Gizbox
             }
         }
     }
-
-
-
-    /// <summary>
-    /// 常量池  
-    /// </summary>
-    public class ConstantValueTable
-    {
-        public List<string> table = new List<string>();
-
-        public int AddConstantValue(string val)
-        {
-            table.Add(val);
-            return table.Count - 1;
-        }
-    }
-
 
 
 
@@ -611,8 +598,8 @@ namespace Gizbox
         //Settings  
         public static bool enableLogScanner = false;
         public static bool enableLogParser = false;
-        public static bool enableLogSemanticAnalyzer = false;
-        public static bool enableLogILGenerator = false;
+        public static bool enableLogSemanticAnalyzer = true;
+        public static bool enableLogILGenerator = true;
         public static bool enableLogScriptEngine = false;
 
         //parser data  
@@ -701,6 +688,7 @@ namespace Gizbox
             //编译器中查找  
             if (this.libs.ContainsKey(libname))
             {
+                Console.WriteLine("导入已加载的库：" + libname);
                 return this.libs[libname];
             }
             //路径查找  
@@ -713,13 +701,18 @@ namespace Gizbox
                     {
                         if (System.IO.Path.GetFileNameWithoutExtension(f.Name) == libname)
                         {
-                            if(System.IO.Path.GetExtension(f.Name).EndsWith("gzblib"))
+                            if(System.IO.Path.GetExtension(f.Name).EndsWith("gixlib"))
                             {
-                                throw new Exception("库反序列未实现！");
+                                var unit = Gizbox.IL.ILSerializer.DeserializeDirectly(f.FullName);
+                                Console.WriteLine("导入库文件：" + f.Name);
+                                return unit;
                             }
                             else
                             {
-                                return this.Compile(System.IO.File.ReadAllText(f.FullName));
+                                var unit = this.Compile(System.IO.File.ReadAllText(f.FullName));
+                                unit.name = libname;
+                                Console.WriteLine("导入源文件引用：" + f.Name);
+                                return unit;
                             }
                         }
                     }

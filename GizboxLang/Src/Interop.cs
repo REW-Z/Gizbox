@@ -118,7 +118,7 @@ namespace Gizbox.Interop.CSharp
         {
             if (gzVal.Type == GizType.GizObject)
             {
-                var gizobj = ((GizObject)gzVal.AsObject);
+                var gizobj =  ((GizObject)engine.DeReference(gzVal.AsPtr));
 
                 //CS引用类型  
                 var cstype = FindType(gizobj.truetype);
@@ -153,7 +153,7 @@ namespace Gizbox.Interop.CSharp
             }
             else if (gzVal.Type == GizType.GizArray)
             {
-                Value[] gzarr = (gzVal.AsObject) as Value[];
+                Value[] gzarr = engine.DeReference(gzVal.AsPtr) as Value[];
                 object[] csArr = new object[gzarr.Length]; 
                 for (int i = 0; i < gzarr.Length; ++i)
                 {
@@ -163,7 +163,7 @@ namespace Gizbox.Interop.CSharp
             }
             else
             {
-                return engine.Box(gzVal);
+                return engine.BoxGizValue2CsObject(gzVal);
             }
         }
 
@@ -176,7 +176,7 @@ namespace Gizbox.Interop.CSharp
                 case int i:
                 case float f:
                 case bool b:
-                    return engine.UnBox(csVal);
+                    return engine.UnBoxCsObject2GizValue(csVal);
                 default: break;
             }
 

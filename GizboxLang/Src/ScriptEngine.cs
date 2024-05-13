@@ -9,12 +9,6 @@ using Gizbox.IL;
 
 namespace Gizbox.ScriptEngine
 {
-    //全局内存区  
-    public class GlobalMemory
-    {
-        public Dictionary<string, Value> data = new Dictionary<string, Value>();
-    }
-
     //堆区  
     public class Heap
     {
@@ -30,16 +24,25 @@ namespace Gizbox.ScriptEngine
         {
             return data[(int)addr];
         }
+
+        public void Print()
+        {
+            Console.WriteLine("堆区(" + this.data.Count + ")");
+            for (int i = 0; i < this.data.Count; ++i)
+            {
+                Console.WriteLine("(" + i + ")" + this.data[i]);
+            }
+        }
     }
+
 
     //虚拟栈帧（活动记录）  
     public class Frame
     {
         public Gizbox.GStack<Value> args = new Gizbox.GStack<Value>();//由Caller压栈(从后往前)  
-        public Tuple<int,int> returnPtr;//返回地址  
+        public Tuple<int, int> returnPtr;//返回地址  
         public Dictionary<string, Value> localVariables = new Dictionary<string, Value>();//局部变量和临时变量  
     }
-
     //调用堆栈  
     public class CallStack
     {
@@ -88,10 +91,6 @@ namespace Gizbox.ScriptEngine
         //C#互操作上下文  
         public Gizbox.Interop.CSharp.InteropContext csharpInteropContext;
 
-
-        //全局内存  
-        private GlobalMemory globalMemory = new GlobalMemory();
-
         //堆区  
         private Heap heap = new Heap();
 
@@ -101,6 +100,9 @@ namespace Gizbox.ScriptEngine
         //返回值寄存器（虚拟）(实际在x86架构通常为EAX寄存器 x86-64架构通常为RAX寄存器)
         private Value retRegister = Value.Void;
 
+
+        //计算工具  
+        private Calculator caculator;
 
         //临时数据  
         private int currUnit = -1;
@@ -122,6 +124,7 @@ namespace Gizbox.ScriptEngine
 
         public ScriptEngine()
         {
+            caculator = new Calculator(this);
             csharpInteropContext = new Interop.CSharp.InteropContext(this);
         }
 
@@ -370,11 +373,11 @@ namespace Gizbox.ScriptEngine
                         if (this.callStack[this.callStack.Top + 1].args.Count == 0) throw new Exception("成员方法调用没有this参数！");
                         var arg_this = this.callStack[this.callStack.Top + 1].args.Peek();
                         if (arg_this.Type != GizType.GizObject) throw new Exception("成员方法调用没有this参数！(第一个参数不是this参数)");
-                        string trueType = (arg_this.AsObject as GizObject).truetype;
+                        string trueType = (this.DeReference(arg_this.AsPtr)as GizObject).truetype;
 
 
                         //新方法：虚函数表vtable    
-                        var vrec = (arg_this.AsObject as GizObject).vtable.Query(funcMangledName);
+                        var vrec = (this.DeReference(arg_this.AsPtr) as GizObject).vtable.Query(funcMangledName);
                         string funcFinalName = vrec.funcfullname;
 
 
@@ -397,60 +400,60 @@ namespace Gizbox.ScriptEngine
                     {
                         if (tac.arg3 != null) throw new Exception("赋值语句只有包含两个地址！");
 
-                        SetValue(tac.arg1, Calculator.CalBinary("+", GetValue(tac.arg1), GetValue(tac.arg2)));
+                        SetValue(tac.arg1, caculator.CalBinary("+", GetValue(tac.arg1), GetValue(tac.arg2)));
                     }
                     break;
                 case "-=":
                     {
                         if (tac.arg3 != null) throw new Exception("赋值语句只有包含两个地址！");
 
-                        SetValue(tac.arg1, Calculator.CalBinary("-", GetValue(tac.arg1), GetValue(tac.arg2)));
+                        SetValue(tac.arg1, caculator.CalBinary("-", GetValue(tac.arg1), GetValue(tac.arg2)));
                     }
                     break;
                 case "*=":
                     {
                         if (tac.arg3 != null) throw new Exception("赋值语句只有包含两个地址！");
 
-                        SetValue(tac.arg1, Calculator.CalBinary("*", GetValue(tac.arg1), GetValue(tac.arg2)));
+                        SetValue(tac.arg1, caculator.CalBinary("*", GetValue(tac.arg1), GetValue(tac.arg2)));
                     }
                     break;
                 case "/=":
                     {
                         if (tac.arg3 != null) throw new Exception("赋值语句只有包含两个地址！");
 
-                        SetValue(tac.arg1, Calculator.CalBinary("/", GetValue(tac.arg1), GetValue(tac.arg2)));
+                        SetValue(tac.arg1, caculator.CalBinary("/", GetValue(tac.arg1), GetValue(tac.arg2)));
                     }
                     break;
                 case "%=":
                     {
                         if (tac.arg3 != null) throw new Exception("赋值语句只有包含两个地址！");
 
-                        SetValue(tac.arg1, Calculator.CalBinary("%", GetValue(tac.arg1), GetValue(tac.arg2)));
+                        SetValue(tac.arg1, caculator.CalBinary("%", GetValue(tac.arg1), GetValue(tac.arg2)));
                     }
                     break;
                 case "+":
                     {
-                        SetValue(tac.arg1, Calculator.CalBinary("+", GetValue(tac.arg2), GetValue(tac.arg3)));
+                        SetValue(tac.arg1, caculator.CalBinary("+", GetValue(tac.arg2), GetValue(tac.arg3)));
                     }
                     break;
                 case "-":
                     {
-                        SetValue(tac.arg1, Calculator.CalBinary("-", GetValue(tac.arg2), GetValue(tac.arg3)));
+                        SetValue(tac.arg1, caculator.CalBinary("-", GetValue(tac.arg2), GetValue(tac.arg3)));
                     }
                     break;
                 case "*":
                     {
-                        SetValue(tac.arg1, Calculator.CalBinary("*", GetValue(tac.arg2), GetValue(tac.arg3)));
+                        SetValue(tac.arg1, caculator.CalBinary("*", GetValue(tac.arg2), GetValue(tac.arg3)));
                     }
                     break;
                 case "/":
                     {
-                        SetValue(tac.arg1, Calculator.CalBinary("/", GetValue(tac.arg2), GetValue(tac.arg3)));
+                        SetValue(tac.arg1, caculator.CalBinary("/", GetValue(tac.arg2), GetValue(tac.arg3)));
                     }
                     break;
                 case "%":
                     {
-                        SetValue(tac.arg1, Calculator.CalBinary("%", GetValue(tac.arg2), GetValue(tac.arg3)));
+                        SetValue(tac.arg1, caculator.CalBinary("%", GetValue(tac.arg2), GetValue(tac.arg3)));
                     }
                     break;
                 case "ALLOC":
@@ -458,7 +461,7 @@ namespace Gizbox.ScriptEngine
                         string className = tac.arg2;
                         SymbolTable tableFound; 
                         var rec = Query(className, out tableFound);
-                        GizObject newfanObj = new GizObject(className, rec.envPtr, mainUnit.vtables[className]);
+                        GizObject newfanObj = new GizObject(className, rec.envPtr, mainUnit.QueryVTable(className));
                         var ptr = heap.Alloc(newfanObj);
                         SetValue(tac.arg1, Value.FromGizObjectPtr(ptr));
                     }
@@ -493,32 +496,32 @@ namespace Gizbox.ScriptEngine
                     }
                 case "<":
                     {
-                        SetValue(tac.arg1, Calculator.CalBinary("<", GetValue(tac.arg2), GetValue(tac.arg3)));
+                        SetValue(tac.arg1, caculator.CalBinary("<", GetValue(tac.arg2), GetValue(tac.arg3)));
                     }
                     break;
                 case "<=":
                     {
-                        SetValue(tac.arg1, Calculator.CalBinary("<=", GetValue(tac.arg2), GetValue(tac.arg3)));
+                        SetValue(tac.arg1, caculator.CalBinary("<=", GetValue(tac.arg2), GetValue(tac.arg3)));
                     }
                     break;
                 case ">":
                     {
-                        SetValue(tac.arg1, Calculator.CalBinary(">", GetValue(tac.arg2), GetValue(tac.arg3)));
+                        SetValue(tac.arg1, caculator.CalBinary(">", GetValue(tac.arg2), GetValue(tac.arg3)));
                     }
                     break;
                 case ">=":
                     {
-                        SetValue(tac.arg1, Calculator.CalBinary(">=", GetValue(tac.arg2), GetValue(tac.arg3)));
+                        SetValue(tac.arg1, caculator.CalBinary(">=", GetValue(tac.arg2), GetValue(tac.arg3)));
                     }
                     break;
                 case "==":
                     {
-                        SetValue(tac.arg1, Calculator.CalBinary("==", GetValue(tac.arg2), GetValue(tac.arg3)));
+                        SetValue(tac.arg1, caculator.CalBinary("==", GetValue(tac.arg2), GetValue(tac.arg3)));
                     }
                     break;
                 case "!=":
                     {
-                        SetValue(tac.arg1, Calculator.CalBinary("!=", GetValue(tac.arg2), GetValue(tac.arg3)));
+                        SetValue(tac.arg1, caculator.CalBinary("!=", GetValue(tac.arg2), GetValue(tac.arg3)));
                     }
                     break;
                 case "++":
@@ -533,7 +536,7 @@ namespace Gizbox.ScriptEngine
                     break;
                 case "CAST":
                     {
-                        SetValue(tac.arg1, Calculator.Cast(tac.arg2, GetValue(tac.arg3), this));
+                        SetValue(tac.arg1, caculator.Cast(tac.arg2, GetValue(tac.arg3), this));
                     }
                     break;
             }
@@ -558,7 +561,7 @@ namespace Gizbox.ScriptEngine
             Access(str, write: true, value: v);
         }
 
-        public Value UnBox(object o)
+        public Value UnBoxCsObject2GizValue(object o)
         {
             switch(o)
             {
@@ -569,17 +572,26 @@ namespace Gizbox.ScriptEngine
                 case Char c: return c;
                 default:
                     {
-                        //if (o is String)
-                        //    return Value.FromStringPtr();
-                        //else if (o is GizObject)
-                        //    return Value.FromGizObjectPtr();
-                        //else if (o is System.Array)
-                        //    return Value.FromArrayPtr();
-                        return Value.Void; //TODO: Box和UnBox
+                        if(o is String)
+                        {
+                            long ptr = heap.Alloc(o);
+                            return Value.FromStringPtr(ptr);
+                        }
+                        else if(o is System.Array)
+                        {
+                            long ptr = heap.Alloc(o);
+                            return Value.FromArrayPtr(ptr);
+                        }
+                        else if(o is GizObject)
+                        {
+                            long ptr = heap.Alloc(o);
+                            return Value.FromGizObjectPtr(ptr);
+                        }
+                        return Value.Void; 
                     }
             }
         }
-        public object Box(Value v)
+        public object BoxGizValue2CsObject(Value v)
         {
             switch (v.Type)
             {
@@ -588,12 +600,43 @@ namespace Gizbox.ScriptEngine
                 case GizType.Float: return v.AsFloat;
                 case GizType.Double: return v.AsDouble;
                 case GizType.Char: return v.AsChar;
+
+                case GizType.String:
+                    {
+                        return this.DeReference(v.AsPtr);
+                    }
                 default:
                     {
-                        return null;
+                        return this.DeReference(v.AsPtr);
                     }
 
             }
+        }
+        public object DeReference(long ptr)
+        {
+            if (ptr >= 0)
+            {
+                return heap.data[(int)ptr];
+            }
+            else
+            {
+                var v = mainUnit.ReadConst((int)(-ptr));
+                if(v is char[])
+                {
+                    return new string((char[])v);
+                }
+                else
+                {
+                    return v;
+                }
+            }
+        }
+
+
+        public Value NewString(string str)
+        {
+            long ptr = this.heap.Alloc(str);
+            return Value.FromStringPtr(ptr);
         }
 
         private Value Access(string str, bool write, Value value = default)
@@ -617,22 +660,17 @@ namespace Gizbox.ScriptEngine
                 string expr = TrimName(str);
                 return AccessExprRecursive(expr, write, value);
             }
-            //常量(只读)  
+            //字面量  
             else if(str.StartsWith("LIT") && str.Contains(':') && write == false)
             {
-                int splitIndex = str.IndexOf(':');
-                string baseType = str.Substring(0, splitIndex);
-                string lex = str.Substring(splitIndex + 1);
-                switch (baseType)
-                {
-                    case "LITNULL": return Value.Void;
-                    case "LITBOOL": return bool.Parse(lex);
-                    case "LITINT": return int.Parse(lex);
-                    case "LITFLOAT": return float.Parse(lex.Substring(0, lex.Length - 1));//去除F标记  
-                    case "LITDOUBLE": return double.Parse(lex.Substring(0, lex.Length - 1));//去除F标记  
-                    case "LITCHAR": return lex[1];
-                    case "LITSTRING": return Value.Void;//TODO: 读取字符串字面量  
-                }
+                return AccessLiteral(str);
+
+                throw new Exception("未知的参数：" + str);
+            }
+            //常量(只读)  
+            else if (str.StartsWith("CONST") && str.Contains(':') && write == false)
+            {
+                return AccessConst(str);
 
                 throw new Exception("未知的参数：" + str);
             }
@@ -643,6 +681,7 @@ namespace Gizbox.ScriptEngine
         private Value AccessExprRecursive(string expr, bool write, Value value = default)
         {
             bool isLiterial = false;
+            bool isConst = false;
             bool isMemberAccess = false;
             bool isElementAccess = false;
             if(expr[expr.Length - 1] == ']')
@@ -655,7 +694,10 @@ namespace Gizbox.ScriptEngine
             }
             else if(expr.Contains(':'))
             {
-                isLiterial = true;
+                if (expr.StartsWith("CONST"))
+                    isConst = true;
+                else if (expr.StartsWith("LIT"))
+                    isLiterial = true;
             }
 
             //字面量访问  
@@ -663,24 +705,25 @@ namespace Gizbox.ScriptEngine
             {
                 if(write)
                 {
+                    throw new Exception("不能对字面量赋值！");
+                }
+                else
+                {
+                    return AccessLiteral(expr);
+
+                }
+            }
+            //常量  
+            else if (isConst)
+            {
+                if (write)
+                {
                     throw new Exception("不能对常量赋值！");
                 }
                 else
                 {
-                    string baseType = expr.Split(':')[0];
-                    string lex = expr.Split(':')[1];
-                    switch (baseType)
-                    {
-                        case "LITNULL": return Value.Void;
-                        case "LITBOOL": return bool.Parse(lex);
-                        case "LITINT": return int.Parse(lex);
-                        case "LITFLOAT": return float.Parse(lex.Substring(0, lex.Length - 1));//去除F标记  
-                        case "LITDOUBLE": return double.Parse(lex.Substring(0, lex.Length - 1));//去除F标记  
-                        case "LITCHAR": return lex[1];
-                        case "LITSTRING": return Value.Void;//TODO: 读取字符串字面量  
-                    }
+                    return AccessConst(expr);
 
-                    throw new Exception("未知的参数：" + expr);
                 }
             }
             //普通变量访问  
@@ -704,13 +747,13 @@ namespace Gizbox.ScriptEngine
 
                 if (write)
                 {
-                    var arr = (Value[])(array.AsObject);
+                    var arr = (Value[])(this.DeReference(array.AsPtr));
                     arr[idx] = value;
                     return Value.Void;
                 }
                 else
                 {
-                    var arr = (Value[])(array.AsObject);
+                    var arr = (Value[])(this.DeReference(array.AsPtr));
                     return arr[idx];
                 }
             }
@@ -729,14 +772,14 @@ namespace Gizbox.ScriptEngine
 
                 if (write)
                 {
-                    (obj.AsObject as GizObject).fields[fieldName] = value;
-                    if (Compiler.enableLogScriptEngine) Log("对象" + variableExpr + "(InstanceID:" + (obj.AsObject as GizObject).instanceID + ")字段" + fieldName + "写入：" + value.ToString());
+                    (this.DeReference(obj.AsPtr) as GizObject).fields[fieldName] = value;
+                    if (Compiler.enableLogScriptEngine) Log("对象" + variableExpr + "(InstanceID:" + (this.DeReference(obj.AsPtr) as GizObject).instanceID + ")字段" + fieldName + "写入：" + value.ToString());
                     return Value.Void;
                 }
                 else
                 {
-                    if ((obj.AsObject as GizObject).fields.ContainsKey(fieldName) == false) throw new Exception("对象" + variableExpr + "字段未初始化" + fieldName);
-                    return (obj.AsObject as GizObject).fields[fieldName];
+                    if ((this.DeReference(obj.AsPtr) as GizObject).fields.ContainsKey(fieldName) == false) throw new Exception("对象" + variableExpr + "字段未初始化" + fieldName);
+                    return (this.DeReference(obj.AsPtr) as GizObject).fields[fieldName];
                 }
             }
             return Value.Void;
@@ -786,7 +829,7 @@ namespace Gizbox.ScriptEngine
                     else
                     {
                         if (currentFrame.localVariables.ContainsKey(name) == false)
-                            throw new Exception("局部变量 " + name + "还未初始化！");
+                            throw new Exception("局部变量 " + name + "还未初始化！");//TODO:判断用户是否成员变量没加this.  
 
                         return currentFrame.localVariables[name];
                     }
@@ -803,17 +846,17 @@ namespace Gizbox.ScriptEngine
 
                 if (write)
                 {
-                    globalMemory.data[name] = value;
+                    mainUnit.WriteGlobalVar(name, value);
 
                     if (Compiler.enableLogScriptEngine) Log("全局变量" + name + "写入：" + value.ToString());
                     return Value.Void;
                 }
                 else
                 {
-                    if (globalMemory.data.ContainsKey(name) == false)
+                    if (mainUnit.ReadGlobalVar(name).Type == GizType.Void)
                         throw new Exception("全局变量 " + name + " 还未初始化！");
 
-                    return globalMemory.data[name];
+                    return mainUnit.ReadGlobalVar(name);
                 }
             }
             else
@@ -822,6 +865,39 @@ namespace Gizbox.ScriptEngine
             }
         }
 
+        private Value AccessLiteral(string str)
+        {
+            int splitIndex = str.IndexOf(':');
+            string baseType = str.Substring(0, splitIndex);
+            string lex = str.Substring(splitIndex + 1);
+            switch (baseType)
+            {
+                case "LITNULL": return Value.Void;
+                case "LITBOOL": return bool.Parse(lex);
+                case "LITINT": return int.Parse(lex);
+                case "LITFLOAT": return float.Parse(lex.Substring(0, lex.Length - 1));//去除F标记  
+                case "LITDOUBLE": return double.Parse(lex.Substring(0, lex.Length - 1));//去除F标记  
+                case "LITCHAR": return lex[1];
+                //case "LITSTRING": return Value.Void;//字符串字面量已经移除  
+            }
+            throw new Exception("未知的字面量" + str + "！");
+        }
+        private Value AccessConst(string str)
+        {
+            int splitIndex = str.IndexOf(':');
+            string baseType = str.Substring(0, splitIndex);
+            string lex = str.Substring(splitIndex + 1);
+            switch (baseType)
+            {
+                case "CONSTSTRING":
+                    {
+                        //Console.WriteLine("字符串常量：" + lex);
+                        int ptr = int.Parse(lex);
+                        return Value.FromConstStringPtr(ptr);
+                    }
+            }
+            throw new Exception("未知的常量" + str + "！");
+        }
 
         private SymbolTable.Record Query(string symbolName, out SymbolTable tableFound)
         {
@@ -929,7 +1005,15 @@ namespace Gizbox.ScriptEngine
         private static string[] arithmeticOperators = new string[] { "+", "-", "*", "/", "%" };
         private static string[] comparisonOperators = new string[] { ">", "<", ">=", "<=", "==", "!=" };
 
-        public static Value CalNegtive(Value v)
+
+        private ScriptEngine engine;
+
+        public Calculator(ScriptEngine engineContext)
+        {
+            this.engine = engineContext;
+        }
+
+        public Value CalNegtive(Value v)
         {
             switch(v.Type)
             {
@@ -938,8 +1022,18 @@ namespace Gizbox.ScriptEngine
                 default: throw new Exception("错误类型");
             }
         }
-        public static Value CalBinary(string op, Value v1, Value v2)
+        public Value CalBinary(string op, Value v1, Value v2)
         {
+            //固有的操作符重载    
+            if(v1.Type == GizType.String && v2.Type == GizType.String)
+            {
+                string newstring = (string)engine.DeReference(v1.AsPtr) + (string)engine.DeReference(v2.AsPtr);
+                return engine.NewString(newstring);
+            }
+
+
+            //查询其他操作符重载......    
+
             switch (op)
             {
                 case "+": return v1 + v2;
@@ -959,35 +1053,131 @@ namespace Gizbox.ScriptEngine
             }
         }
 
-        public static Value Cast(string toType, Value val, ScriptEngine engine)
+        public Value Cast(string toType, Value val, ScriptEngine engine)
         {
-            switch (toType)
+            //强制转换重载查询.....
+
+
+            //转换为string  
+            if(toType == "string")
             {
-                case "bool":
-                    {
-                        if(val.Type == GizType.Bool)
-                        {
-                            return val.AsBool;
-                        }
-                        throw new Exception("错误的转换：" + val.Type + "  ->  " + toType);
-                    }
-                case "int": return System.Convert.ToInt32(engine.Box(val));
-                case "float": return System.Convert.ToSingle(engine.Box(val));
-                case "double": return System.Convert.ToDouble(engine.Box(val));
-                case "char": return System.Convert.ToChar(engine.Box(val));
-                default:
-                    {
-                        if(toType == "string")
-                        {
-                            return Value.Void;//TODO: 把ToString结果存储到堆中  
-                        }
-                        else
-                        {
-                            //里氏替换  
-                            return val;
-                        }
-                    }
+                return ToString(val);
             }
+
+
+            //其他转换  
+            switch(val.Type)
+            {
+                case GizType.Bool:
+                    {
+                        switch(toType)
+                        {
+                            case "bool": return val;
+                        }
+                    }
+                    break;
+                case GizType.Int:
+                    {
+                        switch (toType)
+                        {
+                            case "int": return val;
+                            case "float": return ((float)val.AsInt);
+                            case "double": return ((double)val.AsInt);
+                        }
+                    }
+                    break;
+                case GizType.Float:
+                    {
+                        switch (toType)
+                        {
+                            case "int": return ((int)val.AsFloat);
+                            case "float": return val;
+                            case "double": return ((double)val.AsFloat);
+                        }
+                    }
+                    break;
+                case GizType.Double:
+                    {
+                        switch (toType)
+                        {
+                            case "int": return ((int)val.AsDouble);
+                            case "float": return ((float)val.AsDouble);
+                            case "double": return val;
+                        }
+                    }
+                    break;
+                case GizType.String:
+                    {
+                        switch (toType)
+                        {
+                            case "string": return val;
+                        }
+                    }
+                    break;
+                case GizType.GizObject:
+                    {
+                        switch (toType)
+                        {
+                            case "void": throw new Exception("转换错误！");
+                            case "bool": throw new Exception("转换错误！");
+                            case "int": throw new Exception("转换错误！");
+                            case "float": throw new Exception("转换错误！");
+                            case "double": throw new Exception("转换错误！");
+                            case "char": throw new Exception("转换错误！");
+                            default:
+                                {
+                                    return val;//里氏替换
+                                }
+                        }
+                    }
+                    break;
+                case GizType.GizArray:
+                    {
+                        switch (toType)
+                        {
+                            case "void": throw new Exception("转换错误！");
+                            case "bool": throw new Exception("转换错误！");
+                            case "int": throw new Exception("转换错误！");
+                            case "float": throw new Exception("转换错误！");
+                            case "double": throw new Exception("转换错误！");
+                            case "char": throw new Exception("转换错误！");
+                            default:
+                                {
+                                    throw new Exception("数组转换为其他类型未实现！");
+                                }
+                        }
+                    }
+                    break;
+            }
+
+            return Value.Void;
+        }
+
+        public Value ToString(Value value)
+        {
+            string str = "";
+            switch(value.Type)
+            {
+                case GizType.String:
+                    {
+                        return value;
+                    }
+                    break;
+                case GizType.Void:
+                case GizType.Bool:
+                case GizType.Int:
+                case GizType.Float:
+                case GizType.Double:
+                case GizType.Char:
+                case GizType.GizObject:
+                case GizType.GizArray:
+                    {
+                        str = value.ToString();
+                    }
+                    break;
+            }
+
+            return engine.NewString(str);
         }
     }
 }

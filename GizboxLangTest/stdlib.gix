@@ -1,0 +1,41 @@
+﻿
+namespace Console
+{
+	extern void Log(string text);
+}
+
+namespace Collections
+{
+	class ListInt
+	{
+		int[] data = new int[10];
+		int opacity = 10;
+		int count = 0;
+
+		void Add(int v)
+		{
+			if(this.count >= this.opacity)
+			{
+				this.Resize();
+			}
+
+			this.data[this.count] = v;
+			this.count += 1;
+		}
+		int Get(int idx)
+		{
+			return this.data[idx];
+		}
+
+		void Resize()
+		{
+			int[] newdata = new int[this.opacity * 2];
+			for(int i = 0; i < this.opacity; ++i)
+			{
+				newdata[i] = this.data[i];
+			}
+			this.data = newdata;
+			this.opacity *= 2;
+		}
+	}
+}

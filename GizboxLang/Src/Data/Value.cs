@@ -23,6 +23,7 @@ namespace Gizbox
 
     //Giz值类型    
     [StructLayout(LayoutKind.Explicit)]
+    [Serializable]
     public struct Value
     {
         // ---------- DATA --------------
@@ -47,11 +48,6 @@ namespace Gizbox
         [FieldOffset(4)]
         public long AsPtr;
 
-
-        public object AsObject
-        {
-            get { return null; }
-        }
 
 
 
@@ -87,6 +83,10 @@ namespace Gizbox
         }
 
 
+        public static Value FromConstStringPtr(int constDataPtr)
+        {
+            return new Value() { type = GizType.String, AsPtr = -constDataPtr };
+        }
         public static Value FromStringPtr(long ptr)
         {
             return new Value() { type = GizType.String, AsPtr = ptr };
@@ -205,7 +205,6 @@ namespace Gizbox
                 case GizType.Bool: return v1.AsBool == v2.AsBool;
                 case GizType.Int: return v1.AsInt == v2.AsInt;
                 case GizType.Float: return v1.AsFloat == v2.AsFloat;
-                case GizType.String: return (string)v1.AsObject == (string)v2.AsObject;
                 default: throw new Exception("运算类型错误!");
             }
         }
@@ -217,7 +216,6 @@ namespace Gizbox
                 case GizType.Bool: return v1.AsBool != v2.AsBool;
                 case GizType.Int: return v1.AsInt != v2.AsInt;
                 case GizType.Float: return v1.AsFloat != v2.AsFloat;
-                case GizType.String: return (string)v1.AsObject != (string)v2.AsObject;
                 default: throw new Exception("运算类型错误!");
             }
         }
@@ -229,22 +227,25 @@ namespace Gizbox
         {
             switch (this.type)
             {
-                case GizType.Void: return "Void";
+                case GizType.Void: return "";
                 case GizType.Bool: return AsBool.ToString();
                 case GizType.Int: return AsInt.ToString();
                 case GizType.Float: return AsFloat.ToString();
-                case GizType.String: return (string)AsObject;
-                case GizType.GizObject: return ((GizObject)AsObject).ToString();
+                case GizType.String:
+                    {
+                        return "GizType-String";
+                    }
+                case GizType.GizArray:
+                    {
+                        return "GizType-Array";
+                    }
+                case GizType.GizObject:
+                    {
+                        return "GizType-Object";
+                    }
                 default:
                     {
-                        if (AsObject != null)
-                        {
-                            return "(Unknown Object)";
-                        }
-                        else
-                        {
-                            return "(Null Object)";
-                        }
+                        return "???";
                     };
             }
         }

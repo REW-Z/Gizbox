@@ -1,4 +1,4 @@
-﻿import <"lib">
+﻿import <"stdlib">
 
 using Console;
 using GizTest;

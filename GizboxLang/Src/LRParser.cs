@@ -1172,7 +1172,7 @@ namespace Gizbox.SemanticRule
                 {
                     isMemberAccessContainer = true,
                     containerNode = (SyntaxTree.ObjectMemberAccessNode)psr.stack[psr.stack.Top - 3].attributes["ast_node"],
-                    indexNode = ((SyntaxTree.IndexerNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"]).indexNode,
+                    indexNode = ((SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"]),
 
                     attributes = psr.newElement.attributes,
                 };
@@ -2162,6 +2162,12 @@ namespace Gizbox.SemanticRule
                     }
                     break;
 
+                // ********************* 其他节点检查 *********************************
+                case SyntaxTree.IndexerNode indexerNode:
+                    {
+                        Pass3_AnalysisNode(indexerNode.indexNode);
+                    }
+                    break;
 
 
                 // ********************* 表达式检查 *********************************
@@ -2324,6 +2330,14 @@ namespace Gizbox.SemanticRule
                                 }
                             }
                         }
+
+                        Console.WriteLine("分析：" + objMemberAccessNode.objectNode.FirstToken().ToString());
+                        Pass3_AnalysisNode(objMemberAccessNode.objectNode);
+                        Console.WriteLine("分析：" + objMemberAccessNode.memberNode.FirstToken().ToString());
+                        Pass3_AnalysisNode(objMemberAccessNode.memberNode);
+
+                        Console.WriteLine("分析：" + objMemberAccessNode.FirstToken().ToString());
+                        AnalyzeTypeExpression(objMemberAccessNode);
                     }
                     break;
                 case SyntaxTree.ThisNode thisObjNode:
@@ -2339,6 +2353,9 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.NewArrayNode newArrNode:
                     {
                         TryCompleteType(newArrNode.typeNode);
+
+                        Pass3_AnalysisNode(newArrNode.typeNode);
+                        Pass3_AnalysisNode(newArrNode.lengthNode);
                     }
                     break;
                 //其他节点     

@@ -6,6 +6,7 @@ using Gizbox;
 
 namespace Gizbox.IL
 {
+    [Serializable]
     public class TAC
     {
         public string label;
@@ -47,7 +48,7 @@ namespace Gizbox.IL
             return str;
         }
     }
-
+    [Serializable]
     public class Scope
     {
         public int lineFrom;
@@ -56,15 +57,15 @@ namespace Gizbox.IL
     }
 
 
+    [Serializable]
     public class ILUnit
     {
-        // *** 中间代码信息 ***  
+        //名称    
+        public string name;
         //依赖库
         public List<ILUnit> dependencies = new List<ILUnit>();
         //代码  
         public List<TAC> codes = new List<TAC>();
-        //标号 -> 行数 查询表  
-        private Dictionary<string, int> label2Line = new Dictionary<string, int>(); 
         //作用域状态数组  
         public int[] scopeStatusArr;
         //代码入口  
@@ -76,15 +77,31 @@ namespace Gizbox.IL
         //虚函数表  
         public Dictionary<string, VTable> vtables = new Dictionary<string, VTable>();
 
+        //标号 -> 行数 查询表  
+        private Dictionary<string, int> label2Line = new Dictionary<string, int>();
         //行数 -> 符号表链 查询表
         public Dictionary<int, Gizbox.GStack<SymbolTable>> stackDic;
 
+        //静态数据区 - 常量  
+        public List<object> constData = new List<object>() { null };
+
+        //静态数据区 - 全局变量（不序列化）（仅主编译单元的区域能够读写）    
+        public Dictionary<string, Value> globalData = new Dictionary<string, Value>();
+
+
+
+
+
+        //构造函数  
         public ILUnit()
         {
+            this.name = "unnamed";
+
             var globalSymbolTable = new SymbolTable("global", SymbolTable.TableCatagory.GlobalScope);
             this.globalScope = new Scope() { env = globalSymbolTable };
         }
 
+        //查询标号  
         public Tuple<int, int> QueryLabel(string label)
         {
             if (label2Line.ContainsKey(label) == true)
@@ -102,6 +119,42 @@ namespace Gizbox.IL
                 }
             }
             throw new Exception("本单元和库中找不到标签" + label);
+        }
+
+
+        //读取常量值    
+        public object ReadConst(int ptr)
+        {
+            object constval = constData[ptr];
+            return constval;
+            //switch(constval)
+            //{
+            //    case bool b: return b;
+            //    case int i: return i;
+            //    case float f: return f;
+            //    case double s: return s;
+            //    case char c: return c;
+            //    case char[] s: return Value.FromConstStringPtr(ptr);
+            //    default:
+            //        {
+            //            throw new Exception("常量区不能存储引用类型");
+            //            return Value.Void;
+            //        }
+            //}
+        }
+        //读取全局变量  
+        public Value ReadGlobalVar(string name)
+        {
+            if(this.globalData.ContainsKey(name))
+            {
+                return this.globalData[name];
+            }
+            return Value.Void;
+        }
+        //写入全局变量  
+        public void WriteGlobalVar(string name, Value val)
+        {
+            this.globalData[name] = val;
         }
 
         //添加依赖  
@@ -243,7 +296,24 @@ namespace Gizbox.IL
 
             return null;
         }
+        // 查询虚函数表  
+        public VTable QueryVTable(string className)
+        {
+            if (this.vtables.ContainsKey(className))
+            {
+                return this.vtables[className];
+            }
 
+            foreach (var dep in dependencies)
+            {
+                if (dep.vtables.ContainsKey(className))
+                {
+                    return dep.vtables[className];
+                }
+            }
+
+            return null;
+        }
 
         public void Print()
         {
@@ -705,9 +775,24 @@ namespace Gizbox.IL
                         string valStr;
 
                         if(literalNode.token.name != "null")
-                            valStr = literalNode.token.name + ":" + literalNode.token.attribute;
+                        {
+                            if(literalNode.token.name == "LITSTRING")
+                            {
+                                int ptr = this.ilUnit.constData.Count - 1 + 1;
+                                string lex = literalNode.token.attribute;
+                                this.ilUnit.constData.Add(lex.Substring(1, lex.Length - 2));
+
+                                valStr = "CONSTSTRING:" + ptr;
+                            }
+                            else
+                            {
+                                valStr = literalNode.token.name + ":" + literalNode.token.attribute;
+                            }
+                        }
                         else
+                        {
                             valStr = "LITNULL:";
+                        }
 
                         literalNode.attributes["ret"] = valStr;
                     }
@@ -736,7 +821,8 @@ namespace Gizbox.IL
                         GenNode(binaryOp.leftNode);
                         GenNode(binaryOp.rightNode);
 
-
+                        if (binaryOp.leftNode.attributes.ContainsKey("type") == false)
+                            throw new Exception("type未设置：" + binaryOp.leftNode.FirstToken().line + " :" + binaryOp.leftNode.FirstToken().ToString());
                         //表达式的返回变量  
                         binaryOp.attributes["ret"] = NewTemp((string)binaryOp.leftNode.attributes["type"]);
 

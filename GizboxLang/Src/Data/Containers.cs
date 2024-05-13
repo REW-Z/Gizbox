@@ -4,6 +4,7 @@ using System.Text;
 
 namespace Gizbox
 {
+    [Serializable]
     public class GStack<T>
     {
         private List<T> data = new List<T>();

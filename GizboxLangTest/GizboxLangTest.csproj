@@ -84,15 +84,15 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="example.txt">
+    <None Include="example.gix">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="lib.txt">
+    </None>
+    <None Include="stdlib.gix">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="test.txt">
+    </None>
+    <None Include="test.gix">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
+    </None>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

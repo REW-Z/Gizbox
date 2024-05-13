@@ -1,0 +1,29 @@
+﻿import <"stdlib">
+
+using Console;
+
+Collections::ListInt list = new Collections::ListInt();
+
+list.Add(233);
+list.Add(2333);
+list.Add(23333);
+
+Log("totalCount : " + (string)list.count);
+Log((string)(list.Get(0)));
+Log((string)(list.Get(1)));
+Log((string)(list.Get(2)));
+
+
+list.Add(0);
+list.Add(0);
+list.Add(0);
+list.Add(0);
+list.Add(0);
+list.Add(0);
+list.Add(0);
+list.Add(0);
+list.Add(0);
+list.Add(0);
+
+Log("newCount : " + (string)list.count);
+Log("newOpacity : " + (string)list.opacity);

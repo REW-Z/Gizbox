@@ -65,11 +65,12 @@ REW：偏底层中间代码应该使用地址偏移（成员和元素都是）
 
 （DONE）考虑用硬编码初始化语法分析器。  
 
-Value优化。（Mono上无法运行）（尝试Ptr替代AsObject）  
-	Box交给Engine做。    
-	检查运算符重载的步骤。（有个默认的重载：字符串加号连接）    
-	字符串字面量。    
+（DONE）Value优化。（Mono上无法运行）（尝试Ptr替代AsObject）  
+	（DONE）Box交给Engine做。    
+	（DONE）检查运算符重载的步骤。（有个默认的重载：字符串加号连接）    
+	（DONE）字符串字面量。    
 
-库编译为gzxlib格式。（序列化和反序列化）    
+（DONE）库编译为gzxlib格式。（序列化和反序列化）    
 
 C#调用Giz。（Giz函数调用转换为C#委托）      
+Giz调用Giz。（重载操作符的函数）    

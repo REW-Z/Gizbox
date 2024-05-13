@@ -28,6 +28,11 @@ namespace GizboxLangTest
             //return;
 
 
+            //生成库文件  
+            //string libsrc = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\stdlib.gix");
+
+
+
             ////生成分析器硬编码  
             //Gizbox.Compiler compilerTest = new Compiler();
             //compilerTest.ConfigParserDataSource(hardcode: false);
@@ -36,7 +41,7 @@ namespace GizboxLangTest
             //return;
 
 
-            string source = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\test.txt");
+            string source = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\test.gix");
 
             //Compile  
             Gizbox.Compiler compiler = new Compiler();

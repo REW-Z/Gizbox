@@ -130,7 +130,7 @@ namespace Gizbox
 
             var desktop = System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop);
             System.IO.File.WriteAllText(desktop + "\\" + fileName + ".cs", codebuilderCs.ToString());
-            System.IO.File.WriteAllText(desktop + "\\" + fileName + ".gx", codebuilderGiz.ToString());
+            System.IO.File.WriteAllText(desktop + "\\" + fileName + ".gix", codebuilderGiz.ToString());
         }
 
         private void GenNamspace(string name, List<Type> types, StringBuilder strbCs, StringBuilder strbGiz)
