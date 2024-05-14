@@ -18,12 +18,14 @@ namespace GizboxLangTest
         {
             ////生成互操作Wrap代码      
             //InteropWrapGenerator generator = new InteropWrapGenerator();
-            //generator.GetClosure(new Type[] { typeof(GizboxLang.Examples.Student) });
+            //generator.IncludeTypes(new Type[] { 
+            //    typeof(GizboxLang.Examples.Student),
+            //});
             //foreach (var t in generator.closure)
             //{
             //    Console.WriteLine(t.Name);
             //}
-            //generator.GenerateFile("AAA");
+            //generator.GenerateFile("Example");
             //Console.ReadLine();
             //return;
 
@@ -50,12 +52,13 @@ namespace GizboxLangTest
             compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
             var il = compiler.Compile(source);
 
-
             Compiler.Pause("Compile End");
 
             //Interpret  
             ScriptEngine engine = new ScriptEngine();
-            engine.csharpInteropContext.ConfigExternCallClasses(typeof(GizboxLang.Examples.ExampleInterop));
+            engine.csharpInteropContext.ConfigExternCallClasses( new Type[] {
+                typeof(GizboxLang.Examples.ExampleInterop),
+            });
             engine.Execute(il);
 
             Compiler.Pause("Execute End");
