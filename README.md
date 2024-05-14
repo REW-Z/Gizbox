@@ -1,4 +1,4 @@
-![GizboxLogo](./Gizbox.png)
+![GizboxLogo](./GizboxLang/Documents/GizboxLogo.png)
 
 # Introduction
 
