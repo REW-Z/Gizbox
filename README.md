@@ -1,3 +1,5 @@
+![](Gizbox.png)
+
 # Introduction
 
 Gizbox is a scripting language that can be embedded in C# applications.
