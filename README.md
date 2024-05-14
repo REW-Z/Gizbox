@@ -1,4 +1,4 @@
-![](Gizbox.png)
+![GizboxLogo](./Gizbox.png)
 
 # Introduction
 
