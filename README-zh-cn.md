@@ -1,4 +1,6 @@
-﻿# 介绍      
+﻿![GizboxLogo](./GizboxLang/Documents/GizboxLogoBlack.png)
+
+# 介绍      
 
 Gizbox是一种脚本语言，可以用来嵌入C#的应用程序。    
 
