@@ -156,6 +156,8 @@ namespace Gizbox
             "primitive -> bool",
             "primitive -> int",
             "primitive -> float",
+            "primitive -> double",
+            "primitive -> char",
             "primitive -> string",
 
 

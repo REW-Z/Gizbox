@@ -25,5 +25,13 @@ list.Add(0);
 list.Add(0);
 list.Add(0);
 
-Log("newCount : " + (string)list.count);
-Log("newOpacity : " + (string)list.opacity);
+Console::Log("newCount : " + (string)list.count);
+Console::Log("newOpacity : " + (string)list.opacity);
+
+float num_16 = 16.0f;
+float sqrtResult = Math::Sqrt(num_16);
+Console::Log((string)sqrtResult);
+
+float num_3 = 3.0f;
+float powResult = Math::Pow(num_3, 3);
+Console::Log((string)powResult);

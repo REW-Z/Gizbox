@@ -244,7 +244,7 @@ namespace Gizbox.ScriptEngine
                 case "": break;
                 case "JUMP":
                     {
-                        var jaddr = mainUnit.QueryLabel(tac.arg1);
+                        var jaddr = mainUnit.QueryLabel(tac.arg1, currUnit);
                         this.currUnit = jaddr.Item1;
                         this.curr = jaddr.Item2;
                         return;
@@ -300,7 +300,7 @@ namespace Gizbox.ScriptEngine
                         {
                             retRegister = GetValue(tac.arg1);
                         }
-                        var jumpAddr = mainUnit.QueryLabel("exit:" + envStack.Peek().name);
+                        var jumpAddr = mainUnit.QueryLabel("exit:" + envStack.Peek().name, currUnit);
                         int exitLine = jumpAddr.Item2;
                         int endLine = exitLine - 1;    
                         
@@ -323,7 +323,7 @@ namespace Gizbox.ScriptEngine
 
                         retRegister = result;
 
-                        var jumpAddr = mainUnit.QueryLabel("exit:" + envStack.Peek().name); 
+                        var jumpAddr = mainUnit.QueryLabel("exit:" + envStack.Peek().name, currUnit); 
                         int exitLine = jumpAddr.Item2;
                         int endLine = exitLine - 1;
 
@@ -357,7 +357,7 @@ namespace Gizbox.ScriptEngine
 
                         string label = "entry:" + funcFinalName;
 
-                        var jumpAddr = mainUnit.QueryLabel(label);
+                        var jumpAddr = mainUnit.QueryLabel(label, currUnit);
                         this.curr = jumpAddr.Item2;
                         this.currUnit = jumpAddr.Item1;
 
@@ -386,7 +386,7 @@ namespace Gizbox.ScriptEngine
 
                         string label = "entry:" + funcFinalName;
 
-                        var jumpAddr = mainUnit.QueryLabel(label);
+                        var jumpAddr = mainUnit.QueryLabel(label, currUnit);
                         this.curr = jumpAddr.Item2;
                         this.currUnit = jumpAddr.Item1;
 
@@ -474,7 +474,7 @@ namespace Gizbox.ScriptEngine
                         bool conditionTrue = GetValue(tac.arg1).AsBool;
                         if(conditionTrue == false)
                         {
-                            var jumpAddr = mainUnit.QueryLabel(tac.arg2);
+                            var jumpAddr = mainUnit.QueryLabel(tac.arg2, currUnit);
                             
                             this.curr = jumpAddr.Item2;
                             this.currUnit = jumpAddr.Item1;
@@ -610,11 +610,11 @@ namespace Gizbox.ScriptEngine
         {
             if (ptr >= 0)
             {
-                return heap.data[(int)ptr];
+                return this.heap.data[(int)ptr];
             }
             else
             {
-                var v = mainUnit.ReadConst((int)(-ptr));
+                var v = mainUnit.QueryUnit(this.currUnit).ReadConst((int)(-ptr));
                 if(v is char[])
                 {
                     return new string((char[])v);
@@ -629,6 +629,8 @@ namespace Gizbox.ScriptEngine
 
         public Value NewString(string str)
         {
+            Log("创建新的动态字符串：" + str);
+
             long ptr = this.heap.Alloc(str);
             return Value.FromStringPtr(ptr);
         }

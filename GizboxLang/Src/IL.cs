@@ -102,8 +102,18 @@ namespace Gizbox.IL
         }
 
         //查询标号  
-        public Tuple<int, int> QueryLabel(string label)
+        public Tuple<int, int> QueryLabel(string label, int priorityUnit)
         {
+            //优先查找的库  
+            if(priorityUnit != -1)
+            {
+                if(dependencies[priorityUnit].label2Line.ContainsKey(label))
+                {
+                    return new Tuple<int, int>(priorityUnit, dependencies[priorityUnit].label2Line[label]);
+                }
+            }
+
+            //正常查找顺序  
             if (label2Line.ContainsKey(label) == true)
             {
                 return new Tuple<int, int>(-1, label2Line[label]);
@@ -118,6 +128,7 @@ namespace Gizbox.IL
                     }
                 }
             }
+
             throw new GizboxException("本单元和库中找不到标签" + label);
         }
 
@@ -277,6 +288,13 @@ namespace Gizbox.IL
             }
         }
 
+
+        // 查询库  
+        public ILUnit QueryUnit(int unitIdx)
+        {
+            if (unitIdx == -1) return this;
+            else return dependencies[unitIdx];
+        }
 
         // 查询类  
         public SymbolTable.Record QueryClass(string className)
@@ -795,6 +813,9 @@ namespace Gizbox.IL
                                 int ptr = this.ilUnit.constData.Count - 1 + 1;
                                 string lex = literalNode.token.attribute;
                                 this.ilUnit.constData.Add(lex.Substring(1, lex.Length - 2));
+
+                                if(Compiler.enableLogILGenerator) 
+                                    Log("新的字符串常量：" + lex + " 指针：" + ptr);
 
                                 valStr = "CONSTSTRING:" + ptr;
                             }

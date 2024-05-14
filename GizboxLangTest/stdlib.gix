@@ -2,7 +2,76 @@
 namespace Console
 {
 	extern void Log(string text);
+	
+	void Log(bool b)
+	{
+		Console::Log((string)b);
+	}
+	void Log(int num)
+	{
+		Console::Log((string)num);
+	}
+	void Log(float num)
+	{
+		Console::Log((string)num);
+	}
+	void Log(double num)
+	{
+		Console::Log((string)num);
+	}
+	void Log(char c)
+	{
+		Console::Log((string)c);
+	}
 }
+
+
+namespace Math
+{
+	float Abs(float number)
+	{
+		float result = number;
+		if(number < 0.0f)
+			result = -number;
+		return result;
+	}
+
+	float Pow(float bs, int exp)
+	{
+		float result = 1.0f;
+		bool isNegativeExponent = (exp < 0);
+		if (isNegativeExponent) {
+		    exp = -exp;
+		}
+
+		for (int i = 0; i < exp; ++i) {
+		    result *= bs;
+		}
+
+		if (isNegativeExponent) {
+		    result = 1.0f / result;
+		}
+
+		return result;
+	}
+
+	float Sqrt(float number) 
+	{
+		if (number < 0.0f) 
+		{
+			return 0.0f;
+		}
+		float precision = 0.0000001f;
+		float guess = number / 2.0f;
+		while (Math::Abs(guess * guess - number) > precision) 
+		{
+		    guess = (guess + (number / guess)) / 2.0f;
+		}
+		return guess;
+	}
+
+}
+
 
 namespace Collections
 {

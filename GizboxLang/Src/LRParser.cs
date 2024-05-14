@@ -844,7 +844,7 @@ namespace Gizbox.SemanticRule
                 psr.newElement.attributes["ast_node"] = (SyntaxTree.PrimitiveTypeNode)psr.stack[psr.stack.Top].attributes["ast_node"];
             });
 
-            string[] primiveProductions = new string[] { "void", "bool", "int", "float", "string" };
+            string[] primiveProductions = new string[] { "void", "bool", "int", "float", "double", "char", "string" };
             foreach(var t in primiveProductions)
             {
                 AddActionAtTail("primitive -> " + t, (psr, production) => {
@@ -966,7 +966,7 @@ namespace Gizbox.SemanticRule
             AddActionAtTail("term -> term / factor", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.BinaryOpNode()
                 {
-                    op = "*",
+                    op = "/",
                     leftNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes["ast_node"],
                     rightNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes["ast_node"],
 
@@ -985,6 +985,7 @@ namespace Gizbox.SemanticRule
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.UnaryOpNode()
                 {
                     op = "!",
+                    exprNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes["ast_node"],
 
                     attributes = psr.newElement.attributes,
                 };
@@ -994,6 +995,7 @@ namespace Gizbox.SemanticRule
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.UnaryOpNode()
                 {
                     op = "-",
+                    exprNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes["ast_node"],
 
                     attributes = psr.newElement.attributes,
                 };
@@ -2188,11 +2190,14 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.UnaryOpNode unaryNode:
                     {
+                        Pass3_AnalysisNode(unaryNode.exprNode);
                         AnalyzeTypeExpression(unaryNode);
                     }
                     break;
                 case SyntaxTree.BinaryOpNode binaryNode:
                     {
+                        Pass3_AnalysisNode(binaryNode.leftNode);
+                        Pass3_AnalysisNode(binaryNode.rightNode);
                         AnalyzeTypeExpression(binaryNode);
                     }
                     break;
@@ -2334,12 +2339,12 @@ namespace Gizbox.SemanticRule
                             }
                         }
 
-                        Console.WriteLine("分析：" + objMemberAccessNode.objectNode.FirstToken().ToString());
                         Pass3_AnalysisNode(objMemberAccessNode.objectNode);
-                        Console.WriteLine("分析：" + objMemberAccessNode.memberNode.FirstToken().ToString());
-                        Pass3_AnalysisNode(objMemberAccessNode.memberNode);
+                        
+                        //不能分析成员名称，当前作用域会找不到标识符。      
+                        //Console.WriteLine("分析：" + objMemberAccessNode.memberNode.FirstToken().ToString());
+                        //Pass3_AnalysisNode(objMemberAccessNode.memberNode);
 
-                        Console.WriteLine("分析：" + objMemberAccessNode.FirstToken().ToString());
                         AnalyzeTypeExpression(objMemberAccessNode);
                     }
                     break;
@@ -2409,6 +2414,8 @@ namespace Gizbox.SemanticRule
         /// </summary>
         private string AnalyzeTypeExpression(SyntaxTree.ExprNode exprNode)
         {
+            if (exprNode == null) throw new GizboxException("表达式节点为空！");
+            if (exprNode.attributes == null) throw new SemanticException(exprNode, "节点没有初始化属性列表！");
             if (exprNode.attributes.ContainsKey("type")) return (string)exprNode.attributes["type"];
             
             string nodeTypeExprssion = "";
@@ -2418,7 +2425,10 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.IdentityNode idNode:
                     {
                         var result = Query(idNode.FullName);
-                        if (result == null) throw new SemanticException(idNode, "找不到标识符:" + idNode.FullName);
+                        if (result == null)
+                        {
+                            throw new SemanticException(idNode, "找不到标识符:" + idNode.FullName + " 当前顶层符号表：" + envStack.Peek().name);
+                        }
 
                         nodeTypeExprssion = result.typeExpression;
                     }

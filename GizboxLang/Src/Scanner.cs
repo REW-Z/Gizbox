@@ -156,6 +156,9 @@ namespace Gizbox
                 {
                     Log("发现越界：" + (lexemBegin + (forward - lexemBegin)));
                     Log("总长度：" + source.Length);
+
+                    string remainingText = source.Substring(lexemBegin);
+                    throw new LexerException(currLine, remainingText.Substring(0, System.Math.Min(10, remainingText.Length)), "词法分析器扫描越界！");
                 }
                 var seg = source.Substring(lexemBegin, forward - lexemBegin);
 

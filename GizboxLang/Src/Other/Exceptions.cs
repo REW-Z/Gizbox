@@ -8,6 +8,18 @@ namespace Gizbox
     {
         public GizboxException(string message) : base(message) { }
     }
+    public class LexerException : GizboxException
+    {
+        public int line;
+        public string scanning;
+        public LexerException(int line, string scanningText, string message) : base(message) 
+        {
+            this.line = line;
+            this.scanning = scanningText;
+        }
+
+        public override string Message => "(line:" + line + "  scanning:\"" + scanning + "\")" +  base.Message;
+    }
     public class ParseException : GizboxException
     {
         public Token token;
@@ -16,12 +28,12 @@ namespace Gizbox
             this.token = token;
         }
 
-        public string LineMessage()
+        public string TokenMessage()
         {
-            return "(line:" + token.line + ")";
+            return "(token:" + token.ToString() + "  line:" + token.line + ")";
         }
 
-        public override string Message => LineMessage() + base.Message;
+        public override string Message => TokenMessage() + base.Message;
     }
     public class SemanticException : GizboxException
     {
