@@ -128,7 +128,7 @@ extern void Log(string text);
 
 ```C#  
 Gizbox.Compiler compiler = new Compiler();//创建编译器实例  
-compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);//设置库文件搜索路径  
+compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);//设置库文件搜索路径（语义分析需要加载库文件）      
 var ir = compiler.Compile(source);//编译源代码为中间代码  
 ```    
 
@@ -136,6 +136,7 @@ var ir = compiler.Compile(source);//编译源代码为中间代码
 
 ```C#
 ScriptEngine engine = new ScriptEngine();//创建解释器实例  
+engine.AddLibSearchDirectory(AppDomain.CurrentDomain.BaseDirectory);//搜索".gixlib"库文件的目录    
 engine.csharpInteropContext.ConfigExternCallClasses(typeof(GizboxLang.Examples.ExampleInterop));//
 engine.Execute(ir);
 ```  
@@ -149,6 +150,15 @@ engine.csharpInteropContext.ConfigExternCallClasses( new Type[] {
 });//Gizbox中的extern函数会从这个类中查找对应方法    
 ```  
 
+
+- C#调用Gizbox    
+
+```C#
+ScriptEngine engine = new ScriptEngine();
+engine.Load(il);
+var ret = engine.Call("Math::Pow", 2f, 4);
+Console.WriteLine("result:" + ret); //result:16
+```  
 
 - 生成互操作的Wrap代码    
 

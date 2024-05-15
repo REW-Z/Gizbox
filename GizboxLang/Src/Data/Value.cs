@@ -82,10 +82,9 @@ namespace Gizbox
             return new Value() { type = GizType.Char, AsChar = v };
         }
 
-
-        public static Value FromConstStringPtr(int constDataPtr)
+        public static Value FromConstStringPtr(long ptr)
         {
-            return new Value() { type = GizType.String, AsPtr = -constDataPtr };
+            return new Value() { type = GizType.String, AsPtr = (-ptr) - 1 };
         }
         public static Value FromStringPtr(long ptr)
         {

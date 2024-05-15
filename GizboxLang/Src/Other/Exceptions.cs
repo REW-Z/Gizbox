@@ -52,14 +52,14 @@ namespace Gizbox
 
     public class RuntimeException : GizboxException
     {
-        public Gizbox.IL.TAC tac;
-        public RuntimeException(Gizbox.IL.TAC tac, string message):base(message)
+        public Gizbox.ScriptEngine.RuntimeCode code;
+        public RuntimeException(Gizbox.ScriptEngine.RuntimeCode c, string message):base(message)
         {
-            this.tac = tac;
+            this.code = c;
         }
         public string TacMessage()
         {
-            return "\"" + tac.ToExpression() + "\"";
+            return "\"" + code.ToExpression() + "\"";
         }
         public override string Message => TacMessage() + base.Message;
     }

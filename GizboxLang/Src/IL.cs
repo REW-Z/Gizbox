@@ -56,122 +56,63 @@ namespace Gizbox.IL
         public SymbolTable env;
     }
 
-
     [Serializable]
     public class ILUnit
     {
         //名称    
         public string name;
-        //依赖库
-        public List<ILUnit> dependencies = new List<ILUnit>();
+
+        //依赖库名称  
+        public List<string> dependencies = new List<string>();
+
         //代码  
         public List<TAC> codes = new List<TAC>();
+
         //作用域状态数组  
         public int[] scopeStatusArr;
-        //代码入口  
-        public int codeEntry;
+
         //作用域列表  
         public List<Scope> scopes = new List<Scope>();
+
         //全局作用域  
         public Scope globalScope;
+
         //虚函数表  
         public Dictionary<string, VTable> vtables = new Dictionary<string, VTable>();
 
         //标号 -> 行数 查询表  
-        private Dictionary<string, int> label2Line = new Dictionary<string, int>();
+        public Dictionary<string, int> label2Line = new Dictionary<string, int>();
+
         //行数 -> 符号表链 查询表
         public Dictionary<int, Gizbox.GStack<SymbolTable>> stackDic;
 
         //静态数据区 - 常量  
-        public List<object> constData = new List<object>() { null };
-
-        //静态数据区 - 全局变量（不序列化）（仅主编译单元的区域能够读写）    
-        public Dictionary<string, Value> globalData = new Dictionary<string, Value>();
+        public List<object> constData = new List<object>();
 
 
+        //(不序列化) 临时载入的依赖      
+        [System.NonSerialized]
+        public List<ILUnit> dependencyLibs = new List<ILUnit>();
 
 
 
         //构造函数  
         public ILUnit()
         {
-            this.name = "unnamed";
-
             var globalSymbolTable = new SymbolTable("global", SymbolTable.TableCatagory.GlobalScope);
             this.globalScope = new Scope() { env = globalSymbolTable };
         }
 
-        //查询标号  
-        public Tuple<int, int> QueryLabel(string label, int priorityUnit)
-        {
-            //优先查找的库  
-            if(priorityUnit != -1)
-            {
-                if(dependencies[priorityUnit].label2Line.ContainsKey(label))
-                {
-                    return new Tuple<int, int>(priorityUnit, dependencies[priorityUnit].label2Line[label]);
-                }
-            }
 
-            //正常查找顺序  
-            if (label2Line.ContainsKey(label) == true)
-            {
-                return new Tuple<int, int>(-1, label2Line[label]);
-            }
-            else
-            {
-                for (int i = 0; i < dependencies.Count; ++i)
-                {
-                    if (dependencies[i].label2Line.ContainsKey(label))
-                    {
-                        return new Tuple<int, int>(i, dependencies[i].label2Line[label]);
-                    }
-                }
-            }
-
-            throw new GizboxException("本单元和库中找不到标签" + label);
-        }
-
-
-        //读取常量值    
-        public object ReadConst(int ptr)
-        {
-            object constval = constData[ptr];
-            return constval;
-            //switch(constval)
-            //{
-            //    case bool b: return b;
-            //    case int i: return i;
-            //    case float f: return f;
-            //    case double s: return s;
-            //    case char c: return c;
-            //    case char[] s: return Value.FromConstStringPtr(ptr);
-            //    default:
-            //        {
-            //            throw new Exception("常量区不能存储引用类型");
-            //            return Value.Void;
-            //        }
-            //}
-        }
-        //读取全局变量  
-        public Value ReadGlobalVar(string name)
-        {
-            if(this.globalData.ContainsKey(name))
-            {
-                return this.globalData[name];
-            }
-            return Value.Void;
-        }
-        //写入全局变量  
-        public void WriteGlobalVar(string name, Value val)
-        {
-            this.globalData[name] = val;
-        }
 
         //添加依赖  
-        public void AddDependency(ILUnit dep)
+        public void AddDependency(string libName)
         {
-            this.dependencies.Add(dep);
+            this.dependencies.Add(libName);
+        }
+        public void AddDependencyUnitTemp(ILUnit dep)
+        {
+            this.dependencyLibs.Add(dep);
         }
 
         //完成构建  
@@ -184,6 +125,7 @@ namespace Gizbox.IL
             BuildMarkArray();
             CacheEnvStack();
         }
+
         //刷新  
         public bool NeedResetStack(int prevUnit, int prev, int currUnit, int curr)
         {
@@ -195,7 +137,7 @@ namespace Gizbox.IL
             }
             else
             {
-                return this.dependencies[currUnit].scopeStatusArr[curr] != this.dependencies[currUnit].scopeStatusArr[prev];
+                return this.dependencyLibs[currUnit].scopeStatusArr[curr] != this.dependencyLibs[currUnit].scopeStatusArr[prev];
             }
         }
         // 获取堆栈  
@@ -208,8 +150,8 @@ namespace Gizbox.IL
             }
             else
             {
-                var extStatus = this.dependencies[currentUnit].scopeStatusArr[currentLine];
-                return this.dependencies[currentUnit].stackDic[extStatus];
+                var extStatus = this.dependencyLibs[currentUnit].scopeStatusArr[currentLine];
+                return this.dependencyLibs[currentUnit].stackDic[extStatus];
             }
         }
 
@@ -289,11 +231,42 @@ namespace Gizbox.IL
         }
 
 
+        //查询标号  
+        public Tuple<int, int> QueryLabel(string label, int priorityUnit)
+        {
+            //优先查找的库  
+            if (priorityUnit != -1)
+            {
+                if (dependencyLibs[priorityUnit].label2Line.ContainsKey(label))
+                {
+                    return new Tuple<int, int>(priorityUnit, dependencyLibs[priorityUnit].label2Line[label]);
+                }
+            }
+
+            //正常查找顺序  
+            if (label2Line.ContainsKey(label) == true)
+            {
+                return new Tuple<int, int>(-1, label2Line[label]);
+            }
+            else
+            {
+                for (int i = 0; i < dependencyLibs.Count; ++i)
+                {
+                    if (dependencyLibs[i].label2Line.ContainsKey(label))
+                    {
+                        return new Tuple<int, int>(i, dependencyLibs[i].label2Line[label]);
+                    }
+                }
+            }
+
+            return null;
+        }
+
         // 查询库  
         public ILUnit QueryUnit(int unitIdx)
         {
             if (unitIdx == -1) return this;
-            else return dependencies[unitIdx];
+            else return dependencyLibs[unitIdx];
         }
 
         // 查询类  
@@ -304,7 +277,7 @@ namespace Gizbox.IL
                 return globalScope.env.GetRecord(className);
             }
 
-            foreach(var dep in dependencies)
+            foreach(var dep in dependencyLibs)
             {
                 if(dep.globalScope.env.ContainRecordName(className))
                 {
@@ -324,7 +297,7 @@ namespace Gizbox.IL
             }
             else
             {
-                return this.dependencies[unitIdx].codes[line];
+                return this.dependencyLibs[unitIdx].codes[line];
             }
         }
 
@@ -336,7 +309,7 @@ namespace Gizbox.IL
                 return this.vtables[className];
             }
 
-            foreach (var dep in dependencies)
+            foreach (var dep in dependencyLibs)
             {
                 if (dep.vtables.ContainsKey(className))
                 {
@@ -398,7 +371,8 @@ namespace Gizbox.IL
             foreach(var importNode in ast.rootNode.importNodes)
             {
                 var lib = (ILUnit)importNode.attributes["lib"];
-                this.ilUnit.AddDependency(lib);
+                this.ilUnit.AddDependency(lib.name);
+                this.ilUnit.AddDependencyUnitTemp(lib);
             }
 
             this.tmpCounter = 0;
@@ -504,7 +478,7 @@ namespace Gizbox.IL
                                 var baseEnv = baseRec.envPtr;
 
                                 GenerateCode("PARAM", "[this]");
-                                GenerateCode("CALL", "[" + baseClassName + ".ctor]", 1);
+                                GenerateCode("CALL", "[" + baseClassName + ".ctor]", "LITINT:1");
                             }
                             
                             //成员变量初始化
@@ -808,17 +782,20 @@ namespace Gizbox.IL
 
                         if(literalNode.token.name != "null")
                         {
-                            if(literalNode.token.name == "LITSTRING")
+                            //字符串字面量 -> 存储为字符串常量    
+                            if (literalNode.token.name == "LITSTRING")
                             {
-                                int ptr = this.ilUnit.constData.Count - 1 + 1;
                                 string lex = literalNode.token.attribute;
-                                this.ilUnit.constData.Add(lex.Substring(1, lex.Length - 2));
+                                string conststr = lex.Substring(1, lex.Length - 2);
+                                this.ilUnit.constData.Add(conststr);
+                                int ptr = this.ilUnit.constData.Count - 1;
 
-                                if(Compiler.enableLogILGenerator) 
+                                if (Compiler.enableLogILGenerator) 
                                     Log("新的字符串常量：" + lex + " 指针：" + ptr);
 
                                 valStr = "CONSTSTRING:" + ptr;
                             }
+                            //其他类型字面量    
                             else
                             {
                                 valStr = literalNode.token.name + ":" + literalNode.token.attribute;
@@ -939,12 +916,12 @@ namespace Gizbox.IL
 
                         if(callNode.isMemberAccessFunction == true)
                         {
-                            GenerateCode("MCALL", "[" + mangledName + "]", argCount);
+                            GenerateCode("MCALL", "[" + mangledName + "]", "LITINT:" + argCount);
                             GenerateCode("=", callNode.attributes["ret"], "RET");
                         }
                         else
                         {
-                            GenerateCode("CALL", "[" + mangledName + "]", argCount);
+                            GenerateCode("CALL", "[" + mangledName + "]", "LITINT:" + argCount);
                             GenerateCode("=", callNode.attributes["ret"], "RET");
                         }
                     }
@@ -977,7 +954,7 @@ namespace Gizbox.IL
 
                         GenerateCode("ALLOC", newObjNode.attributes["ret"], className);
                         GenerateCode("PARAM", newObjNode.attributes["ret"]);
-                        GenerateCode("CALL", "[" + className + ".ctor]", 1);
+                        GenerateCode("CALL", "[" + className + ".ctor]", "LITINT:" + 1);
                     }
                     break;
                 case SyntaxTree.NewArrayNode newArrNode:
@@ -1061,7 +1038,7 @@ namespace Gizbox.IL
             }
 
             //导入库查找  
-            foreach(var lib in ilUnit.dependencies)
+            foreach(var lib in ilUnit.dependencyLibs)
             {
                 var rec = lib.globalScope.env.GetRecord(id);
                 if(rec != null)

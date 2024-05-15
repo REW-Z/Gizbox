@@ -25,6 +25,9 @@ list.Add(0);
 list.Add(0);
 list.Add(0);
 
+Console::Log("Gizbox!");
+Console::LogHelloWorld();
+
 Console::Log("newCount : " + (string)list.count);
 Console::Log("newOpacity : " + (string)list.opacity);
 

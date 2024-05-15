@@ -12,6 +12,13 @@ using Gizbox.Interop.CSharp;
 
 namespace GizboxLangTest
 {
+    public class TestExternCall
+    {
+        public static void Console__Log(string text)
+        {
+            Console.WriteLine("Gizbox >>>" + text);
+        }
+    }
     class Program
     {
         static void Main(string[] args)
@@ -30,10 +37,14 @@ namespace GizboxLangTest
             //return;
 
 
-            //生成库文件  
+            ////生成库文件  
             //string libsrc = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\stdlib.gix");
-
-
+            //Compiler libCompiler = new Compiler();
+            //libCompiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
+            //libCompiler.ConfigParserDataSource(hardcode: false);
+            //libCompiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
+            //libCompiler.CompileToLib(libsrc, "stdlib", AppDomain.CurrentDomain.BaseDirectory + "\\stdlib.gixlib");
+            //return;
 
             ////生成分析器硬编码  
             //Gizbox.Compiler compilerTest = new Compiler();
@@ -43,9 +54,8 @@ namespace GizboxLangTest
             //return;
 
 
+            //Compile Test  
             string source = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\test.gix");
-
-            //Compile  
             Gizbox.Compiler compiler = new Compiler();
             compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
             compiler.ConfigParserDataSource(hardcode: false);
@@ -56,12 +66,19 @@ namespace GizboxLangTest
 
             //Interpret  
             ScriptEngine engine = new ScriptEngine();
-            engine.csharpInteropContext.ConfigExternCallClasses( new Type[] {
+            engine.AddLibSearchDirectory(AppDomain.CurrentDomain.BaseDirectory);
+            engine.csharpInteropContext.ConfigExternCallClasses(new Type[] {
+                typeof(TestExternCall),
                 typeof(GizboxLang.Examples.ExampleInterop),
             });
             engine.Execute(il);
 
             Compiler.Pause("Execute End");
+
+            //ScriptEngine engineCallTest = new ScriptEngine();
+            //engineCallTest.Load(il);
+            //var ret = engineCallTest.Call("Math::Pow", 2f, 4);
+            //Console.WriteLine("result:" + ret); //result:16
         }
     }
 }

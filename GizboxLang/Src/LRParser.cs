@@ -994,7 +994,7 @@ namespace Gizbox.SemanticRule
             AddActionAtTail("factor -> - factor", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.UnaryOpNode()
                 {
-                    op = "-",
+                    op = "NEG",
                     exprNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes["ast_node"],
 
                     attributes = psr.newElement.attributes,
@@ -1438,7 +1438,7 @@ namespace Gizbox.SemanticRule
             foreach(var importNode in ast.rootNode.importNodes)
             {
                 if (importNode == null) throw new SemanticException(ast.rootNode, "空的导入节点节点");
-                importNode.attributes["lib"] = compilerContext.LoadLib(importNode.uri);
+                importNode.attributes["lib"] = compilerContext.LoadOrCompileLib(importNode.uri);
             }
         }
 
@@ -2389,24 +2389,6 @@ namespace Gizbox.SemanticRule
             }
         }
 
-
-        /// <summary>
-        /// 完善继承信息（虚函数表并入、符号表字段复制）  
-        /// </summary>
-        [System.Obsolete]
-        private void Pass4_InheritInfoComplete()
-        {
-            List<SymbolTable.Record> classListApp = new List<SymbolTable.Record>();
-            List<SymbolTable.Record> classListThisUnit = this.ilUnit.globalScope.env.GetByCategory(SymbolTable.RecordCatagory.Class);
-            classListApp.AddRange(classListThisUnit);
-            foreach(var dep in this.ilUnit.dependencies)
-            {
-                classListApp.AddRange(dep.globalScope.env.GetByCategory(SymbolTable.RecordCatagory.Class));
-            }
-            foreach(var klass in classListThisUnit)
-            {
-            }
-        }
 
 
         /// <summary>

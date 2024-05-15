@@ -603,7 +603,7 @@ namespace Gizbox
         public static bool enableLogScriptEngine = false;
 
         //parser data  
-        private bool parserDataHardcode;
+        private bool parserDataHardcode = true;
         public string parserDataPath;
 
         //lib info  
@@ -681,14 +681,13 @@ namespace Gizbox
         }
 
         /// <summary>
-        /// 载入库  
+        /// 载入或者编译库（语义分析用）  
         /// </summary>
-        public Gizbox.IL.ILUnit LoadLib(string libname)
+        public Gizbox.IL.ILUnit LoadOrCompileLib(string libname)
         {
             //编译器中查找  
             if (this.libs.ContainsKey(libname))
             {
-                Console.WriteLine("导入已加载的库：" + libname);
                 return this.libs[libname];
             }
             //路径查找  
@@ -703,15 +702,13 @@ namespace Gizbox
                         {
                             if(System.IO.Path.GetExtension(f.Name).EndsWith("gixlib"))
                             {
-                                var unit = Gizbox.IL.ILSerializer.DeserializeDirectly(f.FullName);
-                                Console.WriteLine("导入库文件：" + f.Name);
+                                var unit = Gizbox.IL.ILSerializer.Deserialize(f.FullName);
                                 return unit;
                             }
                             else
                             {
                                 var unit = this.Compile(System.IO.File.ReadAllText(f.FullName));
                                 unit.name = libname;
-                                Console.WriteLine("导入源文件引用：" + f.Name);
                                 return unit;
                             }
                         }
@@ -754,6 +751,13 @@ namespace Gizbox
             string codepath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop) + "\\cs_parse_hardcode.cs";
             string csStr = Utility.ParserHardcoder.GenerateHardcode(data);
             System.IO.File.WriteAllText(codepath, csStr);
+        }
+
+        public void CompileToLib(string source, string libName, string savePath)
+        {
+            var ir = this.Compile(source);
+            ir.name = libName;
+            Gizbox.IL.ILSerializer.Serialize(savePath, ir);
         }
 
         /// <summary>
@@ -802,6 +806,9 @@ namespace Gizbox
 
             return ilUnit;
         }
+
+
+
     }
 
 

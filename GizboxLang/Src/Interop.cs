@@ -28,7 +28,6 @@ namespace Gizbox.Interop.CSharp
         };
 
 
-
         //绑定表  
         public List<ObjectBinding> bindingTable = new List<ObjectBinding>();
         private Dictionary<int, ObjectBinding> idToBind = new Dictionary<int, ObjectBinding>();
@@ -116,7 +115,11 @@ namespace Gizbox.Interop.CSharp
         //数据封送
         public object Marshal2CSharp(Value gzVal)
         {
-            if (gzVal.Type == GizType.GizObject)
+            if (gzVal.Type == GizType.Void)
+            {
+                return null;
+            }
+            else if (gzVal.Type == GizType.GizObject)
             {
                 var gizobj =  ((GizObject)engine.DeReference(gzVal.AsPtr));
 
@@ -234,6 +237,22 @@ namespace Gizbox.Interop.CSharp
             throw new Exception("封送错误");
         }
 
+        //获取CS数值/对象的类型  
+        public string GetGizType(object csVal)
+        {
+            switch(csVal)
+            {
+                case bool i: return "bool";
+                case int i: return "int";
+                case float i: return "float";
+                case double i: return "double";
+                case string s: return "string";
+                default:
+                    {
+                        return csVal.GetType().FullName.Replace(".","::");
+                    }
+            }
+        }
 
         //配置  
         public void ConfigExternCallClasses(params Type[] classes)
@@ -251,11 +270,6 @@ namespace Gizbox.Interop.CSharp
 
     public static class ExterCallPreset
     {
-        public static void Console__Log(string text)
-        {
-            Console.WriteLine("Gizbox >>>" + text);
-        }
-
         public static void SetFieldValue(object obj, string fieldName, object val)
         {
             obj.GetType().GetField(fieldName).SetValue(obj, val);

@@ -82,11 +82,11 @@ namespace Gizbox.ScriptEngine
     //脚本引擎  
     public class ScriptEngine
     {
+        //运行时  
+        public Gizbox.ScriptEngine.RuntimeUnit mainUnit;
+        
         //符号表堆栈  
         public GStack<SymbolTable> envStack;
-
-        //中间代码  
-        public Gizbox.IL.ILUnit mainUnit;
 
         //C#互操作上下文  
         public Gizbox.Interop.CSharp.InteropContext csharpInteropContext;
@@ -105,13 +105,14 @@ namespace Gizbox.ScriptEngine
         private Calculator caculator;
 
         //临时数据  
+        private bool executing = false;
         private int currUnit = -1;
         private int curr = 0;
         private int prevUnit = -1;
         private int prev = 0;
 
         //DEBUG    
-        private static bool analysisTime = false;
+        private static bool analysisTime = true;
         private System.Diagnostics.Stopwatch watch = new System.Diagnostics.Stopwatch();
         private long prevTicks;
         private List<long> timeList = new List<long>(10000);
@@ -127,42 +128,56 @@ namespace Gizbox.ScriptEngine
             csharpInteropContext = new Interop.CSharp.InteropContext(this);
         }
 
-        public void Execute(Gizbox.IL.ILUnit ir)
+
+        public void Load(Gizbox.IL.ILUnit ir)
         {
-            this.mainUnit = ir;
+            Console.WriteLine("载入主程序");
+            //运行时
+            this.mainUnit = new RuntimeUnit(this, ir);
+            this.mainUnit.MainUnitLinkLibs();
+
+
+            Console.WriteLine("主程序的依赖链接完毕，总共：" + this.mainUnit.allUnits.Count);
 
             //调用堆栈  
             this.callStack = new CallStack();
-            
+
             //入口
-            this.curr = ir.codeEntry;
+            this.curr = 0;
 
             //符号栈  
-            this.envStack = ir.GetEnvStack(-1 , 0);
+            this.envStack = ir.GetEnvStack(-1, 0);
+        }
+
+        public void Execute()
+        {
+            if (this.mainUnit == null) throw new GizboxException("没有指令要执行！");
 
             //留空  
             Console.WriteLine("开始执行");
             Console.WriteLine(new string('\n', 20));
 
+            executing = true;
+
             watch.Start();
 
-            while ((this.currUnit == -1 && this.curr >= ir.codes.Count) == false)
+            while ((this.currUnit == -1 && this.curr >= mainUnit.codes.Count) == false)
             {
-                if(this.currUnit == -1)
+                if (this.currUnit == -1)
                 {
-                    Interpret(ir.codes[this.curr]);
+                    Interpret(mainUnit.codes[this.curr]);
                 }
                 else
                 {
-                    Interpret(ir.dependencies[this.currUnit].codes[this.curr]);
+                    Interpret(mainUnit.dependencies[this.currUnit].codes[this.curr]);
                 }
             }
 
             watch.Stop();
 
-            if(analysisTime == true)
+            if (analysisTime == true)
             {
-                if(Compiler.enableLogScriptEngine == false)
+                if (Compiler.enableLogScriptEngine == false)
                 {
 
                     Console.WriteLine(new string('\n', 3));
@@ -179,42 +194,17 @@ namespace Gizbox.ScriptEngine
                 }
             }
 
+            executing = false;
         }
 
-        private void ProfilerLog()
+        public void Execute(Gizbox.IL.ILUnit ir)
         {
-            Console.WriteLine(new string('\n', 3));
-            Console.WriteLine(" ---- 性能剖析 ---- ");
+            Load(ir);
 
-            Dictionary<int, List<long>> lineToTicksList = new Dictionary<int, List<long>>();
-            for (int i = 0; i < timeList.Count; ++i)
-            {
-                int line = lineList[i];
-                long time = timeList[i];
-
-                if (lineToTicksList.ContainsKey(line) == false)
-                    lineToTicksList[line] = new List<long>(100);
-
-                lineToTicksList[line].Add(time);
-            }
-
-
-            List<KeyValuePair<int, double>> line_Time_List = new List<KeyValuePair<int, double>>();
-            foreach (var k in lineToTicksList.Keys)
-            {
-                var avg = lineToTicksList[k].Average();
-                line_Time_List.Add(new KeyValuePair<int, double>(k, avg));
-            }
-
-            line_Time_List.Sort((kv1, kv2) => (int)kv1.Value - (int)kv2.Value);
-
-            foreach (var kv in line_Time_List)
-            {
-                Console.WriteLine("line:" + kv.Key + "[" + mainUnit.codes[kv.Key].ToExpression(false) + "]" + "  avgTicks:" + kv.Value);
-            }
+            Execute();
         }
 
-        private void Interpret(TAC tac)
+        private void Interpret(RuntimeCode code)
         {
             //DEBUG信息  
             if (analysisTime)
@@ -237,14 +227,14 @@ namespace Gizbox.ScriptEngine
 
             //开始指向本条指令  
             if (Compiler.enableLogScriptEngine) 
-                Log(new string('>', 10) + tac.ToExpression(showlabel:false));
+                Log(new string('>', 10) + code.ToExpression(showlabel:false));
             
-            switch(tac.op)
+            switch(code.op)
             {
                 case "": break;
                 case "JUMP":
                     {
-                        var jaddr = mainUnit.QueryLabel(tac.arg1, currUnit);
+                        var jaddr = mainUnit.QueryLabel(((OperandString)code.arg1).str, "", currUnit);
                         this.currUnit = jaddr.Item1;
                         this.curr = jaddr.Item2;
                         return;
@@ -271,9 +261,9 @@ namespace Gizbox.ScriptEngine
                     }
                 case "METHOD_BEGIN":
                     {
-                        //进入类作用域、方法作用域    
-                        string className = tac.arg1.Split('.')[0];
-                        string methodName = tac.arg1.Split('.')[1];
+                        ////进入类作用域、方法作用域    
+                        //string className = code.arg1.Split('.')[0];
+                        //string methodName = code.arg1.Split('.')[1];
 
                         //新的栈帧
                         this.callStack.Top += 1;
@@ -295,12 +285,12 @@ namespace Gizbox.ScriptEngine
                     }
                 case "RETURN":
                     {
-                        var retValue = tac.arg1;
+                        var retValue = code.arg1;
                         if(retValue != null)
                         {
-                            retRegister = GetValue(tac.arg1);
+                            retRegister = GetValue(code.arg1);
                         }
-                        var jumpAddr = mainUnit.QueryLabel("exit:" + envStack.Peek().name, currUnit);
+                        var jumpAddr = mainUnit.QueryLabel("exit", envStack.Peek().name, currUnit);
                         int exitLine = jumpAddr.Item2;
                         int endLine = exitLine - 1;    
                         
@@ -319,11 +309,11 @@ namespace Gizbox.ScriptEngine
                         List<Value> arguments = callStack[callStack.Top].args.ToList();
                         arguments.Reverse();
 
-                        Value result = csharpInteropContext.ExternCall(tac.arg1, arguments);
+                        Value result = csharpInteropContext.ExternCall(OperandString.GetString(code.arg1), arguments);
 
                         retRegister = result;
 
-                        var jumpAddr = mainUnit.QueryLabel("exit:" + envStack.Peek().name, currUnit); 
+                        var jumpAddr = mainUnit.QueryLabel("exit", envStack.Peek().name, currUnit); 
                         int exitLine = jumpAddr.Item2;
                         int endLine = exitLine - 1;
 
@@ -338,7 +328,7 @@ namespace Gizbox.ScriptEngine
                     }
                 case "PARAM":
                     {
-                        Value arg = GetValue(tac.arg1); 
+                        Value arg = GetValue(code.arg1); 
                         
                         if (arg.Type == GizType.Void)
                             throw new RuntimeException(GetCurrentCode(), "null实参");
@@ -348,16 +338,16 @@ namespace Gizbox.ScriptEngine
                     break;
                 case "CALL":
                     {
-                        string funcMangledName = TrimName(tac.arg1);
-                        int argCount = int.Parse(tac.arg2);
+                        string funcMangledName = code.arg1.str;
+
+                        if (GetValue(code.arg2).Type != GizType.Int) throw new GizboxException("参数个数不为整数！");
+                        int argCount = GetValue(code.arg2).AsInt;
 
                         this.callStack[this.callStack.Top + 1].returnPtr = new Tuple<int, int>(this.currUnit, (this.curr + 1));
 
                         string funcFinalName = funcMangledName;
 
-                        string label = "entry:" + funcFinalName;
-
-                        var jumpAddr = mainUnit.QueryLabel(label, currUnit);
+                        var jumpAddr = mainUnit.QueryLabel("entry", funcFinalName, currUnit);
                         this.curr = jumpAddr.Item2;
                         this.currUnit = jumpAddr.Item1;
 
@@ -365,8 +355,10 @@ namespace Gizbox.ScriptEngine
                     }
                 case "MCALL":
                     {
-                        string funcMangledName = TrimName(tac.arg1);
-                        int argCount = int.Parse(tac.arg2);
+                        string funcMangledName = code.arg1.str;
+
+                        if (GetValue(code.arg2).Type != GizType.Int) throw new GizboxException("参数个数不为整数！");
+                        int argCount = GetValue(code.arg2).AsInt;
 
                         this.callStack[this.callStack.Top + 1].returnPtr = new Tuple<int, int>(this.currUnit, (this.curr + 1));
 
@@ -383,10 +375,7 @@ namespace Gizbox.ScriptEngine
                         var vrec = (this.DeReference(arg_this.AsPtr) as GizObject).vtable.Query(funcMangledName);
                         string funcFinalName = vrec.funcfullname;
 
-
-                        string label = "entry:" + funcFinalName;
-
-                        var jumpAddr = mainUnit.QueryLabel(label, currUnit);
+                        var jumpAddr = mainUnit.QueryLabel("entry", funcFinalName, currUnit);
                         this.curr = jumpAddr.Item2;
                         this.currUnit = jumpAddr.Item1;
 
@@ -394,87 +383,97 @@ namespace Gizbox.ScriptEngine
                     }
                 case "=":
                     {
-                        SetValue(tac.arg1, GetValue(tac.arg2)); 
+                        SetValue(code.arg1, GetValue(code.arg2)); 
                     }
                     break;
                 case "+=":
                     {
-                        SetValue(tac.arg1, caculator.CalBinary("+", GetValue(tac.arg1), GetValue(tac.arg2)));
+                        SetValue(code.arg1, caculator.CalBinary("+", GetValue(code.arg1), GetValue(code.arg2)));
                     }
                     break;
                 case "-=":
                     {
-                        SetValue(tac.arg1, caculator.CalBinary("-", GetValue(tac.arg1), GetValue(tac.arg2)));
+                        SetValue(code.arg1, caculator.CalBinary("-", GetValue(code.arg1), GetValue(code.arg2)));
                     }
                     break;
                 case "*=":
                     {
-                        SetValue(tac.arg1, caculator.CalBinary("*", GetValue(tac.arg1), GetValue(tac.arg2)));
+                        SetValue(code.arg1, caculator.CalBinary("*", GetValue(code.arg1), GetValue(code.arg2)));
                     }
                     break;
                 case "/=":
                     {
-                        SetValue(tac.arg1, caculator.CalBinary("/", GetValue(tac.arg1), GetValue(tac.arg2)));
+                        SetValue(code.arg1, caculator.CalBinary("/", GetValue(code.arg1), GetValue(code.arg2)));
                     }
                     break;
                 case "%=":
                     {
-                        SetValue(tac.arg1, caculator.CalBinary("%", GetValue(tac.arg1), GetValue(tac.arg2)));
+                        SetValue(code.arg1, caculator.CalBinary("%", GetValue(code.arg1), GetValue(code.arg2)));
                     }
                     break;
                 case "+":
                     {
-                        SetValue(tac.arg1, caculator.CalBinary("+", GetValue(tac.arg2), GetValue(tac.arg3)));
+                        SetValue(code.arg1, caculator.CalBinary("+", GetValue(code.arg2), GetValue(code.arg3)));
                     }
                     break;
                 case "-":
                     {
-                        SetValue(tac.arg1, caculator.CalBinary("-", GetValue(tac.arg2), GetValue(tac.arg3)));
+                        SetValue(code.arg1, caculator.CalBinary("-", GetValue(code.arg2), GetValue(code.arg3)));
                     }
                     break;
                 case "*":
                     {
-                        SetValue(tac.arg1, caculator.CalBinary("*", GetValue(tac.arg2), GetValue(tac.arg3)));
+                        SetValue(code.arg1, caculator.CalBinary("*", GetValue(code.arg2), GetValue(code.arg3)));
                     }
                     break;
                 case "/":
                     {
-                        SetValue(tac.arg1, caculator.CalBinary("/", GetValue(tac.arg2), GetValue(tac.arg3)));
+                        SetValue(code.arg1, caculator.CalBinary("/", GetValue(code.arg2), GetValue(code.arg3)));
                     }
                     break;
                 case "%":
                     {
-                        SetValue(tac.arg1, caculator.CalBinary("%", GetValue(tac.arg2), GetValue(tac.arg3)));
+                        SetValue(code.arg1, caculator.CalBinary("%", GetValue(code.arg2), GetValue(code.arg3)));
+                    }
+                    break;
+                case "NEG":
+                    {
+                        SetValue(code.arg1, caculator.CalNegtive(GetValue(code.arg2)));
+                    }
+                    break;
+                case "!":
+                    {
+                        SetValue(code.arg1, caculator.CalNot(GetValue(code.arg2)));
                     }
                     break;
                 case "ALLOC":
                     {
-                        string className = tac.arg2;
+                        string className = OperandString.GetString(code.arg2);
                         SymbolTable tableFound; 
                         var rec = Query(className, out tableFound);
                         GizObject newfanObj = new GizObject(className, rec.envPtr, mainUnit.QueryVTable(className));
                         var ptr = heap.Alloc(newfanObj);
-                        SetValue(tac.arg1, Value.FromGizObjectPtr(ptr));
+                        SetValue(code.arg1, Value.FromGizObjectPtr(ptr));
                     }
                     break;
                 case "DEL":
                     {
-                        SetValue(tac.arg1, Value.Void);
+                        SetValue(code.arg1, Value.Void);
                     }
                     break;
                 case "ALLOC_ARRAY":
                     {
-                        Value[] arr = new Value[GetValue(tac.arg2).AsInt];
+                        Value[] arr = new Value[GetValue(code.arg2).AsInt];
                         var ptr = heap.Alloc(arr);
-                        SetValue(tac.arg1, Value.FromArrayPtr(ptr));
+                        SetValue(code.arg1, Value.FromArrayPtr(ptr));
                     }
                     break;
                 case "IF_FALSE_JUMP":
                     {
-                        bool conditionTrue = GetValue(tac.arg1).AsBool;
+                        bool conditionTrue = GetValue(code.arg1).AsBool;
                         if(conditionTrue == false)
                         {
-                            var jumpAddr = mainUnit.QueryLabel(tac.arg2, currUnit);
+                            var jumpAddr = mainUnit.QueryLabel(OperandString.GetString(code.arg2), "", currUnit);
                             
                             this.curr = jumpAddr.Item2;
                             this.currUnit = jumpAddr.Item1;
@@ -487,47 +486,47 @@ namespace Gizbox.ScriptEngine
                     }
                 case "<":
                     {
-                        SetValue(tac.arg1, caculator.CalBinary("<", GetValue(tac.arg2), GetValue(tac.arg3)));
+                        SetValue(code.arg1, caculator.CalBinary("<", GetValue(code.arg2), GetValue(code.arg3)));
                     }
                     break;
                 case "<=":
                     {
-                        SetValue(tac.arg1, caculator.CalBinary("<=", GetValue(tac.arg2), GetValue(tac.arg3)));
+                        SetValue(code.arg1, caculator.CalBinary("<=", GetValue(code.arg2), GetValue(code.arg3)));
                     }
                     break;
                 case ">":
                     {
-                        SetValue(tac.arg1, caculator.CalBinary(">", GetValue(tac.arg2), GetValue(tac.arg3)));
+                        SetValue(code.arg1, caculator.CalBinary(">", GetValue(code.arg2), GetValue(code.arg3)));
                     }
                     break;
                 case ">=":
                     {
-                        SetValue(tac.arg1, caculator.CalBinary(">=", GetValue(tac.arg2), GetValue(tac.arg3)));
+                        SetValue(code.arg1, caculator.CalBinary(">=", GetValue(code.arg2), GetValue(code.arg3)));
                     }
                     break;
                 case "==":
                     {
-                        SetValue(tac.arg1, caculator.CalBinary("==", GetValue(tac.arg2), GetValue(tac.arg3)));
+                        SetValue(code.arg1, caculator.CalBinary("==", GetValue(code.arg2), GetValue(code.arg3)));
                     }
                     break;
                 case "!=":
                     {
-                        SetValue(tac.arg1, caculator.CalBinary("!=", GetValue(tac.arg2), GetValue(tac.arg3)));
+                        SetValue(code.arg1, caculator.CalBinary("!=", GetValue(code.arg2), GetValue(code.arg3)));
                     }
                     break;
                 case "++":
                     {
-                        SetValue(tac.arg1, GetValue(tac.arg1) + 1);
+                        SetValue(code.arg1, GetValue(code.arg1) + 1);
                     }
                     break;
                 case "--":
                     {
-                        SetValue(tac.arg1, GetValue(tac.arg1) - 1);
+                        SetValue(code.arg1, GetValue(code.arg1) - 1);
                     }
                     break;
                 case "CAST":
                     {
-                        SetValue(tac.arg1, caculator.Cast(tac.arg2, GetValue(tac.arg3), this));
+                        SetValue(code.arg1, caculator.Cast(OperandString.GetString(code.arg2), GetValue(code.arg3), this));
                     }
                     break;
             }
@@ -536,24 +535,219 @@ namespace Gizbox.ScriptEngine
             this.curr++;
         }
 
+        // ----------------------  Load Libs ---------------------------
+
+        private List<string> libSearchDirectories = new List<string>();
+        private List<ILUnit> libsCached = new List<ILUnit>();
+        
+        public void AddLibSearchDirectory(string dir)
+        {
+            this.libSearchDirectories.Add(dir);
+        }
+
+        public ILUnit LoadLib(string libname)
+        {
+            foreach(var libCache in libsCached)
+            {
+                if(libCache.name == libname)
+                {
+                    return libCache;
+                }
+            }
+            if (this.libSearchDirectories.Count == 0) throw new GizboxException("没有设置库加载目录！");
+            foreach (var dir in this.libSearchDirectories)
+            {
+                System.IO.DirectoryInfo dirInfo = new System.IO.DirectoryInfo(dir);
+                foreach (var f in dirInfo.GetFiles())
+                {
+                    if (System.IO.Path.GetFileNameWithoutExtension(f.Name) == libname)
+                    {
+                        if (System.IO.Path.GetExtension(f.Name).EndsWith("gixlib"))
+                        {
+                            var unit = Gizbox.IL.ILSerializer.Deserialize(f.FullName);
+                            Console.WriteLine("导入库文件：" + f.Name + " 库名：" + unit.name);
+                            return unit;
+                        }
+                    }
+                }
+            }
+
+            throw new GizboxException("没有找到库文件：" + libname + ".gixlib  !");
+        }
+
+
+
         // ----------------------- Interfaces ---------------------------
-        public TAC GetCurrentCode()
+
+        public RuntimeCode GetCurrentCode()
         {
             return mainUnit.QueryCode(currUnit, curr);
         }
+ 
+        public object Call(string functionName, params object[] args)
+        {
+            if (executing) return null;
 
+            //查找是否有函数  
+            string[] argGizTypes = args.Select(a => csharpInteropContext.GetGizType(a)).ToArray();
+            string funcFinalName = Utils.Mangle(functionName, argGizTypes);
+            var jumpAddr = mainUnit.QueryLabel("entry", funcFinalName, currUnit);
+            if (jumpAddr == null) return null;
+
+
+            //记录当前状态    
+            int tmpCurrUnit = currUnit;
+            int tmpCurr = curr;
+            var currentStack = callStack[callStack.Top]; 
+            
+
+            //参数入栈  
+            for (int i = args.Length - 1; i >= 0; --i)
+            {
+                Value arg = csharpInteropContext.Marshal2Giz(args[i]);
+                if (arg.Type == GizType.Void) throw new GizboxException("传入的实参错误！");
+                this.callStack[this.callStack.Top + 1].args.Push(arg);
+            }
+
+            //调用  
+            {
+                this.callStack[this.callStack.Top + 1].returnPtr = new Tuple<int, int>(tmpCurrUnit, tmpCurr);//返回到最后  
+
+                this.curr = jumpAddr.Item2;
+                this.currUnit = jumpAddr.Item1;
+            }
+
+            //执行  
+            while ((this.currUnit == tmpCurrUnit && this.curr == tmpCurr) == false)
+            {
+                if (this.currUnit == -1)
+                {
+                    Interpret(mainUnit.codes[this.curr]);
+                }
+                else
+                {
+                    Interpret(mainUnit.dependencies[this.currUnit].codes[this.curr]);
+                }
+            }
+
+            return csharpInteropContext.Marshal2CSharp(retRegister);
+        }
 
         // ----------------------- Operations ---------------------------
 
-        private Value GetValue(string str)
+        private Value GetValue(Operand operand)
         {
-            return Access(str, write:false);
+            //Console.WriteLine("获取值：" + operand.str);
+            switch (operand)
+            {
+                case OperandRegister r:
+                    {
+                        switch(r.registerName)
+                        {
+                            case "RET": return retRegister;
+                            default: throw new GizboxException("未知寄存器:" + r.registerName);
+                        }
+                    }
+                case OperandConst c:
+                    {
+                        switch(c.giztype)
+                        {
+                            case "string":
+                                {
+                                    return Value.FromConstStringPtr(c.linkedPtr);
+                                }
+                        }
+                        throw new RuntimeException(GetCurrentCode(), "未实现的常量读取！");
+                    }
+                case OperandLiteralValue l: return l.val;
+                case OperandVariable varible:
+                    {
+                        return AccessVariable(varible.name, write:false);
+                    }
+                case OperandElementAccess ele:
+                    {
+                        int idx = GetValue(ele.index).AsInt;
+
+                        var arr = (Value[])(this.DeReference(GetValue(ele.array).AsPtr));
+                        return arr[idx];
+                    }
+                case OperandMemberAccess memb:
+                    {
+                        var objptr = GetValue(memb.obj);
+                        string fieldName = memb.fieldname;
+
+                        if ((objptr.IsVoid)) throw new RuntimeException(GetCurrentCode(), "找不到对象！");
+                        if (objptr.Type != GizType.GizObject) throw new RuntimeException(GetCurrentCode(), "对象不是FanObject类型！");
+
+
+                        if ((this.DeReference(objptr.AsPtr) as GizObject).fields.ContainsKey(fieldName) == false) throw new RuntimeException(GetCurrentCode(), "对象" + fieldName + "字段未初始化!");
+                        return (this.DeReference(objptr.AsPtr) as GizObject).fields[fieldName];
+
+                    }
+                default:
+                    throw new GizboxException("错误的访问：" + operand.GetType().Name);
+            }
         }
 
-        private void SetValue(string str, Value v)
+        private void SetValue(Operand operand, Value val)
         {
-            Access(str, write: true, value: v);
+            //Console.WriteLine("设置值：" + operand.str + "  =  " + val + "    操作数类型：" + operand.GetType().Name);
+            switch (operand)
+            {
+                case OperandRegister r:
+                    {
+                        switch (r.registerName)
+                        {
+                            case "RET": retRegister = val; break;
+                            default: throw new GizboxException("未知寄存器:" + r.registerName);
+                        }
+                    }
+                    break;
+                case OperandConst c:
+                    {
+                        throw new GizboxException("不能设置常数的值");
+                    }
+                    break;
+                case OperandLiteralValue l:
+                    {
+                        throw new GizboxException("不能设置字面量的值");
+                    }
+                    break;
+                case OperandVariable varible:
+                    {
+                        AccessVariable(varible.name, write: true, value:val);
+                    }
+                    break;
+                case OperandElementAccess ele:
+                    {
+                        int idx = GetValue(ele.index).AsInt;
+
+                        var arr = (Value[])(this.DeReference(GetValue(ele.array).AsPtr));
+                        
+                        arr[idx] = val;
+                    }
+                    break;
+                case OperandMemberAccess memb:
+                    {
+                        var objptr = GetValue(memb.obj);
+                        string fieldName = memb.fieldname;
+
+                        if ((objptr.IsVoid)) throw new RuntimeException(GetCurrentCode(), "找不到对象！");
+                        if (objptr.Type != GizType.GizObject) throw new RuntimeException(GetCurrentCode(), "对象不是FanObject类型！");
+
+
+                        (this.DeReference(objptr.AsPtr) as GizObject).fields[fieldName] = val;
+                        //Console.WriteLine((this.DeReference(objptr.AsPtr) as GizObject).truetype + "类型的" + memb.str + "的值被设置为" + val);
+                    }
+                    break;
+                default:
+                    throw new GizboxException("错误的访问！");
+            }
         }
+
+
+
+
 
         public Value UnBoxCsObject2GizValue(object o)
         {
@@ -614,7 +808,7 @@ namespace Gizbox.ScriptEngine
             }
             else
             {
-                var v = mainUnit.QueryUnit(this.currUnit).ReadConst((int)(-ptr));
+                var v = mainUnit.ReadConst(ptr);
                 if(v is char[])
                 {
                     return new string((char[])v);
@@ -635,151 +829,153 @@ namespace Gizbox.ScriptEngine
             return Value.FromStringPtr(ptr);
         }
 
-        private Value Access(string str, bool write, Value value = default)
-        {
-            //虚拟寄存器  
-            if(str == "RET")
-            {
-                if(write)
-                {
-                    retRegister = value;
-                }
-                else
-                {
-                    return retRegister;
-                }
-                
-            }
-            //符号表查找  
-            else if (str[0] == '[')
-            {
-                string expr = TrimName(str);
-                return AccessExprRecursive(expr, write, value);
-            }
-            //字面量  
-            else if(str.StartsWith("LIT") && str.Contains(':') && write == false)
-            {
-                return AccessLiteral(str);
+        //private Value Access(string str, bool write, Value value = default)
+        //{
+        //    if (string.IsNullOrEmpty(str)) throw new RuntimeException(GetCurrentCode(), "运算分量(" + str + ")为空！当前行数:" + currUnit + ":" + curr);
 
-                throw new RuntimeException(GetCurrentCode(), "未知的参数：" + str);
-            }
-            //常量(只读)  
-            else if (str.StartsWith("CONST") && str.Contains(':') && write == false)
-            {
-                return AccessConst(str);
+        //    //虚拟寄存器  
+        //    if(str == "RET")
+        //    {
+        //        if(write)
+        //        {
+        //            retRegister = value;
+        //        }
+        //        else
+        //        {
+        //            return retRegister;
+        //        }
 
-                throw new RuntimeException(GetCurrentCode(), "未知的参数：" + str);
-            }
+        //    }
+        //    //符号表查找  
+        //    else if (str[0] == '[')
+        //    {
+        //        string expr = TrimName(str);
+        //        return AccessExprRecursive(expr, write, value);
+        //    }
+        //    //字面量  
+        //    else if(str.StartsWith("LIT") && str.Contains(':') && write == false)
+        //    {
+        //        return AccessLiteral(str);
 
-            throw new RuntimeException(GetCurrentCode(), "无法识别：" + str);
-        }
+        //        throw new RuntimeException(GetCurrentCode(), "未知的参数：" + str);
+        //    }
+        //    //常量(只读)  
+        //    else if (str.StartsWith("CONST") && str.Contains(':') && write == false)
+        //    {
+        //        return AccessConst(str);
 
-        private Value AccessExprRecursive(string expr, bool write, Value value = default)
-        {
-            bool isLiterial = false;
-            bool isConst = false;
-            bool isMemberAccess = false;
-            bool isElementAccess = false;
-            if(expr[expr.Length - 1] == ']')
-            {
-                isElementAccess = true;
-            }
-            else if(expr.Contains('.'))
-            {
-                isMemberAccess = true;
-            }
-            else if(expr.Contains(':'))
-            {
-                if (expr.StartsWith("CONST"))
-                    isConst = true;
-                else if (expr.StartsWith("LIT"))
-                    isLiterial = true;
-            }
+        //        throw new RuntimeException(GetCurrentCode(), "未知的参数：" + str);
+        //    }
 
-            //字面量访问  
-            if(isLiterial)
-            {
-                if(write)
-                {
-                    throw new RuntimeException(GetCurrentCode(), "不能对字面量赋值！");
-                }
-                else
-                {
-                    return AccessLiteral(expr);
+        //    throw new RuntimeException(GetCurrentCode(), "无法识别：" + str);
+        //}
 
-                }
-            }
-            //常量  
-            else if (isConst)
-            {
-                if (write)
-                {
-                    throw new RuntimeException(GetCurrentCode(), "不能对常量赋值！");
-                }
-                else
-                {
-                    return AccessConst(expr);
+        //private Value AccessExprRecursive(string expr, bool write, Value value = default)
+        //{
+        //    bool isLiterial = false;
+        //    bool isConst = false;
+        //    bool isMemberAccess = false;
+        //    bool isElementAccess = false;
+        //    if(expr[expr.Length - 1] == ']')
+        //    {
+        //        isElementAccess = true;
+        //    }
+        //    else if(expr.Contains('.'))
+        //    {
+        //        isMemberAccess = true;
+        //    }
+        //    else if(expr.Contains(':'))
+        //    {
+        //        if (expr.StartsWith("CONST"))
+        //            isConst = true;
+        //        else if (expr.StartsWith("LIT"))
+        //            isLiterial = true;
+        //    }
 
-                }
-            }
-            //普通变量访问  
-            else if (isMemberAccess == false && isElementAccess == false)
-            {
-                string name = expr;
-                var varible = AccessVariable(name, write: write, value);
-                return varible;
-            }
-            //数组元素访问    
-            else if (isElementAccess == true)
-            {
-                int lbracket = expr.IndexOf('[');
-                int rbracket = expr.IndexOf(']');
+        //    //字面量访问  
+        //    if(isLiterial)
+        //    {
+        //        if(write)
+        //        {
+        //            throw new RuntimeException(GetCurrentCode(), "不能对字面量赋值！");
+        //        }
+        //        else
+        //        {
+        //            return AccessLiteral(expr);
 
-                string arrVarExpr = expr.Substring(0, lbracket);
-                var array = AccessExprRecursive(arrVarExpr, write: false);
-                string idxStr = expr.Substring(lbracket, (rbracket - lbracket) + 1);
+        //        }
+        //    }
+        //    //常量  
+        //    else if (isConst)
+        //    {
+        //        if (write)
+        //        {
+        //            throw new RuntimeException(GetCurrentCode(), "不能对常量赋值！");
+        //        }
+        //        else
+        //        {
+        //            return AccessConst(expr);
 
-                int idx = GetValue(idxStr).AsInt;
+        //        }
+        //    }
+        //    //普通变量访问  
+        //    else if (isMemberAccess == false && isElementAccess == false)
+        //    {
+        //        string name = expr;
+        //        var varible = AccessVariable(name, write: write, value);
+        //        return varible;
+        //    }
+        //    //数组元素访问    
+        //    else if (isElementAccess == true)
+        //    {
+        //        int lbracket = expr.IndexOf('[');
+        //        int rbracket = expr.IndexOf(']');
 
-                if (write)
-                {
-                    var arr = (Value[])(this.DeReference(array.AsPtr));
-                    arr[idx] = value;
-                    return Value.Void;
-                }
-                else
-                {
-                    var arr = (Value[])(this.DeReference(array.AsPtr));
-                    return arr[idx];
-                }
-            }
-            //对象成员访问  
-            else if (isMemberAccess == true)
-            {
-                int lDot = expr.LastIndexOf('.');
-                var variableExpr = expr.Substring(0, lDot);
-                Value obj = AccessExprRecursive(variableExpr, write: false);
+        //        string arrVarExpr = expr.Substring(0, lbracket);
+        //        var array = AccessExprRecursive(arrVarExpr, write: false);
+        //        string idxStr = expr.Substring(lbracket, (rbracket - lbracket) + 1);
 
-                string fieldName = expr.Split('.')[1];
+        //        int idx = GetValue(idxStr).AsInt;
 
-                if ((obj.IsVoid)) throw new RuntimeException(GetCurrentCode(), "找不到对象" + variableExpr + "！");
-                if (obj.Type != GizType.GizObject) throw new RuntimeException(GetCurrentCode(), "对象" + variableExpr + "不是FanObject类型！而是" + obj.GetType().Name);
+        //        if (write)
+        //        {
+        //            var arr = (Value[])(this.DeReference(array.AsPtr));
+        //            arr[idx] = value;
+        //            return Value.Void;
+        //        }
+        //        else
+        //        {
+        //            var arr = (Value[])(this.DeReference(array.AsPtr));
+        //            return arr[idx];
+        //        }
+        //    }
+        //    //对象成员访问  
+        //    else if (isMemberAccess == true)
+        //    {
+        //        int lDot = expr.LastIndexOf('.');
+        //        var variableExpr = expr.Substring(0, lDot);
+        //        Value obj = AccessExprRecursive(variableExpr, write: false);
+
+        //        string fieldName = expr.Split('.')[1];
+
+        //        if ((obj.IsVoid)) throw new RuntimeException(GetCurrentCode(), "找不到对象" + variableExpr + "！");
+        //        if (obj.Type != GizType.GizObject) throw new RuntimeException(GetCurrentCode(), "对象" + variableExpr + "不是FanObject类型！而是" + obj.GetType().Name);
 
 
-                if (write)
-                {
-                    (this.DeReference(obj.AsPtr) as GizObject).fields[fieldName] = value;
-                    if (Compiler.enableLogScriptEngine) Log("对象" + variableExpr + "(InstanceID:" + (this.DeReference(obj.AsPtr) as GizObject).instanceID + ")字段" + fieldName + "写入：" + value.ToString());
-                    return Value.Void;
-                }
-                else
-                {
-                    if ((this.DeReference(obj.AsPtr) as GizObject).fields.ContainsKey(fieldName) == false) throw new RuntimeException(GetCurrentCode(), "对象" + variableExpr + "字段未初始化" + fieldName);
-                    return (this.DeReference(obj.AsPtr) as GizObject).fields[fieldName];
-                }
-            }
-            return Value.Void;
-        }
+        //        if (write)
+        //        {
+        //            (this.DeReference(obj.AsPtr) as GizObject).fields[fieldName] = value;
+        //            if (Compiler.enableLogScriptEngine) Log("对象" + variableExpr + "(InstanceID:" + (this.DeReference(obj.AsPtr) as GizObject).instanceID + ")字段" + fieldName + "写入：" + value.ToString());
+        //            return Value.Void;
+        //        }
+        //        else
+        //        {
+        //            if ((this.DeReference(obj.AsPtr) as GizObject).fields.ContainsKey(fieldName) == false) throw new RuntimeException(GetCurrentCode(), "对象" + variableExpr + "字段未初始化" + fieldName);
+        //            return (this.DeReference(obj.AsPtr) as GizObject).fields[fieldName];
+        //        }
+        //    }
+        //    return Value.Void;
+        //}
 
         private Value AccessVariable(string varname, bool write, Value value = default)
         {
@@ -861,39 +1057,40 @@ namespace Gizbox.ScriptEngine
             }
         }
 
-        private Value AccessLiteral(string str)
-        {
-            int splitIndex = str.IndexOf(':');
-            string baseType = str.Substring(0, splitIndex);
-            string lex = str.Substring(splitIndex + 1);
-            switch (baseType)
-            {
-                case "LITNULL": return Value.Void;
-                case "LITBOOL": return bool.Parse(lex);
-                case "LITINT": return int.Parse(lex);
-                case "LITFLOAT": return float.Parse(lex.Substring(0, lex.Length - 1));//去除F标记  
-                case "LITDOUBLE": return double.Parse(lex.Substring(0, lex.Length - 1));//去除F标记  
-                case "LITCHAR": return lex[1];
-                //case "LITSTRING": return Value.Void;//字符串字面量已经移除  
-            }
-            throw new RuntimeException(GetCurrentCode(), "未知的字面量" + str + "！");
-        }
-        private Value AccessConst(string str)
-        {
-            int splitIndex = str.IndexOf(':');
-            string baseType = str.Substring(0, splitIndex);
-            string lex = str.Substring(splitIndex + 1);
-            switch (baseType)
-            {
-                case "CONSTSTRING":
-                    {
-                        //Console.WriteLine("字符串常量：" + lex);
-                        int ptr = int.Parse(lex);
-                        return Value.FromConstStringPtr(ptr);
-                    }
-            }
-            throw new RuntimeException(GetCurrentCode(), "未知的常量" + str + "！");
-        }
+        //private Value AccessLiteral(string str)
+        //{
+        //    int splitIndex = str.IndexOf(':');
+        //    string baseType = str.Substring(0, splitIndex);
+        //    string lex = str.Substring(splitIndex + 1);
+        //    switch (baseType)
+        //    {
+        //        case "LITNULL": return Value.Void;
+        //        case "LITBOOL": return bool.Parse(lex);
+        //        case "LITINT": return int.Parse(lex);
+        //        case "LITFLOAT": return float.Parse(lex.Substring(0, lex.Length - 1));//去除F标记  
+        //        case "LITDOUBLE": return double.Parse(lex.Substring(0, lex.Length - 1));//去除F标记  
+        //        case "LITCHAR": return lex[1];
+        //        //case "LITSTRING": return Value.Void;//字符串字面量已经移除  
+        //    }
+        //    throw new RuntimeException(GetCurrentCode(), "未知的字面量" + str + "！");
+        //}
+
+        //private Value AccessConst(string str)
+        //{
+        //    int splitIndex = str.IndexOf(':');
+        //    string baseType = str.Substring(0, splitIndex);
+        //    string lex = str.Substring(splitIndex + 1);
+        //    switch (baseType)
+        //    {
+        //        case "CONSTSTRING":
+        //            {
+        //                //Console.WriteLine("字符串常量：" + lex);
+        //                int ptr = int.Parse(lex);
+        //                return Value.FromConstStringPtr(ptr);
+        //            }
+        //    }
+        //    throw new RuntimeException(GetCurrentCode(), "未知的常量" + str + "！");
+        //}
 
         private SymbolTable.Record Query(string symbolName, out SymbolTable tableFound)
         {
@@ -922,13 +1119,6 @@ namespace Gizbox.ScriptEngine
             Console.WriteLine("在符号表链中未找到：" + symbolName + "符号表链：" + string.Concat(envStack.ToList().Select(e => e.name + " - ")) + " 当前行数：" + curr);
             tableFound = null;
             return null;
-        }
-
-        private string TrimName(string input)
-        {
-            if (input[0] != ('[')) throw new RuntimeException(GetCurrentCode(), "无法Trim:" + input);
-
-            return input.Substring(1, input.Length - 2);
         }
 
         private bool IsBaseType(string typeExpr)
@@ -962,8 +1152,40 @@ namespace Gizbox.ScriptEngine
         }
 
 
-        private System.Diagnostics.Stopwatch profileW = new System.Diagnostics.Stopwatch();
-        private string profileName = "";
+        //Profiler
+        private void ProfilerLog()
+        {
+            Console.WriteLine(new string('\n', 3));
+            Console.WriteLine(" ---- 性能剖析 ---- ");
+
+            Dictionary<int, List<long>> lineToTicksList = new Dictionary<int, List<long>>();
+            for (int i = 0; i < timeList.Count; ++i)
+            {
+                int line = lineList[i];
+                long time = timeList[i];
+
+                if (lineToTicksList.ContainsKey(line) == false)
+                    lineToTicksList[line] = new List<long>(100);
+
+                lineToTicksList[line].Add(time);
+            }
+
+
+            List<KeyValuePair<int, double>> line_Time_List = new List<KeyValuePair<int, double>>();
+            foreach (var k in lineToTicksList.Keys)
+            {
+                var avg = lineToTicksList[k].Average();
+                line_Time_List.Add(new KeyValuePair<int, double>(k, avg));
+            }
+
+            line_Time_List.Sort((kv1, kv2) => (int)kv1.Value - (int)kv2.Value);
+
+            foreach (var kv in line_Time_List)
+            {
+                Console.WriteLine("line:" + kv.Key + "[" + mainUnit.codes[kv.Key].ToExpression(false) + "]" + "  avgTicks:" + kv.Value);
+            }
+        }
+
         private void ProfileBegin(string name)
         {
             profileName = name;
@@ -975,6 +1197,9 @@ namespace Gizbox.ScriptEngine
             Console.WriteLine(profileName + ": " + profileW.ElapsedTicks);
         }
 
+        //DEBUG  
+        private System.Diagnostics.Stopwatch profileW = new System.Diagnostics.Stopwatch();
+        private string profileName = "";
         private void PrintCallStack()
         {
             for (int i = 0; i <= callStack.Top; ++i)
@@ -1010,6 +1235,18 @@ namespace Gizbox.ScriptEngine
             this.engine = engineContext;
         }
 
+        public Value CalNot(Value v)
+        {
+            if(v.Type == GizType.Bool)
+            {
+                return !(v.AsBool);
+            }
+            else
+            {
+                throw new RuntimeException(engine.GetCurrentCode(), "只有布尔值能取非");
+            }
+        }
+
         public Value CalNegtive(Value v)
         {
             switch(v.Type)
@@ -1019,11 +1256,13 @@ namespace Gizbox.ScriptEngine
                 default: throw new RuntimeException(engine.GetCurrentCode(), v.Type + "类型不能进行求负数操作!");
             }
         }
+
         public Value CalBinary(string op, Value v1, Value v2)
         {
             //固有的操作符重载    
             if(v1.Type == GizType.String && v2.Type == GizType.String)
             {
+                //Console.WriteLine("字符串连接：str1: " + (string)engine.DeReference(v1.AsPtr) + " ptr1 : " + v1.AsPtr + "  str2: " + (string)engine.DeReference(v2.AsPtr) + "  ptr2 : " + v2.AsPtr);
                 string newstring = (string)engine.DeReference(v1.AsPtr) + (string)engine.DeReference(v2.AsPtr);
                 return engine.NewString(newstring);
             }

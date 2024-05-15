@@ -3,6 +3,11 @@ namespace Console
 {
 	extern void Log(string text);
 	
+	void LogHelloWorld()
+	{
+		Console::Log("Hello World!");
+	}
+
 	void Log(bool b)
 	{
 		Console::Log((string)b);

@@ -121,7 +121,7 @@ In the same compilation unit, the base class must be defined before the derived 
 
 ```C#
 Gizbox.Compiler compiler = new Compiler(); // Create a compiler instance
-compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory); // Set the library file search path
+compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory); // Set the library file search path（Requires library files for semantic analysis）
 var ir = compiler.Compile(source); // Compile the source code into intermediate code
 ```
 
@@ -129,7 +129,8 @@ var ir = compiler.Compile(source); // Compile the source code into intermediate 
 
 ```C#
 ScriptEngine engine = new ScriptEngine(); // Create an interpreter instance
-engine.csharpInteropContext.ConfigExternCallClasses(typeof(GizboxLang.Examples.ExampleInterop)); //
+engine.AddLibSearchDirectory(AppDomain.CurrentDomain.BaseDirectory);//Search Directory Of Libs  
+engine.csharpInteropContext.ConfigExternCallClasses(typeof(GizboxLang.Examples.ExampleInterop));
 engine.Execute(ir);
 ```
 
@@ -140,6 +141,16 @@ engine.csharpInteropContext.ConfigExternCallClasses(new Type[] {
     typeof(GizboxLang.Examples.ExampleInterop),
 }); // The extern functions in Gizbox will find the corresponding methods from this class
 ```
+
+
+- Calling Gizbox Function from C#    
+
+```C#
+ScriptEngine engine = new ScriptEngine();
+engine.Load(il);
+var ret = engine.Call("Math::Pow", 2f, 4);
+Console.WriteLine("result:" + ret); //result:16
+```  
 
 - Generate Interop Wrap code
 
