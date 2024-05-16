@@ -264,17 +264,19 @@ namespace Gizbox
         // ***** Data *****
         public Dictionary<string, Value> fields = new Dictionary<string, Value>();
 
-        public GizObject(string classname, ScriptEngine.ScriptEngine engineContext)
+        public GizObject(string gzclassname, ScriptEngine.ScriptEngine engineContext)
         {
             this.instanceID = currentMaxId++;
-            this.truetype = classname;
-            this.classEnv = engineContext.mainUnit.QueryClass(classname).envPtr;
-            this.vtable = engineContext.mainUnit.vtables[classname];
+            this.truetype = gzclassname;
+            var classRec = engineContext.mainUnit.QueryClass(gzclassname); if (classRec == null || classRec.envPtr == null) throw new Exception("找不到" + gzclassname + "的记录和符号表");
+            this.classEnv = engineContext.mainUnit.QueryClass(gzclassname).envPtr;
+            if (engineContext.mainUnit.QueryVTable(gzclassname) == null) throw new Exception("找不到虚函数表：" + gzclassname);
+            this.vtable = engineContext.mainUnit.QueryVTable(gzclassname);
         }
-        public GizObject(string classname, SymbolTable classEnv, VTable vtable)
+        public GizObject(string gzclassname, SymbolTable classEnv, VTable vtable)
         {
             this.instanceID = currentMaxId++;
-            this.truetype = classname;
+            this.truetype = gzclassname;
             this.classEnv = classEnv;
             this.vtable = vtable;
         }

@@ -599,7 +599,7 @@ namespace Gizbox
         public static bool enableLogScanner = false;
         public static bool enableLogParser = false;
         public static bool enableLogSemanticAnalyzer = false;
-        public static bool enableLogILGenerator = false;
+        public static bool enableLogILGenerator = true;
         public static bool enableLogScriptEngine = false;
 
         //parser data  

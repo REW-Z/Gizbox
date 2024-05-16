@@ -25,7 +25,7 @@ namespace GizboxLangTest
         {
             ////生成互操作Wrap代码      
             //InteropWrapGenerator generator = new InteropWrapGenerator();
-            //generator.IncludeTypes(new Type[] { 
+            //generator.IncludeTypes(new Type[] {
             //    typeof(GizboxLang.Examples.Student),
             //});
             //foreach (var t in generator.closure)

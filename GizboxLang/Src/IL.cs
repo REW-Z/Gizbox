@@ -889,32 +889,47 @@ namespace Gizbox.IL
                         }
                         
 
-                        //显式定义的参数（倒序压栈）    
+                        //一定要先计算参数再Param，否则连续调用aaa().bbb()会出错！
+
+                        //实参计算
                         for(int i = callNode.argumantsNode.arguments.Count - 1; i >= 0 ; --i)
                         {
                             //计算参数表达式的值  
                             GenNode(callNode.argumantsNode.arguments[i]);
-                            GenerateCode("PARAM", (string)callNode.argumantsNode.arguments[i].attributes["ret"]);
                         }
 
-                        //隐藏的参数  -  对象指针  
+                        //this实参计算（成员方法）    
                         if (callNode.isMemberAccessFunction == true)
                         {
                             if (callNode.funcNode is SyntaxTree.ObjectMemberAccessNode)
                             {
                                 var objNode = (callNode.funcNode as SyntaxTree.ObjectMemberAccessNode).objectNode;
                                 GenNode(objNode);
+                            }
+                        }
+
+                        //实参倒序压栈  
+                        for (int i = callNode.argumantsNode.arguments.Count - 1; i >= 0; --i)
+                        {
+                            GenerateCode("PARAM", (string)callNode.argumantsNode.arguments[i].attributes["ret"]);
+                        }
+                        //this实参压栈（成员方法）    
+                        if (callNode.isMemberAccessFunction == true)
+                        {
+                            if (callNode.funcNode is SyntaxTree.ObjectMemberAccessNode)
+                            {
+                                var objNode = (callNode.funcNode as SyntaxTree.ObjectMemberAccessNode).objectNode;
                                 GenerateCode("PARAM", (string)objNode.attributes["ret"]);
                             }
                             else
                             {
                                 GenerateCode("PARAM", "[this]");
                             }
-
-
                         }
 
-                        if(callNode.isMemberAccessFunction == true)
+
+
+                        if (callNode.isMemberAccessFunction == true)
                         {
                             GenerateCode("MCALL", "[" + mangledName + "]", "LITINT:" + argCount);
                             GenerateCode("=", callNode.attributes["ret"], "RET");

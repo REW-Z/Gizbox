@@ -1545,6 +1545,12 @@ namespace Gizbox.SemanticRule
                                 funcDeclNode.identifierNode.SetPrefix(currentNamespace);
 
 
+                            //形参类型补全  
+                            foreach (var p in funcDeclNode.parametersNode.parameterNodes)
+                            {
+                                TryCompleteType(p.typeNode);
+                            }
+
                             //符号的类型表达式  
                             string typeExpr = "";
                             for (int i = 0; i < funcDeclNode.parametersNode.parameterNodes.Count; ++i)
@@ -1590,6 +1596,12 @@ namespace Gizbox.SemanticRule
                             if (isTopLevelAtNamespace)
                                 externFuncDeclNode.identifierNode.SetPrefix(currentNamespace);
 
+
+                            //形参类型补全  
+                            foreach (var p in externFuncDeclNode.parametersNode.parameterNodes)
+                            {
+                                TryCompleteType(p.typeNode);
+                            }
 
                             //符号的类型表达式  
                             string typeExpr = "";
@@ -1751,6 +1763,12 @@ namespace Gizbox.SemanticRule
                             funcDeclNode.identifierNode.SetPrefix(null);
 
 
+                            //形参类型补全  
+                            foreach(var p in funcDeclNode.parametersNode.parameterNodes)
+                            {
+                                TryCompleteType(p.typeNode);
+                            }
+
                             //符号的类型表达式（成员函数）  
                             string typeExpr = "";
                             for (int i = 0; i < funcDeclNode.parametersNode.parameterNodes.Count; ++i)
@@ -1805,6 +1823,7 @@ namespace Gizbox.SemanticRule
                             //返回值类型补全    
                             TryCompleteType(funcDeclNode.returnTypeNode);
 
+                            
 
 
                             //隐藏的this参数加入符号表    
@@ -1813,7 +1832,7 @@ namespace Gizbox.SemanticRule
                                 funcEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, className);
                             }
 
-                            //形参加入符号表    
+                            //形参加入符号表  
                             foreach (var paramNode in funcDeclNode.parametersNode.parameterNodes)
                             {
                                 Pass2_CollectOtherSymbols(paramNode);
@@ -1842,6 +1861,10 @@ namespace Gizbox.SemanticRule
                         //进入函数作用域  
                         envStack.Push(funcEnv);
 
+                        //返回值类型补全    
+                        TryCompleteType(externFuncDeclNode.returnTypeNode);
+
+
                         //形参加入符号表    
                         foreach (var paramNode in externFuncDeclNode.parametersNode.parameterNodes)
                         {
@@ -1854,9 +1877,6 @@ namespace Gizbox.SemanticRule
 
                 case SyntaxTree.ParameterNode paramNode:
                     {
-                        //形参类型补全  
-                        TryCompleteType(paramNode.typeNode);
-
                         //形参加入函数作用域的符号表  
                         var newRec = envStack.Peek().NewRecord(
                             paramNode.identifierNode.FullName,
@@ -2156,7 +2176,7 @@ namespace Gizbox.SemanticRule
 
                         if (Utils.IsArrayType(objTypeExpr) == false)
                         {
-                            if (this.ilUnit.QueryClass(objTypeExpr) == null)
+                            if (Query(objTypeExpr) == null)
                             {
                                 if((objTypeExpr == "string") == false)
                                 {
@@ -2710,7 +2730,10 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.ClassTypeNode classTypeNode:
                     {
+                        Console.WriteLine("类类型补全：" + classTypeNode.classname);
                         TryCompleteIdenfier(classTypeNode.classname);
+
+                        Console.WriteLine("结果：" + classTypeNode.classname.FullName);
                     }
                     break;
                 case SyntaxTree.ArrayTypeNode arrayTypeNpde:

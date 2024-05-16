@@ -92,7 +92,7 @@ namespace Gizbox.ScriptEngine
         public Gizbox.Interop.CSharp.InteropContext csharpInteropContext;
 
         //堆区  
-        private Heap heap = new Heap();
+        public Heap heap = new Heap();
 
         //调用堆栈  
         private CallStack callStack = new CallStack();
@@ -1107,11 +1107,10 @@ namespace Gizbox.ScriptEngine
             //导入库查找  
             foreach (var lib in this.mainUnit.dependencies)
             {
-                var rec = lib.globalScope.env.GetRecord(symbolName);
-                if (rec != null)
+                if (lib.globalScope.env.ContainRecordName(symbolName))
                 {
                     tableFound = lib.globalScope.env;
-                    return rec;
+                    return lib.globalScope.env.GetRecord(symbolName);
                 }
             }
 

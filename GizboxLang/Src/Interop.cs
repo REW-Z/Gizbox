@@ -13,6 +13,7 @@ namespace Gizbox.Interop.CSharp
 {
     public class ObjectBinding
     {
+        public long gizHeapPtr;
         public GizObject gizObj;
         public object csObj;
     }
@@ -30,8 +31,8 @@ namespace Gizbox.Interop.CSharp
 
         //绑定表  
         public List<ObjectBinding> bindingTable = new List<ObjectBinding>();
-        private Dictionary<int, ObjectBinding> idToBind = new Dictionary<int, ObjectBinding>();
-        private Dictionary<object, ObjectBinding> objToBind = new Dictionary<object, ObjectBinding>();
+        private Dictionary<int, ObjectBinding> instanceidToBind = new Dictionary<int, ObjectBinding>();
+        private Dictionary<object, ObjectBinding> csobjToBind = new Dictionary<object, ObjectBinding>();
 
         //类型缓存（从Giz类名到C#的类型）    
         private Dictionary<string, Type> typeCache = new Dictionary<string, Type>();
@@ -62,13 +63,13 @@ namespace Gizbox.Interop.CSharp
         }
 
         //绑定对象  
-        public void NewBinding(GizObject gObj, object csObj)
+        public void NewBinding(long gzheapPtr, GizObject gObj, object csObj)
         {
             int id = gObj.instanceID;
-            var bd = new ObjectBinding() { gizObj = gObj, csObj = csObj };
+            var bd = new ObjectBinding() { gizHeapPtr = gzheapPtr,  gizObj = gObj, csObj = csObj };
             bindingTable.Add(bd);
-            idToBind[id] = bd;
-            objToBind[csObj] = bd;
+            instanceidToBind[id] = bd;
+            csobjToBind[csObj] = bd;
         }
 
         //查询类型  
@@ -128,15 +129,15 @@ namespace Gizbox.Interop.CSharp
                 if (cstype.IsValueType == false)
                 {
                     //存在已绑定对象  
-                    if (idToBind.ContainsKey(gizobj.instanceID))
+                    if (instanceidToBind.ContainsKey(gizobj.instanceID))
                     {
-                        return idToBind[gizobj.instanceID].csObj;
+                        return instanceidToBind[gizobj.instanceID].csObj;
                     }
                     //没有绑定的对象-新建  
                     else
                     {
                         var newobj = Activator.CreateInstance(FindType(gizobj.truetype));
-                        NewBinding(gizobj, newobj);
+                        NewBinding(gzVal.AsPtr, gizobj, newobj);
                         return newobj;
                     }
                 }
@@ -207,29 +208,28 @@ namespace Gizbox.Interop.CSharp
                 //引用类型  
                 if(cstype.IsValueType == false)
                 {
-                    if (objToBind.ContainsKey(csVal))
+                    if (csobjToBind.ContainsKey(csVal))
                     {
-                        //return objToBind[csVal].gizObj; //TODO: ???
-                        return Value.Void;
+                        var bind = csobjToBind[csVal];
+                        return Value.FromGizObjectPtr(bind.gizHeapPtr);
                     }
                     else
                     {
-                        var newgizobj = new GizObject(cstype.Name, engine);
-                        NewBinding(newgizobj, csVal);
-                        //return newgizobj; //TODO: ???????
-                        return Value.Void;
+                        var newgizobj = new GizObject(GetGizClassName(cstype.FullName), engine);
+                        long newptr = engine.heap.Alloc(newgizobj);
+                        NewBinding(newptr, newgizobj, csVal);
+                        return Value.FromGizObjectPtr(newptr); 
                     }
                 }
                 //值类型  
                 else
                 {
-                    var newgizobj = new GizObject(cstype.Name, engine);
+                    var newgizobj = new GizObject(GetGizClassName(cstype.FullName), engine);
                     //结构体无法绑定 - 需要Marshal数值    
                     foreach (var field in cstype.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
                     {
                         newgizobj.fields[field.Name] = Marshal2Giz(field.GetValue(csVal));   
                     }
-                    //return newgizobj; //TODO: ????????????
                     return Value.Void;
                 }
             }
@@ -249,9 +249,13 @@ namespace Gizbox.Interop.CSharp
                 case string s: return "string";
                 default:
                     {
-                        return csVal.GetType().FullName.Replace(".","::");
+                        return GetGizClassName(csVal.GetType().FullName);
                     }
             }
+        }
+        public string GetGizClassName(string csFullName)
+        {
+            return csFullName.Replace(".", "::").Replace("+","::");
         }
 
         //配置  

@@ -168,6 +168,11 @@ namespace Gizbox
                 .Where(m => IsInClosure(m))
                 .Where(f => IsMemberObsolete(f) == false)
                 .ToArray();
+            var staticFuncs = type.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.DeclaredOnly)
+                .Where(m => m.IsSpecialName == false)
+                .Where(m => IsInClosure(m))
+                .Where(f => IsMemberObsolete(f) == false)
+                .ToArray();
 
 
             //C#包装类声明  
@@ -210,52 +215,102 @@ namespace Gizbox
             {
                 //无访问器  
             }
-            if (methods.Length > 0)
+
+            //方法  
+            foreach (var m in methods)
             {
-                foreach (var m in methods)
+                List<string> paramList = new List<string>();
+                paramList.Add(type.FullName);//this 参数  
+                paramList.AddRange(m.GetParameters().Select(p => p.ParameterType.FullName));
+
+                string paramsStr = "";
+                string argsStr = "";
+                int i = 0;
+                foreach (var p in paramList)
                 {
-                    List<string> paramList = new List<string>();
-                    paramList.Add(type.FullName);
-                    paramList.AddRange(m.GetParameters().Select(p => p.ParameterType.FullName));
+                    if (i > 0) paramsStr += ", ";
+                    paramsStr += (p + " arg" + i.ToString());
 
-                    string paramsStr = "";
-                    string argsStr = "";
-                    int i = 0;
-                    foreach (var p in paramList)
+
+                    if (i > 1) argsStr += ", ";
+                    if (i != 0)
                     {
-                        if (i > 0) paramsStr += ", ";
-                        paramsStr += (p + " arg" + i.ToString());
-
-
-                        if (i > 1) argsStr += ", ";
-                        if (i != 0)
-                        {
-                            argsStr += ("arg" + i.ToString());
-                        }
-
-                        i++;
+                        argsStr += ("arg" + i.ToString());
                     }
 
-                    strbCs.AppendLine("\tpublic static " + ToCsType(m.ReturnType) + " " + (classnameCs + "_" + m.Name) + "(" + paramsStr + ")");
-                    strbCs.AppendLine("\t{");
-
-                    if (m.ReturnType == typeof(void))
-                    {
-                        strbCs.AppendLine("\t\t" + "arg0." + m.Name + "(" + argsStr + ");");
-                    }
-                    else
-                    {
-                        strbCs.AppendLine("\t\t" + "return arg0." + m.Name + "(" + argsStr + ");");
-                    }
-
-                    strbCs.AppendLine("\t}");
+                    i++;
                 }
 
+                strbCs.AppendLine("\tpublic static " + ToCsType(m.ReturnType) + " " + (classnameCs + "_" + m.Name) + "(" + paramsStr + ")");
+                strbCs.AppendLine("\t{");
+
+                if (m.ReturnType == typeof(void))
+                {
+                    strbCs.AppendLine("\t\t" + "arg0." + m.Name + "(" + argsStr + ");");
+                }
+                else
+                {
+                    strbCs.AppendLine("\t\t" + "return arg0." + m.Name + "(" + argsStr + ");");
+                }
+
+                strbCs.AppendLine("\t}");
+            }
+            //静态函数
+            foreach (var func in staticFuncs)
+            {
+                List<string> paramList = new List<string>();
+                paramList.AddRange(func.GetParameters().Select(p => p.ParameterType.FullName));
+
+                string paramsStr = "";
+                string argsStr = "";
+                int i = 0;
+                foreach (var p in paramList)
+                {
+                    if (i > 0) paramsStr += ", ";
+                    paramsStr += (p + " arg" + i.ToString());
+
+                    if (i > 0) argsStr += ", ";
+                    argsStr += ("arg" + i.ToString());
+
+                    i++;
+                }
+
+                strbCs.AppendLine("\tpublic static " + ToCsType(func.ReturnType) + " " + (classnameCs + "_" + func.Name + "_Static") + "(" + paramsStr + ")");
+                strbCs.AppendLine("\t{");
+
+                if (func.ReturnType == typeof(void))
+                {
+                    strbCs.AppendLine("\t\t" + type.FullName + "." + func.Name + "(" + argsStr + ");");
+                }
+                else
+                {
+                    strbCs.AppendLine("\t\t" + "return " + type.FullName + "." + func.Name + "(" + argsStr + ");");
+                }
+
+                strbCs.AppendLine("\t}");
             }
 
 
-            //Giz类外声明部分  
 
+            //Giz类外声明部分 - 类静态方法      
+            foreach (var func in staticFuncs)
+            {
+                List<string> paramList = new List<string>();
+                paramList.AddRange(func.GetParameters().Select(p => ToGizType(p.ParameterType)));
+
+                string paramsStr = "";
+                int i = 0;
+                foreach (var p in paramList)
+                {
+                    if (i != 0) paramsStr += ", ";
+                    paramsStr += (p + " arg" + i.ToString());
+                    i++;
+                }
+
+                strbGiz.AppendLine("extern " + ToGizType(func.ReturnType) + " " + (classnameGz + "_" + func.Name + "_Static") + "(" + paramsStr + ");");
+            }
+
+            //Giz类外声明部分 - 成员函数实现和成员字段/属性实现  
             if (type.IsValueType == false)
             {
                 foreach (var f in fields)
@@ -291,6 +346,9 @@ namespace Gizbox
 
                 strbGiz.AppendLine("extern " + ToGizType(m.ReturnType) + " " + (classnameGz + "_" + m.Name) + "(" + paramsStr + ");");
             }
+            strbGiz.AppendLine();
+            strbGiz.AppendLine();
+            strbGiz.AppendLine();
 
 
             //Giz类内声明部分  
@@ -406,7 +464,8 @@ namespace Gizbox
 
 
             strbGiz.AppendLine("}");
-            strbGiz.AppendLine("");
+            strbGiz.AppendLine();
+            strbGiz.AppendLine();
         }
 
         private static string GizTypeDefaultValueStr(string gizType)
@@ -480,7 +539,7 @@ namespace Gizbox
                 case "String": return "string";
                 default:
                     {
-                        return t.Name;
+                        return t.FullName.Replace(".", "::").Replace("+", "__");
                     }
             }
         }
@@ -493,7 +552,7 @@ namespace Gizbox
             }
             else
             {
-                return t.Name;
+                return t.FullName;
             }
         }
     }
