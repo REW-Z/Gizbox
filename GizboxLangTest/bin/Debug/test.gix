@@ -3,32 +3,6 @@
 using Console;
 
 
-class GameObject
-{
-	Transform t = new Transform();
-	Transform transform()
-	{
-		return this.t;
-	}
-}
-class Transform
-{
-	string name = "unanmed";
-	void name(string newv)
-	{
-		this.name = newv;
-	}
-	string name()
-	{
-		return this.name ;
-	}
-}
-
-
-GameObject go = new GameObject();
-go.transform().name("aaa");
-Log(go.transform().name());
-
 Collections::ListInt list = new Collections::ListInt();
 
 list.Add(233);

@@ -23,6 +23,9 @@ namespace GizboxLangTest
     {
         static void Main(string[] args)
         {
+            Gizbox.Test.Foo();
+            return;
+
             ////生成互操作Wrap代码      
             //InteropWrapGenerator generator = new InteropWrapGenerator();
             //generator.IncludeTypes(new Type[] {

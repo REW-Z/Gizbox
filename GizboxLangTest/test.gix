@@ -3,11 +3,6 @@
 using Console;
 
 
-
-GameObject go = new GameObject();
-go.transform().name("aaa");
-Log(go.transform().name());
-
 Collections::ListInt list = new Collections::ListInt();
 
 list.Add(233);
