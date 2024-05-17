@@ -676,7 +676,7 @@ namespace Gizbox.ScriptEngine
                         var objptr = GetValue(memb.obj);
                         string fieldName = memb.fieldname;
 
-                        if ((objptr.IsVoid)) throw new RuntimeException(GetCurrentCode(), "找不到对象！");
+                        if ((objptr.IsVoid)) throw new RuntimeException(GetCurrentCode(), "获取对象字段\"" + fieldName + "\"时发生错误：找不到要访问的对象");
                         if (objptr.Type != GizType.GizObject) throw new RuntimeException(GetCurrentCode(), "对象不是FanObject类型！");
 
 
@@ -732,7 +732,7 @@ namespace Gizbox.ScriptEngine
                         var objptr = GetValue(memb.obj);
                         string fieldName = memb.fieldname;
 
-                        if ((objptr.IsVoid)) throw new RuntimeException(GetCurrentCode(), "找不到对象！");
+                        if ((objptr.IsVoid)) throw new RuntimeException(GetCurrentCode(), "设置对象字段\"" + fieldName + "\"时发生错误：找不到要访问的对象");
                         if (objptr.Type != GizType.GizObject) throw new RuntimeException(GetCurrentCode(), "对象不是FanObject类型！");
 
 

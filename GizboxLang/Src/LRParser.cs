@@ -2570,9 +2570,7 @@ namespace Gizbox.SemanticRule
                         //比较运算符
                         if(op == "<" || op == ">" || op == "<=" || op == ">=" || op == "==" || op == "!=")
                         {
-                            if (typeL != typeR) throw new SemanticException(binaryOp, "二元运算两边的类型不一致！");
-                            if (typeL == "string" ) throw new SemanticException(binaryOp,"字符串不能进行比较！");
-                            if (typeL == "bool") throw new SemanticException(binaryOp,"布尔值不能进行比较！");
+                            if (CheckType(typeL, typeR) == false) throw new SemanticException(binaryOp, "类型不一致的表达式不能比较");
 
                             nodeTypeExprssion = "bool";
                         }

@@ -176,10 +176,12 @@ namespace Gizbox.Interop.CSharp
         {
             switch (csVal)
             {
-                case string str:
+                case bool b:
                 case int i:
                 case float f:
-                case bool b:
+                case double d:
+                case char c:
+                case string str:
                     return engine.UnBoxCsObject2GizValue(csVal);
                 default: break;
             }
@@ -225,12 +227,13 @@ namespace Gizbox.Interop.CSharp
                 else
                 {
                     var newgizobj = new GizObject(GetGizClassName(cstype.FullName), engine);
+                    long newptr = engine.heap.Alloc(newgizobj);
                     //结构体无法绑定 - 需要Marshal数值    
                     foreach (var field in cstype.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
                     {
-                        newgizobj.fields[field.Name] = Marshal2Giz(field.GetValue(csVal));   
+                        newgizobj.fields[field.Name] = Marshal2Giz(field.GetValue(csVal));
                     }
-                    return Value.Void;
+                    return Value.FromGizObjectPtr(newptr);
                 }
             }
 

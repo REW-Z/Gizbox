@@ -60,26 +60,6 @@ namespace Gizbox
     }
 
 
-    /// <summary>
-    /// 模式  
-    /// </summary>
-    public class TokenPattern
-    {
-        public string tokenName;  
-
-        public string regularExpression;
-
-        public int back;
-
-        public TokenPattern(string tokenName, string regularExpr, int back = 0)
-        {
-            this.tokenName = tokenName;
-            this.regularExpression = regularExpr;
-            this.back = back;
-        }
-    }
-
-
 
 
     /// <summary>

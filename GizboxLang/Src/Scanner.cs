@@ -6,6 +6,30 @@ using System.Text;
 
 namespace Gizbox
 {
+    /// <summary>
+    /// 模式  
+    /// </summary>
+    public class TokenPattern
+    {
+        public string tokenName;
+
+        public string regularExpression;
+
+        public int back;
+
+        public Regex regex;
+
+        public TokenPattern(string tokenName, string regularExpr, int back = 0)
+        {
+            this.tokenName = tokenName;
+            this.regularExpression = regularExpr;
+            this.back = back;
+
+            this.regex = new Regex("^" + this.regularExpression + "$");
+        }
+    }
+
+
     public class Scanner
     {
         //Token Patterns  
@@ -59,7 +83,7 @@ namespace Gizbox
             operators.Add(new TokenPattern("{", "\\{"));
             operators.Add(new TokenPattern("}", "\\}"));
 
-            operators.Add(new TokenPattern("=", "=(?![=\\+])"));
+            operators.Add(new TokenPattern("=", "=[^=]", 1));
             operators.Add(new TokenPattern("+=", "\\+="));
             operators.Add(new TokenPattern("-=", "-="));
             operators.Add(new TokenPattern("*=", "\\*="));
@@ -70,7 +94,7 @@ namespace Gizbox
             operators.Add(new TokenPattern("++", "\\+\\+"));
 
 
-            operators.Add(new TokenPattern("==", "=="));
+            operators.Add(new TokenPattern("==", "==[^=]", 1));
             operators.Add(new TokenPattern("!=", "!="));
             operators.Add(new TokenPattern("<=", "<="));
             operators.Add(new TokenPattern(">=", ">="));
@@ -120,9 +144,7 @@ namespace Gizbox
 
         public static bool PatternMatch(string input, TokenPattern pattern)
         {
-            bool ismatch = Regex.IsMatch(input, "^" + pattern.regularExpression + "$");
-
-            return ismatch;
+            return pattern.regex.IsMatch(input);
         }
 
         public List<Token> Scan(string input)
@@ -154,26 +176,26 @@ namespace Gizbox
             {
                 if (lexemBegin + (forward - lexemBegin) > source.Length)
                 {
-                    Log("发现越界：" + (lexemBegin + (forward - lexemBegin)));
-                    Log("总长度：" + source.Length);
-
+                    if(Compiler.enableLogScanner) Log("发现越界：" + (lexemBegin + (forward - lexemBegin)));
+                    if (Compiler.enableLogScanner) Log("总长度：" + source.Length);
                     string remainingText = source.Substring(lexemBegin);
                     throw new LexerException(currLine, remainingText.Substring(0, System.Math.Min(10, remainingText.Length)), "词法分析器扫描越界！");
                 }
+
+
                 var seg = source.Substring(lexemBegin, forward - lexemBegin);
 
-                Log("[" + seg + "]" + "(" + lexemBegin + "," + forward + ")");
+                if (Compiler.enableLogScanner) Log("[" + seg + "]" + "(" + lexemBegin + "," + forward + ")");
 
                 //WHITE SPACE  
-                if (seg != "" && PatternMatch(seg, whitespace))
+                if (seg.Length > 0 && PatternMatch(seg, whitespace))
                 {
-                    Log("\n>>>>> white space. length:" + seg.Length + "\n\n");
+                    if (Compiler.enableLogScanner) Log("\n>>>>> white space. length:" + seg.Length + "\n\n");
 
                     //识别换行  
-                    string spaceStr = seg.Substring(0, seg.Length - whitespace.back);
-                    for (int i = 0; i < spaceStr.Length; ++i)
+                    for (int i = 0; i < seg.Length - whitespace.back; ++i)
                     {
-                        if(spaceStr[i] == '\n')
+                        if (seg[i] == '\n')
                         {
                             currLine++;
                         }
@@ -190,8 +212,7 @@ namespace Gizbox
                     if (PatternMatch(seg, kw))
                     {
                         string keyword = seg.Substring(0, seg.Length - kw.back);
-
-                        Log("\n>>>>> keyword:" + keyword + "\n\n");
+                        if (Compiler.enableLogScanner) Log("\n>>>>> keyword:" + keyword + "\n\n");
 
                         Token token = new Token(keyword, PatternType.Keyword, currLine);
                         tokens.Add(token);
@@ -216,7 +237,7 @@ namespace Gizbox
                     if (PatternMatch(seg, op))
                     {
                         string opStr = seg.Substring(0, seg.Length - op.back);
-                        Log("\n>>>>> operator:" + opStr + "  tokenname:" + op.tokenName + "\n\n");
+                        if (Compiler.enableLogScanner) Log("\n>>>>> operator:" + opStr + "  tokenname:" + op.tokenName + "\n\n");
 
                         Token token = new Token(opStr, PatternType.Operator, currLine);
                         tokens.Add(token);
@@ -240,7 +261,7 @@ namespace Gizbox
                     if (PatternMatch(seg, lit))
                     {
                         string litstr = seg.Substring(0, seg.Length - lit.back);
-                        Log("\n>>>>> literal value:" + lit.tokenName + ":" + litstr + "\n\n");
+                        if (Compiler.enableLogScanner) Log("\n>>>>> literal value:" + lit.tokenName + ":" + litstr + "\n\n");
 
                         Token token = new Token(lit.tokenName, PatternType.Number, currLine, litstr);
                         tokens.Add(token);
@@ -261,7 +282,7 @@ namespace Gizbox
                 if (PatternMatch(seg, identifierPattern))
                 {
                     string identifierName = seg.Substring(0, seg.Length - identifierPattern.back);
-                    Log("\n>>>>> identifier:" + identifierName + "\n\n");
+                    if (Compiler.enableLogScanner) Log("\n>>>>> identifier:" + identifierName + "\n\n");
 
                     //int idx = globalSymbolTable.AddIdentifier(identifierName);//词法分析阶段最好不创建符号表条目（编译原理p53）  
                     Token token = new Token(identifierPattern.tokenName, PatternType.Id, currLine, identifierName);
@@ -279,10 +300,10 @@ namespace Gizbox
 
             //DEBUG  
             {
-                Log("Token列表：");
+                if (Compiler.enableLogScanner) Log("Token列表：");
                 foreach(var token in tokens)
                 {
-                    Log(token.ToString());
+                    if (Compiler.enableLogScanner) Log(token.ToString());
                 }
 
                 Compiler.Pause("词法单元扫描完毕，共" + tokens.Count + "个...");
