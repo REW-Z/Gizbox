@@ -2,18 +2,24 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Runtime.Serialization;
 using Gizbox;
 
 namespace Gizbox.IL
 {
-    [Serializable]
+    [DataContract]
     public class TAC
     {
+        [DataMember]
         public string label;
 
+        [DataMember]
         public string op;
+        [DataMember]
         public string arg1;
+        [DataMember]
         public string arg2;
+        [DataMember]
         public string arg3;
 
         public string ToExpression(bool showlabel = true)
@@ -48,51 +54,66 @@ namespace Gizbox.IL
             return str;
         }
     }
-    [Serializable]
+    [DataContract(IsReference = true)]
     public class Scope
     {
+        [DataMember]
         public int lineFrom;
+        [DataMember]
         public int lineTo;
+        [DataMember]
         public SymbolTable env;
     }
 
     [Serializable]
+    [DataContract(IsReference = true)]
     public class ILUnit
     {
         //名称    
+        [DataMember]
         public string name;
 
         //依赖库名称  
+        [DataMember]
         public List<string> dependencies = new List<string>();
 
         //代码  
+        [DataMember]
         public List<TAC> codes = new List<TAC>();
 
         //作用域状态数组  
+        [DataMember]
         public int[] scopeStatusArr;
 
         //作用域列表  
+        [DataMember]
         public List<Scope> scopes = new List<Scope>();
 
         //全局作用域  
+        [DataMember]
         public Scope globalScope;
 
         //虚函数表  
+        [DataMember]
         public Dictionary<string, VTable> vtables = new Dictionary<string, VTable>();
 
         //标号 -> 行数 查询表  
+        [DataMember]
         public Dictionary<string, int> label2Line = new Dictionary<string, int>();
 
         //行数 -> 符号表链 查询表
+        [DataMember]
         public Dictionary<int, Gizbox.GStack<SymbolTable>> stackDic;
 
         //静态数据区 - 常量  
+        [DataMember]
         public List<object> constData = new List<object>();
 
 
         //(不序列化) 临时载入的依赖      
-        [System.NonSerialized]
         public List<ILUnit> dependencyLibs = new List<ILUnit>();
+        //(不序列化) 
+        public List<ILUnit> libsDenpendThis = new List<ILUnit>();
 
 
 
@@ -106,13 +127,15 @@ namespace Gizbox.IL
 
 
         //添加依赖  
-        public void AddDependency(string libName)
+        public void AddDependencyLib(ILUnit dep)
         {
-            this.dependencies.Add(libName);
-        }
-        public void AddDependencyUnitTemp(ILUnit dep)
-        {
+            if (dep == null) throw new GizboxException("依赖的库为空！");
+
+            if (this.dependencyLibs == null) this.dependencyLibs = new List<ILUnit>();
             this.dependencyLibs.Add(dep);
+
+            if (dep.libsDenpendThis == null) dep.libsDenpendThis = new List<ILUnit>();
+            dep.libsDenpendThis.Add(this);
         }
 
         //完成构建  
@@ -124,35 +147,6 @@ namespace Gizbox.IL
             FillLabelDic();
             BuildMarkArray();
             CacheEnvStack();
-        }
-
-        //刷新  
-        public bool NeedResetStack(int prevUnit, int prev, int currUnit, int curr)
-        {
-            if (prevUnit != currUnit) return true;
-
-            if(currUnit == -1)
-            {
-                return scopeStatusArr[curr] != scopeStatusArr[prev];
-            }
-            else
-            {
-                return this.dependencyLibs[currUnit].scopeStatusArr[curr] != this.dependencyLibs[currUnit].scopeStatusArr[prev];
-            }
-        }
-        // 获取堆栈  
-        public Gizbox.GStack<SymbolTable> GetEnvStack(int currentUnit, int currentLine)
-        {
-            if(currentUnit == -1)
-            {
-                var status = this.scopeStatusArr[currentLine];
-                return stackDic[status];
-            }
-            else
-            {
-                var extStatus = this.dependencyLibs[currentUnit].scopeStatusArr[currentLine];
-                return this.dependencyLibs[currentUnit].stackDic[extStatus];
-            }
         }
 
         //填充作用域标记  
@@ -175,6 +169,7 @@ namespace Gizbox.IL
                 }
             }
         }
+
         //填充字典  
         private void FillLabelDic()
         {
@@ -230,96 +225,61 @@ namespace Gizbox.IL
             }
         }
 
-
-        //查询标号  
-        public Tuple<int, int> QueryLabel(string label, int priorityUnit)
+        //查询顶层符号  
+        public SymbolTable.Record QueryTopSymbol(string name, bool ignoreMangle = false)
         {
-            //优先查找的库  
-            if (priorityUnit != -1)
+            //本单元查找  
+            if(ignoreMangle == false)
             {
-                if (dependencyLibs[priorityUnit].label2Line.ContainsKey(label))
+                if (globalScope.env.ContainRecordName(name))
                 {
-                    return new Tuple<int, int>(priorityUnit, dependencyLibs[priorityUnit].label2Line[label]);
+                    return globalScope.env.GetRecord(name);
                 }
-            }
-
-            //正常查找顺序  
-            if (label2Line.ContainsKey(label) == true)
-            {
-                return new Tuple<int, int>(-1, label2Line[label]);
             }
             else
             {
-                for (int i = 0; i < dependencyLibs.Count; ++i)
+                if (globalScope.env.ContainRecordRawName(name))
                 {
-                    if (dependencyLibs[i].label2Line.ContainsKey(label))
-                    {
-                        return new Tuple<int, int>(i, dependencyLibs[i].label2Line[label]);
-                    }
+                    return globalScope.env.GetRecordByRawname(name);
+                }
+            }
+
+            //依赖中查找  
+            if(this.dependencyLibs != null)
+            {
+                foreach (var dep in dependencyLibs)
+                {
+                    var result = dep.QueryTopSymbol(name, ignoreMangle);
+                    if (result != null) return result;
                 }
             }
 
             return null;
         }
 
-        // 查询库  
-        public ILUnit QueryUnit(int unitIdx)
+        //查询虚函数表  
+        public VTable QueryVTable(string name)
         {
-            if (unitIdx == -1) return this;
-            else return dependencyLibs[unitIdx];
-        }
-
-        // 查询类  
-        public SymbolTable.Record QueryClass(string className)
-        {
-            if(globalScope.env.ContainRecordName(className))
+            //本单元查找  
+            if (vtables.ContainsKey(name))
             {
-                return globalScope.env.GetRecord(className);
+                return vtables[name];
             }
 
-            foreach(var dep in dependencyLibs)
+            //依赖中查找  
+            if (this.dependencyLibs != null)
             {
-                if(dep.globalScope.env.ContainRecordName(className))
+                foreach (var dep in dependencyLibs)
                 {
-                    return dep.globalScope.env.GetRecord(className);
+                    var result = dep.QueryVTable(name);
+                    if (result != null) return result;
                 }
             }
 
             return null;
         }
 
-        //查询代码  
-        public TAC QueryCode(int unitIdx, int line)
-        {
-            if (unitIdx == -1)
-            {
-                return this.codes[line];
-            }
-            else
-            {
-                return this.dependencyLibs[unitIdx].codes[line];
-            }
-        }
-
-        // 查询虚函数表  
-        public VTable QueryVTable(string className)
-        {
-            if (this.vtables.ContainsKey(className))
-            {
-                return this.vtables[className];
-            }
-
-            foreach (var dep in dependencyLibs)
-            {
-                if (dep.vtables.ContainsKey(className))
-                {
-                    return dep.vtables[className];
-                }
-            }
-
-            return null;
-        }
-
+        //打印  
         public void Print()
         {
             Console.WriteLine("中间代码输出：(" + this.codes.Count + "行)");
@@ -367,19 +327,16 @@ namespace Gizbox.IL
         
         public void Generate()
         {
-            //依赖库  
-            foreach(var importNode in ast.rootNode.importNodes)
-            {
-                var lib = (ILUnit)importNode.attributes["lib"];
-                this.ilUnit.AddDependency(lib.name);
-                this.ilUnit.AddDependencyUnitTemp(lib);
-            }
-
             this.tmpCounter = 0;
 
             this.envStack.Push(ilUnit.globalScope.env);
 
+
+            //从根节点生成   
             GenNode(ast.rootNode);
+
+            //生成一个空指令  
+            GenerateCode("");
 
             this.ilUnit.Complete();
 

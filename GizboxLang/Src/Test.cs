@@ -118,8 +118,12 @@ entry:
             //// 释放资源
             //LLVM.DisposeMemoryBuffer(buffer);
             //LLVM.DisposeModule(module);
-            LLVM.DisposeExecutionEngine(engineRef);
-            LLVM.ContextDispose(context);
+            LLVM.DisposeExecutionEngine(engineRef);//先释放Engine再释放Context，因为可能存在依赖关系    
+            LLVM.ContextDispose(context);//释放Context会同时释放LLVMTypeRef、LLVMValueRef、LLVMModuleRef。
+
+            //LLVMGenericValueRef 需要手动管理其生命周期。
+            //LLVMMCJITCompilerOptions 是一个用于配置MCJIT编译器选项的结构体。在大多数情况下，你不需要手动释放它，因为它是一个普通的C#结构体而不是非托管资源。
+            //LLVMMemoryBufferRef 是一个独立的非托管资源，需要你手动管理其生命周期。
 
             return resultValue;
         }

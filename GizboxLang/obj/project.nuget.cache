@@ -1,13 +1,13 @@
 {
   "version": 2,
-  "dgSpecHash": "1bym6xJN/e1pvdqzAmkFJiZXNbpVA8ughhnw5JSwUjHRfzyArtpWV8LW28yLEm+OFQJmMuCORiR4wYPu/1EiPg==",
+  "dgSpecHash": "4oJDBC0W9vMgAJL2mfwgzao+tPADt6F8Kt0EIh78w47TrZRZK+GXImzQsq4biA5S9fRcqpy5Ywh4eWYqO+Fn6A==",
   "success": true,
-  "projectFilePath": "C:\\Users\\Administrator\\Desktop\\笔记\\Gizbox\\GizboxLang\\GizboxLang.csproj",
+  "projectFilePath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\Administrator\\.nuget\\packages\\libllvm\\5.0.1\\libllvm.5.0.1.nupkg.sha512",
-    "C:\\Users\\Administrator\\.nuget\\packages\\llvmsharp\\5.0.0\\llvmsharp.5.0.0.nupkg.sha512",
-    "C:\\Users\\Administrator\\.nuget\\packages\\microsoft.netcore.platforms\\1.1.0\\microsoft.netcore.platforms.1.1.0.nupkg.sha512",
-    "C:\\Users\\Administrator\\.nuget\\packages\\netstandard.library\\2.0.3\\netstandard.library.2.0.3.nupkg.sha512"
+    "C:\\Users\\leona\\.nuget\\packages\\libllvm\\5.0.1\\libllvm.5.0.1.nupkg.sha512",
+    "C:\\Users\\leona\\.nuget\\packages\\llvmsharp\\5.0.0\\llvmsharp.5.0.0.nupkg.sha512",
+    "C:\\Users\\leona\\.nuget\\packages\\microsoft.netcore.platforms\\1.1.0\\microsoft.netcore.platforms.1.1.0.nupkg.sha512",
+    "C:\\Users\\leona\\.nuget\\packages\\netstandard.library\\2.0.3\\netstandard.library.2.0.3.nupkg.sha512"
   ],
   "logs": [
     {

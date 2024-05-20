@@ -1,12 +1,12 @@
 {
   "version": 2,
-  "dgSpecHash": "ub8n1BzSEs9Gq6mJL9IYpHY1g6kNlvVNhNRTDHXtqdeldSP4uBLdw+S0rsQCypAsYh602xdcBRE1IgRvNhkrfQ==",
+  "dgSpecHash": "7DH3VP65q1IdMN6KKq4vERYB6Fh+d8ykhvpSctyUkHan0k7afWY9jiEv8uTvGIG4SPu0aybBCB3+93mt0Do2dg==",
   "success": true,
-  "projectFilePath": "C:\\Users\\Administrator\\Desktop\\笔记\\Gizbox\\GizboxTest\\GizboxTest.csproj",
+  "projectFilePath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxTest\\GizboxTest.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\Administrator\\.nuget\\packages\\libllvm\\5.0.1\\libllvm.5.0.1.nupkg.sha512",
-    "C:\\Users\\Administrator\\.nuget\\packages\\llvmsharp\\5.0.0\\llvmsharp.5.0.0.nupkg.sha512",
-    "C:\\Users\\Administrator\\.nuget\\packages\\microsoft.netcore.platforms\\1.0.1\\microsoft.netcore.platforms.1.0.1.nupkg.sha512"
+    "C:\\Users\\leona\\.nuget\\packages\\libllvm\\5.0.1\\libllvm.5.0.1.nupkg.sha512",
+    "C:\\Users\\leona\\.nuget\\packages\\llvmsharp\\5.0.0\\llvmsharp.5.0.0.nupkg.sha512",
+    "C:\\Users\\leona\\.nuget\\packages\\microsoft.netcore.platforms\\1.0.1\\microsoft.netcore.platforms.1.0.1.nupkg.sha512"
   ],
   "logs": [
     {

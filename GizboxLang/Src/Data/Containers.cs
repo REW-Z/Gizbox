@@ -1,12 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.Serialization;
 using System.Text;
 
 namespace Gizbox
 {
     [Serializable]
+    [DataContract]
     public class GStack<T>
     {
+        [DataMember]
         private List<T> data = new List<T>();
 
         public int Count => data.Count;

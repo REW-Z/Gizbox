@@ -278,7 +278,7 @@ namespace Gizbox.ScriptEngine
 
         public int id = -1;
         public string name;
-        public List<RuntimeUnit> dependencies = new List<RuntimeUnit>();
+        public List<RuntimeUnit> directlyDependencies = new List<RuntimeUnit>();
         public List<RuntimeCode> codes = new List<RuntimeCode>();
         public int[] scopeStatusArr;
         public List<Scope> scopes = new List<Scope>();
@@ -308,7 +308,7 @@ namespace Gizbox.ScriptEngine
             foreach(var depName in ilunit.dependencies)
             {
                 var libIr = engineContext.LoadLib(depName);
-                this.dependencies.Add(new RuntimeUnit(engineContext, libIr));
+                this.directlyDependencies.Add(new RuntimeUnit(engineContext, libIr));
             }
 
             foreach(var tac in ilunit.codes)
@@ -357,12 +357,13 @@ namespace Gizbox.ScriptEngine
             }
 
             //依赖链接    
-            foreach(var dep in dependencies)
+            foreach(var dep in directlyDependencies)
             {
-                dep.LinkToMainUnit(this);
+                dep.LinkToMainUnitCursive(this);
             }
         }
-        private void LinkToMainUnit(RuntimeUnit mainUnit)
+
+        private void LinkToMainUnitCursive(RuntimeUnit mainUnit)
         {
             if (mainUnit.allUnits.Contains(this)) return;
             if (mainUnit.allUnits.Any(lib => lib.name == this.name)) return;
@@ -380,9 +381,9 @@ namespace Gizbox.ScriptEngine
             }
 
             //依赖  
-            foreach(var dep in this.dependencies)
+            foreach(var dep in this.directlyDependencies)
             {
-                dep.LinkToMainUnit(mainUnit);
+                dep.LinkToMainUnitCursive(mainUnit);
             }
         }
 
@@ -444,7 +445,7 @@ namespace Gizbox.ScriptEngine
             }
             else
             {
-                return this.dependencies[currUnit].scopeStatusArr[curr] != this.dependencies[currUnit].scopeStatusArr[prev];
+                return this.allUnits[currUnit].scopeStatusArr[curr] != this.allUnits[currUnit].scopeStatusArr[prev];
             }
         }
 
@@ -458,8 +459,8 @@ namespace Gizbox.ScriptEngine
             }
             else
             {
-                var extStatus = this.dependencies[currentUnit].scopeStatusArr[currentLine];
-                return this.dependencies[currentUnit].stackDic[extStatus];
+                var extStatus = this.allUnits[currentUnit].scopeStatusArr[currentLine];
+                return this.allUnits[currentUnit].stackDic[extStatus];
             }
         }
 
@@ -517,9 +518,9 @@ namespace Gizbox.ScriptEngine
                 //优先查找的库  
                 if (priorityUnit != -1)
                 {
-                    if (dependencies[priorityUnit].entryLabels.ContainsKey(labelp1))
+                    if (allUnits[priorityUnit].entryLabels.ContainsKey(labelp1))
                     {
-                        return new Tuple<int, int>(priorityUnit, dependencies[priorityUnit].entryLabels[labelp1]);
+                        return new Tuple<int, int>(priorityUnit, allUnits[priorityUnit].entryLabels[labelp1]);
                     }
                 }
                 //正常查找顺序  
@@ -529,11 +530,11 @@ namespace Gizbox.ScriptEngine
                 }
                 else
                 {
-                    for (int i = 0; i < dependencies.Count; ++i)
+                    for (int i = 0; i < allUnits.Count; ++i)
                     {
-                        if (dependencies[i].entryLabels.ContainsKey(labelp1))
+                        if (allUnits[i].entryLabels.ContainsKey(labelp1))
                         {
-                            return new Tuple<int, int>(i, dependencies[i].entryLabels[labelp1]);
+                            return new Tuple<int, int>(i, allUnits[i].entryLabels[labelp1]);
                         }
                     }
                 }
@@ -544,9 +545,9 @@ namespace Gizbox.ScriptEngine
                 //优先查找的库  
                 if (priorityUnit != -1)
                 {
-                    if (dependencies[priorityUnit].exitLabels.ContainsKey(labelp1))
+                    if (allUnits[priorityUnit].exitLabels.ContainsKey(labelp1))
                     {
-                        return new Tuple<int, int>(priorityUnit, dependencies[priorityUnit].exitLabels[labelp1]);
+                        return new Tuple<int, int>(priorityUnit, allUnits[priorityUnit].exitLabels[labelp1]);
                     }
                 }
                 //正常查找顺序  
@@ -556,11 +557,11 @@ namespace Gizbox.ScriptEngine
                 }
                 else
                 {
-                    for (int i = 0; i < dependencies.Count; ++i)
+                    for (int i = 0; i < allUnits.Count; ++i)
                     {
-                        if (dependencies[i].exitLabels.ContainsKey(labelp1))
+                        if (allUnits[i].exitLabels.ContainsKey(labelp1))
                         {
-                            return new Tuple<int, int>(i, dependencies[i].exitLabels[labelp1]);
+                            return new Tuple<int, int>(i, allUnits[i].exitLabels[labelp1]);
                         }
                     }
                 }
@@ -572,9 +573,9 @@ namespace Gizbox.ScriptEngine
                 //优先查找的库  
                 if (priorityUnit != -1)
                 {
-                    if (dependencies[priorityUnit].label2Line.ContainsKey(label))
+                    if (allUnits[priorityUnit].label2Line.ContainsKey(label))
                     {
-                        return new Tuple<int, int>(priorityUnit, dependencies[priorityUnit].label2Line[label]);
+                        return new Tuple<int, int>(priorityUnit, allUnits[priorityUnit].label2Line[label]);
                     }
                 }
 
@@ -585,11 +586,11 @@ namespace Gizbox.ScriptEngine
                 }
                 else
                 {
-                    for (int i = 0; i < dependencies.Count; ++i)
+                    for (int i = 0; i < allUnits.Count; ++i)
                     {
-                        if (dependencies[i].label2Line.ContainsKey(label))
+                        if (allUnits[i].label2Line.ContainsKey(label))
                         {
-                            return new Tuple<int, int>(i, dependencies[i].label2Line[label]);
+                            return new Tuple<int, int>(i, allUnits[i].label2Line[label]);
                         }
                     }
                 }
@@ -602,7 +603,7 @@ namespace Gizbox.ScriptEngine
         public RuntimeUnit QueryUnit(int unitIdx)
         {
             if (unitIdx == -1) return this;
-            else return dependencies[unitIdx];
+            else return allUnits[unitIdx];
         }
 
         // 查询类  
@@ -613,7 +614,7 @@ namespace Gizbox.ScriptEngine
                 return globalScope.env.GetRecord(className);
             }
 
-            foreach (var dep in dependencies)
+            foreach (var dep in allUnits)
             {
                 if (dep.globalScope.env.ContainRecordName(className))
                 {
@@ -633,7 +634,7 @@ namespace Gizbox.ScriptEngine
             }
             else
             {
-                return this.dependencies[unitIdx].codes[line];
+                return this.allUnits[unitIdx].codes[line];
             }
         }
 
@@ -645,7 +646,7 @@ namespace Gizbox.ScriptEngine
                 return this.vtables[className];
             }
 
-            foreach (var dep in dependencies)
+            foreach (var dep in allUnits)
             {
                 if (dep.vtables.ContainsKey(className))
                 {

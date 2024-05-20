@@ -1,34 +1,4 @@
-﻿
-namespace Console
-{
-	extern void Log(string text);
-	
-	void LogHelloWorld()
-	{
-		Console::Log("Hello World!");
-	}
-
-	void Log(bool b)
-	{
-		Console::Log((string)b);
-	}
-	void Log(int num)
-	{
-		Console::Log((string)num);
-	}
-	void Log(float num)
-	{
-		Console::Log((string)num);
-	}
-	void Log(double num)
-	{
-		Console::Log((string)num);
-	}
-	void Log(char c)
-	{
-		Console::Log((string)c);
-	}
-}
+﻿import <"core">
 
 
 namespace Math
@@ -80,13 +50,13 @@ namespace Math
 
 namespace Collections
 {
-	class ListInt
+	class List
 	{
-		int[] data = new int[10];
+		Core::Object[] data = new Core::Object[10];
 		int opacity = 10;
 		int count = 0;
 
-		void Add(int v)
+		void Add(Core::Object v)
 		{
 			if(this.count >= this.opacity)
 			{
@@ -96,14 +66,15 @@ namespace Collections
 			this.data[this.count] = v;
 			this.count += 1;
 		}
-		int Get(int idx)
+
+		Core::Object Get(int idx)
 		{
 			return this.data[idx];
 		}
 
 		void Resize()
 		{
-			int[] newdata = new int[this.opacity * 2];
+			Core::Object[] newdata = new Core::Object[this.opacity * 2];
 			for(int i = 0; i < this.opacity; ++i)
 			{
 				newdata[i] = this.data[i];

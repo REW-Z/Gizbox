@@ -1,0 +1,60 @@
+﻿
+namespace Core
+{
+	class Object
+	{
+		string ToString()
+		{
+			return "Object";
+		}
+	}
+	
+	class Boolean
+	{
+		bool value = false;
+	}
+	class Integer
+	{
+		int value = 0;
+	}
+	class Float
+	{
+		float value = 0.0f;
+	}
+	class Double
+	{
+		double value = 0.0d;
+	}
+}
+
+namespace Console
+{
+	extern void Log(string text);
+	
+	void LogHelloWorld()
+	{
+		Console::Log("Hello World!");
+	}
+
+	void Log(bool b)
+	{
+		Console::Log((string)b);
+	}
+	void Log(int num)
+	{
+		Console::Log((string)num);
+	}
+	void Log(float num)
+	{
+		Console::Log((string)num);
+	}
+	void Log(double num)
+	{
+		Console::Log((string)num);
+	}
+	void Log(char c)
+	{
+		Console::Log((string)c);
+	}
+}
+

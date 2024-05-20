@@ -146,7 +146,7 @@ namespace Gizbox.ScriptEngine
             this.curr = 0;
 
             //符号栈  
-            this.envStack = ir.GetEnvStack(-1, 0);
+            this.envStack = this.mainUnit.GetEnvStack(-1, 0); 
         }
 
         public void Execute()
@@ -169,7 +169,7 @@ namespace Gizbox.ScriptEngine
                 }
                 else
                 {
-                    Interpret(mainUnit.dependencies[this.currUnit].codes[this.curr]);
+                    Interpret(mainUnit.allUnits[this.currUnit].codes[this.curr]);
                 }
             }
 
@@ -209,10 +209,12 @@ namespace Gizbox.ScriptEngine
             //DEBUG信息  
             if (analysisTime)
             {
-                //Console.WriteLine("Exe:  " + currUnit + " {" + curr + "}" + tac.ToExpression(false));
-                //Console.ReadKey();
-                lineList.Add(prev);
-                timeList.Add(watch.ElapsedTicks - prevTicks);
+                //仅记录主模块的执行代码  
+                if(prevUnit == -1)
+                {
+                    lineList.Add(prev);
+                    timeList.Add(watch.ElapsedTicks - prevTicks);
+                }
                 prevTicks = watch.ElapsedTicks;
             }
 
@@ -626,7 +628,7 @@ namespace Gizbox.ScriptEngine
                 }
                 else
                 {
-                    Interpret(mainUnit.dependencies[this.currUnit].codes[this.curr]);
+                    Interpret(mainUnit.allUnits[this.currUnit].codes[this.curr]);
                 }
             }
 
@@ -1105,7 +1107,7 @@ namespace Gizbox.ScriptEngine
             }
 
             //导入库查找  
-            foreach (var lib in this.mainUnit.dependencies)
+            foreach (var lib in this.mainUnit.allUnits)
             {
                 if (lib.globalScope.env.ContainRecordName(symbolName))
                 {

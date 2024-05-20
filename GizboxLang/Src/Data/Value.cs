@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Runtime.InteropServices;
+using System.Runtime.Serialization;
 
 namespace Gizbox
 {
@@ -24,27 +25,35 @@ namespace Gizbox
     //Giz值类型    
     [StructLayout(LayoutKind.Explicit)]
     [Serializable]
+    [DataContract]
     public struct Value
     {
         // ---------- DATA --------------
+        [DataMember]
         [FieldOffset(0)]
         private GizType type;
 
+        [DataMember]
         [FieldOffset(4)]
         public bool AsBool;
 
+        [DataMember]
         [FieldOffset(4)]
         public int AsInt;
 
+        [DataMember]
         [FieldOffset(4)]
         public float AsFloat;
 
+        [DataMember]
         [FieldOffset(4)]
         public double AsDouble;
 
+        [DataMember]
         [FieldOffset(4)]
         public float AsChar;
 
+        [DataMember]
         [FieldOffset(4)]
         public long AsPtr;
 

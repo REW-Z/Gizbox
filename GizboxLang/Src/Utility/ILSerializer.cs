@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
+using System.Runtime.Serialization;
 
 namespace Gizbox.IL
 {
@@ -10,21 +11,40 @@ namespace Gizbox.IL
     {
         public static void Serialize(string path, ILUnit unit)
         {
-            BinaryFormatter formatter = new BinaryFormatter();
-            using (FileStream stream = new FileStream(path, FileMode.Create, FileAccess.Write))
+            var serializer = new DataContractSerializer(typeof(ILUnit));
+
+            using (var stream = new System.IO.FileStream(path, FileMode.Create))
             {
-                formatter.Serialize(stream, unit);
+                serializer.WriteObject(stream, unit);
+                stream.Position = 0;
             }
         }
         public static ILUnit Deserialize(string path)
         {
-            BinaryFormatter formatter = new BinaryFormatter();
-            using (FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read))
+            var serializer = new DataContractSerializer(typeof(ILUnit));
+
+            using (var stream = new System.IO.FileStream(path, FileMode.Open))
             {
-                ILUnit unit = (ILUnit)formatter.Deserialize(stream);
-                return unit;
+                return (ILUnit)serializer.ReadObject(stream);
             }
         }
+        //public static void Serialize(string path, ILUnit unit)
+        //{
+        //    BinaryFormatter formatter = new BinaryFormatter();
+        //    using (FileStream stream = new FileStream(path, FileMode.Create, FileAccess.Write))
+        //    {
+        //        formatter.Serialize(stream, unit);
+        //    }
+        //}
+        //public static ILUnit Deserialize(string path)
+        //{
+        //    BinaryFormatter formatter = new BinaryFormatter();
+        //    using (FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read))
+        //    {
+        //        ILUnit unit = (ILUnit)formatter.Deserialize(stream);
+        //        return unit;
+        //    }
+        //}
 
     }
 }

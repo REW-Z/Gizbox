@@ -1,23 +1,24 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\Administrator\\Desktop\\笔记\\Gizbox\\GizboxLang\\GizboxLang.csproj": {}
+    "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj": {}
   },
   "projects": {
-    "C:\\Users\\Administrator\\Desktop\\笔记\\Gizbox\\GizboxLang\\GizboxLang.csproj": {
+    "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\Administrator\\Desktop\\笔记\\Gizbox\\GizboxLang\\GizboxLang.csproj",
+        "projectUniqueName": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj",
         "projectName": "GizboxLang",
-        "projectPath": "C:\\Users\\Administrator\\Desktop\\笔记\\Gizbox\\GizboxLang\\GizboxLang.csproj",
-        "packagesPath": "C:\\Users\\Administrator\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\Administrator\\Desktop\\笔记\\Gizbox\\GizboxLang\\obj\\",
+        "projectPath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj",
+        "packagesPath": "C:\\Users\\leona\\.nuget\\packages\\",
+        "outputPath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
-          "C:\\Program Files\\dotnet\\sdk\\NuGetFallbackFolder"
+          "E:\\Visual Studio 2019\\Shared\\NuGetPackages"
         ],
         "configFilePaths": [
-          "C:\\Users\\Administrator\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\leona\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [

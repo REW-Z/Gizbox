@@ -1,44 +1,9 @@
-﻿import <"stdlib">
+﻿import <"stdlib">  
 
+using Core;
 using Console;
+using Collections;
 
-int a = 1;
-int b = a * a;
-
-
-Collections::ListInt list = new Collections::ListInt();
-
-list.Add(233);
-list.Add(2333);
-list.Add(23333);
-
-Log("totalCount : " + (string)list.count);
-Log((string)(list.Get(0)));
-Log((string)(list.Get(1)));
-Log((string)(list.Get(2)));
-
-
-list.Add(0);
-list.Add(0);
-list.Add(0);
-list.Add(0);
-list.Add(0);
-list.Add(0);
-list.Add(0);
-list.Add(0);
-list.Add(0);
-list.Add(0);
-
-Console::Log("Gizbox!");
-Console::LogHelloWorld();
-
-Console::Log("newCount : " + (string)list.count);
-Console::Log("newOpacity : " + (string)list.opacity);
-
-float num_16 = 16.0f;
-float sqrtResult = Math::Sqrt(num_16);
-Console::Log((string)sqrtResult);
-
-float num_3 = 3.0f;
-float powResult = Math::Pow(num_3, 3);
-Console::Log((string)powResult);
+Log("Hello World!");
+Log("Hello World!");
+Log("Hello World!");

@@ -8,6 +8,8 @@ using Gizbox;
 using Gizbox.LRParse;
 using Gizbox.LALRGenerator;
 using Gizbox.SemanticRule;
+using Gizbox.IL;
+using System.Runtime.CompilerServices;
 
 
 namespace Gizbox.LRParse
@@ -700,6 +702,7 @@ namespace Gizbox.SemanticRule
 
             AddActionAtTail("declstmt -> class ID inherit { declstatements }", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.ClassDeclareNode() {
+
                     classNameNode = new SyntaxTree.IdentityNode() {
                         attributes = psr.stack[psr.stack.Top - 4].attributes,
                         token = psr.stack[psr.stack.Top - 4].attributes["token"] as Token,
@@ -725,6 +728,10 @@ namespace Gizbox.SemanticRule
                     (List<SyntaxTree.DeclareNode>)psr.stack[psr.stack.Top - 1].attributes["decl_stmts"]
                 );
             });
+
+
+
+
 
 
             AddActionAtTail("elifclauselist -> ε", (psr, production) => {
@@ -1235,7 +1242,7 @@ namespace Gizbox.SemanticRule
                 };
             });
 
-            string[] litTypes = new string[] { "null", "LITINT", "LITFLOAT", "LITSTRING", "LITBOOL" };
+            string[] litTypes = new string[] { "null", "LITINT", "LITFLOAT", "LITDOUBLE", "LITCHAR", "LITSTRING", "LITBOOL" };
             foreach (var litType in litTypes)
             {
 
@@ -1434,12 +1441,6 @@ namespace Gizbox.SemanticRule
 
             this.ast = ast;
             this.ilUnit = ilUnit;
-
-            foreach(var importNode in ast.rootNode.importNodes)
-            {
-                if (importNode == null) throw new SemanticException(ast.rootNode, "空的导入节点节点");
-                importNode.attributes["lib"] = compilerContext.LoadOrCompileLib(importNode.uri);
-            }
         }
 
 
@@ -1448,11 +1449,33 @@ namespace Gizbox.SemanticRule
         /// </summary>
         public void Analysis()
         {
+            //Libs    
+            foreach (var importNode in ast.rootNode.importNodes)
+            {
+                if (importNode == null) throw new SemanticException(ast.rootNode, "空的导入节点节点");
+                this.ilUnit.dependencies.Add(importNode.uri);
+            }
+            foreach (var lname in this.ilUnit.dependencies)
+            {
+                var lib = compilerContext.LoadLib(lname);
+
+                foreach(var depNameOfLib in lib.dependencies)
+                {
+                    var libdep = compilerContext.LoadLib(depNameOfLib);
+                    lib.AddDependencyLib(libdep);
+                }
+
+                this.ilUnit.AddDependencyLib(lib);
+            }
+
+
+            //Pass1
             envStack = new GStack<SymbolTable>();
             envStack.Push(ilUnit.globalScope.env);
             Pass1_CollectGlobalSymbols(ast.rootNode);
 
 
+            //Pass2
             envStack.Clear();
             envStack.Push(ilUnit.globalScope.env);
             Pass2_CollectOtherSymbols(ast.rootNode);
@@ -1464,6 +1487,7 @@ namespace Gizbox.SemanticRule
                 Compiler.Pause("符号表初步收集完毕");
             }
 
+            //Pass3
             envStack.Clear();
             envStack.Push(ilUnit.globalScope.env);
             Pass3_AnalysisNode(ast.rootNode);
@@ -1648,6 +1672,14 @@ namespace Gizbox.SemanticRule
                         {
                             if(isTopLevelAtNamespace)
                                 classDeclNode.classNameNode.SetPrefix(currentNamespace);
+
+                            if(classDeclNode.classNameNode.FullName == "Core::Object")
+                            {
+                                if(currentNamespace != "Core")
+                                {
+                                    throw new SemanticException(classDeclNode, "类名不能是最终基类名Object！");
+                                }
+                            }
 
                             //新的作用域  
                             var newEnv = new SymbolTable(classDeclNode.classNameNode.FullName, SymbolTable.TableCatagory.ClassScope, envStack.Peek());
@@ -1906,17 +1938,26 @@ namespace Gizbox.SemanticRule
                         envStack.Push(newEnv);
 
                         //有基类  
-                        if (classDeclNode.baseClassNameNode != null)
+                        if (classDeclNode.classNameNode.FullName != "Core::Object")
                         {
-                            //尝试补全基类标记  
-                            TryCompleteIdenfier(classDeclNode.baseClassNameNode);
+                            //基类名    
+                            string baseClassFullName;
+                            if (classDeclNode.baseClassNameNode != null)
+                            {
+                                //尝试补全基类标记  
+                                TryCompleteIdenfier(classDeclNode.baseClassNameNode);
+                                baseClassFullName = classDeclNode.baseClassNameNode.FullName;
+                            }
+                            else
+                            {
+                                baseClassFullName = "Core::Object";
+                            }
 
-                            //基类标记  
-                            var baseClassFullName = classDeclNode.baseClassNameNode.FullName;
 
                             var baseRec = Query(baseClassFullName); if (baseRec == null) throw new SemanticException(classDeclNode.baseClassNameNode, "未找到基类" + baseClassFullName);
                             var baseEnv = baseRec.envPtr;
                             newEnv.NewRecord("base", SymbolTable.RecordCatagory.Other, "(inherit)", baseEnv);
+
 
                             //基类符号表条目并入//仅字段  
                             foreach (var reckv in baseEnv.records)
@@ -1927,8 +1968,9 @@ namespace Gizbox.SemanticRule
                                 }
                             }
                             //虚函数表克隆  
-                            if (this.ilUnit.vtables.ContainsKey(baseClassFullName) == false) throw new SemanticException(classDeclNode.baseClassNameNode, "找不到基类：" + baseClassFullName);
-                            this.ilUnit.vtables[baseClassFullName].CloneDataTo(vtable);
+                            var baseVTable = this.ilUnit.QueryVTable(baseClassFullName);
+                            if (baseVTable == null) throw new SemanticException(classDeclNode.baseClassNameNode, "找不到基类：" + baseClassFullName);
+                            baseVTable.CloneDataTo(vtable);
                         }
 
 
@@ -2168,17 +2210,23 @@ namespace Gizbox.SemanticRule
                         envStack.Pop();
                     }
                     break;
+                case SyntaxTree.ReturnStmtNode retNode:
+                    {
+                        //检查返回值  
+                        Pass3_AnalysisNode(retNode.returnExprNode);
+                    }
+                    break;
                 case SyntaxTree.DeleteStmtNode delNode:
                     {
                         //检查要删除的对象    
                         Pass3_AnalysisNode(delNode.objToDelete);
-                        string objTypeExpr =  (string)delNode.objToDelete.attributes["type"];
+                        string objTypeExpr = (string)delNode.objToDelete.attributes["type"];
 
                         if (Utils.IsArrayType(objTypeExpr) == false)
                         {
                             if (Query(objTypeExpr) == null)
                             {
-                                if((objTypeExpr == "string") == false)
+                                if ((objTypeExpr == "string") == false)
                                 {
                                     throw new SemanticException(delNode, "错误的删除语句!");
                                 }
@@ -2426,11 +2474,23 @@ namespace Gizbox.SemanticRule
             {
                 case SyntaxTree.IdentityNode idNode:
                     {
+                        if (envStack.Count >= 2
+                            && envStack[envStack.Top].tableCatagory == SymbolTable.TableCatagory.FuncScope
+                            && envStack[envStack.Top - 1].tableCatagory == SymbolTable.TableCatagory.ClassScope
+                            )
+                        {
+                            if(envStack[envStack.Top - 1].ContainRecordRawName(idNode.FullName))
+                            {
+                                throw new SemanticException(idNode, "在类成员函数中的 类成员标识符 没有加this!");
+                            }
+                        }
+
                         var result = Query(idNode.FullName);
                         if (result == null)
                         {
                             throw new SemanticException(idNode, "找不到标识符:" + idNode.FullName + " 当前顶层符号表：" + envStack.Peek().name);
                         }
+
 
                         nodeTypeExprssion = result.typeExpression;
                     }
@@ -2443,6 +2503,8 @@ namespace Gizbox.SemanticRule
                             case "LITBOOL": nodeTypeExprssion = "bool"; break;
                             case "LITINT": nodeTypeExprssion = "int"; break;
                             case "LITFLOAT": nodeTypeExprssion = "float"; break;
+                            case "LITDOUBLE": nodeTypeExprssion = "double"; break;
+                            case "LITCHAR": nodeTypeExprssion = "char"; break;
                             case "LITSTRING": nodeTypeExprssion = "string"; break;
                             default:throw new SemanticException(litNode, "未知的Literal类型：" + litNode.token.name); break;
                         }
@@ -2634,6 +2696,7 @@ namespace Gizbox.SemanticRule
 
         private SymbolTable.Record Query(string name)
         {
+            //符号表链查找  
             var toList = envStack.ToList();
             for (int i = toList.Count - 1; i > -1; --i)
             {
@@ -2642,13 +2705,13 @@ namespace Gizbox.SemanticRule
                     return toList[i].GetRecord(name);
                 }
             }
-
-            foreach(var importNode in ast.rootNode.importNodes)
+            //库依赖中查找  
+            foreach(var lib in this.ilUnit.dependencyLibs)
             {
-                var lib = (Gizbox.IL.ILUnit)importNode.attributes["lib"]; if (lib == null) throw new SemanticException(importNode, "查找" + name + "时库为空！");
-                if(lib.globalScope.env.ContainRecordName(name))
+                var result = lib.QueryTopSymbol(name);
+                if(result != null)
                 {
-                    return lib.globalScope.env.GetRecord(name);
+                    return result;
                 }
             }
 
@@ -2657,28 +2720,27 @@ namespace Gizbox.SemanticRule
 
         private bool TryQueryIgnoreMangle(string name)
         {
-            Log("TryQuery  查找符号：" + name + "从作用域：" + envStack.Peek().name + "开始");
+            //符号表链查找  
             var toList = envStack.ToList();
             for (int i = toList.Count - 1; i > -1; --i)
             {
-                if (toList[i].ContainRecordName(name, true))
+                if (toList[i].ContainRecordRawName(name))
                 {
-                    Log("TryQuery  在符号表:" + toList[i].name + "中成功找到：" + name);
                     return true;
                 }
             }
-
-            foreach (var importNode in ast.rootNode.importNodes)
+            //库依赖中查找  
+            foreach (var lib in this.ilUnit.dependencyLibs)
             {
-                var lib = (Gizbox.IL.ILUnit)importNode.attributes["lib"]; if (lib == null) throw new SemanticException(importNode, "查找" + name + "时库为空！");
-                if (lib.globalScope.env.ContainRecordName(name, true))
+                var result = lib.QueryTopSymbol(name, ignoreMangle:true);
+                if (result != null)
                 {
-                    Log("TryQuery  库中成功找到:" + name);
                     return true;
                 }
             }
 
-            Log("TryQuery  库中未找到:" + name);
+
+            if(Compiler.enableLogParser) Log("TryQuery  库中未找到:" + name);
             return false;
         }
 
@@ -2701,12 +2763,13 @@ namespace Gizbox.SemanticRule
                 string newname = namespaceUsing.namespaceNameNode.token.attribute + "::" + idNode.token.attribute;
                 if (TryQueryIgnoreMangle(newname))
                 {
-                    if(found == true)
+                    if (found == true)
                     {
                         throw new SemanticException(idNode, "标识符" + idNode.token.attribute + "是" + newname + "和" + namevalid + "之间的不明确引用1");
                     }
                     found = true;
                     idNode.SetPrefix(namespaceUsing.namespaceNameNode.token.attribute);
+                    if(Compiler.enableLogParser) Log(idNode.token.attribute + "补全为" + idNode.FullName);
                 }
             }
 

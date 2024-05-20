@@ -15,6 +15,9 @@
     <None Update="example.gix">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="core.gix">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="stdlib.gix">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

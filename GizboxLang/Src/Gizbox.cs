@@ -3,6 +3,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.Serialization;
 
 
 
@@ -65,7 +66,7 @@ namespace Gizbox
     /// <summary>
     /// 符号表  
     /// </summary>
-    [Serializable]
+    [DataContract(IsReference = true)]
     public class SymbolTable
     {
         public enum RecordCatagory
@@ -84,30 +85,47 @@ namespace Gizbox
             LoopScope,
             FuncScope,
         }
-        [Serializable]
+    [DataContract(IsReference = true)]
         public class Record
         {
+            [DataMember]
             public string name;
+            [DataMember]
             public string rawname;
+            [DataMember]
             public RecordCatagory category;
+            [DataMember]
             public string typeExpression;
+            [DataMember]
             public int addr;
+            [DataMember]
             public SymbolTable envPtr;
         }
 
         //符号表名称  
+        [DataMember]
         public string name;
 
         //符号表类型  
+        [DataMember]
         public TableCatagory tableCatagory;
 
         //符号表关系    
+        [DataMember]
         public int depth;
+        [DataMember]
         public SymbolTable parent;
+        [DataMember]
         public List<SymbolTable> children = new List<SymbolTable>();
 
         //条目数据  
+        [DataMember]
         public Dictionary<string, Record> records;
+
+
+
+
+
 
         //构造  
         public SymbolTable(string name, TableCatagory tableCatagory, SymbolTable parentTable = null)
@@ -131,22 +149,21 @@ namespace Gizbox
 
 
         //包含信息  
-        public bool ContainRecordName(string name, bool ignoreMangle = false)
+        public bool ContainRecordName(string name)
         {
-            if(ignoreMangle == false)
-            {
-                return records.ContainsKey(name);
-            }
-            else
-            {
-                if (records.ContainsKey(name)) return true;
-                foreach(var val in records.Values)
-                {
-                    if(val.rawname == name) return true ;
-                }
-                return false;
-            }
+            return records.ContainsKey(name);
         }
+        public bool ContainRecordRawName(string rawname)
+        {
+            if (records.ContainsKey(rawname)) return true;
+            foreach (var val in records.Values)
+            {
+                if (val.rawname == rawname) return true;
+            }
+            return false;
+        }
+
+
         //查询信息  
         public Record GetRecord(string symbolName)
         {
@@ -157,6 +174,14 @@ namespace Gizbox
             }
             return records[symbolName];
         }
+        public Record GetRecordByRawname(string rawSymbolName)
+        {
+            foreach (var val in records.Values)
+            {
+                if (val.rawname == rawSymbolName) return val;
+            }
+            throw new Exception(this.name + "表中获取不到记录原名：" + rawSymbolName);
+        }
 
         //在本符号表和基类符号表中查找  
         public Record GetMemberRecordInChain(string symbolName)
@@ -165,6 +190,7 @@ namespace Gizbox
 
             if (records.ContainsKey(symbolName))
             {
+                Console.WriteLine("has symbol:" + symbolName + " in " + this.name);
                 return records[symbolName];
             }
             else
@@ -268,18 +294,25 @@ namespace Gizbox
     /// 虚函数表  
     /// </summary>
     [Serializable]
+    [DataContract(IsReference = true)]
     public class VTable
     {
         [Serializable]
+        [DataContract]
         public class Record
         {
+            [DataMember]
             public string funcName;
+            [DataMember]
             public string className;
+            [DataMember]
             public string funcfullname;
         }
 
+        [DataMember]
         public string name;
 
+        [DataMember]
         public Dictionary<string, Record> data;
 
         public VTable(string name)
@@ -292,6 +325,7 @@ namespace Gizbox
         {
             return data[funcName];
         }
+
         public void NewRecord(string fname, string cname)
         {
             data[fname] = new Record() { funcName = fname, className = cname, funcfullname = cname + "." + fname };
@@ -587,7 +621,7 @@ namespace Gizbox
         public string parserDataPath;
 
         //lib info  
-        public Dictionary<string, Gizbox.IL.ILUnit> libs = new Dictionary<string, IL.ILUnit>();
+        public Dictionary<string, Gizbox.IL.ILUnit> libsCache = new Dictionary<string, IL.ILUnit>();
         public List<string> libPathFindList = new List<string>();
 
         //CTOR  
@@ -653,7 +687,7 @@ namespace Gizbox
 
         public void AddLib(string libname, Gizbox.IL.ILUnit lib)
         {
-            this.libs[libname] = lib;
+            this.libsCache[libname] = lib;
         }
         public void AddLibPath(string path)
         {
@@ -663,12 +697,12 @@ namespace Gizbox
         /// <summary>
         /// 载入或者编译库（语义分析用）  
         /// </summary>
-        public Gizbox.IL.ILUnit LoadOrCompileLib(string libname)
+        public Gizbox.IL.ILUnit LoadLib(string libname)
         {
             //编译器中查找  
-            if (this.libs.ContainsKey(libname))
+            if (this.libsCache.ContainsKey(libname))
             {
-                return this.libs[libname];
+                return this.libsCache[libname];
             }
             //路径查找  
             else
@@ -683,12 +717,7 @@ namespace Gizbox
                             if(System.IO.Path.GetExtension(f.Name).EndsWith("gixlib"))
                             {
                                 var unit = Gizbox.IL.ILSerializer.Deserialize(f.FullName);
-                                return unit;
-                            }
-                            else
-                            {
-                                var unit = this.Compile(System.IO.File.ReadAllText(f.FullName));
-                                unit.name = libname;
+                                libsCache.Add(unit.name, unit);//cached
                                 return unit;
                             }
                         }
@@ -696,7 +725,7 @@ namespace Gizbox
                 }
             }
 
-            return null;
+            throw new GizboxException("找不到库文件：" + libname) ;
         }
 
 

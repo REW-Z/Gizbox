@@ -5,6 +5,8 @@ using System.Text;
 using System.Linq;
 
 using System.Linq.Expressions;
+using System.Net.Http.Headers;
+using System.Net;
 
 
 namespace Gizbox
@@ -215,7 +217,7 @@ namespace Gizbox
             public IdentityNode namepsaceNode;
             public StatementsNode stmtsNode;
         }
-
+        
         public abstract class DeclareNode : StmtNode { }
 
         public class VarDeclareNode : DeclareNode
@@ -308,8 +310,9 @@ namespace Gizbox
             }
         }
 
+
         // ******************** CONDITION CLAUSE NODES ******************************
-        
+
         public class ConditionClauseNode : Node
         {
             public ExprNode conditionNode;
@@ -579,4 +582,9 @@ namespace Gizbox
             return strb.ToString();
         }
     }
+
+
+
+
+
 }
