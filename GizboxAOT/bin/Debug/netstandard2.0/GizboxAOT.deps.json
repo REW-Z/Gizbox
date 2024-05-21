@@ -1,0 +1,90 @@
+{
+  "runtimeTarget": {
+    "name": ".NETStandard,Version=v2.0/",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETStandard,Version=v2.0": {},
+    ".NETStandard,Version=v2.0/": {
+      "GizboxAOT/1.0.0": {
+        "dependencies": {
+          "GizboxLang": "1.0.0",
+          "LLVMSharp": "5.0.0",
+          "NETStandard.Library": "2.0.3"
+        },
+        "runtime": {
+          "GizboxAOT.dll": {}
+        }
+      },
+      "LibLLVM/5.0.1": {
+        "dependencies": {
+          "Microsoft.NETCore.Platforms": "1.1.0"
+        }
+      },
+      "LLVMSharp/5.0.0": {
+        "dependencies": {
+          "NETStandard.Library": "2.0.3",
+          "LibLLVM": "5.0.1"
+        },
+        "runtime": {
+          "lib/netstandard1.1/LLVMSharp.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "Microsoft.NETCore.Platforms/1.1.0": {},
+      "NETStandard.Library/2.0.3": {
+        "dependencies": {
+          "Microsoft.NETCore.Platforms": "1.1.0"
+        }
+      },
+      "GizboxLang/1.0.0": {
+        "runtime": {
+          "GizboxLang.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "GizboxAOT/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "LibLLVM/5.0.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-pWsPGfwesb/+bn9r+XBz7QF04+aDz9pyQAUIv6geUjDEnMEoMEgX+FnaaNqpTU2t0xdi3YFZoGB70/yraeD21g==",
+      "path": "libllvm/5.0.1",
+      "hashPath": "libllvm.5.0.1.nupkg.sha512"
+    },
+    "LLVMSharp/5.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-cmMzCgd0RWQzRGS0RLaSoZvaqnaSSXW7uxDV8Z+04AT2yzCZLeeuTpve8gWhfVOqYU14VefncreotUI8bdBPEA==",
+      "path": "llvmsharp/5.0.0",
+      "hashPath": "llvmsharp.5.0.0.nupkg.sha512"
+    },
+    "Microsoft.NETCore.Platforms/1.1.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-kz0PEW2lhqygehI/d6XsPCQzD7ff7gUJaVGPVETX611eadGsA3A877GdSlU0LRVMCTH/+P3o2iDTak+S08V2+A==",
+      "path": "microsoft.netcore.platforms/1.1.0",
+      "hashPath": "microsoft.netcore.platforms.1.1.0.nupkg.sha512"
+    },
+    "NETStandard.Library/2.0.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-st47PosZSHrjECdjeIzZQbzivYBJFv6P2nv4cj2ypdI204DO+vZ7l5raGMiX4eXMJ53RfOIg+/s4DHVZ54Nu2A==",
+      "path": "netstandard.library/2.0.3",
+      "hashPath": "netstandard.library.2.0.3.nupkg.sha512"
+    },
+    "GizboxLang/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

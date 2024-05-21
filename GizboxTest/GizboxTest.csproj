@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\GizboxAOT\GizboxAOT.csproj" />
     <ProjectReference Include="..\GizboxLang\GizboxLang.csproj" />
   </ItemGroup>
 

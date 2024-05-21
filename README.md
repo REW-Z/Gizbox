@@ -18,7 +18,7 @@ Gizbox is a scripting language that can be embedded in C# applications.
 - Hello World
 
 ```Gizbox
-import <"stdlib">
+import <"core">
 
 Console::Log("Hello World!");
 ```

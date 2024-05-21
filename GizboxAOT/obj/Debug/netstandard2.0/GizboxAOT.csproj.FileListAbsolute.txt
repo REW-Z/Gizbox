@@ -1,0 +1,13 @@
+C:\Users\Administrator\Desktop\笔记\Gizbox\GizboxAOT\bin\Debug\netstandard2.0\GizboxAOT.deps.json
+C:\Users\Administrator\Desktop\笔记\Gizbox\GizboxAOT\bin\Debug\netstandard2.0\GizboxAOT.dll
+C:\Users\Administrator\Desktop\笔记\Gizbox\GizboxAOT\bin\Debug\netstandard2.0\GizboxAOT.pdb
+C:\Users\Administrator\Desktop\笔记\Gizbox\GizboxAOT\bin\Debug\netstandard2.0\GizboxLang.dll
+C:\Users\Administrator\Desktop\笔记\Gizbox\GizboxAOT\bin\Debug\netstandard2.0\GizboxLang.pdb
+C:\Users\Administrator\Desktop\笔记\Gizbox\GizboxAOT\obj\Debug\netstandard2.0\GizboxAOT.csproj.AssemblyReference.cache
+C:\Users\Administrator\Desktop\笔记\Gizbox\GizboxAOT\obj\Debug\netstandard2.0\GizboxAOT.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Administrator\Desktop\笔记\Gizbox\GizboxAOT\obj\Debug\netstandard2.0\GizboxAOT.AssemblyInfoInputs.cache
+C:\Users\Administrator\Desktop\笔记\Gizbox\GizboxAOT\obj\Debug\netstandard2.0\GizboxAOT.AssemblyInfo.cs
+C:\Users\Administrator\Desktop\笔记\Gizbox\GizboxAOT\obj\Debug\netstandard2.0\GizboxAOT.csproj.CoreCompileInputs.cache
+C:\Users\Administrator\Desktop\笔记\Gizbox\GizboxAOT\obj\Debug\netstandard2.0\GizboxAOT.csproj.Up2Date
+C:\Users\Administrator\Desktop\笔记\Gizbox\GizboxAOT\obj\Debug\netstandard2.0\GizboxAOT.dll
+C:\Users\Administrator\Desktop\笔记\Gizbox\GizboxAOT\obj\Debug\netstandard2.0\GizboxAOT.pdb

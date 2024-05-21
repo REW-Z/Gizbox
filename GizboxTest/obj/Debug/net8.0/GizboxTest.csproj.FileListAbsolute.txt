@@ -53,3 +53,5 @@ F:\Legacy\MyProjects\GizboxLang\GizboxTest\obj\Debug\net8.0\GizboxTest.genruntim
 F:\Legacy\MyProjects\GizboxLang\GizboxTest\obj\Debug\net8.0\ref\GizboxTest.dll
 F:\Legacy\MyProjects\GizboxLang\GizboxTest\bin\Debug\net8.0\core.gix
 C:\Users\Administrator\Desktop\笔记\Gizbox\GizboxTest\bin\Debug\net8.0\core.gix
+C:\Users\Administrator\Desktop\笔记\Gizbox\GizboxTest\bin\Debug\net8.0\GizboxAOT.dll
+C:\Users\Administrator\Desktop\笔记\Gizbox\GizboxTest\bin\Debug\net8.0\GizboxAOT.pdb

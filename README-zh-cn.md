@@ -22,7 +22,7 @@ Gizbox是一种脚本语言，可以用来嵌入C#的应用程序。
 - Hello World    
 
 ```Gizbox  
-import <"stdlib">
+import <"core">
 
 Console::Log("Hello World!");
 ```  

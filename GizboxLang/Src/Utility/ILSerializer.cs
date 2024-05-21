@@ -28,23 +28,5 @@ namespace Gizbox.IL
                 return (ILUnit)serializer.ReadObject(stream);
             }
         }
-        //public static void Serialize(string path, ILUnit unit)
-        //{
-        //    BinaryFormatter formatter = new BinaryFormatter();
-        //    using (FileStream stream = new FileStream(path, FileMode.Create, FileAccess.Write))
-        //    {
-        //        formatter.Serialize(stream, unit);
-        //    }
-        //}
-        //public static ILUnit Deserialize(string path)
-        //{
-        //    BinaryFormatter formatter = new BinaryFormatter();
-        //    using (FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read))
-        //    {
-        //        ILUnit unit = (ILUnit)formatter.Deserialize(stream);
-        //        return unit;
-        //    }
-        //}
-
     }
 }

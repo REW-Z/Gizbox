@@ -1,24 +1,11 @@
 {
   "version": 2,
-  "dgSpecHash": "4oJDBC0W9vMgAJL2mfwgzao+tPADt6F8Kt0EIh78w47TrZRZK+GXImzQsq4biA5S9fRcqpy5Ywh4eWYqO+Fn6A==",
+  "dgSpecHash": "2hmem9TZ1h3XPyiWzE+PhfkYd4ODdfolnhDMEvdv4hXO7GmzNziCq6HCcE0UGeEsLvZgc5W37eHIRHNa7NKtOw==",
   "success": true,
   "projectFilePath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\leona\\.nuget\\packages\\libllvm\\5.0.1\\libllvm.5.0.1.nupkg.sha512",
-    "C:\\Users\\leona\\.nuget\\packages\\llvmsharp\\5.0.0\\llvmsharp.5.0.0.nupkg.sha512",
     "C:\\Users\\leona\\.nuget\\packages\\microsoft.netcore.platforms\\1.1.0\\microsoft.netcore.platforms.1.1.0.nupkg.sha512",
     "C:\\Users\\leona\\.nuget\\packages\\netstandard.library\\2.0.3\\netstandard.library.2.0.3.nupkg.sha512"
   ],
-  "logs": [
-    {
-      "code": "NU1701",
-      "level": "Warning",
-      "warningLevel": 1,
-      "message": "已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETStandard,Version=v2.0”还原包“LibLLVM 5.0.1”。此包可能与项目不完全兼容。",
-      "libraryId": "LibLLVM",
-      "targetGraphs": [
-        ".NETStandard,Version=v2.0"
-      ]
-    }
-  ]
+  "logs": []
 }

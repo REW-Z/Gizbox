@@ -51,12 +51,23 @@
           "lib/netstandard1.0/_._": {}
         }
       },
-      "GizboxLang/1.0.0": {
+      "GizboxAOT/1.0.0": {
         "type": "project",
         "framework": ".NETStandard,Version=v2.0",
         "dependencies": {
+          "GizboxLang": "1.0.0",
           "LLVMSharp": "5.0.0"
         },
+        "compile": {
+          "bin/placeholder/GizboxAOT.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/GizboxAOT.dll": {}
+        }
+      },
+      "GizboxLang/1.0.0": {
+        "type": "project",
+        "framework": ".NETStandard,Version=v2.0",
         "compile": {
           "bin/placeholder/GizboxLang.dll": {}
         },
@@ -111,6 +122,11 @@
         "runtime.json"
       ]
     },
+    "GizboxAOT/1.0.0": {
+      "type": "project",
+      "path": "../GizboxAOT/GizboxAOT.csproj",
+      "msbuildProject": "../GizboxAOT/GizboxAOT.csproj"
+    },
     "GizboxLang/1.0.0": {
       "type": "project",
       "path": "../GizboxLang/GizboxLang.csproj",
@@ -119,6 +135,7 @@
   },
   "projectFileDependencyGroups": {
     "net8.0": [
+      "GizboxAOT >= 1.0.0",
       "GizboxLang >= 1.0.0"
     ]
   },
@@ -154,6 +171,9 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
+            "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxAOT\\GizboxAOT.csproj": {
+              "projectPath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxAOT\\GizboxAOT.csproj"
+            },
             "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj": {
               "projectPath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj"
             }

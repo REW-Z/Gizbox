@@ -717,7 +717,15 @@ namespace Gizbox
                             if(System.IO.Path.GetExtension(f.Name).EndsWith("gixlib"))
                             {
                                 var unit = Gizbox.IL.ILSerializer.Deserialize(f.FullName);
-                                libsCache.Add(unit.name, unit);//cached
+
+                                if (unit.name != libname)
+                                {
+                                    throw new GizboxException("库文件和库名称不一致：" + libname  + " vs " + unit.name);
+                                }
+                                else
+                                {
+                                    libsCache.Add(unit.name, unit);//cached
+                                }
                                 return unit;
                             }
                         }
