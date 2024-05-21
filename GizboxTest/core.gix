@@ -25,6 +25,14 @@ namespace Core
 	{
 		double value = 0.0d;
 	}
+
+}
+
+namespace Core::GC
+{
+	extern void Enable();
+	extern void Disable();
+	extern void Collect();
 }
 
 namespace Console

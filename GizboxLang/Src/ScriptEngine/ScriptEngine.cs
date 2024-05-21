@@ -12,18 +12,89 @@ namespace Gizbox.ScriptEngine
     //堆区  
     public class Heap
     {
-        public List<object> data = new List<object>();
+        private List<object> data = new List<object>(100);
 
-        public long Alloc(object obj)
-        {
-            data.Add(obj);
-            return (data.Count - 1);
-        }
+        public int HeapSize => data.Count;
+
+        //对象数量统计  
+        private int objCount = 0;
+
+        //触发GC的阈值data    
+        private int gcThreshold = 50;
+
 
         public object Read(long addr)
         {
+            if (addr < 0 || addr >= data.Count) return null;
             return data[(int)addr];
         }
+
+        public long Alloc(object obj)
+        {
+            for (int i = 0; i < data.Count; ++i)
+            {
+                if (data[i] == null)
+                {
+                    data[i] = obj;
+                    objCount++;
+                    return i;
+                }
+            }
+
+            data.Add(obj);
+            objCount++;
+            return (data.Count - 1);
+        }
+
+        public object Write(long addr, object val)
+        {
+            if (addr < 0 || addr >= data.Count) throw new GizboxException("堆写入无效");
+
+            if (data[(int)addr] == null && val != null)//写入新对象  
+            {
+                objCount++;
+            }
+            else if (data[(int)addr] != null && val == null)//删除对象  
+            {
+                objCount--;
+            }
+
+
+            return data[(int)addr] = val;
+        }
+
+
+        public int GetObjectCount()
+        {
+            int count = 0;
+            for (int i = 0; i < data.Count; ++i)
+            {
+                if (data[i] != null)
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        public bool NeedGC()
+        {
+            if(objCount > gcThreshold)
+            {
+                return true;
+            }
+            return false;
+        }
+
+        public void FinishGC()
+        {
+            //GC之后的对象数量依然比阈值多 -> 放宽阈值  
+            if(objCount > gcThreshold)
+            {
+                gcThreshold *= 2;
+            }
+        }
+
 
         public void Print()
         {
@@ -84,7 +155,7 @@ namespace Gizbox.ScriptEngine
     {
         //运行时  
         public Gizbox.ScriptEngine.RuntimeUnit mainUnit;
-        
+
         //符号表堆栈  
         public GStack<SymbolTable> envStack;
 
@@ -104,6 +175,11 @@ namespace Gizbox.ScriptEngine
         //计算工具  
         private Calculator caculator;
 
+
+        //GC相关  
+        private bool gcEnabled = false;
+
+
         //临时数据  
         private bool executing = false;
         private int currUnit = -1;
@@ -113,7 +189,7 @@ namespace Gizbox.ScriptEngine
 
         //DEBUG    
         private static bool analysisTime = true;
-        private System.Diagnostics.Stopwatch watch = new System.Diagnostics.Stopwatch();
+        private System.Diagnostics.Stopwatch analysisWatch = new System.Diagnostics.Stopwatch();
         private long prevTicks;
         private List<long> timeList = new List<long>(10000);
         private List<int> lineList = new List<int>(10000);
@@ -149,6 +225,13 @@ namespace Gizbox.ScriptEngine
             this.envStack = this.mainUnit.GetEnvStack(-1, 0); 
         }
 
+        public void Execute(Gizbox.IL.ILUnit ir)
+        {
+            Load(ir);
+
+            Execute();
+        }
+
         public void Execute()
         {
             if (this.mainUnit == null) throw new GizboxException("没有指令要执行！");
@@ -159,7 +242,7 @@ namespace Gizbox.ScriptEngine
 
             executing = true;
 
-            watch.Start();
+            analysisWatch.Start();
 
             while ((this.currUnit == -1 && this.curr >= mainUnit.codes.Count) == false)
             {
@@ -173,15 +256,14 @@ namespace Gizbox.ScriptEngine
                 }
             }
 
-            watch.Stop();
+            analysisWatch.Stop();
 
             if (analysisTime == true)
             {
                 if (Compiler.enableLogScriptEngine == false)
                 {
-
                     Console.WriteLine(new string('\n', 3));
-                    Console.WriteLine("总执行时间：" + watch.ElapsedMilliseconds + "ms");
+                    Console.WriteLine("总执行时间：" + analysisWatch.ElapsedMilliseconds + "ms");
 
                     Console.ReadKey();
                     ProfilerLog();
@@ -194,14 +276,8 @@ namespace Gizbox.ScriptEngine
                 }
             }
 
+
             executing = false;
-        }
-
-        public void Execute(Gizbox.IL.ILUnit ir)
-        {
-            Load(ir);
-
-            Execute();
         }
 
         private void Interpret(RuntimeCode code)
@@ -213,9 +289,18 @@ namespace Gizbox.ScriptEngine
                 if(prevUnit == -1)
                 {
                     lineList.Add(prev);
-                    timeList.Add(watch.ElapsedTicks - prevTicks);
+                    timeList.Add(analysisWatch.ElapsedTicks - prevTicks);
                 }
-                prevTicks = watch.ElapsedTicks;
+                prevTicks = analysisWatch.ElapsedTicks;
+            }
+
+            //GC  
+            if(gcEnabled)
+            {
+                if(heap.NeedGC())
+                {
+                    GCCollect();
+                }
             }
 
             //设置符号表链（用于解析符号）  
@@ -460,7 +545,15 @@ namespace Gizbox.ScriptEngine
                     break;
                 case "DEL":
                     {
-                        SetValue(code.arg1, Value.Void);
+                        var objPtr = GetValue(code.arg1);
+                        if(objPtr.IsPtr && objPtr.AsPtr >= 0)
+                        {
+                            this.heap.Write(objPtr.AsPtr, null);
+                        }
+                        else
+                        {
+                            throw new RuntimeException(GetCurrentCode(), "只能对堆对象进行释放");
+                        }
                     }
                     break;
                 case "ALLOC_ARRAY":
@@ -681,8 +774,8 @@ namespace Gizbox.ScriptEngine
                         if ((objptr.IsVoid)) throw new RuntimeException(GetCurrentCode(), "获取对象字段\"" + fieldName + "\"时发生错误：找不到要访问的对象");
                         if (objptr.Type != GizType.GizObject) throw new RuntimeException(GetCurrentCode(), "对象不是FanObject类型！");
 
-
-                        if ((this.DeReference(objptr.AsPtr) as GizObject).fields.ContainsKey(fieldName) == false) throw new RuntimeException(GetCurrentCode(), "对象" + fieldName + "字段未初始化!");
+                        var fields = (this.DeReference(objptr.AsPtr) as GizObject).fields;
+                        if (fields.ContainsKey(fieldName) == false) throw new RuntimeException(GetCurrentCode(), "对象" + fieldName + "字段未初始化! 所有字段：" + string.Concat(fields.Keys.Select(k => k + ", ")));
                         return (this.DeReference(objptr.AsPtr) as GizObject).fields[fieldName];
 
                     }
@@ -806,7 +899,7 @@ namespace Gizbox.ScriptEngine
         {
             if (ptr >= 0)
             {
-                return this.heap.data[(int)ptr];
+                return this.heap.Read(ptr);
             }
             else
             {
@@ -1152,7 +1245,6 @@ namespace Gizbox.ScriptEngine
             Console.WriteLine("ScriptEngine >>" + content);
         }
 
-
         //Profiler
         private void ProfilerLog()
         {
@@ -1197,6 +1289,184 @@ namespace Gizbox.ScriptEngine
             profileW.Stop();
             Console.WriteLine(profileName + ": " + profileW.ElapsedTicks);
         }
+
+
+        //GC    
+        public void GCEnable(bool enable)
+        {
+            this.gcEnabled = enable;
+        }
+        public void GCCollect()
+        {
+            if (gcEnabled == false) return;  
+
+            List<long> accessableList = new List<long>();
+            List<long> danglingPtrList = new List<long>();
+            Dictionary<long, long> redirectTable = new Dictionary<long, long>();
+
+            System.Func<Value, Value> MarkAccessable = (v) => 
+            {
+                if (accessableList.Contains(v.AsPtr) == false && this.heap.Read(v.AsPtr) != null)
+                {
+                    accessableList.Add(v.AsPtr);
+                }
+
+                return v;
+            };
+            System.Func<Value, Value> Redirect = (v) => 
+            {
+                if (redirectTable.ContainsKey(v.AsPtr))
+                {
+                    long newptr = redirectTable[v.AsPtr];
+                    v.AsPtr = newptr;
+                }
+                return v;
+            };
+
+            //从根集获取所有可达对象    
+            TraversalFromRoot(MarkAccessable);
+
+
+            //删除垃圾对象  
+            {
+                //所有地址的集合  
+                HashSet<long> heapAddresses = new HashSet<long>();
+                for (long i = 1; i < this.heap.HeapSize; i++)
+                {
+                    heapAddresses.Add(i);
+                }
+                // 取补集，找出需要回收的垃圾对象的地址
+                HashSet<long> unreachableAddresses = new HashSet<long>(heapAddresses);
+                foreach (long addr in accessableList)
+                {
+                    unreachableAddresses.Remove(addr);
+                }
+                foreach(var addr in unreachableAddresses)
+                {
+                    this.heap.Write(addr, null);
+                }
+            }
+
+
+
+
+            //堆对象移动    
+            int left = 0;
+            int right = 0;
+            while (right < this.heap.HeapSize)
+            {
+                if (this.heap.Read(left) != null) left++;
+                if (right <= left) right = left + 1;
+                if (right >= this.heap.HeapSize) break;
+
+                if (this.heap.Read(left) == null)
+                {
+                    if (this.heap.Read(right) != null)
+                    {
+                        this.heap.Write(left, this.heap.Read(right));
+                        this.heap.Write(right, null);
+                        redirectTable.Add(right, left);
+
+                        left++;
+                        right++;
+                    }
+                    else
+                    {
+                        right++;
+                    }
+                }
+                else
+                {
+                    left++;
+                }
+
+                if (right >= this.heap.HeapSize) break;
+            }
+
+
+            Console.WriteLine("----------- GC --------------");
+            int objCount = this.heap.GetObjectCount();
+            Console.WriteLine("堆对象数量：" + objCount + "个");
+            Console.WriteLine("不重复引用数量：" + accessableList.Count + "个");
+
+            Console.WriteLine(redirectTable.Keys.Count + "个对象需要重定向:");
+            foreach(var kv in redirectTable)
+            {
+                Console.WriteLine(kv.Key + " -> " + kv.Value);
+            }
+            Console.WriteLine("-----------------------------");
+
+            //重定向指针    
+            TraversalFromRoot(Redirect);
+
+
+            //完成GC  
+            this.heap.FinishGC();
+        }
+        private void TraversalFromRoot(System.Func< Value, Value> op)
+        {
+            foreach (var key in this.mainUnit.globalData.Keys)
+            {
+                if (this.mainUnit.globalData[key].IsPtr)
+                {
+                    var newVal = TraversingObject(this.mainUnit.globalData[key], op);
+                    this.mainUnit.globalData[key] = newVal;
+                }
+            }
+
+            for (int i = 0; i <= this.callStack.Top; ++i)
+            {
+                var argList = this.callStack[i].args.ToList();
+                for (int a = 0; a < argList.Count; ++a)
+                {
+                    if (argList[a].IsPtr)
+                    {
+                        var newVal = TraversingObject(argList[a], op);
+                        argList[a] = newVal;
+                    }
+                }
+                foreach (var key in this.callStack[i].localVariables.Keys)
+                {
+                    if (this.callStack[i].localVariables[key].IsPtr)
+                    {
+                        var newVal = TraversingObject(this.callStack[i].localVariables[key], op);
+                        this.callStack[i].localVariables[key] = newVal;
+                    }
+                }
+            }
+        }
+        private Value TraversingObject(Value objPtr, System.Func<Value, Value> op)
+        {
+            var obj = DeReference(objPtr.AsPtr);
+            if (obj is GizObject)
+            {
+                var fieldDic = (obj as GizObject).fields;
+                foreach (var key in fieldDic.Keys)
+                {
+                    if (fieldDic[key].IsPtr)
+                    {
+                        var newVal = TraversingObject(fieldDic[key], op);
+                        fieldDic[key] = newVal;
+                    }
+                }
+            }
+            else if(obj is Value[])
+            {
+                var arr = (obj as Value[]);
+                for (int i = 0; i < arr.Length; ++i)
+                {
+                    if (arr[i].IsPtr)
+                    {
+                        var newVal = TraversingObject(arr[i], op);
+                        arr[i] = newVal;
+                    }
+                }
+            }
+
+            var newPtrVal  = op(objPtr);
+            return newPtrVal;
+        }
+
 
         //DEBUG  
         private System.Diagnostics.Stopwatch profileW = new System.Diagnostics.Stopwatch();

@@ -64,6 +64,8 @@ namespace Gizbox
 
         public GizType Type => this.type;
 
+        public bool IsPtr => (this.type == GizType.GizObject || this.type == GizType.GizArray || this.type == GizType.String);
+
         public bool IsVoid => (this.type == GizType.Void);
 
         public static Value Void => new Value() { type = GizType.Void };
@@ -291,7 +293,7 @@ namespace Gizbox
         }
         public override string ToString()
         {
-            return "GizObect(instanceID:" + this.instanceID + ")";
+            return "GizObect(instanceID:" + this.instanceID + "  type:" + truetype + ")";
         }
     }
 

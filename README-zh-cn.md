@@ -6,6 +6,8 @@ Gizbox是一种脚本语言，可以用来嵌入C#的应用程序。
 
 面向对象。只能继承一个基类。不支持多继承。    
 
+所有类都直接或者间接继承自Core::Object类。    
+
 所有成员函数都是虚函数。    
 
 没有隐式转换，所有类型都需要显示转换。    
@@ -25,7 +27,7 @@ import <"stdlib">
 Console::Log("Hello World!");
 ```  
 
-- 库    
+- 导入库文件        
 
 通过`import`关键字引入导入库文件。    
 
@@ -112,10 +114,14 @@ class Student : Person
 extern void Log(string text);
 ```
 
+- GC    
+
+可以调用`GC::Enable()`开启GC，也可以使用`delete`控制对象生命周期。    
+
+
 - 注意事项    
 
 在同一个编译单元中，基类必须先于派生类定义。（否则虚函数表合并会出问题）    
-
 
 
 
@@ -137,7 +143,7 @@ var ir = compiler.Compile(source);//编译源代码为中间代码
 ```C#
 ScriptEngine engine = new ScriptEngine();//创建解释器实例  
 engine.AddLibSearchDirectory(AppDomain.CurrentDomain.BaseDirectory);//搜索".gixlib"库文件的目录    
-engine.csharpInteropContext.ConfigExternCallClasses(typeof(GizboxLang.Examples.ExampleInterop));//
+engine.csharpInteropContext.ConfigExternCallClasses(typeof(GizboxLang.Examples.ExampleInterop));//外部调用的函数优先在这些类中查找
 engine.Execute(ir);
 ```  
 

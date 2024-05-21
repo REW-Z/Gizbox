@@ -136,7 +136,7 @@ namespace Gizbox.ScriptEngine
             int rbracket = expr.IndexOf(']');
 
             string arrVarExpr = expr.Substring(0, lbracket);
-            string idxExpr = expr.Substring(lbracket, (rbracket - lbracket) + 1);
+            string idxExpr = expr.Substring(lbracket + 1, (rbracket - lbracket) - 1);
 
 
             if (arrVarExpr[arrVarExpr.Length - 1] == ']')

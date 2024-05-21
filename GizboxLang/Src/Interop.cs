@@ -23,10 +23,8 @@ namespace Gizbox.Interop.CSharp
         public ScriptEngine.ScriptEngine engine;
 
         //外部调用类列表  
-        public List<Type> externCallTypes = new List<Type>() 
-        {
-            typeof(ExterCallPreset) 
-        };
+        public CoreGiz coreGiz;
+        public List<Type> externCallTypes = new List<Type>();
 
 
         //绑定表  
@@ -41,6 +39,7 @@ namespace Gizbox.Interop.CSharp
         public InteropContext(ScriptEngine.ScriptEngine engineContext)
         {
             this.engine = engineContext;
+            this.coreGiz = new CoreGiz() { engineContext = engineContext };
         }
 
         //外部调用  
@@ -50,16 +49,23 @@ namespace Gizbox.Interop.CSharp
 
             object[] argumentsBoxed = argments.Select(a => Marshal2CSharp(a)).ToArray();
 
-            var funcInfo = FindFunc(funcName);
+            //核心库查找
+            var coreFuncInfo = FindFuncInCoreClass(funcName);
+            if (coreFuncInfo != null)
+            {
+                var ret = coreFuncInfo.Invoke(coreGiz, argumentsBoxed);
+                return Marshal2Giz(ret);
+            }
+
+            //外部查找    
+            var funcInfo = FindFuncExternClass(funcName);
             if (funcInfo != null)
             {
                 var ret = funcInfo.Invoke(null, argumentsBoxed);
                 return Marshal2Giz(ret);
             }
-            else
-            {
-                throw new Exception("找不到对应函数实现：" + funcName);
-            }
+
+            throw new Exception("找不到对应函数实现：" + funcName);
         }
 
         //绑定对象  
@@ -99,7 +105,17 @@ namespace Gizbox.Interop.CSharp
         }
 
         //查询函数  
-        public MethodInfo FindFunc(string funcName)
+        public MethodInfo FindFuncInCoreClass(string funcName)
+        {
+            var func = typeof(CoreGiz).GetMethods(System.Reflection.BindingFlags.Public | BindingFlags.Instance)
+                .FirstOrDefault(m => m.Name == funcName);
+            if (func != null)
+            {
+                return func;
+            }
+            return null;
+        }
+        public MethodInfo FindFuncExternClass(string funcName)
         {
             foreach (var t in externCallTypes)
             {
@@ -275,15 +291,21 @@ namespace Gizbox.Interop.CSharp
         }
     }
 
-    public static class ExterCallPreset
+    public class CoreGiz
     {
-        public static void SetFieldValue(object obj, string fieldName, object val)
+        public ScriptEngine.ScriptEngine engineContext;
+
+        public void Core__GC__Collect()
         {
-            obj.GetType().GetField(fieldName).SetValue(obj, val);
+            engineContext.GCCollect();
         }
-        public static object GetFieldValue(object obj, string fieldName)
+        public void Core__GC__Enable()
         {
-            return obj.GetType().GetField(fieldName).GetValue(obj);
+            engineContext.GCEnable(true);
+        }
+        public void Core__GC__Disable()
+        {
+            engineContext.GCEnable(false);
         }
     }
 

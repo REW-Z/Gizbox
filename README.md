@@ -4,7 +4,8 @@
 
 Gizbox is a scripting language that can be embedded in C# applications.
 
-- Object-oriented. Can only inherit from one base class. Does not support multiple inheritance.
+- Object-oriented. Can only inherit from one base class. Does not support multiple inheritance.  
+- All classes directly or indirectly inherit from the Core::Object class.   
 - All member functions are virtual functions.
 - No implicit conversions; all types require explicit conversion.
 - Field declarations must be initialized.
@@ -98,7 +99,7 @@ In member functions, all member fields and member functions must be accessed wit
 
 - Properties
 
-Properties: Member functions `void xxxx(type arg)` and `type xxxx()` can be used as setters and getters.
+Properties: Member functions `void xxxx(type arg)` and `type xxxx()` can be used as setters and getters.    
 
 - Interoperability
 
@@ -107,6 +108,10 @@ C# methods can be called through extern functions.
 ```Gizbox
 extern void Log(string text);
 ```
+
+- GC    
+
+You can enable garbage collection (GC) by calling `GC::Enable()`, or control the object lifecycle using `delete`.    
 
 - Notes
 
@@ -130,7 +135,7 @@ var ir = compiler.Compile(source); // Compile the source code into intermediate 
 ```C#
 ScriptEngine engine = new ScriptEngine(); // Create an interpreter instance
 engine.AddLibSearchDirectory(AppDomain.CurrentDomain.BaseDirectory);//Search Directory Of Libs  
-engine.csharpInteropContext.ConfigExternCallClasses(typeof(GizboxLang.Examples.ExampleInterop));
+engine.csharpInteropContext.ConfigExternCallClasses(typeof(GizboxLang.Examples.ExampleInterop));//Functions called externally are prioritized to be searched within these classes.
 engine.Execute(ir);
 ```
 

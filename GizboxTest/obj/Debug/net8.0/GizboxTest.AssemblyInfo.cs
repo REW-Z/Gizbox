@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("GizboxTest")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a691589b4a18c4b144fa0a88ef24219381c68b4e")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+fc1ce13fb1b4b2ae24e505bee6ba48deeba175cf")]
 [assembly: System.Reflection.AssemblyProductAttribute("GizboxTest")]
 [assembly: System.Reflection.AssemblyTitleAttribute("GizboxTest")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

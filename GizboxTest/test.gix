@@ -3,3 +3,11 @@
 using Core;
 using Console;
 using Collections;
+
+GC::Enable();
+
+for(int i = 0; i < 250; ++i)
+{
+	Integer itg = new Integer();
+}
+

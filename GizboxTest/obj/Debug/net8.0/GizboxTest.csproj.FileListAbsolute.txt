@@ -52,3 +52,4 @@ F:\Legacy\MyProjects\GizboxLang\GizboxTest\obj\Debug\net8.0\GizboxTest.pdb
 F:\Legacy\MyProjects\GizboxLang\GizboxTest\obj\Debug\net8.0\GizboxTest.genruntimeconfig.cache
 F:\Legacy\MyProjects\GizboxLang\GizboxTest\obj\Debug\net8.0\ref\GizboxTest.dll
 F:\Legacy\MyProjects\GizboxLang\GizboxTest\bin\Debug\net8.0\core.gix
+C:\Users\Administrator\Desktop\笔记\Gizbox\GizboxTest\bin\Debug\net8.0\core.gix
