@@ -1,6 +1,5 @@
 ﻿import <"core">
 
-
 namespace Math
 {
 	float Abs(float number)

@@ -30,6 +30,9 @@ namespace Gizbox
         public Node root;
 
 
+
+
+
         public ParseTree()
         {
             allnodes = new List<Node>();
@@ -66,6 +69,17 @@ namespace Gizbox
             return strb.ToString();
         }
 
+        public void CompleteBuild()
+        {
+            this.root.depth = 0;
+            this.Traversal((node) => {
+                foreach (var c in node.children)
+                {
+                    //深度设置  
+                    c.depth = node.depth + 1;
+                }
+            });
+        }
         public void Traversal(Action<Node> operation)
         {
             TraversalNode(root, operation);
@@ -528,9 +542,14 @@ namespace Gizbox
             public ExprNode indexNode;
         }
 
+        
         // ******************** Instance Members ******************************
         public ProgramNode rootNode;
-        public Node allNodes;
+        
+        public List<IdentityNode> identityNodes = new List<IdentityNode>();
+        public List<LiteralNode> literalNodes = new List<LiteralNode>();
+
+
         public SyntaxTree(ProgramNode root)
         {
             this.rootNode = root;
@@ -541,11 +560,23 @@ namespace Gizbox
             Traversal((n) => {
                 foreach(var child in n.Children)
                 {
+                    //父子关系  
                     if(child == null)
                     {
                         throw new Exception("NULL CHILD of" + n.ToString());
                     }
                     child.Parent = n;
+
+                    //标识符收集  
+                    switch(child)
+                    {
+                        case SyntaxTree.IdentityNode:
+                            identityNodes.Add(child as SyntaxTree.IdentityNode);
+                            break;
+                        case SyntaxTree.LiteralNode:
+                            literalNodes.Add(child as SyntaxTree.LiteralNode);
+                            break;
+                    }
                 }
             });
         }

@@ -1,0 +1,9 @@
+{
+  "runtimeOptions": {
+    "additionalProbingPaths": [
+      "C:\\Users\\leona\\.dotnet\\store\\|arch|\\|tfm|",
+      "C:\\Users\\leona\\.nuget\\packages",
+      "E:\\Visual Studio 2019\\Shared\\NuGetPackages"
+    ]
+  }
+}

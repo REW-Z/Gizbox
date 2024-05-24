@@ -1,13 +1,11 @@
 ﻿import <"stdlib">  
 
-using Core;
+using Core;  
 using Console;
 using Collections;
 
-GC::Enable();
+GC::Enable();    
 
-for(int i = 0; i < 250; ++i)
+void Test()  
 {
-	GC::Enable();
-}
-
+}  

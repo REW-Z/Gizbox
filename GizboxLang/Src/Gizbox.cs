@@ -17,7 +17,7 @@ namespace Gizbox
         Keyword,
         Operator,
         Id,
-        Number,
+        Literal,
     }
 
     /// <summary>
@@ -42,17 +42,29 @@ namespace Gizbox
         public int line;
 
         /// <summary>
+        /// 每行起始  
+        /// </summary>
+        public int start;
+
+        /// <summary>
+        /// 每行结束  
+        /// </summary>
+        public int length;
+
+        /// <summary>
         /// 属性值（一般是词素或者指针）    
         /// </summary>
         public string attribute;
 
 
-        public Token(string name, PatternType type, int lineCount, string attribute = null)
+        public Token(string name, PatternType type, string attribute, int lineCount, int start, int length)
         {
             this.name = name;
             this.patternType = type;
-            this.line = lineCount;
             this.attribute = attribute;
+            this.line = lineCount;
+            this.start = start;
+            this.length = length;
         }
         public override string ToString()
         {
@@ -190,7 +202,7 @@ namespace Gizbox
 
             if (records.ContainsKey(symbolName))
             {
-                Console.WriteLine("has symbol:" + symbolName + " in " + this.name);
+                Debug.LogLine("has symbol:" + symbolName + " in " + this.name);
                 return records[symbolName];
             }
             else
@@ -267,17 +279,17 @@ namespace Gizbox
         public void Print()
         {
             int pad = 16;
-            Console.WriteLine();
-            Console.WriteLine($"|{new string('-', pad)}-{new string('-', pad)}-{ this.name.PadRight(pad) + (this.parent != null ? ("(parent:" + this.parent.name + ")") : "") }-{new string('-', pad)}-{new string('-', pad)}|");
-            Console.WriteLine($"|{"NAME".PadRight(pad)}|{"RAW".PadRight(pad)}|{"CATAGORY".PadRight(pad)}|{"TYPE".PadRight(pad)}|{"ADDR".PadRight(pad)}|{"SubTable".PadRight(pad)}|");
-            Console.WriteLine($"|{new string('-', pad * 6 + 4)}|");
+            Debug.LogLine();
+            Debug.LogLine($"|{new string('-', pad)}-{new string('-', pad)}-{ this.name.PadRight(pad) + (this.parent != null ? ("(parent:" + this.parent.name + ")") : "") }-{new string('-', pad)}-{new string('-', pad)}|");
+            Debug.LogLine($"|{"NAME".PadRight(pad)}|{"RAW".PadRight(pad)}|{"CATAGORY".PadRight(pad)}|{"TYPE".PadRight(pad)}|{"ADDR".PadRight(pad)}|{"SubTable".PadRight(pad)}|");
+            Debug.LogLine($"|{new string('-', pad * 6 + 4)}|");
             foreach (var key in records.Keys)
             {
                 var rec = records[key];
-                Console.WriteLine($"|{rec.name.PadRight(pad)}|{rec.rawname.PadRight(pad)}|{rec.category.ToString().PadRight(pad)}|{rec.typeExpression.PadRight(pad)}|{rec.addr.ToString().PadRight(pad)}|{(rec.envPtr != null ? "hasSubTable" : "").PadRight(pad)}|");
+                Debug.LogLine($"|{rec.name.PadRight(pad)}|{rec.rawname.PadRight(pad)}|{rec.category.ToString().PadRight(pad)}|{rec.typeExpression.PadRight(pad)}|{rec.addr.ToString().PadRight(pad)}|{(rec.envPtr != null ? "hasSubTable" : "").PadRight(pad)}|");
             }
-            Console.WriteLine($"|{new string('-', pad * 6 + 4)}|");
-            Console.WriteLine();
+            Debug.LogLine($"|{new string('-', pad * 6 + 4)}|");
+            Debug.LogLine();
 
             if(this.children .Count > 0)
             {
@@ -613,7 +625,7 @@ namespace Gizbox
         public static bool enableLogScanner = false;
         public static bool enableLogParser = false;
         public static bool enableLogSemanticAnalyzer = false;
-        public static bool enableLogILGenerator = true;
+        public static bool enableLogILGenerator = false;
         public static bool enableLogScriptEngine = false;
 
         //parser data  
@@ -646,8 +658,8 @@ namespace Gizbox
             SimpleParser parser = new SimpleParser();
             parser.Parse(tokens);
 
-            Console.WriteLine("\n\n语法分析树：");
-            Console.WriteLine(parser.parseTree.Serialize());
+            Debug.LogLine("\n\n语法分析树：");
+            Debug.LogLine(parser.parseTree.Serialize());
 
             return parser.parseTree;
         }
@@ -668,8 +680,8 @@ namespace Gizbox
             parser.Parse(tokens);
 
 
-            Console.WriteLine("\n\n语法分析树：");
-            Console.WriteLine(parser.parseTree.Serialize());
+            Debug.LogLine("\n\n语法分析树：");
+            Debug.LogLine(parser.parseTree.Serialize());
 
             return parser.parseTree;
         }
@@ -681,8 +693,8 @@ namespace Gizbox
         {
             return;
 
-            Console.WriteLine(txt + "\n按任意键继续...");
-            Console.ReadKey();
+            Debug.LogLine(txt + "\n按任意键继续...");
+            Debug.Pause();
         }
 
         public void AddLib(string libname, Gizbox.IL.ILUnit lib)
@@ -770,6 +782,12 @@ namespace Gizbox
             System.IO.File.WriteAllText(codepath, csStr);
         }
 
+
+
+
+        /// <summary>
+        /// 编译库  
+        /// </summary>
         public void CompileToLib(string source, string libName, string savePath)
         {
             var ir = this.Compile(source);
@@ -831,7 +849,32 @@ namespace Gizbox
 
 
 
+    public static class Debug
+    {
+        public static bool enableConsole = false;
 
+        public static void Log(object msg = null)
+        {
+            if(Debug.enableConsole)
+            {
+                Console.Write(msg);
+            }
+        }
+        public static void LogLine(object msg = null)
+        {
+            if (Debug.enableConsole)
+            {
+                Console.WriteLine(msg);
+            }
+        }
+        public static void Pause()
+        {
+            if (Debug.enableConsole)
+            {
+                Console.ReadKey();
+            }
+        }
+    }
 
     public static class Utils
     {

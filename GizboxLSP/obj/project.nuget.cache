@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "dgSpecHash": "VjYGY+qHhWRwIPjxyOv/FwkP7A6rajF+HYYWziKrQyQPdPG7NZedF/YxOv8L6JWLvH8u4wbyXjtFoKRBoZ9DjA==",
+  "success": true,
+  "projectFilePath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLSP\\GizboxLSP.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\leona\\.nuget\\packages\\microsoft.netcore.platforms\\1.1.0\\microsoft.netcore.platforms.1.1.0.nupkg.sha512",
+    "C:\\Users\\leona\\.nuget\\packages\\microsoft.visualstudio.languageserver.protocol\\17.2.8\\microsoft.visualstudio.languageserver.protocol.17.2.8.nupkg.sha512",
+    "C:\\Users\\leona\\.nuget\\packages\\netstandard.library\\2.0.3\\netstandard.library.2.0.3.nupkg.sha512",
+    "C:\\Users\\leona\\.nuget\\packages\\newtonsoft.json\\13.0.1\\newtonsoft.json.13.0.1.nupkg.sha512"
+  ],
+  "logs": []
+}

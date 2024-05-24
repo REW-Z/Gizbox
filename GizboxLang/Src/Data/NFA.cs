@@ -3,7 +3,7 @@ using System.Linq;
 using System.Collections;
 using System.Collections.Generic;
 
-
+using Gizbox;
 
 
 
@@ -160,7 +160,7 @@ public class NFATest
     public static void Test()
     {
         NFA nfa = new NFA("a|b*");
-        Console.WriteLine(nfa.Matches("aaaa")); // Should be true
-        Console.WriteLine(nfa.Matches("b"));    // Should be true
+        Debug.LogLine(nfa.Matches("aaaa")); // Should be true
+        Debug.LogLine(nfa.Matches("b"));    // Should be true
     }
 }

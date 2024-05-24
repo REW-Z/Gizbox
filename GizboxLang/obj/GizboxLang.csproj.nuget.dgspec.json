@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj": {}
+    "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLang\\GizboxLang.csproj": {}
   },
   "projects": {
-    "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj": {
+    "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLang\\GizboxLang.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj",
+        "projectUniqueName": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLang\\GizboxLang.csproj",
         "projectName": "GizboxLang",
-        "projectPath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj",
+        "projectPath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLang\\GizboxLang.csproj",
         "packagesPath": "C:\\Users\\leona\\.nuget\\packages\\",
-        "outputPath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\obj\\",
+        "outputPath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLang\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "E:\\Visual Studio 2019\\Shared\\NuGetPackages"

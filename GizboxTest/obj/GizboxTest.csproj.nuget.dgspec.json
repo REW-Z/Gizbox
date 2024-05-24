@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxTest\\GizboxTest.csproj": {}
+    "F:\\Legacy\\MyProjects\\Gizbox\\GizboxTest\\GizboxTest.csproj": {}
   },
   "projects": {
-    "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxAOT\\GizboxAOT.csproj": {
+    "F:\\Legacy\\MyProjects\\Gizbox\\GizboxAOT\\GizboxAOT.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxAOT\\GizboxAOT.csproj",
+        "projectUniqueName": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxAOT\\GizboxAOT.csproj",
         "projectName": "GizboxAOT",
-        "projectPath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxAOT\\GizboxAOT.csproj",
+        "projectPath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxAOT\\GizboxAOT.csproj",
         "packagesPath": "C:\\Users\\leona\\.nuget\\packages\\",
-        "outputPath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxAOT\\obj\\",
+        "outputPath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxAOT\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "E:\\Visual Studio 2019\\Shared\\NuGetPackages"
@@ -32,8 +32,8 @@
           "netstandard2.0": {
             "targetAlias": "netstandard2.0",
             "projectReferences": {
-              "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj": {
-                "projectPath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj"
+              "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLang\\GizboxLang.csproj": {
+                "projectPath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLang\\GizboxLang.csproj"
               }
             }
           }
@@ -79,14 +79,14 @@
         }
       }
     },
-    "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj": {
+    "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLang\\GizboxLang.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj",
+        "projectUniqueName": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLang\\GizboxLang.csproj",
         "projectName": "GizboxLang",
-        "projectPath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj",
+        "projectPath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLang\\GizboxLang.csproj",
         "packagesPath": "C:\\Users\\leona\\.nuget\\packages\\",
-        "outputPath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\obj\\",
+        "outputPath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLang\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "E:\\Visual Studio 2019\\Shared\\NuGetPackages"
@@ -146,14 +146,14 @@
         }
       }
     },
-    "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxTest\\GizboxTest.csproj": {
+    "F:\\Legacy\\MyProjects\\Gizbox\\GizboxTest\\GizboxTest.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxTest\\GizboxTest.csproj",
+        "projectUniqueName": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxTest\\GizboxTest.csproj",
         "projectName": "GizboxTest",
-        "projectPath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxTest\\GizboxTest.csproj",
+        "projectPath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxTest\\GizboxTest.csproj",
         "packagesPath": "C:\\Users\\leona\\.nuget\\packages\\",
-        "outputPath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxTest\\obj\\",
+        "outputPath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxTest\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "E:\\Visual Studio 2019\\Shared\\NuGetPackages"
@@ -174,11 +174,11 @@
           "net8.0": {
             "targetAlias": "net8.0",
             "projectReferences": {
-              "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxAOT\\GizboxAOT.csproj": {
-                "projectPath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxAOT\\GizboxAOT.csproj"
+              "F:\\Legacy\\MyProjects\\Gizbox\\GizboxAOT\\GizboxAOT.csproj": {
+                "projectPath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxAOT\\GizboxAOT.csproj"
               },
-              "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj": {
-                "projectPath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj"
+              "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLang\\GizboxLang.csproj": {
+                "projectPath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLang\\GizboxLang.csproj"
               }
             }
           }

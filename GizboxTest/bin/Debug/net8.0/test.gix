@@ -1,4 +1,5 @@
-﻿import <"stdlib">  
+﻿
+import <"stdlib">  
 
 using Core;
 using Console;
@@ -6,8 +7,31 @@ using Collections;
 
 GC::Enable();
 
-for(int i = 0; i < 250; ++i)
+class Transform
 {
-	Integer itg = new Integer();
+	int p = 0;
+	int position()
+	{
+		this.p += 1;
+		return this.p;
+	}
+}
+class GameObject
+{
+	Transform t = new Transform();
+	Transform transform()
+	{
+		return this.t;
+	}
 }
 
+GameObject go = new GameObject();
+
+void Test()
+{
+	int num = (go.transform()).position();
+	
+	Console::Log("test:" + (string)num);
+}
+
+AAAAA

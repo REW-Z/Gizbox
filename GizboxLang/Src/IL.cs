@@ -282,19 +282,19 @@ namespace Gizbox.IL
         //打印  
         public void Print()
         {
-            Console.WriteLine("中间代码输出：(" + this.codes.Count + "行)");
-            Console.WriteLine(new string('-', 50));
+            Debug.LogLine("中间代码输出：(" + this.codes.Count + "行)");
+            Debug.LogLine(new string('-', 50));
             for (int i = 0; i < this.codes.Count; ++i)
             {
-                Console.WriteLine($"{i.ToString().PadRight(4)}|status {this.scopeStatusArr[i].ToString().PadRight(3)}|{this.codes[i].ToExpression()}");
+                Debug.LogLine($"{i.ToString().PadRight(4)}|status {this.scopeStatusArr[i].ToString().PadRight(3)}|{this.codes[i].ToExpression()}");
             }
-            Console.WriteLine(new string('-', 50));
+            Debug.LogLine(new string('-', 50));
 
 
-            Console.WriteLine("作用域：");
+            Debug.LogLine("作用域：");
             foreach (var scope in this.scopes)
             {
-                Console.WriteLine("scope:" + scope.env.name + ":  " + scope.lineFrom + " ~ " + scope.lineTo);
+                Debug.LogLine("scope:" + scope.env.name + ":  " + scope.lineFrom + " ~ " + scope.lineTo);
             }
         }
     }
@@ -1048,7 +1048,7 @@ namespace Gizbox.IL
         //            {
         //                if(classEnv .ContainRecordName(id))
         //                {
-        //                    Console.WriteLine("库中找到：" + className + "." + id);
+        //                    Debug.Log("库中找到：" + className + "." + id);
         //                    return classEnv.GetRecord(id);
         //                }
         //            }
@@ -1081,7 +1081,7 @@ namespace Gizbox.IL
         public static void Log(object content)
         {
             if(!Compiler.enableLogILGenerator) return;
-            Console.WriteLine("ILGen >>>" + content);
+            Debug.LogLine("ILGen >>>" + content);
         }
 
     }

@@ -272,11 +272,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxAOT\\GizboxAOT.csproj",
+      "projectUniqueName": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxAOT\\GizboxAOT.csproj",
       "projectName": "GizboxAOT",
-      "projectPath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxAOT\\GizboxAOT.csproj",
+      "projectPath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxAOT\\GizboxAOT.csproj",
       "packagesPath": "C:\\Users\\leona\\.nuget\\packages\\",
-      "outputPath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxAOT\\obj\\",
+      "outputPath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxAOT\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "E:\\Visual Studio 2019\\Shared\\NuGetPackages"
@@ -297,8 +297,8 @@
         "netstandard2.0": {
           "targetAlias": "netstandard2.0",
           "projectReferences": {
-            "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj": {
-              "projectPath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxLang\\GizboxLang.csproj"
+            "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLang\\GizboxLang.csproj": {
+              "projectPath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLang\\GizboxLang.csproj"
             }
           }
         }

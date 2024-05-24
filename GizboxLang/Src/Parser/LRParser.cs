@@ -122,7 +122,7 @@ namespace Gizbox.LRParse
                 //添加$符号  
                 if (input.LastOrDefault().name != "$")
                 {
-                    this.remainingInput.Enqueue(new Token("$", PatternType.Keyword, -99));
+                    this.remainingInput.Enqueue(new Token("$", PatternType.Keyword, null, -99, 0, 0));
                 }
             }
 
@@ -242,7 +242,6 @@ namespace Gizbox.LRParse
                 }
             }
 
-            Console.ReadKey();
 
             Log("\n\n语法分析树：");
             Log(this.parseTree.Serialize());
@@ -250,13 +249,12 @@ namespace Gizbox.LRParse
             Log("\n\n抽象语法树：");
             Log(this.syntaxTree.Serialize());
             Compiler.Pause("抽象语法树生成完成");
-            Console.ReadKey();
         }
 
         private static void Log(object content)
         {
             if (!Compiler.enableLogParser) return;
-            Console.WriteLine("Parser >>>" + content);
+            Debug.LogLine("Parser >>>" + content);
         }
     }
 }
@@ -351,14 +349,8 @@ namespace Gizbox.SemanticRule
             //设置根节点  
             resultTree.root = parser.newElement.attributes["cst_node"] as ParseTree.Node;
 
-            //设置深度
-            resultTree.root.depth = 0;
-            resultTree.Traversal((node) => {
-                foreach (var c in node.children)
-                {
-                    c.depth = node.depth + 1;
-                }
-            });
+            //完成构建 （设置深度等操作）  
+            resultTree.CompleteBuild();
 
             SemanticAnalyzer.Log("根节点:" + resultTree.root.name);
             SemanticAnalyzer.Log("节点数:" + resultTree.allnodes.Count);
@@ -1932,7 +1924,7 @@ namespace Gizbox.SemanticRule
                         //新建虚函数表  
                         string classname = classDeclNode.classNameNode.FullName;
                         var vtable = ilUnit.vtables[classname] = new VTable(classname);
-                        Console.WriteLine("新的虚函数表：" + classname);
+                        Debug.LogLine("新的虚函数表：" + classname);
 
                         //进入类作用域  
                         envStack.Push(newEnv);
@@ -2410,7 +2402,7 @@ namespace Gizbox.SemanticRule
                         Pass3_AnalysisNode(objMemberAccessNode.objectNode);
                         
                         //不能分析成员名称，当前作用域会找不到标识符。      
-                        //Console.WriteLine("分析：" + objMemberAccessNode.memberNode.FirstToken().ToString());
+                        //Debug.Log("分析：" + objMemberAccessNode.memberNode.FirstToken().ToString());
                         //Pass3_AnalysisNode(objMemberAccessNode.memberNode);
 
                         AnalyzeTypeExpression(objMemberAccessNode);
@@ -2791,10 +2783,10 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.ClassTypeNode classTypeNode:
                     {
-                        Console.WriteLine("类类型补全：" + classTypeNode.classname);
+                        Debug.LogLine("类类型补全：" + classTypeNode.classname);
                         TryCompleteIdenfier(classTypeNode.classname);
 
-                        Console.WriteLine("结果：" + classTypeNode.classname.FullName);
+                        Debug.LogLine("结果：" + classTypeNode.classname.FullName);
                     }
                     break;
                 case SyntaxTree.ArrayTypeNode arrayTypeNpde:
@@ -2808,7 +2800,7 @@ namespace Gizbox.SemanticRule
         public static void Log(object content)
         {
             if (!Compiler.enableLogSemanticAnalyzer) return;
-            Console.WriteLine("SematicAnalyzer >>>>" + content);
+            Debug.LogLine("SematicAnalyzer >>>>" + content);
         }
     }
 }

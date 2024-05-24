@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "hs/95tQdnY/oBhSfwDVxbbmfGGivYTGIL2lnhV9eNF/NChx1VSWEC+5IhGV9PHUHOKcWudmHtFJBeyjDSFcBbw==",
+  "dgSpecHash": "8Ur8VADhJp09flgd8qGBdLPhU4EzFe8k1/fq2JIW5OGnX9Cngv8FzgP7inSUQ9sSRqgV4PdNckUgPKGScpiLqw==",
   "success": true,
-  "projectFilePath": "F:\\Legacy\\MyProjects\\GizboxLang\\GizboxTest\\GizboxTest.csproj",
+  "projectFilePath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxTest\\GizboxTest.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\leona\\.nuget\\packages\\libllvm\\5.0.1\\libllvm.5.0.1.nupkg.sha512",
     "C:\\Users\\leona\\.nuget\\packages\\llvmsharp\\5.0.0\\llvmsharp.5.0.0.nupkg.sha512",

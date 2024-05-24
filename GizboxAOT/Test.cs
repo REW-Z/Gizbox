@@ -30,7 +30,7 @@ namespace Gizbox
             //LLVM.InitializeAllAsmParsers();
             //LLVM.InitializeAllAsmPrinters();
 
-            Console.WriteLine("Start：LLVM SQR");
+            Debug.LogLine("Start：LLVM SQR");
 
 
             LLVM.LinkInMCJIT();
@@ -48,12 +48,12 @@ entry:
 }
 ";
 
-            Console.WriteLine("Context Create!");
+            Debug.LogLine("Context Create!");
 
             // 创建LLVM上下文
             LLVMContextRef context = LLVM.ContextCreate();
             
-            Console.WriteLine("Parse!");
+            Debug.LogLine("Parse!");
             // 创建模块并将IR文本解析到模块中
 
             LLVMMemoryBufferRef buffer = LLVM.CreateMemoryBufferWithMemoryRange(Marshal.StringToHGlobalAnsi(llvmIR), llvmIR.Length, "simple_module", true);
@@ -64,26 +64,26 @@ entry:
             {
                 throw new Exception("IR解析错误 -- (" + Marshal.PtrToStringAnsi(msg) + ")");
             }
-            Console.WriteLine("Parse 输出：(" + Marshal.PtrToStringAnsi(msg) + ")");
+            Debug.LogLine("Parse 输出：(" + Marshal.PtrToStringAnsi(msg) + ")");
             LLVM.DisposeMessage(msg);
 
-            Console.WriteLine("Verify!");
+            Debug.LogLine("Verify!");
             // 验证模块
             string verMsg;
             LLVM.VerifyModule(module, LLVMVerifierFailureAction.LLVMPrintMessageAction, out verMsg);
-            Console.WriteLine("Verify 输出：" + verMsg);
+            Debug.LogLine("Verify 输出：" + verMsg);
 
             // 打印LLVM IR
-            Console.WriteLine("模块打印：");
-            Console.WriteLine(Marshal.PtrToStringAnsi(LLVM.PrintModuleToString(module)));
+            Debug.LogLine("模块打印：");
+            Debug.LogLine(Marshal.PtrToStringAnsi(LLVM.PrintModuleToString(module)));
 
-            Console.WriteLine("GetFunc!");
+            Debug.LogLine("GetFunc!");
             // 查找main函数
             LLVMValueRef func = LLVM.GetNamedFunction(module, "square");
-            Console.WriteLine("找到函数：" + func.GetValueName());
-            Console.WriteLine("");
+            Debug.LogLine("找到函数：" + func.GetValueName());
+            Debug.LogLine("");
 
-            Console.WriteLine("CreateEngine!");
+            Debug.LogLine("CreateEngine!");
             // 初始化执行引擎
             LLVMMCJITCompilerOptions options = new LLVMMCJITCompilerOptions();
             //LLVMOpaqueExecutionEngine* enginePtr;
@@ -91,13 +91,13 @@ entry:
             string createMCJITmsg;
             if (LLVM.CreateMCJITCompilerForModule(out engineRef, module, options, out createMCJITmsg))
             {
-                Console.WriteLine("JIT ERROR : " + createMCJITmsg);
+                Debug.LogLine("JIT ERROR : " + createMCJITmsg);
                 return -1;
             }
 
 
 
-            Console.WriteLine("Execute!");
+            Debug.LogLine("Execute!");
             // 执行main函数
             LLVMGenericValueRef[] args = new LLVMGenericValueRef[1];
             LLVMTypeRef i32Type = LLVM.Int32TypeInContext(context);
@@ -107,10 +107,10 @@ entry:
 
             // 获取结果
             Int32 resultValue = (int)LLVM.GenericValueToInt(result, true);
-            Console.WriteLine("结果打印：");
-            Console.WriteLine(resultValue.ToString());
+            Debug.LogLine("结果打印：");
+            Debug.LogLine(resultValue.ToString());
 
-            Console.WriteLine("Dispose!");
+            Debug.LogLine("Dispose!");
             //释放参数和返回值  
             LLVM.DisposeGenericValue(args[0]);
             LLVM.DisposeGenericValue(result);
@@ -169,8 +169,8 @@ entry:
         //            module.Verify(LLVMVerifierFailureAction.LLVMPrintMessageAction);
 
         //            // 打印LLVM IR
-        //            Console.WriteLine("模块打印：");
-        //            Console.WriteLine(module.PrintToString());
+        //            Debug.Log("模块打印：");
+        //            Debug.Log(module.PrintToString());
 
         //            // 初始化执行引擎
         //            LLVMMCJITCompilerOptions options = new LLVMMCJITCompilerOptions();
@@ -178,7 +178,7 @@ entry:
         //            sbyte* msg;
         //            if (LLVM.CreateMCJITCompilerForModule(&enginePtr, module, &options, 0, &msg) != 0)
         //            {
-        //                Console.WriteLine("Failed to create MCJIT compiler.");
+        //                Debug.Log("Failed to create MCJIT compiler.");
         //                return;
         //            }
         //            LLVMExecutionEngineRef engineRef = enginePtr;
@@ -187,19 +187,19 @@ entry:
         //            LLVMValueRef mainFunction = module.GetNamedFunction("main");
 
 
-        //            Console.WriteLine("函数打印：");
-        //            Console.WriteLine(mainFunction.PrintToString());
+        //            Debug.Log("函数打印：");
+        //            Debug.Log(mainFunction.PrintToString());
 
         //            // 执行main函数
         //            LLVMGenericValueRef[] args = new LLVMGenericValueRef[0];
         //            LLVMGenericValueRef result = engineRef.RunFunction(mainFunction, args);
 
-        //            Console.WriteLine("结果打印：");
-        //            Console.WriteLine(result.ToString());
+        //            Debug.Log("结果打印：");
+        //            Debug.Log(result.ToString());
 
         //            // 获取结果
         //            Int32 resultValue = (int)LLVM.GenericValueToInt(result, 0);
-        //            Console.WriteLine($"Result: {resultValue}");
+        //            Debug.Log($"Result: {resultValue}");
 
         //            //// 释放资源
         //            engineRef.Dispose();

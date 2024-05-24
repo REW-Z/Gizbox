@@ -17,7 +17,46 @@ namespace Gizbox.Interop.CSharp
         public GizObject gizObj;
         public object csObj;
     }
+    public static class InteropCSharp
+    {
 
+        //获取CS数值/对象的类型  
+        public static string GetGizType(object csVal)
+        {
+            switch (csVal)
+            {
+                case bool i: return "bool";
+                case int i: return "int";
+                case float i: return "float";
+                case double i: return "double";
+                case string s: return "string";
+                default:
+                    {
+                        return GetGizClassName(csVal.GetType().FullName);
+                    }
+            }
+        }
+        private static string GetGizType(Type t)
+        {
+            switch (t.Name)
+            {
+                case "Void": return "void";
+                case "Boolean": return "bool";
+                case "Int32": return "int";
+                case "Single": return "float";
+                case "String": return "string";
+                default:
+                    {
+                        return t.FullName.Replace(".", "::").Replace("+", "__");
+                    }
+            }
+        }
+
+        public static string GetGizClassName(string csFullName)
+        {
+            return csFullName.Replace(".", "::").Replace("+", "::");
+        }
+    }
     public class InteropContext
     {
         public ScriptEngine.ScriptEngine engine;
@@ -233,7 +272,7 @@ namespace Gizbox.Interop.CSharp
                     }
                     else
                     {
-                        var newgizobj = new GizObject(GetGizClassName(cstype.FullName), engine);
+                        var newgizobj = new GizObject(InteropCSharp. GetGizClassName(cstype.FullName), engine);
                         long newptr = engine.heap.Alloc(newgizobj);
                         NewBinding(newptr, newgizobj, csVal);
                         return Value.FromGizObjectPtr(newptr); 
@@ -242,7 +281,7 @@ namespace Gizbox.Interop.CSharp
                 //值类型  
                 else
                 {
-                    var newgizobj = new GizObject(GetGizClassName(cstype.FullName), engine);
+                    var newgizobj = new GizObject(InteropCSharp.GetGizClassName(cstype.FullName), engine);
                     long newptr = engine.heap.Alloc(newgizobj);
                     //结构体无法绑定 - 需要Marshal数值    
                     foreach (var field in cstype.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
@@ -256,26 +295,6 @@ namespace Gizbox.Interop.CSharp
             throw new Exception("封送错误");
         }
 
-        //获取CS数值/对象的类型  
-        public string GetGizType(object csVal)
-        {
-            switch(csVal)
-            {
-                case bool i: return "bool";
-                case int i: return "int";
-                case float i: return "float";
-                case double i: return "double";
-                case string s: return "string";
-                default:
-                    {
-                        return GetGizClassName(csVal.GetType().FullName);
-                    }
-            }
-        }
-        public string GetGizClassName(string csFullName)
-        {
-            return csFullName.Replace(".", "::").Replace("+","::");
-        }
 
         //配置  
         public void ConfigExternCallClasses(params Type[] classes)

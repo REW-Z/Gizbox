@@ -1,0 +1,177 @@
+[
+  //Content-Length: ...\r\n
+  //\r\n
+  //{
+  //	"jsonrpc": "2.0",
+  //	"id": 1,
+  //	"method": "textDocument/completion",
+  //	"params": {
+  //		...
+  //	}
+  //}
+
+
+
+  //didOpen请求包应该包含整个代码文件的文本（服务器端不进行IO读写）      
+  //textDocument/publishDiagnostics 通常不是由客户端发送的请求，而是由服务器在处理 didChange 通知后，主动发送的通知。
+  //当 start 和 end 位置相同时，表示这是一个插入操作，即在指定位置插入新的文本。
+  //如果请求丢包，可以用didChange重新同步（删到第0行）；
+
+
+
+  //请求示例：初始化
+  {
+    "jsonrpc": "2.0",
+    "method": "initialized",
+    "params": {}
+  },
+  //请求示例：打开文档  
+  {
+    "jsonrpc": "2.0",
+    "method": "textDocument/didOpen",
+    "params": {
+      "textDocument": {
+        "uri": "file:///path/to/file",
+        "languageId": "python",
+        "version": 1,
+        "text": "print('Hello, World!')"
+      }
+    }
+  },
+  //请求示例：改变
+
+  {
+    "jsonrpc": "2.0",
+    "method": "textDocument/didChange",
+    "params": {
+      "textDocument": {
+        "version": 2,
+        "uri": "file:///path/to/file.txt"
+      },
+      "contentChanges": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 0
+            },
+            "end": {
+              "line": 0,
+              "character": 1
+            }
+          },
+          "text": "H"
+        }
+      ]
+    }
+  },
+  //请求示例：自动补全    
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "textDocument/completion",
+    "params": {
+      "textDocument": {
+        "uri": "file:///path/to/file"
+      },
+      "position": {
+        "line": 10,
+        "character": 5
+      }
+    }
+  },
+  //请求示例：高亮   
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "textDocument/documentHighlight",
+    "params": {
+      "textDocument": {
+        "uri": "file:///path/to/file.ext"
+      },
+      "position": {
+        "line": 10,
+        "character": 5
+      }
+    }
+  },
+
+
+
+
+
+  //响应示例：自动补全    
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+      "isIncomplete": false,
+      "items": [
+        {
+          "label": "print",
+          "kind": 3,
+          "detail": "Built-in function",
+          "documentation": "Prints a message to the console.",
+          "insertText": "print"
+        },
+        {
+          "label": "printf",
+          "kind": 3,
+          "detail": "C-style formatted print function",
+          "documentation": "Prints a formatted string to the console.",
+          "insertText": "printf"
+        }
+      ]
+    }
+  },
+  //示例：诊断
+  {
+    "jsonrpc": "2.0",
+    "method": "textDocument/publishDiagnostics",
+    "params": {
+      "uri": "file:///path/to/file",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 6
+            },
+            "end": {
+              "line": 0,
+              "character": 7
+            }
+          },
+          "severity": 1,
+          "code": "example",
+          "source": "example",
+          "message": "Unexpected character"
+        }
+      ]
+    }
+  },
+  //示例：高亮响应  
+  {
+    "jsonrpc": "2.0",
+    "id": "请求的ID",
+    "result": [
+      {
+        "range": {
+          "start": {
+            "line": 10,
+            "character": 4
+          },
+          "end": {
+            "line": 10,
+            "character": 24
+          }
+        },
+        "kind": 1 // 可选字段，标识高亮的种类
+      }
+      // 可能包含多个类似的高亮区域
+    ]
+  }
+
+
+
+]

@@ -164,6 +164,8 @@ namespace Gizbox
 
             //line  
             int currLine = 1;//当前行数  
+            int currLineStart = 0;
+
 
             Action<int> MovePointer = (offset) =>
             {
@@ -198,6 +200,7 @@ namespace Gizbox
                         if (seg[i] == '\n')
                         {
                             currLine++;
+                            currLineStart = lexemBegin + i + 1;
                         }
                     }
 
@@ -214,7 +217,7 @@ namespace Gizbox
                         string keyword = seg.Substring(0, seg.Length - kw.back);
                         if (Compiler.enableLogScanner) Log("\n>>>>> keyword:" + keyword + "\n\n");
 
-                        Token token = new Token(keyword, PatternType.Keyword, currLine);
+                        Token token = new Token(keyword, PatternType.Keyword, null, currLine, lexemBegin - currLineStart, keyword.Length);
                         tokens.Add(token);
 
 
@@ -239,7 +242,7 @@ namespace Gizbox
                         string opStr = seg.Substring(0, seg.Length - op.back);
                         if (Compiler.enableLogScanner) Log("\n>>>>> operator:" + opStr + "  tokenname:" + op.tokenName + "\n\n");
 
-                        Token token = new Token(opStr, PatternType.Operator, currLine);
+                        Token token = new Token(opStr, PatternType.Operator, null, currLine, lexemBegin - currLineStart, opStr.Length);
                         tokens.Add(token);
 
                         MovePointer(seg.Length - op.back);
@@ -263,7 +266,7 @@ namespace Gizbox
                         string litstr = seg.Substring(0, seg.Length - lit.back);
                         if (Compiler.enableLogScanner) Log("\n>>>>> literal value:" + lit.tokenName + ":" + litstr + "\n\n");
 
-                        Token token = new Token(lit.tokenName, PatternType.Number, currLine, litstr);
+                        Token token = new Token(lit.tokenName, PatternType.Literal, litstr, currLine, lexemBegin - currLineStart, litstr.Length);
                         tokens.Add(token);
 
                         MovePointer(seg.Length - lit.back);
@@ -285,7 +288,7 @@ namespace Gizbox
                     if (Compiler.enableLogScanner) Log("\n>>>>> identifier:" + identifierName + "\n\n");
 
                     //int idx = globalSymbolTable.AddIdentifier(identifierName);//词法分析阶段最好不创建符号表条目（编译原理p53）  
-                    Token token = new Token(identifierPattern.tokenName, PatternType.Id, currLine, identifierName);
+                    Token token = new Token(identifierPattern.tokenName, PatternType.Id, identifierName, currLine, lexemBegin - currLineStart, identifierName.Length);
                     tokens.Add(token);
 
                     MovePointer(seg.Length - identifierPattern.back);
@@ -316,7 +319,7 @@ namespace Gizbox
         private static void Log(object content)
         {
             if(!Compiler.enableLogScanner) return;
-            Console.WriteLine("Scanner >>>" + content);
+            Debug.LogLine("Scanner >>>" + content);
         }
     }
 }

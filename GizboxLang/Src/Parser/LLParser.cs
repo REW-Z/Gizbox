@@ -84,7 +84,7 @@ namespace Gizbox
         /// </summary>
         private void InitGrammar()
         {
-            Console.WriteLine("\n\n上下文无关文法初始化中....");
+            Debug.LogLine("\n\n上下文无关文法初始化中....");
 
             ////生成文法符号  
             //startSymbol = NewNonterminal("stmt");
@@ -163,15 +163,15 @@ namespace Gizbox
             //DEBUG  
             foreach (var nont in nonterminals)
             {
-                Console.WriteLine("非终结符" + nont.name + "的FIRST集：" + string.Concat(FIRST(nont).ToArray().Select(symb => symb.name + ",")));
+                Debug.LogLine("非终结符" + nont.name + "的FIRST集：" + string.Concat(FIRST(nont).ToArray().Select(symb => symb.name + ",")));
 
-                Console.WriteLine("非终结符" + nont.name + "的FOLLOW集：" + string.Concat(FOLLOW(nont).ToArray().Select(symb => symb.name + ",")));
+                Debug.LogLine("非终结符" + nont.name + "的FOLLOW集：" + string.Concat(FOLLOW(nont).ToArray().Select(symb => symb.name + ",")));
 
-                Console.WriteLine("");
+                Debug.LogLine("");
 
                 foreach (var production in nont.productions)
                 {
-                    Console.WriteLine("     产生式 " + production.ToExpression() + " 的FIRST集：" + string.Concat(FIRST(production.body).ToArray().Select(symb => symb.name + ",")));
+                    Debug.LogLine("     产生式 " + production.ToExpression() + " 的FIRST集：" + string.Concat(FIRST(production.body).ToArray().Select(symb => symb.name + ",")));
                 }
             }
 
@@ -268,13 +268,13 @@ namespace Gizbox
 
             if (isLeftRecursive)
             {
-                Console.WriteLine("文法中有左递归，已重新生成文法...");
-                Console.WriteLine("重新生成的产生式列表：");
+                Debug.LogLine("文法中有左递归，已重新生成文法...");
+                Debug.LogLine("重新生成的产生式列表：");
                 foreach (var nt in nonterminals)
                 {
                     foreach (var p in nt.productions)
                     {
-                        Console.WriteLine(p.ToExpression());
+                        Debug.LogLine(p.ToExpression());
                     }
                 }
             }
@@ -382,7 +382,7 @@ namespace Gizbox
                 }
             }
 
-            Console.WriteLine("\n\nLL1文法验证通过。\n\n");
+            Debug.LogLine("\n\nLL1文法验证通过。\n\n");
         }
 
 
@@ -551,7 +551,7 @@ namespace Gizbox
         {
             if (nonterminal == null) throw new Exception("要执行的非终结符为空");
 
-            Console.WriteLine("执行非终结符:" + nonterminal.name);
+            Debug.LogLine("执行非终结符:" + nonterminal.name);
 
             var stmtNode = new SimpleParseTree.Node() { isLeaf = false, name = nonterminal.name };
             parseTree.AppendNode(currentNode, stmtNode);
@@ -564,21 +564,21 @@ namespace Gizbox
                 if (FIRST(production.body).ContainsTerminal(lookaheadToken.name))
                 {
                     targetProduction = production;
-                    Console.WriteLine("选择产生式：" + targetProduction.ToExpression());
+                    Debug.LogLine("选择产生式：" + targetProduction.ToExpression());
                     break;
                 }
             }
             //未找到合适产生式 - 最后考虑ε产生式  
             if (targetProduction == null)
             {
-                Console.WriteLine("未找到非ε产生式...考虑ε产生式...");
+                Debug.LogLine("未找到非ε产生式...考虑ε产生式...");
                 if (FOLLOW(nonterminal).ContainsTerminal(lookaheadToken.name))
                 {
                     //考虑epsilon产生式  
                     var εProduction = nonterminal.productions.FirstOrDefault(p => p.body.Length == 1 && p.body[0] == null);
                     if (εProduction != null)
                     {
-                        Console.WriteLine("存在ε产生式，已选择ε产生式");
+                        Debug.LogLine("存在ε产生式，已选择ε产生式");
                         targetProduction = εProduction;
                     }
 
@@ -590,7 +590,7 @@ namespace Gizbox
                             if (p.CanDeriveε())
                             {
                                 targetProduction = p;
-                                Console.WriteLine("产生式" + p.ToExpression() + "可以推导出ε，已选择该产生式");
+                                Debug.LogLine("产生式" + p.ToExpression() + "可以推导出ε，已选择该产生式");
                                 break;
                             }
                         }
@@ -645,7 +645,7 @@ namespace Gizbox
                 var terminalNode = new SimpleParseTree.Node() { isLeaf = true, name = terminal };
                 parseTree.AppendNode(currentNode, terminalNode);
 
-                Console.WriteLine("成功匹配:" + terminal);
+                Debug.LogLine("成功匹配:" + terminal);
 
                 lookahead++;
             }

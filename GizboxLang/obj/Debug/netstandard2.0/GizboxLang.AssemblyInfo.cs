@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("GizboxLang")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8d647d768f73201445f0c1ff05135f094fda5387")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8e9441a5df36d02703b5ef6f26a696a8c50faa8e")]
 [assembly: System.Reflection.AssemblyProductAttribute("GizboxLang")]
 [assembly: System.Reflection.AssemblyTitleAttribute("GizboxLang")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
