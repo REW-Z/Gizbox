@@ -1,11 +1,22 @@
-﻿import <"stdlib">  
+﻿import <"core">
+import <"stdlib">    
 
 using Core;  
 using Console;
-using Collections;
 
-GC::Enable();    
-
-void Test()  
+class Student
 {
-}  
+    int a = 0;
+    void Test()
+    {
+        Console::Log("Test");
+    }
+    void Talk()
+    {
+    }
+    void Toke(string a)
+    {
+    }
+}
+
+Student fafa = new Student();

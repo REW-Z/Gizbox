@@ -1,37 +1,26 @@
-﻿
-import <"stdlib">  
+﻿import <"core">
+import <"stdlib">    
 
-using Core;
+using Core;  
 using Console;
-using Collections;
 
-GC::Enable();
-
-class Transform
+class Student
 {
-	int p = 0;
-	int position()
-	{
-		this.p += 1;
-		return this.p;
-	}
-}
-class GameObject
-{
-	Transform t = new Transform();
-	Transform transform()
-	{
-		return this.t;
-	}
+    int a = 0;
+    void Test()
+    {
+        Console::Log("Test");
+    }
+    void Talk()
+    {
+    }
+    void Toke(string a)
+    {
+    }
 }
 
-GameObject go = new GameObject();
+fdsfds 
 
-void Test()
-{
-	int num = (go.transform()).position();
-	
-	Console::Log("test:" + (string)num);
-}
-
-AAAAA
+Student fafa = new Student();
+fafa.a = 2;
+fafa.a = 3;

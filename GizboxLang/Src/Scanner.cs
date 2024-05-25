@@ -181,7 +181,7 @@ namespace Gizbox
                     if(Compiler.enableLogScanner) Log("发现越界：" + (lexemBegin + (forward - lexemBegin)));
                     if (Compiler.enableLogScanner) Log("总长度：" + source.Length);
                     string remainingText = source.Substring(lexemBegin);
-                    throw new LexerException(currLine, remainingText.Substring(0, System.Math.Min(10, remainingText.Length)), "词法分析器扫描越界！");
+                    throw new LexerException(ExceptionType.LexicalAnalysisError, currLine, (lexemBegin - currLineStart), remainingText.Substring(0, System.Math.Min(10, remainingText.Length)), "");
                 }
 
 

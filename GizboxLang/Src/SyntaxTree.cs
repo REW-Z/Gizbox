@@ -181,6 +181,19 @@ namespace Gizbox
 
                 return GetChildren().FirstOrDefault().FirstToken();
             }
+            public Token LastToken()
+            {
+                var tokenField = this.GetType()
+                    .GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
+                    .LastOrDefault(f => f.FieldType == typeof(Token));
+
+                if (tokenField != null)
+                {
+                    return (Token)tokenField.GetValue(this);
+                }
+
+                return GetChildren().LastOrDefault().LastToken();
+            }
 
             public override string ToString()
             {

@@ -19,7 +19,7 @@ namespace Gizbox.ScriptEngine
 
         public static string GetString(Operand operand)
         {
-            if ((operand is OperandString) == false) throw new GizboxException("不是stringOperand类型");
+            if ((operand is OperandString) == false) throw new RuntimeException(ExceptionType.ScriptRuntimeError, null, "not StringOperand type !");
             return ((OperandString)operand).str;
         }
 
@@ -62,7 +62,7 @@ namespace Gizbox.ScriptEngine
                 return new OperandString(argStr);
             }
 
-            throw new GizboxException("错误的TAC！");
+            throw new GizboxException(ExceptionType.TacError);
         }
     }
     public class OperandRegister : Operand
@@ -100,7 +100,7 @@ namespace Gizbox.ScriptEngine
                     }
                     break;
                 default:
-                    throw new GizboxException("未知的常量" + str + "！");
+                    throw new GizboxException(ExceptionType.UnknownConstant, str);
             }
         }
     }
@@ -121,7 +121,7 @@ namespace Gizbox.ScriptEngine
                 case "LITDOUBLE": this.val = double.Parse(lex.Substring(0, lex.Length - 1)); break;//去除F标记  
                 case "LITCHAR": this.val = lex[1]; break;
                 //case "LITSTRING": return Value.Void;//字符串字面量已经移除
-                default: throw new GizboxException("未知字面量：" + str);
+                default: throw new GizboxException(ExceptionType.UnknownLiteral,  str);
             }
         }
     }
@@ -411,7 +411,7 @@ namespace Gizbox.ScriptEngine
         //读取常量值    
         public object ReadConst(long ptr)
         {
-            if (ptr >= 0) throw new GizboxException("已约定指向常量的long指针为负！");
+            if (ptr >= 0) throw new GizboxException(ExceptionType.NotPointerToConstant);
             
             long truePtr = Math.Abs(ptr) - 1;
             int unitId = (int)(truePtr / __constdataOffset);
@@ -596,7 +596,7 @@ namespace Gizbox.ScriptEngine
                 }
             }
 
-            throw new GizboxException(labelp0 + "标签未找到");
+            throw new GizboxException(ExceptionType.LabelNotFound, labelp0);
         }
 
         // 查询库  

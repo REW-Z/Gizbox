@@ -117,6 +117,7 @@ namespace Gizbox.IL
 
 
 
+
         //构造函数  
         public ILUnit()
         {
@@ -129,7 +130,7 @@ namespace Gizbox.IL
         //添加依赖  
         public void AddDependencyLib(ILUnit dep)
         {
-            if (dep == null) throw new GizboxException("依赖的库为空！");
+            if (dep == null) throw new GizboxException(ExceptionType.LibraryDependencyCannotBeEmpty);
 
             if (this.dependencyLibs == null) this.dependencyLibs = new List<ILUnit>();
             this.dependencyLibs.Add(dep);
@@ -278,6 +279,26 @@ namespace Gizbox.IL
 
             return null;
         }
+
+
+        //查询所有全局作用域   
+        public List<SymbolTable> GetAllGlobalEnvs()
+        {
+            List<SymbolTable> envs = new List<SymbolTable>();
+            AddGlobalEnvsToList(this, envs);
+            return envs;
+        }
+        private void AddGlobalEnvsToList(ILUnit unit, List<SymbolTable> list)
+        {
+            if (list.Contains(unit.globalScope.env)) return;
+
+            list.Add(unit.globalScope.env);
+            foreach (var dep in this.dependencyLibs)
+            {
+                AddGlobalEnvsToList(dep, list);
+            }
+        }
+
 
         //打印  
         public void Print()
@@ -568,7 +589,7 @@ namespace Gizbox.IL
 
                         if(varDeclNode.initializerNode.attributes.ContainsKey("ret") == false)
                         {
-                            throw new SemanticException(varDeclNode, "子表达式节点无返回变量：" + varDeclNode.identifierNode.FullName);
+                            throw new SemanticException(ExceptionType.SubExpressionNoReturnVariable, varDeclNode, varDeclNode.identifierNode.FullName);
                         }
 
                         GenerateCode("=", (string)varDeclNode.identifierNode.attributes["ret"], (string)varDeclNode.initializerNode.attributes["ret"]);
@@ -791,7 +812,7 @@ namespace Gizbox.IL
                         GenNode(binaryOp.rightNode);
 
                         if (binaryOp.leftNode.attributes.ContainsKey("type") == false)
-                            throw new SemanticException(binaryOp.leftNode, "type未设置!");
+                            throw new SemanticException(ExceptionType.TypeNotSet, binaryOp.leftNode, "");
 
                         //if (binaryOp.rightNode.attributes.ContainsKey("type") == false)
                         //    throw new SemanticException(binaryOp.rightNode, "type未设置!");
@@ -825,7 +846,7 @@ namespace Gizbox.IL
                 case SyntaxTree.CallNode callNode:
                     {
                         if (callNode.attributes.ContainsKey("mangled_name") == false)
-                            throw new SemanticException(callNode, "函数未设置混淆名！");
+                            throw new SemanticException(ExceptionType.FunctionObfuscationNameNotSet, callNode, "");
                         //函数全名  
                         string mangledName = (string)callNode.attributes["mangled_name"];
                         //函数返回类型    
@@ -957,7 +978,7 @@ namespace Gizbox.IL
                     }
                     break;
                 default:
-                    throw new SemanticException(node, "节点的中间代码生成未实现:" + node.GetType().Name);
+                    throw new SemanticException(ExceptionType.Unknown, node, "IR generation not implemtented:" + node.GetType().Name);
             }
         }
 
@@ -1019,7 +1040,7 @@ namespace Gizbox.IL
                 }
             }
 
-            throw new GizboxException("查询不到" + id + "的类型！");
+            throw new GizboxException(ExceptionType.TypeNotFound, id);
         }
 
 

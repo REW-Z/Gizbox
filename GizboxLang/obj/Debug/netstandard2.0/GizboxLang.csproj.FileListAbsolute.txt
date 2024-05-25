@@ -40,3 +40,13 @@ F:\Legacy\MyProjects\Gizbox\GizboxLang\obj\Debug\netstandard2.0\GizboxLang.cspro
 F:\Legacy\MyProjects\Gizbox\GizboxLang\obj\Debug\netstandard2.0\GizboxLang.sourcelink.json
 F:\Legacy\MyProjects\Gizbox\GizboxLang\obj\Debug\netstandard2.0\GizboxLang.dll
 F:\Legacy\MyProjects\Gizbox\GizboxLang\obj\Debug\netstandard2.0\GizboxLang.pdb
+C:\Users\Administrator\Desktop\NOTES\Gizbox-master\GizboxLang\bin\Debug\netstandard2.0\GizboxLang.deps.json
+C:\Users\Administrator\Desktop\NOTES\Gizbox-master\GizboxLang\bin\Debug\netstandard2.0\GizboxLang.dll
+C:\Users\Administrator\Desktop\NOTES\Gizbox-master\GizboxLang\bin\Debug\netstandard2.0\GizboxLang.pdb
+C:\Users\Administrator\Desktop\NOTES\Gizbox-master\GizboxLang\obj\Debug\netstandard2.0\GizboxLang.csproj.AssemblyReference.cache
+C:\Users\Administrator\Desktop\NOTES\Gizbox-master\GizboxLang\obj\Debug\netstandard2.0\GizboxLang.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Administrator\Desktop\NOTES\Gizbox-master\GizboxLang\obj\Debug\netstandard2.0\GizboxLang.AssemblyInfoInputs.cache
+C:\Users\Administrator\Desktop\NOTES\Gizbox-master\GizboxLang\obj\Debug\netstandard2.0\GizboxLang.AssemblyInfo.cs
+C:\Users\Administrator\Desktop\NOTES\Gizbox-master\GizboxLang\obj\Debug\netstandard2.0\GizboxLang.csproj.CoreCompileInputs.cache
+C:\Users\Administrator\Desktop\NOTES\Gizbox-master\GizboxLang\obj\Debug\netstandard2.0\GizboxLang.dll
+C:\Users\Administrator\Desktop\NOTES\Gizbox-master\GizboxLang\obj\Debug\netstandard2.0\GizboxLang.pdb

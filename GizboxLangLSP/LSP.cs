@@ -13,12 +13,17 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using static System.Net.Mime.MediaTypeNames;
 using Gizbox.LanguageServices;
+using System.IO.Enumeration;
+using System.Security.AccessControl;
 
 
 class Program
 {
     //语言服务  
     public static Gizbox.LanguageServices.LanguageService gizboxService = new Gizbox.LanguageServices.LanguageService();
+
+    public static Stream inputStream = Console.OpenStandardInput();
+    public static Stream outputStream = Console.OpenStandardOutput();
 
     public static string? currentDocUri = null;
 
@@ -29,6 +34,20 @@ class Program
     public static ConcurrentQueue<string> writeQueue = new System.Collections.Concurrent.ConcurrentQueue<string>();
 
 
+    //输出流同步锁  
+    private static object mutexOutstream = new object();
+
+
+    //诊断计时器目标  
+    private static long needDiagnosticInMilisec = -1;
+    
+    //诊断计时器  
+    private static System.Diagnostics.Stopwatch watch = new System.Diagnostics.Stopwatch();
+
+
+
+
+
 
     //入口  
     static async Task Main(string[] args)
@@ -36,10 +55,11 @@ class Program
 
         //接收器  
         Console.OutputEncoding = Encoding.UTF8;
-        var inputStream = Console.OpenStandardInput();
-        var outputStream = Console.OpenStandardOutput();
         var buffer = new byte[1024 * 64];
         var messageBuilder = new StringBuilder();
+
+        //诊断计时开始  
+        watch.Start();
 
         //Log Clean
         logPath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop) + "//lsplog_" + System.DateTime.Now.Minute + "_" +  System.DateTime.Now.Second + ".txt";
@@ -47,6 +67,13 @@ class Program
         {
             System.IO.File.Delete(logPath);
         }
+
+        //写入流启动    
+        _ = Task.Run(StartWriteQueueToOutstream);
+
+        //诊断计时系统启动  
+        _ = Task.Run(StartDiagnosticSystem);
+
 
         while (true)
         {
@@ -102,11 +129,23 @@ class Program
 
                             //Log("\n\n[Handling didOpen...]\n\n\n");
                             await HandleDidOpen(lspRequest);
+
+                            //第一次诊断  
+                            if (string.IsNullOrEmpty(currentDocUri) == false)
+                            {
+                                await Diagnostics(currentDocUri);
+                            }
                         }
                         else if (methodName == "textDocument/didChange")
                         {
                             //Log("\n\n[Handling didChange...]\n\n\n");
                             await HandleDidChange(lspRequest);
+
+                            //打字时候暂缓发送诊断  
+                            if(currentDocUri != null)
+                            {
+                                _ = DiagnosticsAfter(currentDocUri, 1000);
+                            }
                         }
                         else if (methodName == "textDocument/completion")
                         {
@@ -138,32 +177,51 @@ class Program
                     }
                 }
 
+
                 messageBuilder.Clear();
             }
             catch(Exception ex) 
             {
-                //Log("\n\n[ERR]:\n\n" + ex.ToString());
+                Log("\n\n[ERR]:\n\n" + ex.ToString());
                 messageBuilder.Clear();
             }
+        }
+    }
 
 
-            int trycount = 0;
-            while(writeQueue.Count > 0)
+
+    public static void StartWriteQueueToOutstream()
+    {
+        while(true)
+        {
+            if(writeQueue.Count > 0)
             {
-                trycount++;
-                if (trycount > 99) break;
-
-                string str;
-                bool dequeued = writeQueue.TryDequeue(out str);
-                if(dequeued)
+                string responseMsg;
+                bool dequeued = writeQueue.TryDequeue(out responseMsg);
+                if (dequeued)
                 {
-                    var responseBytes = Encoding.UTF8.GetBytes(str);
+                    var responseBytes = Encoding.UTF8.GetBytes(responseMsg);
                     outputStream.Write(responseBytes, 0, responseBytes.Length);
                 }
             }
         }
     }
 
+
+    public static async void StartDiagnosticSystem()
+    {
+        while(true)
+        {
+            if(needDiagnosticInMilisec > 0)
+            {
+                if (watch.ElapsedMilliseconds > needDiagnosticInMilisec)
+                {
+                    await Diagnostics(currentDocUri);
+                    needDiagnosticInMilisec = -1;
+                }
+            }
+        }
+    }
 
     public static List<string> SplitJson(string input)
     {
@@ -209,6 +267,20 @@ class Program
 
     private static async Task HandleInitialize(JObject request)
     {
+        //set folder  
+        var folderInfos = (JArray?)request["params"]?["workspaceFolders"];
+        if(folderInfos != null && folderInfos.Count > 0)
+        {
+            string? uri = folderInfos[0]["uri"]?.ToObject<string>();
+            if(string.IsNullOrEmpty(uri) == false)
+            {
+                Uri uriObj = new Uri(uri);
+                gizboxService.SetWorkFolder(uriObj.LocalPath);
+            }
+        }
+
+
+        //response  
         var response = new
         {
             jsonrpc = "2.0",
@@ -242,6 +314,11 @@ class Program
     private static async Task HandleDidChange(JObject request)
     {
         var changes = (JArray)request["params"]["contentChanges"];
+        if(changes == null)
+        {
+            throw new Exception("没有contentChanges字段：" + request.ToString());
+        }
+
         //Log("\n change count:" + changes.Count  + "\n");
         for(int i = 0; i < changes.Count; i++)
         {
@@ -288,22 +365,49 @@ class Program
 
     private static async Task HandleCompletion(JObject request)
     {
+        var jposition = request["params"]?["position"]?.ToObject<JObject>();
+        List<Completion> result;
+        if(jposition != null)
+        {
+            int line = jposition["line"]?.ToObject<int>() ?? 0;
+            int character = jposition["character"]?.ToObject<int>() ?? 0;
+
+            try
+            {
+                result = gizboxService.GetCompletion(line, character);
+            }
+            catch (Exception ex)
+            {
+                result = new List<Completion>() { new Completion() { label = "Debug_Err", detail =  ex.ToString(), insertText = "Debug_Err"} };
+            }
+        }
+        else
+        {
+            result = new List<Completion>();
+        }
+
+        var objArr = result.Select(c => new {
+            label = c.label,
+            kind = c.kind,
+            detail = c.detail,
+            documentation = c.documentation,
+            insertText = c.insertText,
+        });
+
         var response = new
         {
             jsonrpc = "2.0",
             id = (int?)request["id"],
             result = new
             {
-                items = new[]
-                {
-                    new { label = "completion1", kind = 1 },
-                    new { label = "completion2", kind = 1 },
-                    new { label = "completion3", kind = 1 }
-                }
+                isIncomplete = false,
+                items = objArr
             }
         };
 
         var responseJson = JsonConvert.SerializeObject(response);
+
+        //Log("\n[Completion Respons:]\n" + responseJson);
 
         var responseMessage = $"Content-Length: {Encoding.UTF8.GetByteCount(responseJson)}\r\n\r\n{responseJson}";
         //var responseBytes = Encoding.UTF8.GetBytes(responseMessage);
@@ -353,6 +457,74 @@ class Program
     }
 
 
+    private static async Task DiagnosticsAfter(string uri, long milisecDelay)
+    {
+        needDiagnosticInMilisec = milisecDelay;
+
+        watch.Restart();
+    }
+    private static async Task Diagnostics(string uri)
+    {
+        if (string.IsNullOrEmpty(uri)) return;
+
+        object response;
+
+        if(gizboxService.tempDiagnosticInfo != null)
+        {
+            response = new
+            {
+                jsonrpc = "2.0",
+                method = "textDocument/publishDiagnostics",
+                @params = new
+                {
+                    uri = uri,
+                    diagnostics = new[]
+                    {
+                        new {
+                            range = new{
+                                start = new {
+                                    line = gizboxService.tempDiagnosticInfo.startLine,
+                                    character = gizboxService.tempDiagnosticInfo.startChar,
+                                },
+                                end = new {
+                                    line = gizboxService.tempDiagnosticInfo.endLine,
+                                    character = gizboxService.tempDiagnosticInfo.endChar,
+                                }
+                            },
+                            severity = gizboxService.tempDiagnosticInfo.severity,
+                            code = gizboxService.tempDiagnosticInfo.code,
+                            source = "gizbox",
+                            message = gizboxService.tempDiagnosticInfo.message,
+                        }
+                    }
+                }
+            };
+        }
+        else
+        {
+            response = new
+            {
+                jsonrpc = "2.0",
+                method = "textDocument/publishDiagnostics",
+                @params = new
+                {
+                    uri = uri,
+                    diagnostics = new object[0]
+                }
+            };
+        }
+
+
+
+        var responseJson = JsonConvert.SerializeObject(response);
+
+        Log("\n[Diag]\n" + responseJson);
+
+        var responseMessage = $"Content-Length: {Encoding.UTF8.GetByteCount(responseJson)}\r\n\r\n{responseJson}";
+        //var responseBytes = Encoding.UTF8.GetBytes(responseMessage);
+        //await outputStream.WriteAsync(responseBytes, 0, responseBytes.Length);
+        writeQueue.Enqueue(responseMessage);
+    }
 
 
 

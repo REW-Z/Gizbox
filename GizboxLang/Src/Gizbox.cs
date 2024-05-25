@@ -732,7 +732,7 @@ namespace Gizbox
 
                                 if (unit.name != libname)
                                 {
-                                    throw new GizboxException("库文件和库名称不一致：" + libname  + " vs " + unit.name);
+                                    throw new GizboxException(ExceptionType.LibraryFileNameMismatch, libname  + " and " + unit.name);
                                 }
                                 else
                                 {
@@ -745,7 +745,7 @@ namespace Gizbox
                 }
             }
 
-            throw new GizboxException("找不到库文件：" + libname) ;
+            throw new GizboxException(ExceptionType.LibraryFileNotFound, libname) ;
         }
 
 

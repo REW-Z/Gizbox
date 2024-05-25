@@ -96,7 +96,6 @@ namespace Gizbox.LRParse
         public ParseStackElement newElement;//待入栈的产生式头元素    
 
 
-
         /// <summary>
         /// 构造函数  
         /// </summary>
@@ -232,12 +231,12 @@ namespace Gizbox.LRParse
                             }
                             else
                             {
-                                throw new ParseException(lastToken, "错误的Accept！");
+                                throw new ParseException(ExceptionType.SyntaxAnalysisError, lastToken, "accept err");
                             }
                         }
                     //报错  
                     case ACTION_TYPE.Error:
-                        throw new ParseException(remainingInput.Peek(), " 查询到ACTION_TYPE.Error！行数：" + remainingInput.Peek().line + "\n接收格子：[" + data.table.accState + "," + data.table.accSymbol + "]\n当前符号:" + currentToken.name + "\n当前状态:\n" + stack.Peek().state.set.ToExpression());
+                        throw new ParseException(ExceptionType.SyntaxAnalysisError, remainingInput.Peek(), "error action. line: " + remainingInput.Peek().line + "\ncurrent symbol :" + currentToken.name + "\ncurrent state:\n" + stack.Peek().state.set.ToExpression());
 
                 }
             }
@@ -1369,7 +1368,7 @@ namespace Gizbox.SemanticRule
         {
             Production production = parserContext.data.productions.FirstOrDefault(p => p.ToExpression() == productionExpression);
 
-            if (production == null) throw new GizboxException("找不到Production：" + productionExpression);
+            if (production == null) throw new GizboxException(ExceptionType.ProductionNotFound , productionExpression);
 
             AddActionAtTail(production, act);
         }
@@ -1444,7 +1443,7 @@ namespace Gizbox.SemanticRule
             //Libs    
             foreach (var importNode in ast.rootNode.importNodes)
             {
-                if (importNode == null) throw new SemanticException(ast.rootNode, "空的导入节点节点");
+                if (importNode == null) throw new SemanticException(ExceptionType.EmptyImportNode, ast.rootNode, "");
                 this.ilUnit.dependencies.Add(importNode.uri);
             }
             foreach (var lname in this.ilUnit.dependencies)
@@ -1459,6 +1458,9 @@ namespace Gizbox.SemanticRule
 
                 this.ilUnit.AddDependencyLib(lib);
             }
+
+            //global env  
+            ast.rootNode.attributes["global_env"] = ilUnit.globalScope.env;
 
 
             //Pass1
@@ -1652,7 +1654,7 @@ namespace Gizbox.SemanticRule
                         }
                         else
                         {
-                            throw new SemanticException(externFuncDeclNode, "extern函数只能定义在顶层！");
+                            throw new SemanticException(ExceptionType.ExternFunctionGlobalOrNamespaceOnly, externFuncDeclNode, "");
                         }
                     }
                     break;
@@ -1669,7 +1671,7 @@ namespace Gizbox.SemanticRule
                             {
                                 if(currentNamespace != "Core")
                                 {
-                                    throw new SemanticException(classDeclNode, "类名不能是最终基类名Object！");
+                                    throw new SemanticException(ExceptionType.ClassNameCannotBeObject, classDeclNode, "");
                                 }
                             }
 
@@ -1687,7 +1689,7 @@ namespace Gizbox.SemanticRule
                         }
                         else
                         {
-                            throw new SemanticException(classDeclNode, "类定义只能全局定义或者嵌套在命名空间顶层！行数：" + classDeclNode.FirstToken().line);
+                            throw new SemanticException(ExceptionType.ClassDefinitionGlobalOrNamespaceOnly, classDeclNode, "");
                         }
                     }
                     break;
@@ -1754,6 +1756,10 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.VarDeclareNode varDeclNode:
                     {
+                        //Id at env
+                        varDeclNode.identifierNode.attributes["def_at_env"] = envStack.Peek();
+
+
                         //（非全局变量）成员字段或者局部变量  
                         if (isTopLevelAtNamespace == false)
                         {
@@ -1773,11 +1779,16 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.FuncDeclareNode funcDeclNode:
                     {
+                        //Id at env
+                        funcDeclNode.identifierNode.attributes["def_at_env"] = envStack.Peek();
+
+
+
                         //是否是实例成员函数  
                         bool isMethod = envStack.Peek().tableCatagory == SymbolTable.TableCatagory.ClassScope;
                         string className = null;
                         if (isMethod) className = envStack.Peek().name;
-                        if (isMethod && isTopLevelAtNamespace) throw new SemanticException(funcDeclNode, "命名空间顶层只能定义全局函数！");
+                        if (isMethod && isTopLevelAtNamespace) throw new SemanticException(ExceptionType.NamespaceTopLevelNonMemberFunctionOnly, funcDeclNode, "");
 
 
                         //如果是成员函数 - 加入符号表  
@@ -1877,8 +1888,13 @@ namespace Gizbox.SemanticRule
 
                 case SyntaxTree.ExternFuncDeclareNode externFuncDeclNode:
                     {
+                        //Id at env
+                        externFuncDeclNode.identifierNode.attributes["def_at_env"] = envStack.Peek();
+
+
+
                         //PASS1止于添加符号条目  
-                        
+
                         //Env  
                         var funcEnv = (SymbolTable)externFuncDeclNode.attributes["env"];
 
@@ -1901,6 +1917,10 @@ namespace Gizbox.SemanticRule
 
                 case SyntaxTree.ParameterNode paramNode:
                     {
+                        //Id at env
+                        paramNode.identifierNode.attributes["def_at_env"] = envStack.Peek();
+
+
                         //形参加入函数作用域的符号表  
                         var newRec = envStack.Peek().NewRecord(
                             paramNode.identifierNode.FullName,
@@ -1911,6 +1931,11 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.ClassDeclareNode classDeclNode:
                     {
+                        //Id at env
+                        classDeclNode.classNameNode.attributes["def_at_env"] = envStack.Peek();
+
+
+
                         //PASS1止于添加符号条目  
 
                         //ENV  
@@ -1946,7 +1971,7 @@ namespace Gizbox.SemanticRule
                             }
 
 
-                            var baseRec = Query(baseClassFullName); if (baseRec == null) throw new SemanticException(classDeclNode.baseClassNameNode, "未找到基类" + baseClassFullName);
+                            var baseRec = Query(baseClassFullName); if (baseRec == null) throw new SemanticException(ExceptionType.BaseClassNotFound, classDeclNode.baseClassNameNode, baseClassFullName);
                             var baseEnv = baseRec.envPtr;
                             newEnv.NewRecord("base", SymbolTable.RecordCatagory.Other, "(inherit)", baseEnv);
 
@@ -1961,7 +1986,7 @@ namespace Gizbox.SemanticRule
                             }
                             //虚函数表克隆  
                             var baseVTable = this.ilUnit.QueryVTable(baseClassFullName);
-                            if (baseVTable == null) throw new SemanticException(classDeclNode.baseClassNameNode, "找不到基类：" + baseClassFullName);
+                            if (baseVTable == null) throw new SemanticException(ExceptionType.BaseClassNotFound, classDeclNode.baseClassNameNode, baseClassFullName);
                             baseVTable.CloneDataTo(vtable);
                         }
 
@@ -2087,7 +2112,7 @@ namespace Gizbox.SemanticRule
 
                         //类型检查（初始值）  
                         bool valid = CheckType(varDeclNode.typeNode.ToExpression(), varDeclNode.initializerNode);
-                        if (!valid) throw new SemanticException(varDeclNode, $"变量{varDeclNode.typeNode.ToExpression()} {varDeclNode.identifierNode.FullName}类型声明错误！初始值类型：{AnalyzeTypeExpression(varDeclNode.initializerNode)}");
+                        if (!valid) throw new SemanticException(ExceptionType.VariableTypeDeclarationError, varDeclNode, "type:" + varDeclNode.typeNode.ToExpression() + "  intializer type:" + AnalyzeTypeExpression(varDeclNode.initializerNode));
                     }
                     break;
                 case SyntaxTree.FuncDeclareNode funcDeclNode:
@@ -2113,10 +2138,10 @@ namespace Gizbox.SemanticRule
                         {
                             //检查返回语句和返回表达式    
                             var returnStmt = funcDeclNode.statementsNode.statements.FirstOrDefault(s => s is SyntaxTree.ReturnStmtNode);
-                            if (returnStmt == null) throw new SemanticException(funcDeclNode, "类型错误：没有返回语句！");
+                            if (returnStmt == null) throw new SemanticException(ExceptionType.MissingReturnStatement, funcDeclNode, "");
 
                             bool valid = CheckType(funcDeclNode.returnTypeNode.ToExpression(), (returnStmt as SyntaxTree.ReturnStmtNode).returnExprNode);
-                            if (!valid) throw new SemanticException(funcDeclNode.returnTypeNode, "返回类型错误！");
+                            if (!valid) throw new SemanticException(ExceptionType.ReturnTypeError, funcDeclNode.returnTypeNode, "");
                         }
 
 
@@ -2220,7 +2245,7 @@ namespace Gizbox.SemanticRule
                             {
                                 if ((objTypeExpr == "string") == false)
                                 {
-                                    throw new SemanticException(delNode, "错误的删除语句!");
+                                    throw new SemanticException(ExceptionType.InvalidDeleteStatement, delNode, "");
                                 }
                             }
                         }
@@ -2311,7 +2336,7 @@ namespace Gizbox.SemanticRule
                             var className = AnalyzeTypeExpression(memberAccess.objectNode);
 
                             var classRec = Query(className);
-                            if (classRec == null) throw new SemanticException(assignNode, "类符号表:" + className + "不存在!");
+                            if (classRec == null) throw new SemanticException(ExceptionType.ClassSymbolTableNotFound, assignNode, className);
 
                             var classEnv = classRec.envPtr;
 
@@ -2353,7 +2378,7 @@ namespace Gizbox.SemanticRule
                             Pass3_AnalysisNode(assignNode.rvalueNode);
 
                             bool valid = CheckType(assignNode.lvalueNode, assignNode.rvalueNode);
-                            if (!valid) throw new SemanticException(assignNode, "赋值类型错误！");
+                            if (!valid) throw new SemanticException(ExceptionType.AssignmentTypeError, assignNode, "");
                         }
                     }
                     break;
@@ -2364,7 +2389,7 @@ namespace Gizbox.SemanticRule
                             var className = AnalyzeTypeExpression(objMemberAccessNode.objectNode);
 
                             var classRec = Query(className);
-                            if (classRec == null) throw new SemanticException(objMemberAccessNode, "类符号表:" + className + "不存在!");
+                            if (classRec == null) throw new SemanticException(ExceptionType.ClassSymbolTableNotFound, objMemberAccessNode, className);
 
                             var classEnv = classRec.envPtr;
 
@@ -2456,8 +2481,8 @@ namespace Gizbox.SemanticRule
         /// </summary>
         private string AnalyzeTypeExpression(SyntaxTree.ExprNode exprNode)
         {
-            if (exprNode == null) throw new GizboxException("表达式节点为空！");
-            if (exprNode.attributes == null) throw new SemanticException(exprNode, "节点没有初始化属性列表！");
+            if (exprNode == null) throw new GizboxException(ExceptionType.ExpressionNodeIsNull);
+            if (exprNode.attributes == null) throw new SemanticException(ExceptionType.NodeNoInitializationPropertyList, exprNode, "");
             if (exprNode.attributes.ContainsKey("type")) return (string)exprNode.attributes["type"];
             
             string nodeTypeExprssion = "";
@@ -2473,14 +2498,14 @@ namespace Gizbox.SemanticRule
                         {
                             if(envStack[envStack.Top - 1].ContainRecordRawName(idNode.FullName))
                             {
-                                throw new SemanticException(idNode, "在类成员函数中的 类成员标识符 没有加this!");
+                                throw new SemanticException(ExceptionType.ClassMemberFunctionThisKeywordMissing, idNode, "");
                             }
                         }
 
                         var result = Query(idNode.FullName);
                         if (result == null)
                         {
-                            throw new SemanticException(idNode, "找不到标识符:" + idNode.FullName + " 当前顶层符号表：" + envStack.Peek().name);
+                            throw new SemanticException(ExceptionType.IdentifierNotFound, idNode, "");
                         }
 
 
@@ -2498,14 +2523,14 @@ namespace Gizbox.SemanticRule
                             case "LITDOUBLE": nodeTypeExprssion = "double"; break;
                             case "LITCHAR": nodeTypeExprssion = "char"; break;
                             case "LITSTRING": nodeTypeExprssion = "string"; break;
-                            default:throw new SemanticException(litNode, "未知的Literal类型：" + litNode.token.name); break;
+                            default:throw new SemanticException(ExceptionType.UnknownLiteral, litNode, "literal type：" + litNode.token.name); break;
                         }
                     }
                     break;
                 case SyntaxTree.ThisNode thisnode:
                     {
                         var result = Query("this");
-                        if (result == null) throw new SemanticException(thisnode, "找不到'this'");
+                        if (result == null) throw new SemanticException(ExceptionType.MissingThisPtrInSymbolTable, thisnode, "");
 
                         nodeTypeExprssion = result.typeExpression;
                     }
@@ -2517,13 +2542,13 @@ namespace Gizbox.SemanticRule
                         var className = AnalyzeTypeExpression(accessNode.objectNode);
 
                         var classRec = Query(className);
-                        if (classRec == null) throw new SemanticException(accessNode.objectNode, "找不到类名：" + className);
+                        if (classRec == null) throw new SemanticException(ExceptionType.ClassNameNotFound, accessNode.objectNode, className);
 
                         var classEnv = classRec.envPtr;
-                        if (classEnv == null) throw new SemanticException(accessNode.objectNode, "类作用域不存在！");
+                        if (classEnv == null) throw new SemanticException(ExceptionType.ClassScopeNotFound, accessNode.objectNode, "");
 
                         var memberRec = classEnv.GetRecord(accessNode.memberNode.FullName);
-                        if (memberRec == null) throw new SemanticException(accessNode.objectNode, "字段" + accessNode.memberNode.FullName + "不存在！");
+                        if (memberRec == null) throw new SemanticException(ExceptionType.MemberFieldNotFound, accessNode.objectNode, accessNode.memberNode.FullName);
 
                         accessNode.attributes["class"] = className;//记录memberAccess节点的点左边类型
                         accessNode.attributes["member_name"] = accessNode.memberNode.FullName;//记录memberAccess节点的点右边名称
@@ -2542,7 +2567,7 @@ namespace Gizbox.SemanticRule
                         {
                             var funcId = (eleAccessNode.containerNode as SyntaxTree.IdentityNode);
                             var idRec = Query(funcId.FullName);
-                            if (idRec == null) throw new SemanticException(eleAccessNode.containerNode, "函数：" + funcId.FullName + "未找到！");
+                            if (idRec == null) throw new SemanticException(ExceptionType.FunctionNotFound, eleAccessNode.containerNode,  funcId.FullName );
 
                             containerTypeExpr = idRec.typeExpression;    
                         }
@@ -2553,7 +2578,7 @@ namespace Gizbox.SemanticRule
                         }
                         else
                         {
-                            throw new SemanticException(eleAccessNode, "未实现非数组的索引！");
+                            throw new SemanticException(ExceptionType.Unknown, eleAccessNode, "only array can use [] operator");
                         }
                     }
                     break;
@@ -2570,19 +2595,19 @@ namespace Gizbox.SemanticRule
                             var className = AnalyzeTypeExpression(funcAccess.objectNode);
 
                             var classRec = Query(className);
-                            if (classRec == null) throw new SemanticException(callNode, "找不到类名：" + className);
+                            if (classRec == null) throw new SemanticException(ExceptionType.ClassNameNotFound, callNode,  className);
 
                             var classEnv = classRec.envPtr;
-                            if (classEnv == null) throw new SemanticException(callNode, "类作用域不存在！");
+                            if (classEnv == null) throw new SemanticException(ExceptionType.ClassScopeNotFound, callNode, "");
 
                             mangledName = Utils.Mangle(funcName, argTypeArr);
 
                             var memberRec = classEnv.GetMemberRecordInChain(mangledName);
-                            if (memberRec == null) throw new SemanticException(callNode, "函数成员" + funcAccess.memberNode.FullName + "不存在！");
+                            if (memberRec == null) throw new SemanticException(ExceptionType.FunctionMemberNotFound ,callNode, funcAccess.memberNode.FullName);
 
                             var typeExpr = memberRec.typeExpression;
 
-                            if (typeExpr.Contains("->") == false) throw new SemanticException(callNode, $"对象的成员类型{typeExpr}不是函数！");
+                            if (typeExpr.Contains("->") == false) throw new SemanticException(ExceptionType.ObjectMemberNotFunction, callNode, typeExpr);
                             nodeTypeExprssion = typeExpr.Split(' ').LastOrDefault();
                         }
                         else
@@ -2593,7 +2618,7 @@ namespace Gizbox.SemanticRule
 
                             var idRec = Query(mangledName);
 
-                            if (idRec == null) throw new SemanticException(callNode, "函数：" + mangledName + "未找到！");
+                            if (idRec == null) throw new SemanticException(ExceptionType.FunctionNotFound, callNode, mangledName);
 
                             string typeExpr = idRec.typeExpression.Split(' ').LastOrDefault();
 
@@ -2606,7 +2631,7 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.NewObjectNode newObjNode:
                     {
                         string className = newObjNode.className.FullName;
-                        if (Query(className) == null) throw new SemanticException(newObjNode.className, "找不到类定义：" + className);
+                        if (Query(className) == null) throw new SemanticException(ExceptionType.ClassDefinitionNotFound, newObjNode.className, className);
                         nodeTypeExprssion = className;
                     }
                     break;
@@ -2624,14 +2649,14 @@ namespace Gizbox.SemanticRule
                         //比较运算符
                         if(op == "<" || op == ">" || op == "<=" || op == ">=" || op == "==" || op == "!=")
                         {
-                            if (CheckType(typeL, typeR) == false) throw new SemanticException(binaryOp, "类型不一致的表达式不能比较");
+                            if (CheckType(typeL, typeR) == false) throw new SemanticException(ExceptionType.InconsistentExpressionTypesCannotCompare, binaryOp, "");
 
                             nodeTypeExprssion = "bool";
                         }
                         //普通运算符  
                         else
                         {
-                            if (typeL != typeR) throw new SemanticException(binaryOp,"二元运算两边的类型不一致！");
+                            if (typeL != typeR) throw new SemanticException(ExceptionType.BinaryOperationTypeMismatch, binaryOp, "");
 
                             nodeTypeExprssion = typeL;
                         }
@@ -2653,7 +2678,7 @@ namespace Gizbox.SemanticRule
                     }
                     break;
                 default:
-                    throw new SemanticException(exprNode, "无法分析类型：" + exprNode.GetType().Name);
+                    throw new SemanticException(ExceptionType.CannotAnalyzeExpressionNodeType, exprNode, exprNode.GetType().Name);
             }
 
             exprNode.attributes["type"] = nodeTypeExprssion;
@@ -2757,7 +2782,7 @@ namespace Gizbox.SemanticRule
                 {
                     if (found == true)
                     {
-                        throw new SemanticException(idNode, "标识符" + idNode.token.attribute + "是" + newname + "和" + namevalid + "之间的不明确引用1");
+                        throw new SemanticException(ExceptionType.IdentifierAmbiguousBetweenNamespaces, idNode, newname + " vs " + namevalid);
                     }
                     found = true;
                     idNode.SetPrefix(namespaceUsing.namespaceNameNode.token.attribute);

@@ -50,7 +50,7 @@ namespace Gizbox.ScriptEngine
 
         public object Write(long addr, object val)
         {
-            if (addr < 0 || addr >= data.Count) throw new GizboxException("堆写入无效");
+            if (addr < 0 || addr >= data.Count) throw new GizboxException(ExceptionType.InvalidHeapWrite);
 
             if (data[(int)addr] == null && val != null)//写入新对象  
             {
@@ -140,7 +140,7 @@ namespace Gizbox.ScriptEngine
             get 
             {
                 if(idx > frames.Length - 1)
-                    throw new GizboxException("Gizbox堆栈溢出：" + string.Concat( frames.Skip(frames.Length - 30).Select(f => "\n" +  (string.IsNullOrEmpty(f.name) ? "no name" : f.name)) ));
+                    throw new GizboxException(ExceptionType.StackOverflow, string.Concat( frames.Skip(frames.Length - 30).Select(f => "\n" +  (string.IsNullOrEmpty(f.name) ? "no name" : f.name)) ));
 
                 if(frames[idx] == null)
                 {
@@ -153,7 +153,7 @@ namespace Gizbox.ScriptEngine
         public void DestoryFrame(int idx)
         {
             if (idx > frames.Length - 1)
-                throw new GizboxException("Gizbox堆栈溢出：" + string.Concat(frames.Skip(frames.Length - 30).Select(f => "\n" + (string.IsNullOrEmpty(f.name) ? "no name" : f.name))));
+                throw new GizboxException(ExceptionType.StackOverflow, string.Concat(frames.Skip(frames.Length - 30).Select(f => "\n" + (string.IsNullOrEmpty(f.name) ? "no name" : f.name))));
 
             this.frames[idx] = null;
         }
@@ -243,7 +243,7 @@ namespace Gizbox.ScriptEngine
 
         public void Execute()
         {
-            if (this.mainUnit == null) throw new GizboxException("没有指令要执行！");
+            if (this.mainUnit == null) throw new GizboxException(ExceptionType.NoInstructionsToExecute);
 
             //留空  
             Log("开始执行");
@@ -427,7 +427,7 @@ namespace Gizbox.ScriptEngine
                         Value arg = GetValue(code.arg1); 
                         
                         if (arg.Type == GizType.Void)
-                            throw new RuntimeException(GetCurrentCode(), "null实参");
+                            throw new RuntimeException(ExceptionType.ScriptRuntimeError, GetCurrentCode(), "null argument");
                         
                         this.callStack[this.callStack.Top + 1].args.Push(arg);
                     }
@@ -436,7 +436,7 @@ namespace Gizbox.ScriptEngine
                     {
                         string funcMangledName = code.arg1.str;
 
-                        if (GetValue(code.arg2).Type != GizType.Int) throw new GizboxException("参数个数不为整数！");
+                        if (GetValue(code.arg2).Type != GizType.Int) throw new GizboxException(ExceptionType.Unknown, "arg count not integer");
                         int argCount = GetValue(code.arg2).AsInt;
 
                         this.callStack[this.callStack.Top + 1].returnPtr = new Tuple<int, int>(this.currUnit, (this.curr + 1));
@@ -455,7 +455,7 @@ namespace Gizbox.ScriptEngine
                     {
                         string funcMangledName = code.arg1.str;
 
-                        if (GetValue(code.arg2).Type != GizType.Int) throw new GizboxException("参数个数不为整数！");
+                        if (GetValue(code.arg2).Type != GizType.Int) throw new GizboxException(ExceptionType.Unknown, "arg count not integer");
                         int argCount = GetValue(code.arg2).AsInt;
 
                         this.callStack[this.callStack.Top + 1].returnPtr = new Tuple<int, int>(this.currUnit, (this.curr + 1));
@@ -463,9 +463,9 @@ namespace Gizbox.ScriptEngine
 
                         //运行时多态  
                         //获取this参数  
-                        if (this.callStack[this.callStack.Top + 1].args.Count == 0) throw new RuntimeException(GetCurrentCode(), "成员方法调用没有this参数！");
+                        if (this.callStack[this.callStack.Top + 1].args.Count == 0) throw new RuntimeException(ExceptionType.ScriptRuntimeError, GetCurrentCode(), "method call doesnt has \"this\" argument！");
                         var arg_this = this.callStack[this.callStack.Top + 1].args.Peek();
-                        if (arg_this.Type != GizType.GizObject) throw new RuntimeException(GetCurrentCode(), "成员方法调用没有this参数！(第一个参数不是this参数)");
+                        if (arg_this.Type != GizType.GizObject) throw new RuntimeException(ExceptionType.ScriptRuntimeError, GetCurrentCode(), "method call doesnt has \"this\" argument！");
                         string trueType = (this.DeReference(arg_this.AsPtr)as GizObject).truetype;
 
 
@@ -566,7 +566,7 @@ namespace Gizbox.ScriptEngine
                         }
                         else
                         {
-                            throw new RuntimeException(GetCurrentCode(), "只能对堆对象进行释放");
+                            throw new RuntimeException(ExceptionType.OnlyHeapObjectsCanBeFreed, GetCurrentCode(), "");
                         }
                     }
                     break;
@@ -663,7 +663,7 @@ namespace Gizbox.ScriptEngine
                     return libCache;
                 }
             }
-            if (this.libSearchDirectories.Count == 0) throw new GizboxException("没有设置库加载目录！");
+            if (this.libSearchDirectories.Count == 0) throw new GizboxException(ExceptionType.LibraryLoadPathNotSet);
             foreach (var dir in this.libSearchDirectories)
             {
                 System.IO.DirectoryInfo dirInfo = new System.IO.DirectoryInfo(dir);
@@ -681,7 +681,7 @@ namespace Gizbox.ScriptEngine
                 }
             }
 
-            throw new GizboxException("没有找到库文件：" + libname + ".gixlib  !");
+            throw new GizboxException(ExceptionType.LibraryFileNotFound,  libname + ".gixlib" );
         }
 
 
@@ -727,7 +727,7 @@ namespace Gizbox.ScriptEngine
             for (int i = args.Length - 1; i >= 0; --i)
             {
                 Value arg = csharpInteropContext.Marshal2Giz(args[i]);
-                if (arg.Type == GizType.Void) throw new GizboxException("传入的实参错误！");
+                if (arg.Type == GizType.Void) throw new GizboxException(ExceptionType.ArgumentError);
                 this.callStack[this.callStack.Top + 1].args.Push(arg);
             }
 
@@ -767,7 +767,7 @@ namespace Gizbox.ScriptEngine
                         switch(r.registerName)
                         {
                             case "RET": return retRegister;
-                            default: throw new GizboxException("未知寄存器:" + r.registerName);
+                            default: throw new GizboxException(ExceptionType.Unknown, "unknown register:" + r.registerName);
                         }
                     }
                 case OperandConst c:
@@ -779,7 +779,7 @@ namespace Gizbox.ScriptEngine
                                     return Value.FromConstStringPtr(c.linkedPtr);
                                 }
                         }
-                        throw new RuntimeException(GetCurrentCode(), "未实现的常量读取！");
+                        throw new RuntimeException(ExceptionType.UnknownConstant, GetCurrentCode(), "");
                     }
                 case OperandLiteralValue l: return l.val;
                 case OperandVariable varible:
@@ -798,16 +798,16 @@ namespace Gizbox.ScriptEngine
                         var objptr = GetValue(memb.obj);
                         string fieldName = memb.fieldname;
 
-                        if ((objptr.IsVoid)) throw new RuntimeException(GetCurrentCode(), "获取对象字段\"" + fieldName + "\"时发生错误：找不到要访问的对象");
-                        if (objptr.Type != GizType.GizObject) throw new RuntimeException(GetCurrentCode(), "对象不是FanObject类型！");
+                        if ((objptr.IsVoid)) throw new RuntimeException(ExceptionType.AccessedObjectNotFound, GetCurrentCode(), "when access member \"" + fieldName +  "\"");
+                        if (objptr.Type != GizType.GizObject) throw new RuntimeException(ExceptionType.ObjectTypeError, GetCurrentCode(), "not gizbox object");
 
                         var fields = (this.DeReference(objptr.AsPtr) as GizObject).fields;
-                        if (fields.ContainsKey(fieldName) == false) throw new RuntimeException(GetCurrentCode(), "对象" + fieldName + "字段未初始化! 所有字段：" + string.Concat(fields.Keys.Select(k => k + ", ")));
+                        if (fields.ContainsKey(fieldName) == false) throw new RuntimeException(ExceptionType.ObjectFieldNotInitialized,GetCurrentCode(), fieldName);
                         return (this.DeReference(objptr.AsPtr) as GizObject).fields[fieldName];
 
                     }
                 default:
-                    throw new GizboxException("错误的访问：" + operand.GetType().Name);
+                    throw new GizboxException(ExceptionType.AccessError, operand.GetType().Name);
             }
         }
 
@@ -821,18 +821,18 @@ namespace Gizbox.ScriptEngine
                         switch (r.registerName)
                         {
                             case "RET": retRegister = val; break;
-                            default: throw new GizboxException("未知寄存器:" + r.registerName);
+                            default: throw new RuntimeException(ExceptionType.ScriptRuntimeError, null, "unknown register :" + r.registerName);
                         }
                     }
                     break;
                 case OperandConst c:
                     {
-                        throw new GizboxException("不能设置常数的值");
+                        throw new RuntimeException(ExceptionType.CannotAssignToConstant, null, "");
                     }
                     break;
                 case OperandLiteralValue l:
                     {
-                        throw new GizboxException("不能设置字面量的值");
+                        throw new RuntimeException(ExceptionType.CannotAssignToLiteral, null, "");
                     }
                     break;
                 case OperandVariable varible:
@@ -854,8 +854,8 @@ namespace Gizbox.ScriptEngine
                         var objptr = GetValue(memb.obj);
                         string fieldName = memb.fieldname;
 
-                        if ((objptr.IsVoid)) throw new RuntimeException(GetCurrentCode(), "设置对象字段\"" + fieldName + "\"时发生错误：找不到要访问的对象");
-                        if (objptr.Type != GizType.GizObject) throw new RuntimeException(GetCurrentCode(), "对象不是FanObject类型！");
+                        if ((objptr.IsVoid)) throw new RuntimeException(ExceptionType.AccessedObjectNotFound, GetCurrentCode(), "when acess member \"" + fieldName + "\"");
+                        if (objptr.Type != GizType.GizObject) throw new RuntimeException(ExceptionType.ScriptRuntimeError, GetCurrentCode(), "not gizbox object");
 
 
                         (this.DeReference(objptr.AsPtr) as GizObject).fields[fieldName] = val;
@@ -863,7 +863,7 @@ namespace Gizbox.ScriptEngine
                     }
                     break;
                 default:
-                    throw new GizboxException("错误的访问！");
+                    throw new RuntimeException(ExceptionType.AccessError, GetCurrentCode(), "");
             }
         }
 
@@ -970,7 +970,7 @@ namespace Gizbox.ScriptEngine
                 {
                     var allParams = envFount.GetByCategory(SymbolTable.RecordCatagory.Param);
                     int idxInParams = allParams.FindIndex(p => p.name == rec.name);
-                    if (idxInParams < 0) throw new RuntimeException(GetCurrentCode(), "形参列表中未找到：" + name);
+                    if (idxInParams < 0) throw new RuntimeException(ExceptionType.ParameterListParameterNotFound, GetCurrentCode(), name);
 
                     if (write)
                     {
@@ -995,14 +995,14 @@ namespace Gizbox.ScriptEngine
                     else
                     {
                         if (currentFrame.localVariables.ContainsKey(name) == false)
-                            throw new RuntimeException(GetCurrentCode(), "局部变量 " + name + "还未初始化！");//TODO:判断用户是否成员变量没加this.  
+                            throw new RuntimeException(ExceptionType.LocalVariableNotInitialized, GetCurrentCode(), name);
 
                         return currentFrame.localVariables[name];
                     }
                 }
                 else
                 {
-                    throw new RuntimeException(GetCurrentCode(), "不是参数也不是局部变量！：" + name);
+                    throw new RuntimeException(ExceptionType.NotParameterOrLocalVariable, GetCurrentCode(), name);
                 }
             }
             //查找全局符号表  
@@ -1020,14 +1020,14 @@ namespace Gizbox.ScriptEngine
                 else
                 {
                     if (mainUnit.ReadGlobalVar(name).Type == GizType.Void)
-                        throw new RuntimeException(GetCurrentCode(), "全局变量 " + name + " 还未初始化！");
+                        throw new RuntimeException(ExceptionType.GlobalVariableNotInitialized, GetCurrentCode(), name);
 
                     return mainUnit.ReadGlobalVar(name);
                 }
             }
             else
             {
-                throw new RuntimeException(GetCurrentCode(), "栈帧和全局符号都不包含：" + name);
+                throw new RuntimeException(ExceptionType.StackFrameAndGlobalSymbolTableNameNotFound, GetCurrentCode(), name);
             }
         }
 
@@ -1359,7 +1359,7 @@ namespace Gizbox.ScriptEngine
             }
             else
             {
-                throw new RuntimeException(engine.GetCurrentCode(), "只有布尔值能取非");
+                throw new RuntimeException(ExceptionType.OnlyBooleanValuesCanBeNegated, engine.GetCurrentCode(), "");
             }
         }
 
@@ -1369,7 +1369,7 @@ namespace Gizbox.ScriptEngine
             {
                 case GizType.Int: return -(v.AsInt);
                 case GizType.Float: return -(v.AsFloat);
-                default: throw new RuntimeException(engine.GetCurrentCode(), v.Type + "类型不能进行求负数操作!");
+                default: throw new RuntimeException(ExceptionType.TypeCannotBeNegative, engine.GetCurrentCode(), v.Type.ToString());
             }
         }
 
@@ -1477,7 +1477,7 @@ namespace Gizbox.ScriptEngine
                             case "double": 
                             case "char":
                                 {
-                                    throw new GizboxException("不能从GizboxObject转换" + toType + "！");
+                                    throw new GizboxException(ExceptionType.TypeConversionError, "GizboxObject to " + toType);
                                 }
                             default:
                                 {
@@ -1497,11 +1497,11 @@ namespace Gizbox.ScriptEngine
                             case "double": 
                             case "char":
                                 {
-                                    throw new GizboxException("不能从GizboxArray转换" + toType + "！");
+                                    throw new GizboxException(ExceptionType.TypeConversionError, "GizboxArray to " + toType);
                                 }
                             default:
                                 {
-                                    throw new GizboxException("数组转换为其他类型未实现！");
+                                    throw new GizboxException(ExceptionType.TypeConversionError, "GizboxArray to other");
                                 }
                         }
                     }

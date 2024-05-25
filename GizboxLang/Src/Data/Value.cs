@@ -116,117 +116,117 @@ namespace Gizbox
         // ---------- OPERATOR --------------
         public static Value operator +(Value v1, Value v2)
         {
-            if (v1.type != v2.type) throw new GizboxException("运算类型错误! " + v1.type + " + " + v2.type);
+            if (v1.type != v2.type) throw new GizboxException(ExceptionType.OperationTypeError, v1.type + " + " + v2.type);
             switch (v1.type)
             {
-                case GizType.Bool: throw new GizboxException("运算类型错误!");
+                case GizType.Bool: throw new GizboxException(ExceptionType.OperationTypeError);
                 case GizType.Int: return v1.AsInt + v2.AsInt;
                 case GizType.Float: return v1.AsFloat + v2.AsFloat;
                 //case GizType.String: return (string)v1.AsObject + (string)v2.AsObject;
-                default: throw new GizboxException("运算类型错误!");
+                default: throw new GizboxException(ExceptionType.OperationTypeError);
             }
         }
         public static Value operator -(Value v1, Value v2)
         {
-            if (v1.type != v2.type) throw new GizboxException("运算类型错误!");
+            if (v1.type != v2.type) throw new GizboxException(ExceptionType.OperationTypeError);
             switch (v1.type)
             {
                 case GizType.Int: return v1.AsInt - v2.AsInt;
                 case GizType.Float: return v1.AsFloat - v2.AsFloat;
-                default: throw new GizboxException("运算类型错误!");
+                default: throw new GizboxException(ExceptionType.OperationTypeError);
             }
         }
         public static Value operator *(Value v1, Value v2)
         {
-            if (v1.type != v2.type) throw new GizboxException("运算类型错误!");
+            if (v1.type != v2.type) throw new GizboxException(ExceptionType.OperationTypeError);
             switch (v1.type)
             {
                 case GizType.Int: return v1.AsInt * v2.AsInt;
                 case GizType.Float: return v1.AsFloat * v2.AsFloat;
-                default: throw new GizboxException("运算类型错误!");
+                default: throw new GizboxException(ExceptionType.OperationTypeError);
             }
         }
         public static Value operator /(Value v1, Value v2)
         {
-            if (v1.type != v2.type) throw new GizboxException("运算类型错误!");
+            if (v1.type != v2.type) throw new GizboxException(ExceptionType.OperationTypeError);
             switch (v1.type)
             {
                 case GizType.Int: return v1.AsInt / v2.AsInt;
                 case GizType.Float: return v1.AsFloat / v2.AsFloat;
-                default: throw new GizboxException("运算类型错误!");
+                default: throw new GizboxException(ExceptionType.OperationTypeError);
             }
         }
         public static Value operator %(Value v1, Value v2)
         {
-            if (v1.type != v2.type) throw new GizboxException("运算类型错误!");
+            if (v1.type != v2.type) throw new GizboxException(ExceptionType.OperationTypeError);
             switch (v1.type)
             {
                 case GizType.Int: return v1.AsInt % v2.AsInt;
                 case GizType.Float: return v1.AsFloat % v2.AsFloat;
-                default: throw new GizboxException("运算类型错误!");
+                default: throw new GizboxException(ExceptionType.OperationTypeError);
             }
         }
         public static Value operator >(Value v1, Value v2)
         {
-            if (v1.type != v2.type) throw new GizboxException("运算类型错误!");
+            if (v1.type != v2.type) throw new GizboxException(ExceptionType.OperationTypeError);
             switch (v1.type)
             {
                 case GizType.Int: return v1.AsInt > v2.AsInt;
                 case GizType.Float: return v1.AsFloat > v2.AsFloat;
-                default: throw new GizboxException("运算类型错误!");
+                default: throw new GizboxException(ExceptionType.OperationTypeError);
             }
         }
         public static Value operator <(Value v1, Value v2)
         {
-            if (v1.type != v2.type) throw new GizboxException("运算类型错误!");
+            if (v1.type != v2.type) throw new GizboxException(ExceptionType.OperationTypeError);
             switch (v1.type)
             {
                 case GizType.Int: return v1.AsInt < v2.AsInt;
                 case GizType.Float: return v1.AsFloat < v2.AsFloat;
-                default: throw new GizboxException("运算类型错误!");
+                default: throw new GizboxException(ExceptionType.OperationTypeError);
             }
         }
         public static Value operator <=(Value v1, Value v2)
         {
-            if (v1.type != v2.type) throw new GizboxException("运算类型错误!");
+            if (v1.type != v2.type) throw new GizboxException(ExceptionType.OperationTypeError);
             switch (v1.type)
             {
                 case GizType.Int: return v1.AsInt <= v2.AsInt;
                 case GizType.Float: return v1.AsFloat <= v2.AsFloat;
-                default: throw new GizboxException("运算类型错误!");
+                default: throw new GizboxException(ExceptionType.OperationTypeError);
             }
         }
         public static Value operator >=(Value v1, Value v2)
         {
-            if (v1.type != v2.type) throw new GizboxException("运算类型错误!");
+            if (v1.type != v2.type) throw new GizboxException(ExceptionType.OperationTypeError);
             switch (v1.type)
             {
                 case GizType.Int: return v1.AsInt >= v2.AsInt;
                 case GizType.Float: return v1.AsFloat >= v2.AsFloat;
-                default: throw new GizboxException("运算类型错误!");
+                default: throw new GizboxException(ExceptionType.OperationTypeError);
             }
         }
         public static Value operator ==(Value v1, Value v2)
         {
-            if (v1.type != v2.type) throw new GizboxException("运算类型错误!");
+            if (v1.type != v2.type) throw new GizboxException(ExceptionType.OperationTypeError);
             switch (v1.type)
             {
                 case GizType.Void: return v1.type == v2.type;
                 case GizType.Bool: return v1.AsBool == v2.AsBool;
                 case GizType.Int: return v1.AsInt == v2.AsInt;
                 case GizType.Float: return v1.AsFloat == v2.AsFloat;
-                default: throw new GizboxException("运算类型错误!");
+                default: throw new GizboxException(ExceptionType.OperationTypeError);
             }
         }
         public static Value operator !=(Value v1, Value v2)
         {
-            if (v1.type != v2.type) throw new GizboxException("运算类型错误!");
+            if (v1.type != v2.type) throw new GizboxException(ExceptionType.OperationTypeError);
             switch (v1.type)
             {
                 case GizType.Bool: return v1.AsBool != v2.AsBool;
                 case GizType.Int: return v1.AsInt != v2.AsInt;
                 case GizType.Float: return v1.AsFloat != v2.AsFloat;
-                default: throw new GizboxException("运算类型错误!");
+                default: throw new GizboxException(ExceptionType.OperationTypeError);
             }
         }
 
