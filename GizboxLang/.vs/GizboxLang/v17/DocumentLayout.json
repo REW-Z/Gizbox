@@ -3,14 +3,14 @@
   "WorkspaceRootPath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLang\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{0667CEB0-F025-4756-AC98-C79BED0F70B6}|..\\GizboxLangLSP\\GizboxLangLSP.csproj|f:\\legacy\\myprojects\\gizbox\\gizboxlanglsp\\lsp.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{3F6178C1-3C2A-4945-A499-339F6CFBBCF0}|GizboxLang.csproj|f:\\legacy\\myprojects\\gizbox\\gizboxlang\\src\\languageservices\\languageservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{3F6178C1-3C2A-4945-A499-339F6CFBBCF0}|GizboxLang.csproj|solutionrelative:src\\languageservices\\languageservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{0667CEB0-F025-4756-AC98-C79BED0F70B6}|..\\GizboxLangLSP\\GizboxLangLSP.csproj|f:\\legacy\\myprojects\\gizbox\\gizboxlanglsp\\lspjsonexamples.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{0667CEB0-F025-4756-AC98-C79BED0F70B6}|..\\GizboxLangLSP\\GizboxLangLSP.csproj|f:\\legacy\\myprojects\\gizbox\\gizboxlanglsp\\lsp.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{19ACE2EC-C36E-456E-91EE-C0ACCD3F9D41}|..\\GizboxTest\\GizboxTest.csproj|f:\\legacy\\myprojects\\gizbox\\gizboxtest\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
@@ -38,12 +38,11 @@
               "RelativeToolTip": "..\\GizboxTest\\Note.txt",
               "ViewState": "AQIAAAAAAAAAAAAAAAAAAAkAAAAAAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003109|",
-              "WhenOpened": "2024-05-25T09:48:09.246Z",
-              "EditorCaption": ""
+              "WhenOpened": "2024-05-25T09:48:09.246Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 2,
               "Title": "LspJsonExamples.json",
               "DocumentMoniker": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLangLSP\\LspJsonExamples.json",
               "RelativeDocumentMoniker": "..\\GizboxLangLSP\\LspJsonExamples.json",
@@ -64,8 +63,7 @@
               "RelativeToolTip": "..\\GizboxTest\\Program.cs",
               "ViewState": "AQIAADwAAAAAAAAAAADwv08AAAAAAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2024-05-25T11:59:17.507Z",
-              "EditorCaption": ""
+              "WhenOpened": "2024-05-25T11:59:17.507Z"
             }
           ]
         },
@@ -76,27 +74,27 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "LanguageService.cs",
-              "DocumentMoniker": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLang\\Src\\LanguageServices\\LanguageService.cs",
-              "RelativeDocumentMoniker": "Src\\LanguageServices\\LanguageService.cs",
-              "ToolTip": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLang\\Src\\LanguageServices\\LanguageService.cs",
-              "RelativeToolTip": "Src\\LanguageServices\\LanguageService.cs",
-              "ViewState": "AQIAAAAAAAAAAAAAAAAAAGgBAAA7AAAA",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2024-05-25T16:10:36.262Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 2,
               "Title": "LSP.cs",
               "DocumentMoniker": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLangLSP\\LSP.cs",
               "RelativeDocumentMoniker": "..\\GizboxLangLSP\\LSP.cs",
               "ToolTip": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLangLSP\\LSP.cs",
               "RelativeToolTip": "..\\GizboxLangLSP\\LSP.cs",
-              "ViewState": "AQIAAD0AAAAAAAAAAAAAAEYAAAAPAAAA",
+              "ViewState": "AQIAAKwAAAAAAAAAAAAcwLgAAAA4AAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2024-05-25T16:34:51.808Z",
+              "WhenOpened": "2024-05-25T20:27:23.585Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "LanguageService.cs",
+              "DocumentMoniker": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLang\\Src\\LanguageServices\\LanguageService.cs",
+              "RelativeDocumentMoniker": "Src\\LanguageServices\\LanguageService.cs",
+              "ToolTip": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLang\\Src\\LanguageServices\\LanguageService.cs",
+              "RelativeToolTip": "Src\\LanguageServices\\LanguageService.cs",
+              "ViewState": "AQIAACEAAAAAAAAAAAAAAGgBAAA7AAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2024-05-25T16:10:36.262Z",
               "EditorCaption": ""
             }
           ]

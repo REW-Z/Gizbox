@@ -182,7 +182,7 @@ class Program
             }
             catch(Exception ex) 
             {
-                Log("\n\n[ERR]:\n\n" + ex.ToString());
+                //Log("\n\n[ERR]:\n\n" + ex.ToString());
                 messageBuilder.Clear();
             }
         }
@@ -517,8 +517,6 @@ class Program
 
 
         var responseJson = JsonConvert.SerializeObject(response);
-
-        Log("\n[Diag]\n" + responseJson);
 
         var responseMessage = $"Content-Length: {Encoding.UTF8.GetByteCount(responseJson)}\r\n\r\n{responseJson}";
         //var responseBytes = Encoding.UTF8.GetBytes(responseMessage);
