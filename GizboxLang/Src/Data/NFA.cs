@@ -160,7 +160,7 @@ public class NFATest
     public static void Test()
     {
         NFA nfa = new NFA("a|b*");
-        Debug.LogLine(nfa.Matches("aaaa")); // Should be true
-        Debug.LogLine(nfa.Matches("b"));    // Should be true
+        GixConsole.LogLine(nfa.Matches("aaaa")); // Should be true
+        GixConsole.LogLine(nfa.Matches("b"));    // Should be true
     }
 }

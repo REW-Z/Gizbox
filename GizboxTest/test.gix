@@ -1,6 +1,5 @@
 ﻿import <"core">
 import <"stdlib">    
-
 using Core;  
 using Console;
 
@@ -11,6 +10,7 @@ class Student
     {
         Console::Log("Test");
     }
+    //AAAA
     void Talk()
     {
     }
@@ -18,5 +18,7 @@ class Student
     {
     }
 }
-
-Student fafa = new Student();
+//AAAA
+Student fafa = new Student(); //FFFF
+fafa.a = 233;
+Console::Log("FCADD" + (string)fafa.a);

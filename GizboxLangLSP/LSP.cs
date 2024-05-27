@@ -188,8 +188,6 @@ class Program
         }
     }
 
-
-
     public static void StartWriteQueueToOutstream()
     {
         while(true)
@@ -206,7 +204,6 @@ class Program
             }
         }
     }
-
 
     public static async void StartDiagnosticSystem()
     {
@@ -253,7 +250,6 @@ class Program
 
         return jsonObjects;
     }
-
 
     private static string GetJsonContent(string message)
     {
@@ -331,8 +327,8 @@ class Program
                 fullUpdate = true;
             }
 
-            //全量更新  
-            if(fullUpdate == false)
+            //增量更新  
+            if (fullUpdate == false)
             {
                 int start_line = (int)jRange["start"]["line"];
                 int start_char = (int)jRange["start"]["character"];
@@ -347,7 +343,7 @@ class Program
                     end_char,
                     text);
             }
-            //增量更新  
+            //全量更新  
             else
             {
                 string text = (string)change["text"];
@@ -456,13 +452,13 @@ class Program
         writeQueue.Enqueue(responseMessage);
     }
 
-
     private static async Task DiagnosticsAfter(string uri, long milisecDelay)
     {
         needDiagnosticInMilisec = milisecDelay;
 
         watch.Restart();
     }
+
     private static async Task Diagnostics(string uri)
     {
         if (string.IsNullOrEmpty(uri)) return;
@@ -522,50 +518,27 @@ class Program
         //var responseBytes = Encoding.UTF8.GetBytes(responseMessage);
         //await outputStream.WriteAsync(responseBytes, 0, responseBytes.Length);
         writeQueue.Enqueue(responseMessage);
+
+        //await LogToStream("StreamLog:\n" + responseJson);
     }
 
-
-
-
-
-
-
-    private static List<string> logList = new List<string>();
-    private static object mutexList = new object();
-    private static object mutexFile = new object();
-    private static void Log(string txt)
+    private static async Task LogToStream(string text)
     {
-        lock (mutexList)
+        var response = new
         {
-            logList.Add(txt);
-        }
+            jsonrpc = "2.0",
+            method = "debug/log",
+            @params = new
+            {
+                text = text,
+            }
+        };
 
-        lock (mutexFile)
-        {
-            // 创建文件时立即关闭文件流
-            if (!File.Exists(logPath))
-            {
-                using (File.Create(logPath)) { }
-            }
+        var responseJson = JsonConvert.SerializeObject(response);
 
-            try
-            {
-                using (StreamWriter sw = new StreamWriter(logPath, true))
-                {
-                    lock (mutexList)
-                    {
-                        foreach (var log in logList)
-                        {
-                            sw.WriteLine(log); // 使用 log 而不是 txt
-                        }
-                        logList.Clear();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-            }
-        }
+        var responseMessage = $"Content-Length: {Encoding.UTF8.GetByteCount(responseJson)}\r\n\r\n{responseJson}";
+        //var responseBytes = Encoding.UTF8.GetBytes(responseMessage);
+        //await outputStream.WriteAsync(responseBytes, 0, responseBytes.Length);
+        writeQueue.Enqueue(responseMessage);
     }
-
 }

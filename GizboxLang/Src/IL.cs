@@ -303,19 +303,19 @@ namespace Gizbox.IL
         //打印  
         public void Print()
         {
-            Debug.LogLine("中间代码输出：(" + this.codes.Count + "行)");
-            Debug.LogLine(new string('-', 50));
+            GixConsole.LogLine("中间代码输出：(" + this.codes.Count + "行)");
+            GixConsole.LogLine(new string('-', 50));
             for (int i = 0; i < this.codes.Count; ++i)
             {
-                Debug.LogLine($"{i.ToString().PadRight(4)}|status {this.scopeStatusArr[i].ToString().PadRight(3)}|{this.codes[i].ToExpression()}");
+                GixConsole.LogLine($"{i.ToString().PadRight(4)}|status {this.scopeStatusArr[i].ToString().PadRight(3)}|{this.codes[i].ToExpression()}");
             }
-            Debug.LogLine(new string('-', 50));
+            GixConsole.LogLine(new string('-', 50));
 
 
-            Debug.LogLine("作用域：");
+            GixConsole.LogLine("作用域：");
             foreach (var scope in this.scopes)
             {
-                Debug.LogLine("scope:" + scope.env.name + ":  " + scope.lineFrom + " ~ " + scope.lineTo);
+                GixConsole.LogLine("scope:" + scope.env.name + ":  " + scope.lineFrom + " ~ " + scope.lineTo);
             }
         }
     }
@@ -1102,7 +1102,7 @@ namespace Gizbox.IL
         public static void Log(object content)
         {
             if(!Compiler.enableLogILGenerator) return;
-            Debug.LogLine("ILGen >>>" + content);
+            GixConsole.LogLine("ILGen >>>" + content);
         }
 
     }

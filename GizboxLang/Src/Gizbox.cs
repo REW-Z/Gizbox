@@ -202,7 +202,7 @@ namespace Gizbox
 
             if (records.ContainsKey(symbolName))
             {
-                Debug.LogLine("has symbol:" + symbolName + " in " + this.name);
+                GixConsole.LogLine("has symbol:" + symbolName + " in " + this.name);
                 return records[symbolName];
             }
             else
@@ -279,17 +279,17 @@ namespace Gizbox
         public void Print()
         {
             int pad = 16;
-            Debug.LogLine();
-            Debug.LogLine($"|{new string('-', pad)}-{new string('-', pad)}-{ this.name.PadRight(pad) + (this.parent != null ? ("(parent:" + this.parent.name + ")") : "") }-{new string('-', pad)}-{new string('-', pad)}|");
-            Debug.LogLine($"|{"NAME".PadRight(pad)}|{"RAW".PadRight(pad)}|{"CATAGORY".PadRight(pad)}|{"TYPE".PadRight(pad)}|{"ADDR".PadRight(pad)}|{"SubTable".PadRight(pad)}|");
-            Debug.LogLine($"|{new string('-', pad * 6 + 4)}|");
+            GixConsole.LogLine();
+            GixConsole.LogLine($"|{new string('-', pad)}-{new string('-', pad)}-{ this.name.PadRight(pad) + (this.parent != null ? ("(parent:" + this.parent.name + ")") : "") }-{new string('-', pad)}-{new string('-', pad)}|");
+            GixConsole.LogLine($"|{"NAME".PadRight(pad)}|{"RAW".PadRight(pad)}|{"CATAGORY".PadRight(pad)}|{"TYPE".PadRight(pad)}|{"ADDR".PadRight(pad)}|{"SubTable".PadRight(pad)}|");
+            GixConsole.LogLine($"|{new string('-', pad * 6 + 4)}|");
             foreach (var key in records.Keys)
             {
                 var rec = records[key];
-                Debug.LogLine($"|{rec.name.PadRight(pad)}|{rec.rawname.PadRight(pad)}|{rec.category.ToString().PadRight(pad)}|{rec.typeExpression.PadRight(pad)}|{rec.addr.ToString().PadRight(pad)}|{(rec.envPtr != null ? "hasSubTable" : "").PadRight(pad)}|");
+                GixConsole.LogLine($"|{rec.name.PadRight(pad)}|{rec.rawname.PadRight(pad)}|{rec.category.ToString().PadRight(pad)}|{rec.typeExpression.PadRight(pad)}|{rec.addr.ToString().PadRight(pad)}|{(rec.envPtr != null ? "hasSubTable" : "").PadRight(pad)}|");
             }
-            Debug.LogLine($"|{new string('-', pad * 6 + 4)}|");
-            Debug.LogLine();
+            GixConsole.LogLine($"|{new string('-', pad * 6 + 4)}|");
+            GixConsole.LogLine();
 
             if(this.children .Count > 0)
             {
@@ -658,8 +658,8 @@ namespace Gizbox
             SimpleParser parser = new SimpleParser();
             parser.Parse(tokens);
 
-            Debug.LogLine("\n\n语法分析树：");
-            Debug.LogLine(parser.parseTree.Serialize());
+            GixConsole.LogLine("\n\n语法分析树：");
+            GixConsole.LogLine(parser.parseTree.Serialize());
 
             return parser.parseTree;
         }
@@ -680,8 +680,8 @@ namespace Gizbox
             parser.Parse(tokens);
 
 
-            Debug.LogLine("\n\n语法分析树：");
-            Debug.LogLine(parser.parseTree.Serialize());
+            GixConsole.LogLine("\n\n语法分析树：");
+            GixConsole.LogLine(parser.parseTree.Serialize());
 
             return parser.parseTree;
         }
@@ -693,8 +693,8 @@ namespace Gizbox
         {
             return;
 
-            Debug.LogLine(txt + "\n按任意键继续...");
-            Debug.Pause();
+            GixConsole.LogLine(txt + "\n按任意键继续...");
+            GixConsole.Pause();
         }
 
         public void AddLib(string libname, Gizbox.IL.ILUnit lib)
@@ -849,27 +849,27 @@ namespace Gizbox
 
 
 
-    public static class Debug
+    public static class GixConsole
     {
-        public static bool enableConsole = false;
+        public static bool enableSystemConsole = false;
 
         public static void Log(object msg = null)
         {
-            if(Debug.enableConsole)
+            if(GixConsole.enableSystemConsole)
             {
                 Console.Write(msg);
             }
         }
         public static void LogLine(object msg = null)
         {
-            if (Debug.enableConsole)
+            if (GixConsole.enableSystemConsole)
             {
                 Console.WriteLine(msg);
             }
         }
         public static void Pause()
         {
-            if (Debug.enableConsole)
+            if (GixConsole.enableSystemConsole)
             {
                 Console.ReadKey();
             }

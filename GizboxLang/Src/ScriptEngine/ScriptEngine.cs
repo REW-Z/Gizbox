@@ -100,10 +100,10 @@ namespace Gizbox.ScriptEngine
 
         public void Print()
         {
-            Debug.LogLine("堆区(" + this.data.Count + ")");
+            GixConsole.LogLine("堆区(" + this.data.Count + ")");
             for (int i = 0; i < this.data.Count; ++i)
             {
-                Debug.LogLine("(" + i + ")" + this.data[i]);
+                GixConsole.LogLine("(" + i + ")" + this.data[i]);
             }
         }
     }
@@ -1087,7 +1087,7 @@ namespace Gizbox.ScriptEngine
         private static void Log(object content)
         {
             if (!Compiler.enableLogScriptEngine) return;
-            Debug.LogLine("ScriptEngine >>" + content);
+            GixConsole.LogLine("ScriptEngine >>" + content);
         }
 
         //Profiler

@@ -30,7 +30,7 @@ namespace Gizbox
             //LLVM.InitializeAllAsmParsers();
             //LLVM.InitializeAllAsmPrinters();
 
-            Debug.LogLine("Start：LLVM SQR");
+            GixConsole.LogLine("Start：LLVM SQR");
 
 
             LLVM.LinkInMCJIT();
@@ -48,12 +48,12 @@ entry:
 }
 ";
 
-            Debug.LogLine("Context Create!");
+            GixConsole.LogLine("Context Create!");
 
             // 创建LLVM上下文
             LLVMContextRef context = LLVM.ContextCreate();
             
-            Debug.LogLine("Parse!");
+            GixConsole.LogLine("Parse!");
             // 创建模块并将IR文本解析到模块中
 
             LLVMMemoryBufferRef buffer = LLVM.CreateMemoryBufferWithMemoryRange(Marshal.StringToHGlobalAnsi(llvmIR), llvmIR.Length, "simple_module", true);
@@ -64,26 +64,26 @@ entry:
             {
                 throw new Exception("IR解析错误 -- (" + Marshal.PtrToStringAnsi(msg) + ")");
             }
-            Debug.LogLine("Parse 输出：(" + Marshal.PtrToStringAnsi(msg) + ")");
+            GixConsole.LogLine("Parse 输出：(" + Marshal.PtrToStringAnsi(msg) + ")");
             LLVM.DisposeMessage(msg);
 
-            Debug.LogLine("Verify!");
+            GixConsole.LogLine("Verify!");
             // 验证模块
             string verMsg;
             LLVM.VerifyModule(module, LLVMVerifierFailureAction.LLVMPrintMessageAction, out verMsg);
-            Debug.LogLine("Verify 输出：" + verMsg);
+            GixConsole.LogLine("Verify 输出：" + verMsg);
 
             // 打印LLVM IR
-            Debug.LogLine("模块打印：");
-            Debug.LogLine(Marshal.PtrToStringAnsi(LLVM.PrintModuleToString(module)));
+            GixConsole.LogLine("模块打印：");
+            GixConsole.LogLine(Marshal.PtrToStringAnsi(LLVM.PrintModuleToString(module)));
 
-            Debug.LogLine("GetFunc!");
+            GixConsole.LogLine("GetFunc!");
             // 查找main函数
             LLVMValueRef func = LLVM.GetNamedFunction(module, "square");
-            Debug.LogLine("找到函数：" + func.GetValueName());
-            Debug.LogLine("");
+            GixConsole.LogLine("找到函数：" + func.GetValueName());
+            GixConsole.LogLine("");
 
-            Debug.LogLine("CreateEngine!");
+            GixConsole.LogLine("CreateEngine!");
             // 初始化执行引擎
             LLVMMCJITCompilerOptions options = new LLVMMCJITCompilerOptions();
             //LLVMOpaqueExecutionEngine* enginePtr;
@@ -91,13 +91,13 @@ entry:
             string createMCJITmsg;
             if (LLVM.CreateMCJITCompilerForModule(out engineRef, module, options, out createMCJITmsg))
             {
-                Debug.LogLine("JIT ERROR : " + createMCJITmsg);
+                GixConsole.LogLine("JIT ERROR : " + createMCJITmsg);
                 return -1;
             }
 
 
 
-            Debug.LogLine("Execute!");
+            GixConsole.LogLine("Execute!");
             // 执行main函数
             LLVMGenericValueRef[] args = new LLVMGenericValueRef[1];
             LLVMTypeRef i32Type = LLVM.Int32TypeInContext(context);
@@ -107,10 +107,10 @@ entry:
 
             // 获取结果
             Int32 resultValue = (int)LLVM.GenericValueToInt(result, true);
-            Debug.LogLine("结果打印：");
-            Debug.LogLine(resultValue.ToString());
+            GixConsole.LogLine("结果打印：");
+            GixConsole.LogLine(resultValue.ToString());
 
-            Debug.LogLine("Dispose!");
+            GixConsole.LogLine("Dispose!");
             //释放参数和返回值  
             LLVM.DisposeGenericValue(args[0]);
             LLVM.DisposeGenericValue(result);

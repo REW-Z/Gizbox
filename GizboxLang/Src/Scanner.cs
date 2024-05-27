@@ -38,6 +38,7 @@ namespace Gizbox
         public List<TokenPattern> literals;
         public TokenPattern identifierPattern;
         public TokenPattern whitespace;
+        public TokenPattern comment;
 
 
         public Scanner()
@@ -129,6 +130,8 @@ namespace Gizbox
             identifierPattern = new TokenPattern("ID", "[A-Z|a-z][A-Z|a-z|0-9|_]*(\\:\\:[A-Z|a-z|0-9|_]+)*[^A-Za-z0-9_\\:]", 1);
 
             whitespace = new TokenPattern("space", "[\\n|\\s|\\t]+");
+
+            comment = new TokenPattern("comment", "//.*\\n", 1);
         }
 
         public List<string> GetTokenNames()
@@ -205,6 +208,13 @@ namespace Gizbox
                     }
 
                     MovePointer(seg.Length - whitespace.back);
+                    continue;
+                }
+
+                //COMMENT  
+                if(seg.Length > 2 && PatternMatch(seg, comment))
+                {
+                    MovePointer(seg.Length - comment.back);
                     continue;
                 }
 
@@ -319,7 +329,7 @@ namespace Gizbox
         private static void Log(object content)
         {
             if(!Compiler.enableLogScanner) return;
-            Debug.LogLine("Scanner >>>" + content);
+            GixConsole.LogLine("Scanner >>>" + content);
         }
     }
 }

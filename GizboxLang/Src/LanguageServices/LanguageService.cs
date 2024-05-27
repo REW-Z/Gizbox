@@ -79,8 +79,6 @@ namespace Gizbox.LanguageServices
         public List<SymbolTable> persistentGlobalEnvs;
 
 
-
-
         //构造函数  
         public LanguageService()
         {

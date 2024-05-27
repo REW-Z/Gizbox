@@ -253,7 +253,7 @@ namespace Gizbox.LRParse
         private static void Log(object content)
         {
             if (!Compiler.enableLogParser) return;
-            Debug.LogLine("Parser >>>" + content);
+            GixConsole.LogLine("Parser >>>" + content);
         }
     }
 }
@@ -1949,7 +1949,7 @@ namespace Gizbox.SemanticRule
                         //新建虚函数表  
                         string classname = classDeclNode.classNameNode.FullName;
                         var vtable = ilUnit.vtables[classname] = new VTable(classname);
-                        Debug.LogLine("新的虚函数表：" + classname);
+                        GixConsole.LogLine("新的虚函数表：" + classname);
 
                         //进入类作用域  
                         envStack.Push(newEnv);
@@ -2808,10 +2808,10 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.ClassTypeNode classTypeNode:
                     {
-                        Debug.LogLine("类类型补全：" + classTypeNode.classname);
+                        GixConsole.LogLine("类类型补全：" + classTypeNode.classname);
                         TryCompleteIdenfier(classTypeNode.classname);
 
-                        Debug.LogLine("结果：" + classTypeNode.classname.FullName);
+                        GixConsole.LogLine("结果：" + classTypeNode.classname.FullName);
                     }
                     break;
                 case SyntaxTree.ArrayTypeNode arrayTypeNpde:
@@ -2825,7 +2825,7 @@ namespace Gizbox.SemanticRule
         public static void Log(object content)
         {
             if (!Compiler.enableLogSemanticAnalyzer) return;
-            Debug.LogLine("SematicAnalyzer >>>>" + content);
+            GixConsole.LogLine("SematicAnalyzer >>>>" + content);
         }
     }
 }
