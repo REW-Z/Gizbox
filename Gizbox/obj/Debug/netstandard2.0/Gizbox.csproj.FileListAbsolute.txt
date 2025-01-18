@@ -1,0 +1,11 @@
+F:\ZQJ\GizboxAndTools\Gizbox\Gizbox\bin\Debug\netstandard2.0\Gizbox.deps.json
+F:\ZQJ\GizboxAndTools\Gizbox\Gizbox\bin\Debug\netstandard2.0\Gizbox.dll
+F:\ZQJ\GizboxAndTools\Gizbox\Gizbox\bin\Debug\netstandard2.0\Gizbox.pdb
+F:\ZQJ\GizboxAndTools\Gizbox\Gizbox\obj\Debug\netstandard2.0\Gizbox.csproj.AssemblyReference.cache
+F:\ZQJ\GizboxAndTools\Gizbox\Gizbox\obj\Debug\netstandard2.0\Gizbox.GeneratedMSBuildEditorConfig.editorconfig
+F:\ZQJ\GizboxAndTools\Gizbox\Gizbox\obj\Debug\netstandard2.0\Gizbox.AssemblyInfoInputs.cache
+F:\ZQJ\GizboxAndTools\Gizbox\Gizbox\obj\Debug\netstandard2.0\Gizbox.AssemblyInfo.cs
+F:\ZQJ\GizboxAndTools\Gizbox\Gizbox\obj\Debug\netstandard2.0\Gizbox.csproj.CoreCompileInputs.cache
+F:\ZQJ\GizboxAndTools\Gizbox\Gizbox\obj\Debug\netstandard2.0\Gizbox.sourcelink.json
+F:\ZQJ\GizboxAndTools\Gizbox\Gizbox\obj\Debug\netstandard2.0\Gizbox.dll
+F:\ZQJ\GizboxAndTools\Gizbox\Gizbox\obj\Debug\netstandard2.0\Gizbox.pdb

@@ -1,13 +1,13 @@
 {
   "version": 2,
-  "dgSpecHash": "Snijouav2ote2f9iT9pAqQJFtzX5anj09Jw5q2MiLDuaqL3WOw6KSC5U3DKV6yFYtqR9BeL+GP7W6RpVY8cJiw==",
+  "dgSpecHash": "TrcKUYhU5UkQ6DznWSTk1TnVZAcGt7NwvmN4QKdzag5ylgvGdwzrooQcKWLIXlQJ0tgjq81qaK8gz9STVC6E6g==",
   "success": true,
-  "projectFilePath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxAOT\\GizboxAOT.csproj",
+  "projectFilePath": "F:\\ZQJ\\GizboxAndTools\\Gizbox\\GizboxAOT\\GizboxAOT.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\leona\\.nuget\\packages\\libllvm\\5.0.1\\libllvm.5.0.1.nupkg.sha512",
-    "C:\\Users\\leona\\.nuget\\packages\\llvmsharp\\5.0.0\\llvmsharp.5.0.0.nupkg.sha512",
-    "C:\\Users\\leona\\.nuget\\packages\\microsoft.netcore.platforms\\1.1.0\\microsoft.netcore.platforms.1.1.0.nupkg.sha512",
-    "C:\\Users\\leona\\.nuget\\packages\\netstandard.library\\2.0.3\\netstandard.library.2.0.3.nupkg.sha512"
+    "C:\\Users\\saus\\.nuget\\packages\\libllvm\\5.0.1\\libllvm.5.0.1.nupkg.sha512",
+    "C:\\Users\\saus\\.nuget\\packages\\llvmsharp\\5.0.0\\llvmsharp.5.0.0.nupkg.sha512",
+    "C:\\Users\\saus\\.nuget\\packages\\microsoft.netcore.platforms\\1.1.0\\microsoft.netcore.platforms.1.1.0.nupkg.sha512",
+    "C:\\Users\\saus\\.nuget\\packages\\netstandard.library\\2.0.3\\netstandard.library.2.0.3.nupkg.sha512"
   ],
   "logs": [
     {

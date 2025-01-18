@@ -9,7 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\GizboxAOT\GizboxAOT.csproj" />
-    <ProjectReference Include="..\GizboxLang\GizboxLang.csproj" />
+    <ProjectReference Include="..\Gizbox\Gizbox.csproj" />
   </ItemGroup>
 
   <ItemGroup>

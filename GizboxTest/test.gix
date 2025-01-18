@@ -3,22 +3,34 @@ import <"stdlib">
 using Core;  
 using Console;
 
+//类定义  
 class Student
 {
     int a = 0;
+
+    //get  
+    int b()
+    {
+        return 99;
+    }
+    //set  
+    void b(int newv)
+    {
+    }
+
     void Test()
     {
         Console::Log("Test");
     }
-    //AAAA
-    void Talk()
-    {
-    }
-    void Toke(string a)
-    {
-    }
 }
 //AAAA
-Student fafa = new Student(); //FFFF
-fafa.a = 233;
-Console::Log("FCADD" + (string)fafa.a);
+Student obj = new Student(); //创建对象测试
+obj.a = 1; //对象字段赋值测试  
+obj.b = 2; //对象属性赋值测试  
+int btmp = obj.b; //对象属性取值测试
+
+Console::Log("Log测试: " + (string)btmp);
+
+//全局常量测试  
+int sizeofInt = Core::Integer::size;
+//Console::Log("size:" + (string)sizeofInt);

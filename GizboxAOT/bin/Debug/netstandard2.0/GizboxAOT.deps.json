@@ -9,7 +9,7 @@
     ".NETStandard,Version=v2.0/": {
       "GizboxAOT/1.0.0": {
         "dependencies": {
-          "GizboxLang": "1.0.0",
+          "Gizbox": "1.0.0",
           "LLVMSharp": "5.0.0",
           "NETStandard.Library": "2.0.3"
         },
@@ -40,9 +40,9 @@
           "Microsoft.NETCore.Platforms": "1.1.0"
         }
       },
-      "GizboxLang/1.0.0": {
+      "Gizbox/1.0.0": {
         "runtime": {
-          "GizboxLang.dll": {}
+          "Gizbox.dll": {}
         }
       }
     }
@@ -81,7 +81,7 @@
       "path": "netstandard.library/2.0.3",
       "hashPath": "netstandard.library.2.0.3.nupkg.sha512"
     },
-    "GizboxLang/1.0.0": {
+    "Gizbox/1.0.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "nfYoSBs1zLn16edsK7vhyLqGj+zuI8DKkNeFwezhOft90UfLdAgVwqOrryLJwykby7+M2CwuyQrTo99iTMBi7Q==",
+  "success": true,
+  "projectFilePath": "F:\\ZQJ\\GizboxAndTools\\Gizbox\\Gizbox\\Gizbox.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\saus\\.nuget\\packages\\microsoft.netcore.platforms\\1.1.0\\microsoft.netcore.platforms.1.1.0.nupkg.sha512",
+    "C:\\Users\\saus\\.nuget\\packages\\netstandard.library\\2.0.3\\netstandard.library.2.0.3.nupkg.sha512"
+  ],
+  "logs": []
+}

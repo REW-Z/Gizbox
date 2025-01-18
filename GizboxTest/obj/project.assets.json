@@ -51,11 +51,21 @@
           "lib/netstandard1.0/_._": {}
         }
       },
+      "Gizbox/1.0.0": {
+        "type": "project",
+        "framework": ".NETStandard,Version=v2.0",
+        "compile": {
+          "bin/placeholder/Gizbox.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/Gizbox.dll": {}
+        }
+      },
       "GizboxAOT/1.0.0": {
         "type": "project",
         "framework": ".NETStandard,Version=v2.0",
         "dependencies": {
-          "GizboxLang": "1.0.0",
+          "Gizbox": "1.0.0",
           "LLVMSharp": "5.0.0"
         },
         "compile": {
@@ -63,16 +73,6 @@
         },
         "runtime": {
           "bin/placeholder/GizboxAOT.dll": {}
-        }
-      },
-      "GizboxLang/1.0.0": {
-        "type": "project",
-        "framework": ".NETStandard,Version=v2.0",
-        "compile": {
-          "bin/placeholder/GizboxLang.dll": {}
-        },
-        "runtime": {
-          "bin/placeholder/GizboxLang.dll": {}
         }
       }
     }
@@ -122,42 +122,37 @@
         "runtime.json"
       ]
     },
+    "Gizbox/1.0.0": {
+      "type": "project",
+      "path": "../Gizbox/Gizbox.csproj",
+      "msbuildProject": "../Gizbox/Gizbox.csproj"
+    },
     "GizboxAOT/1.0.0": {
       "type": "project",
       "path": "../GizboxAOT/GizboxAOT.csproj",
       "msbuildProject": "../GizboxAOT/GizboxAOT.csproj"
-    },
-    "GizboxLang/1.0.0": {
-      "type": "project",
-      "path": "../GizboxLang/GizboxLang.csproj",
-      "msbuildProject": "../GizboxLang/GizboxLang.csproj"
     }
   },
   "projectFileDependencyGroups": {
     "net8.0": [
-      "GizboxAOT >= 1.0.0",
-      "GizboxLang >= 1.0.0"
+      "Gizbox >= 1.0.0",
+      "GizboxAOT >= 1.0.0"
     ]
   },
   "packageFolders": {
-    "C:\\Users\\leona\\.nuget\\packages\\": {},
-    "E:\\Visual Studio 2019\\Shared\\NuGetPackages": {}
+    "C:\\Users\\saus\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxTest\\GizboxTest.csproj",
+      "projectUniqueName": "F:\\ZQJ\\GizboxAndTools\\Gizbox\\GizboxTest\\GizboxTest.csproj",
       "projectName": "GizboxTest",
-      "projectPath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxTest\\GizboxTest.csproj",
-      "packagesPath": "C:\\Users\\leona\\.nuget\\packages\\",
-      "outputPath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxTest\\obj\\",
+      "projectPath": "F:\\ZQJ\\GizboxAndTools\\Gizbox\\GizboxTest\\GizboxTest.csproj",
+      "packagesPath": "C:\\Users\\saus\\.nuget\\packages\\",
+      "outputPath": "F:\\ZQJ\\GizboxAndTools\\Gizbox\\GizboxTest\\obj\\",
       "projectStyle": "PackageReference",
-      "fallbackFolders": [
-        "E:\\Visual Studio 2019\\Shared\\NuGetPackages"
-      ],
       "configFilePaths": [
-        "C:\\Users\\leona\\AppData\\Roaming\\NuGet\\NuGet.Config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+        "C:\\Users\\saus\\AppData\\Roaming\\NuGet\\NuGet.Config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
       "originalTargetFrameworks": [
@@ -171,11 +166,11 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "F:\\Legacy\\MyProjects\\Gizbox\\GizboxAOT\\GizboxAOT.csproj": {
-              "projectPath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxAOT\\GizboxAOT.csproj"
+            "F:\\ZQJ\\GizboxAndTools\\Gizbox\\GizboxAOT\\GizboxAOT.csproj": {
+              "projectPath": "F:\\ZQJ\\GizboxAndTools\\Gizbox\\GizboxAOT\\GizboxAOT.csproj"
             },
-            "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLang\\GizboxLang.csproj": {
-              "projectPath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLang\\GizboxLang.csproj"
+            "F:\\ZQJ\\GizboxAndTools\\Gizbox\\Gizbox\\Gizbox.csproj": {
+              "projectPath": "F:\\ZQJ\\GizboxAndTools\\Gizbox\\Gizbox\\Gizbox.csproj"
             }
           }
         }
@@ -184,11 +179,6 @@
         "warnAsError": [
           "NU1605"
         ]
-      },
-      "restoreAuditProperties": {
-        "enableAudit": "true",
-        "auditLevel": "low",
-        "auditMode": "direct"
       }
     },
     "frameworks": {
@@ -210,7 +200,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.205/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.100/PortableRuntimeIdentifierGraph.json"
       }
     }
   },

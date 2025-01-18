@@ -9,10 +9,10 @@ using System.Text;
 using Gizbox;
 using Gizbox.ScriptEngine;
 using Gizbox.Interop.CSharp;
-using GizboxLangTest;
+using GizboxTest;
 
 
-
+////测试
 //int result = Gizbox.Test.LLVM_Sqr(3);
 //Console.WriteLine("测试结束:" + result);
 //return;
@@ -22,7 +22,7 @@ using GizboxLangTest;
 ////生成互操作Wrap代码      
 //InteropWrapGenerator generator = new InteropWrapGenerator();
 //generator.IncludeTypes(new Type[] {
-//    typeof(GizboxLang.Examples.Student),
+//    typeof(Gizbox.Examples.Student),
 //});
 //foreach (var t in generator.closure)
 //{
@@ -45,10 +45,13 @@ using GizboxLangTest;
 //return;
 
 ////生成分析器硬编码  
+//Console.WriteLine("生成分析器硬编码");
 //Gizbox.Compiler compilerTest = new Compiler();
 //compilerTest.ConfigParserDataSource(hardcode: false);
 //compilerTest.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
-//compilerTest.SaveParserHardcodeToDesktop();
+////compilerTest.SaveParserHardcodeToDesktop();//改为直接插入到代码文件  
+//compilerTest.InsertParserHardcodeToSourceFile("F:\\ZQJ\\GizboxAndTools\\Gizbox\\Gizbox\\Src\\Parser\\ParserHardcoder.cs");
+//Console.WriteLine("生成硬编码完成");
 //return;
 
 
@@ -67,7 +70,7 @@ ScriptEngine engine = new ScriptEngine();
 engine.AddLibSearchDirectory(AppDomain.CurrentDomain.BaseDirectory);
 engine.csharpInteropContext.ConfigExternCallClasses(new Type[] {
                 typeof(TestExternCalls),
-                typeof(GizboxLang.Examples.ExampleInterop),
+                typeof(Gizbox.Examples.ExampleInterop),
             });
 engine.Execute(il);
 
@@ -78,7 +81,7 @@ Compiler.Pause("Execute End");
 
 
 
-namespace GizboxLangTest
+namespace GizboxTest
 {
     public class TestExternCalls
     {

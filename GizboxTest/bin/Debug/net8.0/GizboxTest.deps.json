@@ -8,8 +8,8 @@
     ".NETCoreApp,Version=v8.0": {
       "GizboxTest/1.0.0": {
         "dependencies": {
-          "GizboxAOT": "1.0.0",
-          "GizboxLang": "1.0.0"
+          "Gizbox": "1.0.0",
+          "GizboxAOT": "1.0.0"
         },
         "runtime": {
           "GizboxTest.dll": {}
@@ -54,18 +54,18 @@
         }
       },
       "Microsoft.NETCore.Platforms/1.0.1": {},
+      "Gizbox/1.0.0": {
+        "runtime": {
+          "Gizbox.dll": {}
+        }
+      },
       "GizboxAOT/1.0.0": {
         "dependencies": {
-          "GizboxLang": "1.0.0",
+          "Gizbox": "1.0.0",
           "LLVMSharp": "5.0.0"
         },
         "runtime": {
           "GizboxAOT.dll": {}
-        }
-      },
-      "GizboxLang/1.0.0": {
-        "runtime": {
-          "GizboxLang.dll": {}
         }
       }
     }
@@ -97,12 +97,12 @@
       "path": "microsoft.netcore.platforms/1.0.1",
       "hashPath": "microsoft.netcore.platforms.1.0.1.nupkg.sha512"
     },
-    "GizboxAOT/1.0.0": {
+    "Gizbox/1.0.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
     },
-    "GizboxLang/1.0.0": {
+    "GizboxAOT/1.0.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
