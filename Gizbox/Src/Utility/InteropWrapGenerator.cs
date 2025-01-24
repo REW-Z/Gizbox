@@ -29,9 +29,9 @@ namespace Gizbox
 
         public void IncludeTypes(params Type[] types)
         {
-            List<string> namespaces = new List<string>();
-            List<Type> closure = new List<Type>();
-            List<Type> visited = new List<Type>();
+            HashSet<string> namespaces = new HashSet<string>();
+            HashSet<Type> closure = new HashSet<Type>();
+            HashSet<Type> visited = new HashSet<Type>();
 
             gizPrimitives.Add(typeof(void));
             gizPrimitives.Add(typeof(int));
@@ -39,7 +39,11 @@ namespace Gizbox
             gizPrimitives.Add(typeof(float));
             gizPrimitives.Add(typeof(string));
 
-            closure.AddRange(gizPrimitives);
+            foreach(var pt in gizPrimitives)
+            {
+                closure.Add(pt);
+            }
+            
 
             foreach (var t in types)
             {
@@ -47,59 +51,75 @@ namespace Gizbox
             }
             foreach (var t in types)
             {
-                AddToClosureCursive(t, namespaces, closure, visited);
+                AddToClosureRecursive(t, namespaces, closure, visited);
             }
 
             this.closure = closure.ToArray();
         }
 
-        private void AddToClosureCursive(Type type, List<string> namespaces, List<Type> typeClosure, List<Type> vistied)
+        private void AddToClosureRecursive(Type type, HashSet<string> namespaces, HashSet<Type> typeClosure, HashSet<Type> vistied)
         {
             if (vistied.Contains(type)) return;
             vistied.Add(type);
 
             if (namespaces.Contains(type.Namespace) == false) return;
 
-            if (typeClosure.Contains(type)) return;
-            if (type == typeof(void)) return;
-            if (type.IsGenericType == true) return;
-            if (type.IsPrimitive) return;
-            if (type.IsGenericParameter) return;
-            if (type.IsEnum) return;
+            if(typeClosure.Contains(type)) { return; };
+            if (type == typeof(void)) { return; };
+            if (type.IsGenericType == true) { return; };
+            if (type.IsPrimitive) { return; } 
+            if (type.IsGenericParameter) { return; };
             if (type.IsArray)
             {
-                AddToClosureCursive(type.GetElementType(), namespaces, typeClosure, vistied);
+                AddToClosureRecursive(type.GetElementType(), namespaces, typeClosure, vistied);
                 return;
             }
             if (type.IsByRef)
             {
-                AddToClosureCursive(type.GetElementType(), namespaces, typeClosure, vistied);
+                AddToClosureRecursive(type.GetElementType(), namespaces, typeClosure, vistied);
                 return;
             }
             if (type.IsPointer)
             {
-                AddToClosureCursive(type.GetElementType(), namespaces, typeClosure, vistied);
+                AddToClosureRecursive(type.GetElementType(), namespaces, typeClosure, vistied);
+                return;
+            }
+            if(type.IsEnum)
+            {
+                typeClosure.Add(type);
                 return;
             }
 
-
+            //ADD  
             typeClosure.Add(type);
+
 
             foreach (var field in type.GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.DeclaredOnly | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static))
             {
-                AddToClosureCursive(field.FieldType, namespaces, typeClosure, vistied);
+                AddToClosureRecursive(field.FieldType, namespaces, typeClosure, vistied);
             }
             foreach (var property in type.GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.DeclaredOnly | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static))
             {
-                AddToClosureCursive(property.PropertyType, namespaces, typeClosure, vistied);
+                AddToClosureRecursive(property.PropertyType, namespaces, typeClosure, vistied);
             }
             foreach (var method in type.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.DeclaredOnly | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static))
             {
                 foreach (var paraminfo in method.GetParameters())
                 {
-                    AddToClosureCursive(paraminfo.ParameterType, namespaces, typeClosure, vistied);
+                    AddToClosureRecursive(paraminfo.ParameterType, namespaces, typeClosure, vistied);
                 }
-                AddToClosureCursive(method.ReturnType, namespaces, typeClosure, vistied);
+                AddToClosureRecursive(method.ReturnType, namespaces, typeClosure, vistied);
+            }
+
+
+            //嵌套类型    
+            var nestedTypes = type.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
+            foreach(var nestedType in nestedTypes)
+            {
+                if(nestedType.IsPublic)
+                {
+                    AddToClosureRecursive(nestedType, namespaces, typeClosure, vistied);
+                }
             }
         }
 
@@ -109,10 +129,14 @@ namespace Gizbox
             StringBuilder codebuilderCs = new StringBuilder();
             StringBuilder codebuilderGiz = new StringBuilder();
 
-            //csInterop类 类名
+            //csInterop类 起始
             codebuilderCs.AppendLine("public class "+ filenameWithoutExtension);
             codebuilderCs.AppendLine("{");
 
+            //gizInterop类 起始  
+            codebuilderGiz.AppendLine("import <\"core\">");
+            codebuilderGiz.AppendLine("import <\"stdlib\">");
+            codebuilderGiz.AppendLine();
 
             List<string> namespaceNameList = new List<string>();
             closure = closure.OrderBy(GetInheritanceDepth).ToArray();
@@ -132,7 +156,7 @@ namespace Gizbox
                 GenNamspace(nspace, namespaceArr[i], codebuilderCs, codebuilderGiz);
             }
 
-            //csInterop类
+            //csInterop类 结束  
             codebuilderCs.AppendLine("}");
 
             System.IO.File.WriteAllText(csCodeSaveDirectory + "\\" + filenameWithoutExtension + ".cs", codebuilderCs.ToString());
@@ -158,8 +182,24 @@ namespace Gizbox
         {
             if (gizPrimitives.Contains(type)) return;
 
-            string classnameGz = type.FullName.Replace("+", "::").Replace(".", "::");
-            string classnameCs = type.FullName.Replace("+", "__").Replace(".", "__");
+            //枚举  
+            if(type.IsEnum)
+            {
+                GenerateTypeAsEnum(type, strbCs, strbGiz);
+            }
+            //类或者结构体  
+            else
+            {
+                GenerateTypeAsClassOrStruct(type, strbCs, strbGiz);
+            }
+        }
+
+        private void GenerateTypeAsClassOrStruct(Type type, StringBuilder strbCs, StringBuilder strbGiz)
+        {
+            string gzClassnameIdentif = ToIdentifClassName(type.FullName);
+            string csClassnameIdentif = ToIdentifClassName(type.FullName);
+            
+
 
             var fields = type.GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.DeclaredOnly)
                 .Where(f => IsInClosure(f))
@@ -181,176 +221,186 @@ namespace Gizbox
                 .ToArray();
 
 
-            //C#包装类声明  
-            //类类型  
-            if (type.IsValueType == false)
-            {
-                foreach (var f in fields)
-                {
-                    strbCs.AppendLine("\tpublic static " + ToCsType(f.FieldType) + " " + (classnameCs + "_get_" + f.Name) + "(" + type.FullName + " " + "obj" + ")");
-                    strbCs.AppendLine("\t{");
-                    strbCs.AppendLine("\t\t" + "return obj." + f.Name + ";");
-                    strbCs.AppendLine("\t}");
+            // *** C# ***   
 
-                    strbCs.AppendLine("\tpublic static " + "void" + " " + (classnameCs + "_set_" + f.Name) + "(" + type.FullName + " " + "obj" + ", " + f.FieldType.FullName + " " + "newv" + ")");
-                    strbCs.AppendLine("\t{");
-                    strbCs.AppendLine("\t\t" + "obj" + "." + f.Name + " = newv;");
-                    strbCs.AppendLine("\t}");
-                }
-                foreach (var property in properties)
+            //属性和字段  
+            {
+                //类类型  
+                if(type.IsValueType == false)
                 {
-                    if(property.CanRead)
+                    foreach(var f in fields)
                     {
-                        strbCs.AppendLine("\tpublic static " + ToCsType(property.PropertyType) + " " + (classnameCs + "_get_" + property.Name) + "(" + type.FullName + " " + "obj" + ")");
+                        string anyCast = f.FieldType.IsEnum ? "(int)" : string.Empty;
+                        string anyReverseCast = f.FieldType.IsEnum ? ("(" + ToCsClassName(f.FieldType.FullName) + ")") : string.Empty;
+
+
+                        strbCs.AppendLine("\tpublic static " + ToCsMarshalClassName(f.FieldType) + " " + (csClassnameIdentif + "_get_" + f.Name) + "(" + ToCsMarshalClassName(type) + " " + "obj" + ")");
                         strbCs.AppendLine("\t{");
-                        strbCs.AppendLine("\t\t" + "return obj." + property.Name + ";");
+                        strbCs.AppendLine("\t\t" + "return " + anyCast + "obj." + f.Name + ";");
+                        strbCs.AppendLine("\t}");
+
+                        strbCs.AppendLine("\tpublic static " + "void" + " " + (csClassnameIdentif + "_set_" + f.Name) + "(" + ToCsMarshalClassName(type) + " " + "obj" + ", " + ToCsMarshalClassName(f.FieldType) + " " + "newv" + ")");
+                        strbCs.AppendLine("\t{");
+                        strbCs.AppendLine("\t\t" + "obj" + "." + f.Name + " = " + anyReverseCast + "newv;");
                         strbCs.AppendLine("\t}");
                     }
-
-                    if(property.CanWrite)
+                    foreach(var property in properties)
                     {
-                        strbCs.AppendLine("\tpublic static " + "void" + " " + (classnameCs + "_set_" + property.Name) + "(" + type.FullName + " " + "obj" + ", " + property.PropertyType.FullName + " " + "newv" + ")");
-                        strbCs.AppendLine("\t{");
-                        strbCs.AppendLine("\t\t" + "obj" + "." + property.Name + " = newv;");
-                        strbCs.AppendLine("\t}");
+                        string anyCast = property.PropertyType.IsEnum ? "(int)" : string.Empty;
+                        string anyReverseCast = property.PropertyType.IsEnum ? ("(" + ToCsClassName(property.PropertyType.FullName) + ")") : string.Empty;
+
+
+                        if(property.CanRead)
+                        {
+                            strbCs.AppendLine("\tpublic static " + ToCsMarshalClassName(property.PropertyType) + " " + (csClassnameIdentif + "_get_" + property.Name) + "(" + type.FullName + " " + "obj" + ")");
+                            strbCs.AppendLine("\t{");
+                            strbCs.AppendLine("\t\t" + "return " + anyCast + "obj." + property.Name + ";");
+                            strbCs.AppendLine("\t}");
+                        }
+
+                        if(property.CanWrite)
+                        {
+                            strbCs.AppendLine("\tpublic static " + "void" + " " + (csClassnameIdentif + "_set_" + property.Name) + "(" + ToCsMarshalClassName(type) + " " + "obj" + ", " + ToCsMarshalClassName(property.PropertyType) + " " + "newv" + ")");
+                            strbCs.AppendLine("\t{");
+                            strbCs.AppendLine("\t\t" + "obj" + "." + property.Name + " = " + anyReverseCast + "newv;");
+                            strbCs.AppendLine("\t}");
+                        }
                     }
                 }
-            }
-            //结构体  
-            else
-            {
-                //无访问器  
-            }
-
-            //方法  
-            foreach (var m in methods)
-            {
-                List<string> paramList = new List<string>();
-                paramList.Add(type.FullName);//this 参数  
-                paramList.AddRange(m.GetParameters().Select(p => p.ParameterType.FullName));
-
-                string paramsStr = "";
-                string argsStr = "";
-                int i = 0;
-                foreach (var p in paramList)
+                //结构体  
+                else
                 {
-                    if (i > 0) paramsStr += ", ";
-                    paramsStr += (p + " arg" + i.ToString());
+                    //无访问器  
+                }
+            }
 
-
-                    if (i > 1) argsStr += ", ";
-                    if (i != 0)
+            //实例方法和静态函数    
+            {
+                //实例方法
+                foreach(var m in methods)
+                {
+                    List<Type> parameTypes = new List<Type>();
+                    parameTypes.Add(type);
+                    parameTypes.AddRange(m.GetParameters().Select(p => p.ParameterType));
+                    
+                    List<string> paramDefines = new List<string>();
+                    List<string> callArgs = new List<string>();
+                    for(int i = 0; i < parameTypes.Count; ++i)
                     {
-                        argsStr += ("arg" + i.ToString());
+                        paramDefines.Add($"{ToCsMarshalClassName(parameTypes[i])} arg{i}" );
+
+                        if(i != 0)
+                        {
+                            string anyReverseCast = parameTypes[i].IsEnum ? ($"({ ToCsClassName(parameTypes[i].FullName)})") : "";
+                            callArgs.Add($"{anyReverseCast}arg{i}");
+                        }
                     }
 
-                    i++;
+                    string paramsStr = ConcatViaComma(paramDefines);
+                    string callArgsStr = ConcatViaComma(callArgs);
+
+
+                    strbCs.AppendLine("\tpublic static " + ToCsMarshalClassName(m.ReturnType) + " " + (csClassnameIdentif + "_" + m.Name) + "(" + paramsStr + ")");
+                    strbCs.AppendLine("\t{");
+
+                    if(m.ReturnType == typeof(void))
+                    {
+                        strbCs.AppendLine("\t\t" + "arg0." + m.Name + "(" + callArgsStr + ");");
+                    }
+                    else
+                    {
+                        string anyIntCast = m.ReturnType.IsEnum ? "(int)" : "";
+                        strbCs.AppendLine("\t\t" + "return " + anyIntCast + "arg0." + m.Name + "(" + callArgsStr + ");");
+                    }
+
+                    strbCs.AppendLine("\t}");
                 }
-
-                strbCs.AppendLine("\tpublic static " + ToCsType(m.ReturnType) + " " + (classnameCs + "_" + m.Name) + "(" + paramsStr + ")");
-                strbCs.AppendLine("\t{");
-
-                if (m.ReturnType == typeof(void))
+                //静态函数
+                foreach(var func in staticFuncs)
                 {
-                    strbCs.AppendLine("\t\t" + "arg0." + m.Name + "(" + argsStr + ");");
-                }
-                else
-                {
-                    strbCs.AppendLine("\t\t" + "return arg0." + m.Name + "(" + argsStr + ");");
-                }
+                    List<Type> parameTypes = new List<Type>();
+                    parameTypes.AddRange(func.GetParameters().Select(p => p.ParameterType));
 
-                strbCs.AppendLine("\t}");
+                    List<string> paramDefines = new List<string>();
+                    List<string> callArgs = new List<string>();
+                    for(int i = 0; i < parameTypes.Count; ++i)
+                    {
+                        paramDefines.Add($"{ToCsMarshalClassName(parameTypes[i])} arg{i}");
+
+                        string anyReverseCast = parameTypes[i].IsEnum ? ($"({ToCsClassName(parameTypes[i].FullName)})") : "";
+                        callArgs.Add($"{anyReverseCast}arg{i}");
+                    }
+
+                    string paramsStr = ConcatViaComma(paramDefines);
+                    string callArgsStr = ConcatViaComma(callArgs);
+
+
+                    strbCs.AppendLine("\tpublic static " + ToCsMarshalClassName(func.ReturnType) + " " + (csClassnameIdentif + "_" + func.Name + "_Static") + "(" + paramsStr + ")");
+                    strbCs.AppendLine("\t{");
+
+                    if(func.ReturnType == typeof(void))
+                    {
+                        strbCs.AppendLine("\t\t" + type.FullName + "." + func.Name + "(" + callArgsStr + ");");
+                    }
+                    else
+                    {
+                        string anyIntCast = func.ReturnType.IsEnum ? "(int)" : "";
+                        strbCs.AppendLine("\t\t" + "return " + anyIntCast + type.FullName + "." + func.Name + "(" + callArgsStr + ");");
+                    }
+
+                    strbCs.AppendLine("\t}");
+                }
             }
-            //静态函数
-            foreach (var func in staticFuncs)
-            {
-                List<string> paramList = new List<string>();
-                paramList.AddRange(func.GetParameters().Select(p => p.ParameterType.FullName));
-
-                string paramsStr = "";
-                string argsStr = "";
-                int i = 0;
-                foreach (var p in paramList)
-                {
-                    if (i > 0) paramsStr += ", ";
-                    paramsStr += (p + " arg" + i.ToString());
-
-                    if (i > 0) argsStr += ", ";
-                    argsStr += ("arg" + i.ToString());
-
-                    i++;
-                }
-
-                strbCs.AppendLine("\tpublic static " + ToCsType(func.ReturnType) + " " + (classnameCs + "_" + func.Name + "_Static") + "(" + paramsStr + ")");
-                strbCs.AppendLine("\t{");
-
-                if (func.ReturnType == typeof(void))
-                {
-                    strbCs.AppendLine("\t\t" + type.FullName + "." + func.Name + "(" + argsStr + ");");
-                }
-                else
-                {
-                    strbCs.AppendLine("\t\t" + "return " + type.FullName + "." + func.Name + "(" + argsStr + ");");
-                }
-
-                strbCs.AppendLine("\t}");
-            }
+            
 
 
+            // *** Gizbox *** 
 
             //Giz类外声明部分 - 类静态方法      
-            foreach (var func in staticFuncs)
+            foreach(var func in staticFuncs)
             {
-                List<string> paramList = new List<string>();
-                paramList.AddRange(func.GetParameters().Select(p => ToGizType(p.ParameterType)));
+                List<string> paramDefines = new List<string>();
 
-                string paramsStr = "";
-                int i = 0;
-                foreach (var p in paramList)
+                var paramters = func.GetParameters();
+                for (int i = 0; i < paramters.Length; ++i)
                 {
-                    if (i != 0) paramsStr += ", ";
-                    paramsStr += (p + " arg" + i.ToString());
-                    i++;
+                    paramDefines.Add($"{ToGizMarshalClassName(paramters[i].ParameterType)} arg{i}");
                 }
 
-                strbGiz.AppendLine("extern " + ToGizType(func.ReturnType) + " " + (classnameGz + "_" + func.Name + "_Static") + "(" + paramsStr + ");");
+                strbGiz.AppendLine("extern " + ToGizMarshalClassName(func.ReturnType) + " " + (gzClassnameIdentif + "_" + func.Name + "_Static") + "(" + ConcatViaComma(paramDefines) + ");");
             }
 
             //Giz类外声明部分 - 成员函数实现和成员字段/属性实现  
-            if (type.IsValueType == false)
+            if(type.IsValueType == false)
             {
-                foreach (var f in fields)
+                foreach(var f in fields)
                 {
-                    string gizTypename = ToGizType(f.FieldType);
-                    strbGiz.AppendLine("extern " + gizTypename + " " + (classnameGz + "_get_" + f.Name) + "(" + classnameGz + " " + classnameGz.ToLower() + ");");
-                    strbGiz.AppendLine("extern " + "void" + " " + (classnameGz + "_set_" + f.Name) + "(" + classnameGz + " " + classnameGz.ToLower() + ", " + gizTypename + " " + "newv" + ");");
+                    string gizTypename = ToGizMarshalClassName(f.FieldType);
+                    strbGiz.AppendLine("extern " + gizTypename + " " + (gzClassnameIdentif + "_get_" + f.Name) + "(" + ToGizMarshalClassName(type)  + " " + gzClassnameIdentif.ToLower() + ");");
+                    strbGiz.AppendLine("extern " + "void" + " " + (gzClassnameIdentif + "_set_" + f.Name) + "(" + ToGizMarshalClassName(type) + " " + gzClassnameIdentif.ToLower() + ", " + gizTypename + " " + "newv" + ");");
                 }
-                foreach (var p in properties)
+                foreach(var p in properties)
                 {
-                    string gizTypename = ToGizType(p.PropertyType);
+                    string gizTypename = ToGizMarshalClassName(p.PropertyType);
                     if(p.CanRead)
-                        strbGiz.AppendLine("extern " + gizTypename + " " + (classnameGz + "_get_" + p.Name) + "(" + classnameGz + " " + classnameGz.ToLower() + ");");
+                        strbGiz.AppendLine("extern " + gizTypename + " " + (gzClassnameIdentif + "_get_" + p.Name) + "(" + ToGizMarshalClassName(type) + " " + gzClassnameIdentif.ToLower() + ");");
                     if(p.CanWrite)
-                        strbGiz.AppendLine("extern " + "void" + " " + (classnameGz + "_set_" + p.Name) + "(" + classnameGz + " " + classnameGz.ToLower() + ", " + gizTypename + " " + "newv" + ");");
+                        strbGiz.AppendLine("extern " + "void" + " " + (gzClassnameIdentif + "_set_" + p.Name) + "(" + ToGizMarshalClassName(type) + " " + gzClassnameIdentif.ToLower() + ", " + gizTypename + " " + "newv" + ");");
                 }
             }
 
-            foreach (var m in methods)
+            foreach(var m in methods)
             {
-                List<string> paramList = new List<string>();
-                paramList.Add(classnameGz);
-                paramList.AddRange(m.GetParameters().Select(p => ToGizType(p.ParameterType)));
-
-                string paramsStr = "";
-                int i = 0;
-                foreach (var p in paramList)
+                List<string> paramDefines = new List<string>();
+                paramDefines.Add($"{ToGizMarshalClassName(type)} pthis");
+                var parameters = m.GetParameters();
+                for(int i = 0; i < parameters.Length; i++)
                 {
-                    if (i != 0) paramsStr += ", ";
-                    paramsStr += (p + " arg" + i.ToString());
-                    i++;
+                    paramDefines.Add($"{ToGizMarshalClassName(parameters[i].ParameterType)} arg{i}");
                 }
 
-                strbGiz.AppendLine("extern " + ToGizType(m.ReturnType) + " " + (classnameGz + "_" + m.Name) + "(" + paramsStr + ");");
+
+                strbGiz.AppendLine("extern " + ToGizMarshalClassName(m.ReturnType) + " " + (gzClassnameIdentif + "_" + m.Name) + "(" + ConcatViaComma(paramDefines) + ");");
             }
             strbGiz.AppendLine();
             strbGiz.AppendLine();
@@ -359,41 +409,42 @@ namespace Gizbox
 
             //Giz类内声明部分  
             string inhertStr = "";
-            if (type.IsValueType == false && this.closure.Contains(type.BaseType))
+            if(type.IsValueType == false && this.closure.Contains(type.BaseType))
             {
-                inhertStr = "  :  " + type.BaseType.FullName.Replace("+", "::").Replace(".", "::"); ;
+                inhertStr = "  :  " + ToGizMarshalClassName(type.BaseType);
+                ;
             }
-            strbGiz.AppendLine("class " + classnameGz + inhertStr);
+            strbGiz.AppendLine("class " + ToGizClassName(type.FullName) + inhertStr);
             strbGiz.AppendLine("{");
 
 
             //类类型
-            if (type.IsValueType == false)
+            if(type.IsValueType == false)
             {
-                foreach (var f in fields)
+                foreach(var f in fields)
                 {
-                    string gizTypename = ToGizType(f.FieldType);
+                    string gizTypename = ToGizMarshalClassName(f.FieldType);
 
                     strbGiz.AppendLine("\t" + gizTypename + " " + f.Name + "()");
                     strbGiz.AppendLine("\t{");
-                    strbGiz.AppendLine("\t\t" + "return " + (classnameGz + "_get_" + f.Name) + "(this);");
+                    strbGiz.AppendLine("\t\t" + "return " + (gzClassnameIdentif + "_get_" + f.Name) + "(this);");
                     strbGiz.AppendLine("\t}");
 
                     strbGiz.AppendLine("\t" + "void " + f.Name + "(" + gizTypename + " " + "newv" + ")");
                     strbGiz.AppendLine("\t{");
-                    strbGiz.AppendLine("\t\t" + (classnameGz + "_set_" + f.Name) + "(this, " + "newv" + ");");
+                    strbGiz.AppendLine("\t\t" + (gzClassnameIdentif + "_set_" + f.Name) + "(this, " + "newv" + ");");
                     strbGiz.AppendLine("\t}");
                 }
 
-                foreach (var p in properties)
+                foreach(var p in properties)
                 {
-                    string gizTypename = ToGizType(p.PropertyType);
+                    string gizTypename = ToGizMarshalClassName(p.PropertyType);
 
                     if(p.CanRead)
                     {
                         strbGiz.AppendLine("\t" + gizTypename + " " + p.Name + "()");
                         strbGiz.AppendLine("\t{");
-                        strbGiz.AppendLine("\t\t" + "return " + (classnameGz + "_get_" + p.Name) + "(this);");
+                        strbGiz.AppendLine("\t\t" + "return " + (gzClassnameIdentif + "_get_" + p.Name) + "(this);");
                         strbGiz.AppendLine("\t}");
                     }
 
@@ -401,7 +452,7 @@ namespace Gizbox
                     {
                         strbGiz.AppendLine("\t" + "void " + p.Name + "(" + gizTypename + " " + "newv" + ")");
                         strbGiz.AppendLine("\t{");
-                        strbGiz.AppendLine("\t\t" + (classnameGz + "_set_" + p.Name) + "(this, " + "newv" + ");");
+                        strbGiz.AppendLine("\t\t" + (gzClassnameIdentif + "_set_" + p.Name) + "(this, " + "newv" + ");");
                         strbGiz.AppendLine("\t}");
                     }
                 }
@@ -410,9 +461,9 @@ namespace Gizbox
             //结构体类型  
             else
             {
-                foreach (var f in fields)
+                foreach(var f in fields)
                 {
-                    string gizTypename = ToGizType(f.FieldType);
+                    string gizTypename = ToGizMarshalClassName(f.FieldType);
 
                     strbGiz.AppendLine("\t" + gizTypename + " " + f.Name + " = " + GizTypeDefaultValueStr(gizTypename) + ";");
                 }
@@ -420,49 +471,62 @@ namespace Gizbox
 
 
 
-            foreach (var method in methods)
+            foreach(var method in methods)
             {
-                List<string> paramList = new List<string>();
-                paramList.Add(classnameGz);
-                paramList.AddRange(method.GetParameters().Select(p => ToGizType(p.ParameterType)));
+                //List<string> paramDefines = new List<string>();
+                //paramDefines.Add(ToGizMarshalClassName(type));
+                //paramDefines.AddRange(method.GetParameters().Select(p => ToGizMarshalClassName(p.ParameterType)));
 
-                string paramsStr = "";
-                string argsStr = "";
-                int i = 0;
-                foreach (var p in paramList)
+                //string paramsStr = "";
+                //string argsStr = "";
+                //int i = 0;
+                //foreach(var p in paramDefines)
+                //{
+                //    if(i > 1)
+                //        paramsStr += ", ";
+                //    if(i != 0)
+                //    {
+                //        paramsStr += (p + " arg" + i.ToString());
+                //    }
+
+
+                //    if(i > 0)
+                //        argsStr += ", ";
+                //    if(i == 0)
+                //    {
+                //        argsStr += ("this");
+                //    }
+                //    else
+                //    {
+                //        argsStr += ("arg" + i.ToString());
+                //    }
+
+
+                //    i++;
+                //}
+
+
+                List<string> paramDefines = new List<string>();
+                List<string> callArgs = new List<string>();
+                callArgs.Add("this");                
+                var parameters = method.GetParameters();
+                for(int i = 0; i < parameters.Length; ++i)
                 {
-                    if (i > 1) paramsStr += ", ";
-                    if (i != 0)
-                    {
-                        paramsStr += (p + " arg" + i.ToString());
-                    }
-
-
-                    if (i > 0) argsStr += ", ";
-                    if (i == 0)
-                    {
-                        argsStr += ("this");
-                    }
-                    else
-                    {
-                        argsStr += ("arg" + i.ToString());
-                    }
-
-
-                    i++;
+                    paramDefines.Add($"{ToGizMarshalClassName(parameters[i].ParameterType)} arg{i}");
+                    callArgs.Add($"arg{i}");
                 }
 
-                strbGiz.AppendLine("\t" + ToGizType(method.ReturnType) + " " + method.Name + "(" + paramsStr + ")");
+                strbGiz.AppendLine("\t" + ToGizMarshalClassName(method.ReturnType) + " " + method.Name + "(" + ConcatViaComma(paramDefines) + ")");
                 strbGiz.AppendLine("\t{");
 
 
-                if (ToGizType(method.ReturnType) == "void")
+                if(ToGizMarshalClassName(method.ReturnType) == "void")
                 {
-                    strbGiz.AppendLine("\t\t" + (classnameGz + "_" + method.Name) + "(" + argsStr + ");");
+                    strbGiz.AppendLine("\t\t" + (gzClassnameIdentif + "_" + method.Name) + "(" + ConcatViaComma(callArgs) + ");");
                 }
                 else
                 {
-                    strbGiz.AppendLine("\t\t" + "return " + (classnameGz + "_" + method.Name) + "(" + argsStr + ");");
+                    strbGiz.AppendLine("\t\t" + "return " + (gzClassnameIdentif + "_" + method.Name) + "(" + ConcatViaComma(callArgs) + ");");
                 }
 
                 strbGiz.AppendLine("\t}");
@@ -471,8 +535,59 @@ namespace Gizbox
 
             strbGiz.AppendLine("}");
             strbGiz.AppendLine();
+
+            //Giz类命名空间存放静态方法    
+            strbGiz.AppendLine("namespace " + ToGizClassName(type.FullName));
+            strbGiz.AppendLine("{");
+
+            foreach(var staticFunc in staticFuncs)
+            {
+                List<Type> paramTypes = new List<Type>();
+                paramTypes.AddRange(staticFunc.GetParameters().Select(p => p.ParameterType));
+
+                List<string> paramsDefines = new List<string>();
+                List<string> callArgs = new List<string>();
+                for(int i = 0; i < paramTypes.Count; ++i)
+                {
+                    paramsDefines.Add($"{ToGizMarshalClassName(paramTypes[i])} arg{i}");
+
+                    callArgs.Add($"arg{i}");
+                }
+
+                strbGiz.AppendLine("\t" + ToGizMarshalClassName(staticFunc.ReturnType) + " " + staticFunc.Name + "(" + ConcatViaComma(paramsDefines) + ")");
+                strbGiz.AppendLine("\t{");
+
+
+                if(ToGizMarshalClassName(staticFunc.ReturnType) == "void")
+                {
+                    strbGiz.AppendLine("\t\t" + (gzClassnameIdentif + "_" + staticFunc.Name + "_Static") + "(" + ConcatViaComma(callArgs) + ");");
+                }
+                else
+                {
+                    strbGiz.AppendLine("\t\t" + "return " + (gzClassnameIdentif + "_" + staticFunc.Name + "_Static") + "(" + ConcatViaComma(callArgs) + ");");
+                }
+
+                strbGiz.AppendLine("\t}");
+            }
+
+            strbGiz.AppendLine("}");
+            strbGiz.AppendLine();
             strbGiz.AppendLine();
         }
+        private void GenerateTypeAsEnum(Type type, StringBuilder strbCs, StringBuilder strbGiz)
+        {
+            strbGiz.AppendLine($"namespace {ToGizClassName(type.FullName)}");
+            strbGiz.AppendLine("{");
+
+            var enumValues = Enum.GetValues(type);
+            foreach(var enumval in enumValues)
+            {
+                strbGiz.AppendLine($"\tconst int {enumval.ToString()} = {(int)enumval};");
+            }
+
+            strbGiz.AppendLine("}");
+        }
+
 
         private static string GizTypeDefaultValueStr(string gizType)
         {
@@ -516,6 +631,24 @@ namespace Gizbox
         }
 
 
+        private string ConcatViaComma(IEnumerable<string> elements)
+        {
+            StringBuilder sb = new StringBuilder();
+            
+            int i = 0;
+            foreach(var e in elements)
+            {
+                if(i != 0)
+                    sb.Append(", ");
+
+                sb.Append(e);
+
+                i++;
+            }
+
+            return sb.ToString();
+        }
+
         private static int GetInheritanceDepth(Type type)
         {
             int depth = 0;
@@ -534,32 +667,77 @@ namespace Gizbox
             return obsoleteAttr != null;
         }
 
-        private static string ToGizType(Type t)
+
+        /// <summary>
+        /// 标识符化的类名  
+        /// </summary>
+        private static string ToIdentifClassName(string classFullName)
         {
+            return classFullName
+                .Replace("+", "__")
+                .Replace(".", "__");
+        }
+
+        /// <summary>
+        /// Gizbox类名
+        /// </summary>
+        private static string ToGizClassName(string classFullName)
+        {
+            return classFullName
+                .Replace("+", "::")
+                .Replace(".", "::");
+        }
+        /// <summary>
+        /// 替换嵌套类的"+"号
+        /// </summary>
+        private static string ToCsClassName(string classFullName)
+        {
+            return classFullName
+                .Replace("+", ".");
+        }
+
+        /// <summary>
+        /// Gizbox封送类型  
+        /// </summary>
+        private static string ToGizMarshalClassName(Type t)
+        {
+            if(t.IsEnum)
+            {
+                return "int";
+            }
+
             switch (t.Name)
             {
                 case "Void": return "void";
                 case "Boolean": return "bool";
                 case "Int32": return "int";
+                case "Int64": return "long";
                 case "Single": return "float";
                 case "String": return "string";
                 default:
                     {
-                        return t.FullName.Replace(".", "::").Replace("+", "__");
+                        return ToGizClassName(t.FullName);
                     }
             }
         }
 
-        private static string ToCsType(Type t)
+        /// <summary>
+        /// Cs封送类型  
+        /// </summary>
+        private static string ToCsMarshalClassName(Type t)
         {
+            if(t.IsEnum)
+            {
+                return "int";
+            }
+
+
             if (t == typeof(void))
             {
                 return "void";
             }
-            else
-            {
-                return t.FullName;
-            }
+
+            return ToCsClassName(t.FullName);
         }
     }
 }

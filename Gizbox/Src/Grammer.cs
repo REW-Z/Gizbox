@@ -125,6 +125,7 @@ namespace Gizbox
             "stmt -> if ( expr ) stmt elifclauselist elseclause",
 
             "declstmt -> type ID = expr ;",
+            "declstmt -> const type ID = lit ;",
             "declstmt -> type ID ( params ) { statements }",
             "declstmt -> extern type ID ( params ) ;",
             "declstmt -> class ID inherit { declstatements }",
@@ -261,9 +262,16 @@ namespace Gizbox
 
 
 
-//注意事项：
-//1. 注意避免"错误"/"提前"归约。
-//  （lookahead符号的限制有用但是作用有限，不能跨越一个以上符号限制归约动作）        
-//  （如果当前状态有两个规约项，它们lookahead是一样的，就会发生归约冲突）    
-//  （REW：所以应该尽量减少同一终结符在多个产生式的出现）    
-//  （REW：例如如果不加限制，数组访问在分析到“id [”状态时，“id“可能被提前归约类名，就错误变成了类数组定义的前半部分）    
+///注意事项：
+///1. 注意避免"错误"/"提前"归约。
+///  （lookahead符号的限制有用但是作用有限，不能跨越一个以上符号限制归约动作）        
+///  （如果当前状态有两个规约项，它们lookahead是一样的，就会发生归约冲突）    
+///  （REW：所以应该尽量减少同一终结符在多个产生式的出现）    
+///  （REW：例如如果不加限制，数组访问在分析到“id [”状态时，“id“可能被提前归约类名，就错误变成了类数组定义的前半部分）    
+
+///2. 添加语法  
+///  （添加终结符和非终结符）
+///  （添加产生式）
+///  （添加ast节点类型和语义分析动作）
+///  （添加语义分析和类型检查）  
+///  （添加中间代码生成）  

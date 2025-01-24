@@ -196,7 +196,6 @@ F:\ZQJ\GizboxAndTools\Gizbox\GizboxTest\obj\Debug\net8.0\GizboxTest.GeneratedMSB
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxTest\obj\Debug\net8.0\GizboxTest.AssemblyInfoInputs.cache
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxTest\obj\Debug\net8.0\GizboxTest.AssemblyInfo.cs
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxTest\obj\Debug\net8.0\GizboxTest.csproj.CoreCompileInputs.cache
-F:\ZQJ\GizboxAndTools\Gizbox\GizboxTest\obj\Debug\net8.0\GizboxTest.sourcelink.json
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxTest\obj\Debug\net8.0\GizboxTest.csproj.CopyComplete
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxTest\obj\Debug\net8.0\GizboxTest.dll
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxTest\obj\Debug\net8.0\refint\GizboxTest.dll

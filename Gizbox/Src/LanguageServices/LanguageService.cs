@@ -354,7 +354,7 @@ namespace Gizbox.LanguageServices
                                     insertText = completionStr
                                 });
                             }
-                            else if (globalDef.category == SymbolTable.RecordCatagory.Var)
+                            else if (globalDef.category == SymbolTable.RecordCatagory.Variable)
                             {
                                 result.Add(new Completion()
                                 {
@@ -442,7 +442,7 @@ namespace Gizbox.LanguageServices
                                     var members = classEnv.records.Values;
                                     foreach (var member in members)
                                     {
-                                        if (member.category == SymbolTable.RecordCatagory.Var || member.category == SymbolTable.RecordCatagory.Param)
+                                        if (member.category == SymbolTable.RecordCatagory.Variable || member.category == SymbolTable.RecordCatagory.Param)
                                         {
                                             result.Add(new Completion()
                                             {

@@ -247,6 +247,13 @@ namespace Gizbox
         
         public abstract class DeclareNode : StmtNode { }
 
+        public class ConstantDeclareNode : DeclareNode
+        {
+            public TypeNode typeNode;
+            public IdentityNode identifierNode;
+            public LiteralNode litValNode;
+        }
+
         public class VarDeclareNode : DeclareNode
         {
             public TypeNode typeNode;
@@ -494,15 +501,15 @@ namespace Gizbox
 
         // ******************** TYPE NODES ******************************
 
-        public abstract class TypeNode : Node { public abstract string ToExpression(); }
+        public abstract class TypeNode : Node { public abstract string TypeExpression(); }
 
         public class ArrayTypeNode : TypeNode
         {
             public TypeNode elemtentType;
 
-            public override string ToExpression()
+            public override string TypeExpression()
             {
-                return elemtentType.ToExpression() + "[]";
+                return elemtentType.TypeExpression() + "[]";
             }
         }
 
@@ -510,7 +517,7 @@ namespace Gizbox
         {
             public IdentityNode classname;
 
-            public override string ToExpression()
+            public override string TypeExpression()
             {
                 return classname.FullName;
             }
@@ -519,7 +526,7 @@ namespace Gizbox
         {
             public Token token;
 
-            public override string ToExpression()
+            public override string TypeExpression()
             {
                 return token.name;
             }

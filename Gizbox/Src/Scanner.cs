@@ -51,6 +51,7 @@ namespace Gizbox
 
             keywords.Add(new TokenPattern("namespace", "namespace\\W", 1));
             keywords.Add(new TokenPattern("extern", "extern\\W", 1));
+            keywords.Add(new TokenPattern("const", "const\\W", 1));
 
             keywords.Add(new TokenPattern("var", "var\\W", 1));
             keywords.Add(new TokenPattern("class", "class\\W", 1));
@@ -184,7 +185,7 @@ namespace Gizbox
                     if(Compiler.enableLogScanner) Log("发现越界：" + (lexemBegin + (forward - lexemBegin)));
                     if (Compiler.enableLogScanner) Log("总长度：" + source.Length);
                     string remainingText = source.Substring(lexemBegin);
-                    throw new LexerException(ExceptionType.LexicalAnalysisError, currLine, (lexemBegin - currLineStart), remainingText.Substring(0, System.Math.Min(10, remainingText.Length)), "");
+                    throw new LexerException(ExceptioName.LexicalAnalysisError, currLine, (lexemBegin - currLineStart), remainingText.Substring(0, System.Math.Min(10, remainingText.Length)), "");
                 }
 
 

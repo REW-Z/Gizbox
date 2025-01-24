@@ -4,8 +4,9 @@ using System.Text;
 
 namespace Gizbox
 {
-    public enum ExceptionType
+    public enum ExceptioName
     {
+        //0.
         Unknown,
         LibraryLoadPathNotSet,
         LibraryFileNotFound,
@@ -30,19 +31,26 @@ namespace Gizbox
         ArgumentError,
         AccessError,
 
+
+        //1.
         LexicalAnalysisError,
 
+        //2.
         SyntaxAnalysisError,
 
+        //3.
+        SemanticAnalysysError,
         SubExpressionNoReturnVariable,
         TypeNotSet,
         FunctionObfuscationNameNotSet,
         EmptyImportNode,
         ExternFunctionGlobalOrNamespaceOnly,
+        ConstantGlobalOrNamespaceOnly,
         ClassNameCannotBeObject,
         ClassDefinitionGlobalOrNamespaceOnly,
         NamespaceTopLevelNonMemberFunctionOnly,
         BaseClassNotFound,
+        ConstantTypeDeclarationError,
         VariableTypeDeclarationError,
         MissingReturnStatement,
         ReturnTypeError,
@@ -65,6 +73,8 @@ namespace Gizbox
         IdentifierAmbiguousBetweenNamespaces,
         MemberFieldNotFound,
 
+
+        //4.
         ScriptRuntimeError,
         OnlyHeapObjectsCanBeFreed,
         AccessedObjectNotFound,
@@ -82,9 +92,9 @@ namespace Gizbox
 
     public class GizboxException: System.Exception
     {
-        public ExceptionType exType;
+        public ExceptioName exType;
         public string appendMsg;
-        public GizboxException(ExceptionType extype = ExceptionType.Unknown, string appendMsg = "") : base(appendMsg) 
+        public GizboxException(ExceptioName extype = ExceptioName.Unknown, string appendMsg = "") : base(appendMsg) 
         { 
             this.exType = extype;
             this.appendMsg = appendMsg;
@@ -94,7 +104,7 @@ namespace Gizbox
         {
             get
             {
-                return "\n -> " + Localization.GetString(exType.ToString()) + " <- \n" + "(" + appendMsg + ")";
+                return "\n \"" + Localization.GetString(exType.ToString()) + "\" \n" + "(" + appendMsg + ")";
             }
         }
     }
@@ -105,7 +115,7 @@ namespace Gizbox
         public int line;
         public int charinline;
         public string scanning;
-        public LexerException(ExceptionType etype, int line, int charInLine, string scanningText, string message) : base(etype, message) 
+        public LexerException(ExceptioName etype, int line, int charInLine, string scanningText, string message) : base(etype, message) 
         {
             this.line = line;
             this.charinline = charInLine;
@@ -117,7 +127,7 @@ namespace Gizbox
     public class ParseException : GizboxException
     {
         public Token token;
-        public ParseException(ExceptionType etype, Token token, string message) : base(etype, message)
+        public ParseException(ExceptioName etype, Token token, string message) : base(etype, message)
         {
             this.token = token;
         }
@@ -132,7 +142,7 @@ namespace Gizbox
     public class SemanticException : GizboxException
     {
         public SyntaxTree.Node node;
-        public SemanticException(ExceptionType etype, SyntaxTree.Node astNode, string message): base(etype, message)
+        public SemanticException(ExceptioName etype, SyntaxTree.Node astNode, string message): base(etype, message)
         {
             this.node = astNode;
         }
@@ -147,7 +157,7 @@ namespace Gizbox
     public class RuntimeException : GizboxException
     {
         public Gizbox.ScriptEngine.RuntimeCode code;
-        public RuntimeException(ExceptionType etype, Gizbox.ScriptEngine.RuntimeCode c, string message):base(etype, message)
+        public RuntimeException(ExceptioName etype, Gizbox.ScriptEngine.RuntimeCode c, string message):base(etype, message)
         {
             this.code = c;
         }

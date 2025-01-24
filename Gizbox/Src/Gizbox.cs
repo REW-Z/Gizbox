@@ -83,7 +83,8 @@ namespace Gizbox
     {
         public enum RecordCatagory
         {
-            Var,
+            Variable,
+            Constant,
             Param,
             Function,
             Class,
@@ -109,7 +110,9 @@ namespace Gizbox
             [DataMember]
             public string typeExpression;
             [DataMember]
-            public int addr;
+            public long addr;
+            [DataMember]
+            public string initValue;
             [DataMember]
             public SymbolTable envPtr;
         }
@@ -236,14 +239,14 @@ namespace Gizbox
         }
 
         //新的条目  
-        public Record NewRecord(string synbolName, RecordCatagory catagory, string typeExpr, SymbolTable envPtr = null)
+        public Record NewRecord(string synbolName, RecordCatagory catagory, string typeExpr, SymbolTable envPtr = null, long addr = 9999, string initValue = default)
         {
-            int variableAddr = 99999;
             var newRec = new Record() {
                 name = synbolName, 
                 rawname = synbolName,
                 category = catagory,
-                addr = variableAddr,
+                addr = addr,
+                initValue = initValue,
                 typeExpression = typeExpr ,
                 envPtr = envPtr,
             };
@@ -737,7 +740,7 @@ namespace Gizbox
 
                                 if (unit.name != libname)
                                 {
-                                    throw new GizboxException(ExceptionType.LibraryFileNameMismatch, libname  + " and " + unit.name);
+                                    throw new GizboxException(ExceptioName.LibraryFileNameMismatch, libname  + " and " + unit.name);
                                 }
                                 else
                                 {
@@ -750,7 +753,7 @@ namespace Gizbox
                 }
             }
 
-            throw new GizboxException(ExceptionType.LibraryFileNotFound, libname) ;
+            throw new GizboxException(ExceptioName.LibraryFileNotFound, libname) ;
         }
 
 
@@ -812,6 +815,8 @@ namespace Gizbox
             var ir = this.Compile(source);
             ir.name = libName;
             Gizbox.IL.ILSerializer.Serialize(savePath, ir);
+
+            Gizbox.GixConsole.LogLine($"Lib {libName} Complete Finish!");
         }
 
         /// <summary>

@@ -23,6 +23,13 @@ class Student
         Console::Log("Test");
     }
 }
+
+namespace Student
+{
+    const int totalcount = 9;
+}
+
+
 //AAAA
 Student obj = new Student(); //创建对象测试
 obj.a = 1; //对象字段赋值测试  
@@ -33,4 +40,6 @@ Console::Log("Log测试: " + (string)btmp);
 
 //全局常量测试  
 int sizeofInt = Core::Integer::size;
-//Console::Log("size:" + (string)sizeofInt);
+int totalStu = Student::totalcount;
+Console::Log("size:" + (string)sizeofInt);
+Console::Log("totalstu:" + (string)totalStu);

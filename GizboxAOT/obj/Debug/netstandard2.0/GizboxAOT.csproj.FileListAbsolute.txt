@@ -75,7 +75,6 @@ F:\ZQJ\GizboxAndTools\Gizbox\GizboxAOT\obj\Debug\netstandard2.0\GizboxAOT.Genera
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxAOT\obj\Debug\netstandard2.0\GizboxAOT.AssemblyInfoInputs.cache
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxAOT\obj\Debug\netstandard2.0\GizboxAOT.AssemblyInfo.cs
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxAOT\obj\Debug\netstandard2.0\GizboxAOT.csproj.CoreCompileInputs.cache
-F:\ZQJ\GizboxAndTools\Gizbox\GizboxAOT\obj\Debug\netstandard2.0\GizboxAOT.sourcelink.json
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxAOT\obj\Debug\netstandard2.0\GizboxAOT.csproj.CopyComplete
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxAOT\obj\Debug\netstandard2.0\GizboxAOT.dll
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxAOT\obj\Debug\netstandard2.0\GizboxAOT.pdb

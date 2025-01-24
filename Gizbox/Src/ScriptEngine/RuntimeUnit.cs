@@ -19,7 +19,7 @@ namespace Gizbox.ScriptEngine
 
         public static string GetString(Operand operand)
         {
-            if ((operand is OperandString) == false) throw new RuntimeException(ExceptionType.ScriptRuntimeError, null, "not StringOperand type !");
+            if ((operand is OperandString) == false) throw new RuntimeException(ExceptioName.ScriptRuntimeError, null, "not StringOperand type !");
             return ((OperandString)operand).str;
         }
 
@@ -62,7 +62,7 @@ namespace Gizbox.ScriptEngine
                 return new OperandString(argStr);
             }
 
-            throw new GizboxException(ExceptionType.TacError);
+            throw new GizboxException(ExceptioName.TacError);
         }
     }
     public class OperandRegister : Operand
@@ -100,7 +100,7 @@ namespace Gizbox.ScriptEngine
                     }
                     break;
                 default:
-                    throw new GizboxException(ExceptionType.UnknownConstant, str);
+                    throw new GizboxException(ExceptioName.UnknownConstant, str);
             }
         }
     }
@@ -121,7 +121,7 @@ namespace Gizbox.ScriptEngine
                 case "LITDOUBLE": this.val = double.Parse(lex.Substring(0, lex.Length - 1)); break;//去除F标记  
                 case "LITCHAR": this.val = lex[1]; break;
                 //case "LITSTRING": return Value.Void;//字符串字面量已经移除
-                default: throw new GizboxException(ExceptionType.UnknownLiteral,  str);
+                default: throw new GizboxException(ExceptioName.UnknownLiteral,  str);
             }
         }
     }
@@ -411,7 +411,7 @@ namespace Gizbox.ScriptEngine
         //读取常量值    
         public object ReadConst(long ptr)
         {
-            if (ptr >= 0) throw new GizboxException(ExceptionType.NotPointerToConstant);
+            if (ptr >= 0) throw new GizboxException(ExceptioName.NotPointerToConstant);
             
             long truePtr = Math.Abs(ptr) - 1;
             int unitId = (int)(truePtr / __constdataOffset);
@@ -596,7 +596,7 @@ namespace Gizbox.ScriptEngine
                 }
             }
 
-            throw new GizboxException(ExceptionType.LabelNotFound, labelp0);
+            throw new GizboxException(ExceptioName.LabelNotFound, labelp0);
         }
 
         // 查询库  
