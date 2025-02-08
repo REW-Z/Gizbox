@@ -324,7 +324,7 @@ namespace Gizbox.LSP
             writeQueue.Enqueue(responseMessage);
 
 
-            LogToStream(logStr);
+            await LogToStream("Server Inited... " + logStr);
         }
 
         private static async Task HandleDidOpen(JObject request)
@@ -383,7 +383,7 @@ namespace Gizbox.LSP
                 }
             }
 
-            //Log("\n[did changes....current]\n" + gizboxService.Current());
+            await LogToStream("did changes....current : " + gizboxService.sourceB[gizboxService.sourceB.Length - 1]);
         }
 
         private static async Task HandleCompletion(JObject request)
@@ -401,13 +401,31 @@ namespace Gizbox.LSP
                 }
                 catch(Exception ex)
                 {
-                    result = new List<Completion>() { new Completion() { label = "Debug_Err", detail = ex.ToString(), insertText = "Debug_Err" } };
+                    result = new List<Completion>() { new Completion() { 
+                        label = "DEBUG_ERR:" + ex.ToString(),
+                        detail = ex.ToString(),
+                        insertText = "Debug_Err"
+                        } 
+                    };
                 }
             }
             else
             {
                 result = new List<Completion>();
+
+                if(result.Count == 0)
+                {
+                    result.Add(new Completion()
+                    {
+                        label = "DEBUG_NO_COMPLETION",
+                        kind = ComletionKind.Field,
+                        detail = "no completion",
+                        documentation = "",
+                        insertText = "",
+                    });
+                }
             }
+
 
             var objArr = result.Select(c => new {
                 label = c.label,
@@ -436,6 +454,9 @@ namespace Gizbox.LSP
             //var responseBytes = Encoding.UTF8.GetBytes(responseMessage);
             //await outputStream.WriteAsync(responseBytes, 0, responseBytes.Length);
             writeQueue.Enqueue(responseMessage);
+
+            int takeCount = Math.Min(5, result.Count);
+            await LogToStream("complete items sent:" + string.Concat(result.Take(takeCount).Select(c => c.label + ",")) );
         }
 
         private static async Task HandleHighlighting(JObject request)

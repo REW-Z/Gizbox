@@ -114,6 +114,9 @@ namespace Gizbox
 
             public Dictionary<string, object> attributes;
 
+
+
+
             public Node[] Children 
             {
                 get
@@ -168,31 +171,43 @@ namespace Gizbox
                 return nodes.ToArray();
             }
 
-            public Token FirstToken()
+
+            private Token startToken;
+            private Token endToken;
+            public Token StartToken()
             {
-                var tokenField = this.GetType()
-                    .GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
-                    .FirstOrDefault(f => f.FieldType == typeof(Token));
-
-                if (tokenField != null)
+                if(this.attributes != null)
                 {
-                    return (Token)tokenField.GetValue(this);
+                    this.attributes.TryGetValue("start", out object startTokenObj);
+                    this.startToken = startTokenObj as Token;
                 }
-
-                return GetChildren().FirstOrDefault().FirstToken();
+                else
+                {
+                    for(int i = 0 ; i < Children.Length; i++)
+                    {
+                        this.startToken = Children[i].StartToken();
+                        if(this.startToken != null) break;
+                    }
+                }
+                return this.startToken;
             }
-            public Token LastToken()
+            public Token EndToken()
             {
-                var tokenField = this.GetType()
-                    .GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
-                    .LastOrDefault(f => f.FieldType == typeof(Token));
-
-                if (tokenField != null)
+                if(this.attributes != null)
                 {
-                    return (Token)tokenField.GetValue(this);
+                    this.attributes.TryGetValue("end", out object endTokenObj);
+                    this.endToken = endTokenObj as Token;
                 }
-
-                return GetChildren().LastOrDefault().LastToken();
+                else
+                {
+                    for(int i = Children.Length - 1; i > -1; i--)
+                    {
+                        this.endToken = Children[i].EndToken();
+                        if(this.endToken != null)
+                            break;
+                    }
+                }
+                return this.endToken;
             }
 
             public override string ToString()
@@ -566,6 +581,7 @@ namespace Gizbox
         // ******************** Instance Members ******************************
         public ProgramNode rootNode;
         
+        public List<SyntaxTree.Node> leafNodes = new List<SyntaxTree.Node>();
         public List<IdentityNode> identityNodes = new List<IdentityNode>();
         public List<LiteralNode> literalNodes = new List<LiteralNode>();
 
@@ -578,6 +594,12 @@ namespace Gizbox
 
             //建立联系并计算深度      
             Traversal((n) => {
+
+                //叶子节点收集  
+                if(n.Children.Length == 0)
+                {
+                    leafNodes.Add(n);
+                }
                 foreach(var child in n.Children)
                 {
                     //父子关系  

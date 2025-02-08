@@ -202,3 +202,4 @@ F:\ZQJ\GizboxAndTools\Gizbox\GizboxTest\obj\Debug\net8.0\refint\GizboxTest.dll
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxTest\obj\Debug\net8.0\GizboxTest.pdb
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxTest\obj\Debug\net8.0\GizboxTest.genruntimeconfig.cache
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxTest\obj\Debug\net8.0\ref\GizboxTest.dll
+F:\ZQJ\GizboxAndTools\Gizbox\GizboxTest\obj\Debug\net8.0\GizboxTest.sourcelink.json

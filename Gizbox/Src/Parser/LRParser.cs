@@ -107,6 +107,31 @@ namespace Gizbox.LRParse
         }
 
         /// <summary>
+        /// 规约时记录起始终止Token  
+        /// </summary>
+        private void RecordStartEndToken(ParseStackElement newelement, int βLength)
+        {
+            if(βLength == 0) return;
+
+            for(int i = stack.Count - βLength; i <= stack.Count - 1; ++i)
+            {
+                if(stack[i].attributes.ContainsKey("start") && stack[i].attributes["start"] != null)
+                {
+                    newelement.attributes["start"] = stack[i].attributes["start"];
+                    break;
+                }
+            }
+            for(int i = stack.Count - 1; i >= stack.Count - βLength; --i)
+            {
+                if(stack[i].attributes.ContainsKey("end") && stack[i].attributes["end"] != null)
+                {
+                    newelement.attributes["end"] = stack[i].attributes["end"];
+                    break;
+                }
+            }
+        }
+
+        /// <summary>
         /// 语法分析  
         /// </summary>
         public void Parse(List<Token> input)
@@ -134,7 +159,8 @@ namespace Gizbox.LRParse
 
             //初始状态入栈  
             stack = new ParseStack();
-            stack.Push(new ParseStackElement(data.lalrStates[0]));
+            var initState = new ParseStackElement(data.lalrStates[0]);
+            stack.Push(initState);
 
             //自动机运行  
             while (remainingInput.Count > 0)
@@ -162,7 +188,11 @@ namespace Gizbox.LRParse
                             var stateToPush = data.lalrStates[action.num];
                             var newEle = new ParseStackElement(stateToPush);
 
+
+                            // *** 记录Token信息 ***  
                             newEle.attributes["token"] = token;
+                            newEle.attributes["start"] = token;
+                            newEle.attributes["end"] = token;
 
                             stack.Push(newEle);
                             // ************  
@@ -195,8 +225,23 @@ namespace Gizbox.LRParse
                             // ********************
 
 
+                            // *** 记录新Element起始结束Token ***    
+                            RecordStartEndToken(this.newElement, βLength);
+                            //DEBUG  
+                            if(newElement.attributes.ContainsKey("start") && newElement.attributes.ContainsKey("end"))
+                            {
+                                //Console.WriteLine($"产生式{production.ToExpression()} 开始Token {((Token)newElement.attributes["start"])?.ToString() ?? "null"}  结束Token {((Token)newElement.attributes["end"])?.ToString() ?? "null"}");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"产生式{production.ToExpression()} 无Token");
+                            }
+                            
+                            // ********************
+
+
                             // *** 产生式体出栈 ***  
-                            for (int i = 0; i < βLength; ++i)
+                            for(int i = 0; i < βLength; ++i)
                             {
                                 stack.Pop();
                             }
@@ -1280,7 +1325,9 @@ namespace Gizbox.SemanticRule
             {
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.ParameterListNode()
                 {
-                    parameterNodes = new List<SyntaxTree.ParameterNode>()//空的子节点  
+                    parameterNodes = new List<SyntaxTree.ParameterNode>(), //空的子节点  
+
+                    attributes = psr.newElement.attributes,
                 };
             });
 
@@ -1296,7 +1343,9 @@ namespace Gizbox.SemanticRule
                                 identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
                             },
                         }
-                    }
+                    },
+
+                    attributes = psr.newElement.attributes,
                 };
             });
 

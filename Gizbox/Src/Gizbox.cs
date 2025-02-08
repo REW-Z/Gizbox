@@ -858,6 +858,14 @@ namespace Gizbox
             semanticAnalyzer.Analysis();
 
 
+            //DEBUG  
+            Console.WriteLine("-----------");
+            foreach(var child in syntaxTree.rootNode.Children)
+            {
+                Console.WriteLine("child:" + child.GetType().ToString() + " :" + (child.StartToken()?.ToString() ?? "null") + "  ~  " + (child.EndToken()?.ToString() ?? "null"));
+            }
+            Console.WriteLine("-----------");
+
             //中间代码生成    
             Gizbox.IL.ILGenerator ilGenerator = new IL.ILGenerator(syntaxTree, ilUnit);
             ilGenerator.Generate();

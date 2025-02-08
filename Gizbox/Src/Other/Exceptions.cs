@@ -148,7 +148,7 @@ namespace Gizbox
         }
         public string LineMessage()
         {
-            return "(line:" + node.FirstToken().line + ")";
+            return "(line:" + node.StartToken().line + ")";
         }
 
         public override string Message => LineMessage() + base.Message;

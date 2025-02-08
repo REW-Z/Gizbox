@@ -78,3 +78,4 @@ F:\ZQJ\GizboxAndTools\Gizbox\GizboxAOT\obj\Debug\netstandard2.0\GizboxAOT.csproj
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxAOT\obj\Debug\netstandard2.0\GizboxAOT.csproj.CopyComplete
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxAOT\obj\Debug\netstandard2.0\GizboxAOT.dll
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxAOT\obj\Debug\netstandard2.0\GizboxAOT.pdb
+F:\ZQJ\GizboxAndTools\Gizbox\GizboxAOT\obj\Debug\netstandard2.0\GizboxAOT.sourcelink.json

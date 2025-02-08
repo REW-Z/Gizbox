@@ -18,3 +18,4 @@ F:\ZQJ\GizboxAndTools\Gizbox\GizboxLSP\obj\Debug\net8.0\refint\GizboxLSP.dll
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxLSP\obj\Debug\net8.0\GizboxLSP.pdb
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxLSP\obj\Debug\net8.0\GizboxLSP.genruntimeconfig.cache
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxLSP\obj\Debug\net8.0\ref\GizboxLSP.dll
+F:\ZQJ\GizboxAndTools\Gizbox\GizboxLSP\obj\Debug\net8.0\GizboxLSP.sourcelink.json
