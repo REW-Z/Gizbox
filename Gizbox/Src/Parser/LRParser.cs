@@ -111,8 +111,9 @@ namespace Gizbox.LRParse
         /// </summary>
         private void RecordStartEndToken(ParseStackElement newelement, int βLength)
         {
-            if(βLength == 0) return;
+            if(βLength == 0) return;   
 
+            //记录到分析栈元素attribute
             for(int i = stack.Count - βLength; i <= stack.Count - 1; ++i)
             {
                 if(stack[i].attributes.ContainsKey("start") && stack[i].attributes["start"] != null)
@@ -128,6 +129,15 @@ namespace Gizbox.LRParse
                     newelement.attributes["end"] = stack[i].attributes["end"];
                     break;
                 }
+            }
+
+            //记录到AST节点attribute    
+            if(newElement.attributes.ContainsKey("ast_node"))
+            {
+                var astNode = ((SyntaxTree.Node)newElement.attributes["ast_node"]);
+                if(astNode.attributes == null) astNode.attributes = new Dictionary<string, object>();
+                astNode.attributes["start"] = newelement.attributes["start"];
+                astNode.attributes["end"] = newelement.attributes["end"];
             }
         }
 
@@ -227,16 +237,6 @@ namespace Gizbox.LRParse
 
                             // *** 记录新Element起始结束Token ***    
                             RecordStartEndToken(this.newElement, βLength);
-                            //DEBUG  
-                            if(newElement.attributes.ContainsKey("start") && newElement.attributes.ContainsKey("end"))
-                            {
-                                //Console.WriteLine($"产生式{production.ToExpression()} 开始Token {((Token)newElement.attributes["start"])?.ToString() ?? "null"}  结束Token {((Token)newElement.attributes["end"])?.ToString() ?? "null"}");
-                            }
-                            else
-                            {
-                                Console.WriteLine($"产生式{production.ToExpression()} 无Token");
-                            }
-                            
                             // ********************
 
 

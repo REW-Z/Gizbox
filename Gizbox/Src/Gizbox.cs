@@ -852,19 +852,10 @@ namespace Gizbox
             parser.Parse(tokens);
             var syntaxTree = parser.syntaxTree;
 
-
             //语义分析  
             SemanticRule.SemanticAnalyzer semanticAnalyzer = new SemanticRule.SemanticAnalyzer(syntaxTree, ilUnit, this);
             semanticAnalyzer.Analysis();
 
-
-            //DEBUG  
-            Console.WriteLine("-----------");
-            foreach(var child in syntaxTree.rootNode.Children)
-            {
-                Console.WriteLine("child:" + child.GetType().ToString() + " :" + (child.StartToken()?.ToString() ?? "null") + "  ~  " + (child.EndToken()?.ToString() ?? "null"));
-            }
-            Console.WriteLine("-----------");
 
             //中间代码生成    
             Gizbox.IL.ILGenerator ilGenerator = new IL.ILGenerator(syntaxTree, ilUnit);
@@ -875,7 +866,23 @@ namespace Gizbox
         }
 
 
+        #region DEBUG  
+        private void DebugPrintAST(SyntaxTree.Node root)
+        {
+            Console.WriteLine(System.Linq.Enumerable.Repeat('-', 20));
+            System.Action<SyntaxTree.Node, int> PrintNode = null;
+            PrintNode = (node, indent) => {
+                Console.WriteLine(string.Concat(System.Linq.Enumerable.Repeat('\t', indent)) + "-" + node.GetType().Name + ":" + (node.StartToken() != null ? ($"{node.StartToken().ToString()}line:{node.StartToken().line}") : "null") + " ~ " + (node.EndToken() != null ? ($"{node.EndToken().ToString()}line:{node.EndToken().line}") : "null"));
+                foreach(var child in node.Children)
+                {
+                    PrintNode(child, indent + 1);
+                }
+            };
+            PrintNode(root, 0);
+            Console.WriteLine(System.Linq.Enumerable.Repeat('-', 20));
+        }
 
+        #endregion
     }
 
 

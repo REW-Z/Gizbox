@@ -793,25 +793,38 @@ namespace Gizbox.LanguageServices
                 SyntaxTree.Node currNode = this.persistentAST.rootNode;
                 while(currNode.Children.Length > 0)
                 {
-                    bool childHit = false;
-                    foreach(var child in currNode.Children)
+                    bool breakWhile = false;
+
+                    var start = currNode.StartToken();
+                    var end = currNode.EndToken();
+                    if(start.start <= curr && curr <= (end.start + end.length))
                     {
-                        var childstartToken = child.StartToken();
-                        var childendToken = child.EndToken();
-                        if(childstartToken != null && childendToken != null)
+                        foreach(var child in currNode.Children)
                         {
-                            if(childstartToken.start <= curr && curr <= (childendToken.start + childendToken.length))
+                            var childstartToken = child.StartToken();
+                            var childendToken = child.EndToken();
+                            if(childstartToken != null && childendToken != null)
                             {
-                                currNode = child;
-                                childHit = true;
-                                break;
+                                if(childstartToken.start <= curr && curr <= (childendToken.start + childendToken.length))
+                                {
+                                    currNode = child;
+                                    breakWhile = true;
+                                    break;
+                                }
                             }
                         }
                     }
-
-                    if(childHit == false)
+                    else
                     {
-                        msg += "leaf find unhit:" + currNode.GetType().Name + ".";
+                        msg += ("breakWhile1...currNode:" + currNode.GetType().Name);
+                        break;
+                    }
+
+
+
+                    if(breakWhile == false)
+                    {
+                        msg += ("breakWhile2... currNode:" + currNode.GetType().Name);
                         break;
                     }
                 }
