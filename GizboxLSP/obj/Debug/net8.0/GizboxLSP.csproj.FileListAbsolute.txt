@@ -12,10 +12,10 @@ F:\ZQJ\GizboxAndTools\Gizbox\GizboxLSP\obj\Debug\net8.0\GizboxLSP.GeneratedMSBui
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxLSP\obj\Debug\net8.0\GizboxLSP.AssemblyInfoInputs.cache
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxLSP\obj\Debug\net8.0\GizboxLSP.AssemblyInfo.cs
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxLSP\obj\Debug\net8.0\GizboxLSP.csproj.CoreCompileInputs.cache
+F:\ZQJ\GizboxAndTools\Gizbox\GizboxLSP\obj\Debug\net8.0\GizboxLSP.sourcelink.json
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxLSP\obj\Debug\net8.0\GizboxLSP.csproj.CopyComplete
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxLSP\obj\Debug\net8.0\GizboxLSP.dll
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxLSP\obj\Debug\net8.0\refint\GizboxLSP.dll
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxLSP\obj\Debug\net8.0\GizboxLSP.pdb
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxLSP\obj\Debug\net8.0\GizboxLSP.genruntimeconfig.cache
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxLSP\obj\Debug\net8.0\ref\GizboxLSP.dll
-F:\ZQJ\GizboxAndTools\Gizbox\GizboxLSP\obj\Debug\net8.0\GizboxLSP.sourcelink.json

@@ -123,7 +123,7 @@ namespace Gizbox.Utility
 
             // 将修改后的内容写回文件
             System.IO.File.WriteAllLines(filePath, updatedLines, Encoding.UTF8);
-            Console.WriteLine("替换完成...");
+            Gizbox.GixConsole.LogLine("替换完成...");
         }
 
 

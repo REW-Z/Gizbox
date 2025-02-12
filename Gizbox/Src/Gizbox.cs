@@ -42,12 +42,12 @@ namespace Gizbox
         public int line;
 
         /// <summary>
-        /// 每行起始  
+        /// 行内起始位置  
         /// </summary>
         public int start;
 
         /// <summary>
-        /// 每行结束  
+        /// 行内结束位置  
         /// </summary>
         public int length;
 
@@ -852,6 +852,7 @@ namespace Gizbox
             parser.Parse(tokens);
             var syntaxTree = parser.syntaxTree;
 
+
             //语义分析  
             SemanticRule.SemanticAnalyzer semanticAnalyzer = new SemanticRule.SemanticAnalyzer(syntaxTree, ilUnit, this);
             semanticAnalyzer.Analysis();
@@ -864,25 +865,6 @@ namespace Gizbox
 
             return ilUnit;
         }
-
-
-        #region DEBUG  
-        private void DebugPrintAST(SyntaxTree.Node root)
-        {
-            Console.WriteLine(System.Linq.Enumerable.Repeat('-', 20));
-            System.Action<SyntaxTree.Node, int> PrintNode = null;
-            PrintNode = (node, indent) => {
-                Console.WriteLine(string.Concat(System.Linq.Enumerable.Repeat('\t', indent)) + "-" + node.GetType().Name + ":" + (node.StartToken() != null ? ($"{node.StartToken().ToString()}line:{node.StartToken().line}") : "null") + " ~ " + (node.EndToken() != null ? ($"{node.EndToken().ToString()}line:{node.EndToken().line}") : "null"));
-                foreach(var child in node.Children)
-                {
-                    PrintNode(child, indent + 1);
-                }
-            };
-            PrintNode(root, 0);
-            Console.WriteLine(System.Linq.Enumerable.Repeat('-', 20));
-        }
-
-        #endregion
     }
 
 

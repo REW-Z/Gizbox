@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Net;
 using System.Text;
+using System.Linq;
 using Gizbox;
 using Gizbox.LRParse;
 using Gizbox.IL;
@@ -23,16 +24,114 @@ namespace Gizbox.LanguageServices
 
     public enum ComletionKind
     {
-        Text = 1,
-        Method = 2,
-        Function = 3,
-        Ctor = 4,
-        Field = 5,
-        Var = 6,
-        Class = 7,
-        Interface = 8,
-        Module = 9,
-        Property = 10
+         /**
+		 * The `Text` completion item kind.
+		 */
+        Text = 0,
+        /**
+		 * The `Method` completion item kind.
+		 */
+        Method = 1,
+        /**
+		 * The `Function` completion item kind.
+		 */
+        Function = 2,
+        /**
+		 * The `Constructor` completion item kind.
+		 */
+        Constructor = 3,
+        /**
+		 * The `Field` completion item kind.
+		 */
+        Field = 4,
+        /**
+		 * The `Variable` completion item kind.
+		 */
+        Variable = 5,
+        /**
+		 * The `Class` completion item kind.
+		 */
+        Class = 6,
+        /**
+		 * The `Interface` completion item kind.
+		 */
+        Interface = 7,
+        /**
+		 * The `Module` completion item kind.
+		 */
+        Module = 8,
+        /**
+		 * The `Property` completion item kind.
+		 */
+        Property = 9,
+        /**
+		 * The `Unit` completion item kind.
+		 */
+        Unit = 10,
+        /**
+		 * The `Value` completion item kind.
+		 */
+        Value = 11,
+        /**
+		 * The `Enum` completion item kind.
+		 */
+        Enum = 12,
+        /**
+		 * The `Keyword` completion item kind.
+		 */
+        Keyword = 13,
+        /**
+		 * The `Snippet` completion item kind.
+		 */
+        Snippet = 14,
+        /**
+		 * The `Color` completion item kind.
+		 */
+        Color = 15,
+        /**
+		 * The `Reference` completion item kind.
+		 */
+        Reference = 17,
+        /**
+		 * The `File` completion item kind.
+		 */
+        File = 16,
+        /**
+		 * The `Folder` completion item kind.
+		 */
+        Folder = 18,
+        /**
+		 * The `EnumMember` completion item kind.
+		 */
+        EnumMember = 19,
+        /**
+		 * The `Constant` completion item kind.
+		 */
+        Constant = 20,
+        /**
+		 * The `Struct` completion item kind.
+		 */
+        Struct = 21,
+        /**
+		 * The `Event` completion item kind.
+		 */
+        Event = 22,
+        /**
+		 * The `Operator` completion item kind.
+		 */
+        Operator = 23,
+        /**
+		 * The `TypeParameter` completion item kind.
+		 */
+        TypeParameter = 24,
+        /**
+		 * The `User` completion item kind.
+		 */
+        User = 25,
+        /**
+		 * The `Issue` completion item kind.
+		 */
+        Issue = 26,
     }
     public struct Completion
     {
@@ -340,87 +439,22 @@ namespace Gizbox.LanguageServices
                     sourceB.CopyTo(wordedgeIdx + 1, chararr, 0, curr - wordedgeIdx - 1);
                     string prefix = new string(chararr);
 
-
-                    foreach(var env in persistentGlobalEnvs)
+                    //从符号表链收集  
+                    var curre = currEnv;
+                    while(curre != null)
                     {
-                        foreach(var globalDef in env.records.Values)
-                        {
-                            //尝试名称空间    
-                            bool valid = false;
-                            int offsetNamespace = 0;
-                            if(globalDef.rawname.StartsWith(prefix))
-                            {
-                                valid = true;
-                                offsetNamespace = 0;
-                            }
-                            else
-                            {
-                                foreach(var nameUsingNode in persistentAST.rootNode.usingNamespaceNodes)
-                                {
-                                    string namespaceName = nameUsingNode.namespaceNameNode.token.attribute;
-                                    if(Utils_CheckPrefixUseNamespace(namespaceName, prefix, globalDef.rawname))
-                                    {
-                                        valid = true;
-                                        offsetNamespace = namespaceName.Length + 2;
-                                        break;
-                                    }
-                                }
-                            }
-                            if(valid == false)
-                                continue;//所有命名空间都不合适  
-
-
-                            int offsetPrefix = 0;
-                            if(prefix.Contains(":"))
-                                offsetPrefix = prefix.LastIndexOf(':') + 1;
-                            string completionStr = globalDef.rawname.Substring(offsetNamespace + offsetPrefix);
-
-                            if(globalDef.category == SymbolTable.RecordCatagory.Class)
-                            {
-                                result.Add(new Completion()
-                                {
-                                    label = completionStr,
-                                    kind = ComletionKind.Class,
-                                    detail = "class",
-                                    documentation = "",
-                                    insertText = completionStr
-                                });
-                            }
-                            else if(globalDef.category == SymbolTable.RecordCatagory.Function)
-                            {
-                                string paramStr = "";
-                                foreach(var local in globalDef.envPtr.records.Values)
-                                {
-                                    if(local.category == SymbolTable.RecordCatagory.Param)
-                                    {
-                                        paramStr += local.typeExpression + " " + local.name + ", ";
-                                    }
-                                }
-                                result.Add(new Completion()
-                                {
-                                    label = completionStr,
-                                    kind = ComletionKind.Function,
-                                    detail = globalDef.rawname + "(" + paramStr + ")",
-                                    documentation = "",
-                                    insertText = completionStr
-                                });
-                            }
-                            else if(globalDef.category == SymbolTable.RecordCatagory.Variable)
-                            {
-                                result.Add(new Completion()
-                                {
-                                    label = completionStr,
-                                    kind = ComletionKind.Var,
-                                    detail = globalDef.typeExpression + " " + globalDef.rawname,
-                                    documentation = "",
-                                    insertText = completionStr
-                                });
-                            }
-                        }
+                        if(curre.tableCatagory == SymbolTable.TableCatagory.GlobalScope)
+                            break;
+                        CollectCompletionInEnv(curre, prefix, result);
+                        curre = curre.parent;
                     }
 
+                    //从全局作用域收集  
+                    foreach(var env in persistentGlobalEnvs)
+                    {
+                        CollectCompletionInEnv(env, prefix, result);
+                    }
                 }
-
             }
             //成员自动提示  
             else if(wordedgeChar == '.' && persistentAST != null)
@@ -646,7 +680,7 @@ namespace Gizbox.LanguageServices
                                 result.Add(new Completion()
                                 {
                                     label = completionStr,
-                                    kind = ComletionKind.Var,
+                                    kind = ComletionKind.Variable,
                                     detail = globalDef.typeExpression + " " + globalDef.rawname,
                                     documentation = "",
                                     insertText = completionStr
@@ -763,6 +797,106 @@ namespace Gizbox.LanguageServices
             return result;
         }
 
+        private void CollectCompletionInEnv(SymbolTable env, string prefix, List<Completion> result)
+        {
+            foreach(var rec in env.records.Values)
+            {
+                //尝试名称空间    
+                bool valid = false;
+                int offsetNamespace = 0;
+                if(rec.rawname.StartsWith(prefix))
+                {
+                    valid = true;
+                    offsetNamespace = 0;
+                }
+                else
+                {
+                    foreach(var nameUsingNode in persistentAST.rootNode.usingNamespaceNodes)
+                    {
+                        string namespaceName = nameUsingNode.namespaceNameNode.token.attribute;
+                        if(Utils_CheckPrefixUseNamespace(namespaceName, prefix, rec.rawname))
+                        {
+                            valid = true;
+                            offsetNamespace = namespaceName.Length + 2;
+                            break;
+                        }
+                    }
+                }
+                if(valid == false)
+                    continue;//所有命名空间都不合适  
+
+
+                int offsetPrefix = 0;
+                if(prefix.Contains(":"))
+                    offsetPrefix = prefix.LastIndexOf(':') + 1;
+                string completionStr = rec.rawname.Substring(offsetNamespace + offsetPrefix);
+
+                if(rec.category == SymbolTable.RecordCatagory.Class)
+                {
+                    result.Add(new Completion()
+                    {
+                        label = completionStr,
+                        kind = ComletionKind.Class,
+                        detail = "class",
+                        documentation = "",
+                        insertText = completionStr
+                    });
+                }
+                else if(rec.category == SymbolTable.RecordCatagory.Function)
+                {
+                    string paramStr = "";
+                    foreach(var local in rec.envPtr.records.Values)
+                    {
+                        if(local.category == SymbolTable.RecordCatagory.Param)
+                        {
+                            paramStr += local.typeExpression + " " + local.name + ", ";
+                        }
+                    }
+                    result.Add(new Completion()
+                    {
+                        label = completionStr,
+                        kind = ComletionKind.Function,
+                        detail = rec.rawname + "(" + paramStr + ")",
+                        documentation = "",
+                        insertText = completionStr
+                    });
+                }
+                else if(rec.category == SymbolTable.RecordCatagory.Variable)
+                {
+                    result.Add(new Completion()
+                    {
+                        label = completionStr,
+                        kind = ComletionKind.Variable,
+                        detail = rec.typeExpression + " " + rec.rawname,
+                        documentation = "",
+                        insertText = completionStr
+                    });
+                }
+                else if(rec.category == SymbolTable.RecordCatagory.Param)
+                {
+                    result.Add(new Completion()
+                    {
+                        label = completionStr,
+                        kind = ComletionKind.Variable,
+                        detail = rec.typeExpression + " " + rec.rawname,
+                        documentation = "",
+                        insertText = completionStr
+                    });
+                }
+                else
+                {
+                    result.Add(new Completion()
+                    {
+                        label = completionStr,
+                        kind = ComletionKind.Text,
+                        detail = rec.typeExpression + " " + rec.rawname,
+                        documentation = "",
+                        insertText = completionStr
+                    });
+                }
+            }
+        }
+
         private SymbolTable GetCurrEnv(int line, int character, ref string msg)
         {
             if(line > lineStartsList.Count - 1)
@@ -788,16 +922,16 @@ namespace Gizbox.LanguageServices
 
 
             //寻找叶子节点
-            SyntaxTree.Node leafNode = null;
+            SyntaxTree.Node tgtNode = null;
             {
                 SyntaxTree.Node currNode = this.persistentAST.rootNode;
                 while(currNode.Children.Length > 0)
                 {
-                    bool breakWhile = false;
+                    bool hit = false;
 
-                    var start = currNode.StartToken();
-                    var end = currNode.EndToken();
-                    if(start.start <= curr && curr <= (end.start + end.length))
+                    var startToken = currNode.StartToken();
+                    var endToken = currNode.EndToken();
+                    if(Utils_InRange(startToken, endToken, line, character))
                     {
                         foreach(var child in currNode.Children)
                         {
@@ -805,10 +939,10 @@ namespace Gizbox.LanguageServices
                             var childendToken = child.EndToken();
                             if(childstartToken != null && childendToken != null)
                             {
-                                if(childstartToken.start <= curr && curr <= (childendToken.start + childendToken.length))
+                                if(Utils_InRange(childstartToken, childendToken, line, character))
                                 {
                                     currNode = child;
-                                    breakWhile = true;
+                                    hit = true;
                                     break;
                                 }
                             }
@@ -816,31 +950,30 @@ namespace Gizbox.LanguageServices
                     }
                     else
                     {
-                        msg += ("breakWhile1...currNode:" + currNode.GetType().Name);
                         break;
                     }
 
 
 
-                    if(breakWhile == false)
+                    if(hit == false)
                     {
-                        msg += ("breakWhile2... currNode:" + currNode.GetType().Name);
+                        tgtNode = currNode;
                         break;
                     }
                 }
             }
 
             //DEBUG
-            if(leafNode == null)
+            if(tgtNode == null)
             {
-                msg += "leaf null." ;
+                msg += "node null." ;
             }
             //获取符号表链  
             SymbolTable env = null;
-            if(leafNode != null)
+            if(tgtNode != null)
             {
                 string chain = "";
-                var currNode = leafNode;
+                var currNode = tgtNode;
                 while(currNode != null)
                 {
                     chain += ("-" + currNode.GetType().Name);
@@ -850,13 +983,13 @@ namespace Gizbox.LanguageServices
                         break;
                     }
 
-                    currNode = leafNode.Parent;
+                    currNode = tgtNode.Parent;
                 }
 
                 //DEBUG
                 if(env == null)
                 {
-                    msg += "env null. leaf:" + leafNode.GetType().Name + "  parent chain:" + chain;
+                    msg += "env null. tgtNode:" + tgtNode.GetType().Name + "  parent chain:" + chain;
                 }
             }
 
@@ -1045,6 +1178,12 @@ namespace Gizbox.LanguageServices
         }
 
 
+        public static bool Utils_InRange(Token startToken, Token endToken, int line, int character)
+        {
+            bool leftInRange = line > startToken.line ? true : (line == startToken.line && character >= startToken.start);
+            bool rightInRange = line < endToken.line ? true : (line == endToken.line && character <= (endToken.start + endToken.length));
+            return leftInRange && rightInRange;
+        }
         public static bool Utils_CheckPrefixUseNamespace(string namesp, string prefix, string fullname)
         {
             if (fullname.StartsWith(namesp) == false) return false;
