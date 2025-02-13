@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="LLVMSharp" Version="5.0.0" />
+    <PackageReference Include="LLVMSharp" Version="16.0.0" />
   </ItemGroup>
 
   <ItemGroup>

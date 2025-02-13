@@ -2,55 +2,6 @@
   "version": 3,
   "targets": {
     "net8.0": {
-      "LibLLVM/5.0.1": {
-        "type": "package",
-        "dependencies": {
-          "Microsoft.NETCore.Platforms": "1.0.1"
-        },
-        "build": {
-          "build/net461/_._": {}
-        },
-        "runtimeTargets": {
-          "runtimes/linux-x64/native/libLLVM.so": {
-            "assetType": "native",
-            "rid": "linux-x64"
-          },
-          "runtimes/osx/native/libLLVM.dylib": {
-            "assetType": "native",
-            "rid": "osx"
-          },
-          "runtimes/win-x64/native/libLLVM.dll": {
-            "assetType": "native",
-            "rid": "win-x64"
-          },
-          "runtimes/win-x86/native/libLLVM.dll": {
-            "assetType": "native",
-            "rid": "win-x86"
-          }
-        }
-      },
-      "LLVMSharp/5.0.0": {
-        "type": "package",
-        "dependencies": {
-          "NETStandard.Library": "1.6.1",
-          "libLLVM": "5.0.1"
-        },
-        "compile": {
-          "lib/netstandard1.1/LLVMSharp.dll": {}
-        },
-        "runtime": {
-          "lib/netstandard1.1/LLVMSharp.dll": {}
-        }
-      },
-      "Microsoft.NETCore.Platforms/1.0.1": {
-        "type": "package",
-        "compile": {
-          "lib/netstandard1.0/_._": {}
-        },
-        "runtime": {
-          "lib/netstandard1.0/_._": {}
-        }
-      },
       "Gizbox/1.0.0": {
         "type": "project",
         "framework": ".NETStandard,Version=v2.0",
@@ -60,99 +11,40 @@
         "runtime": {
           "bin/placeholder/Gizbox.dll": {}
         }
-      },
-      "GizboxAOT/1.0.0": {
-        "type": "project",
-        "framework": ".NETStandard,Version=v2.0",
-        "dependencies": {
-          "Gizbox": "1.0.0",
-          "LLVMSharp": "5.0.0"
-        },
-        "compile": {
-          "bin/placeholder/GizboxAOT.dll": {}
-        },
-        "runtime": {
-          "bin/placeholder/GizboxAOT.dll": {}
-        }
       }
     }
   },
   "libraries": {
-    "LibLLVM/5.0.1": {
-      "sha512": "pWsPGfwesb/+bn9r+XBz7QF04+aDz9pyQAUIv6geUjDEnMEoMEgX+FnaaNqpTU2t0xdi3YFZoGB70/yraeD21g==",
-      "type": "package",
-      "path": "libllvm/5.0.1",
-      "files": [
-        ".nupkg.metadata",
-        ".signature.p7s",
-        "License.txt",
-        "build/net461/libLLVM.targets",
-        "libllvm.5.0.1.nupkg.sha512",
-        "libllvm.nuspec",
-        "runtimes/linux-x64/native/libLLVM.so",
-        "runtimes/osx/native/libLLVM.dylib",
-        "runtimes/win-x64/native/libLLVM.dll",
-        "runtimes/win-x86/native/libLLVM.dll"
-      ]
-    },
-    "LLVMSharp/5.0.0": {
-      "sha512": "cmMzCgd0RWQzRGS0RLaSoZvaqnaSSXW7uxDV8Z+04AT2yzCZLeeuTpve8gWhfVOqYU14VefncreotUI8bdBPEA==",
-      "type": "package",
-      "path": "llvmsharp/5.0.0",
-      "files": [
-        ".nupkg.metadata",
-        ".signature.p7s",
-        "lib/netstandard1.1/LLVMSharp.dll",
-        "llvmsharp.5.0.0.nupkg.sha512",
-        "llvmsharp.nuspec"
-      ]
-    },
-    "Microsoft.NETCore.Platforms/1.0.1": {
-      "sha512": "2G6OjjJzwBfNOO8myRV/nFrbTw5iA+DEm0N+qUqhrOmaVtn4pC77h38I1jsXGw5VH55+dPfQsqHD0We9sCl9FQ==",
-      "type": "package",
-      "path": "microsoft.netcore.platforms/1.0.1",
-      "files": [
-        ".nupkg.metadata",
-        ".signature.p7s",
-        "ThirdPartyNotices.txt",
-        "dotnet_library_license.txt",
-        "lib/netstandard1.0/_._",
-        "microsoft.netcore.platforms.1.0.1.nupkg.sha512",
-        "microsoft.netcore.platforms.nuspec",
-        "runtime.json"
-      ]
-    },
     "Gizbox/1.0.0": {
       "type": "project",
       "path": "../Gizbox/Gizbox.csproj",
       "msbuildProject": "../Gizbox/Gizbox.csproj"
-    },
-    "GizboxAOT/1.0.0": {
-      "type": "project",
-      "path": "../GizboxAOT/GizboxAOT.csproj",
-      "msbuildProject": "../GizboxAOT/GizboxAOT.csproj"
     }
   },
   "projectFileDependencyGroups": {
     "net8.0": [
-      "Gizbox >= 1.0.0",
-      "GizboxAOT >= 1.0.0"
+      "Gizbox >= 1.0.0"
     ]
   },
   "packageFolders": {
-    "C:\\Users\\saus\\.nuget\\packages\\": {}
+    "C:\\Users\\leona\\.nuget\\packages\\": {},
+    "E:\\Visual Studio 2019\\Shared\\NuGetPackages": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "F:\\ZQJ\\GizboxAndTools\\Gizbox\\GizboxTest\\GizboxTest.csproj",
+      "projectUniqueName": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxTest\\GizboxTest.csproj",
       "projectName": "GizboxTest",
-      "projectPath": "F:\\ZQJ\\GizboxAndTools\\Gizbox\\GizboxTest\\GizboxTest.csproj",
-      "packagesPath": "C:\\Users\\saus\\.nuget\\packages\\",
-      "outputPath": "F:\\ZQJ\\GizboxAndTools\\Gizbox\\GizboxTest\\obj\\",
+      "projectPath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxTest\\GizboxTest.csproj",
+      "packagesPath": "C:\\Users\\leona\\.nuget\\packages\\",
+      "outputPath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxTest\\obj\\",
       "projectStyle": "PackageReference",
+      "fallbackFolders": [
+        "E:\\Visual Studio 2019\\Shared\\NuGetPackages"
+      ],
       "configFilePaths": [
-        "C:\\Users\\saus\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Users\\leona\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
       "originalTargetFrameworks": [
@@ -166,11 +58,8 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "F:\\ZQJ\\GizboxAndTools\\Gizbox\\GizboxAOT\\GizboxAOT.csproj": {
-              "projectPath": "F:\\ZQJ\\GizboxAndTools\\Gizbox\\GizboxAOT\\GizboxAOT.csproj"
-            },
-            "F:\\ZQJ\\GizboxAndTools\\Gizbox\\Gizbox\\Gizbox.csproj": {
-              "projectPath": "F:\\ZQJ\\GizboxAndTools\\Gizbox\\Gizbox\\Gizbox.csproj"
+            "F:\\Legacy\\MyProjects\\Gizbox\\Gizbox\\Gizbox.csproj": {
+              "projectPath": "F:\\Legacy\\MyProjects\\Gizbox\\Gizbox\\Gizbox.csproj"
             }
           }
         }
@@ -179,6 +68,11 @@
         "warnAsError": [
           "NU1605"
         ]
+      },
+      "restoreAuditProperties": {
+        "enableAudit": "true",
+        "auditLevel": "low",
+        "auditMode": "direct"
       }
     },
     "frameworks": {
@@ -200,20 +94,8 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.100/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.205/PortableRuntimeIdentifierGraph.json"
       }
     }
-  },
-  "logs": [
-    {
-      "code": "NU1701",
-      "level": "Warning",
-      "warningLevel": 1,
-      "message": "已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“net8.0”还原包“LibLLVM 5.0.1”。此包可能与项目不完全兼容。",
-      "libraryId": "LibLLVM",
-      "targetGraphs": [
-        "net8.0"
-      ]
-    }
-  ]
+  }
 }
