@@ -1,23 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "o1Qst/yUw3aVjaSS+4X/sPiMRu55at2Mc9vsZ2mRm3hw0CHPGqp7SQ48CuuVCYpfTi2SesYqywQgZO6rOa8SzA==",
+  "dgSpecHash": "8FKB5RpdcN2VqJF6szA4pRiS/yEk/VJh3/Plt9OVBO+SsrcpIulp1ygoqZhVd8n90MAQ6dAoQJdg5Yq7X9WlBA==",
   "success": true,
-  "projectFilePath": "F:\\ZQJ\\GizboxAndTools\\Gizbox\\GizboxTest\\GizboxTest.csproj",
-  "expectedPackageFiles": [
-    "C:\\Users\\saus\\.nuget\\packages\\libllvm\\5.0.1\\libllvm.5.0.1.nupkg.sha512",
-    "C:\\Users\\saus\\.nuget\\packages\\llvmsharp\\5.0.0\\llvmsharp.5.0.0.nupkg.sha512",
-    "C:\\Users\\saus\\.nuget\\packages\\microsoft.netcore.platforms\\1.0.1\\microsoft.netcore.platforms.1.0.1.nupkg.sha512"
-  ],
-  "logs": [
-    {
-      "code": "NU1701",
-      "level": "Warning",
-      "warningLevel": 1,
-      "message": "已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“net8.0”还原包“LibLLVM 5.0.1”。此包可能与项目不完全兼容。",
-      "libraryId": "LibLLVM",
-      "targetGraphs": [
-        "net8.0"
-      ]
-    }
-  ]
+  "projectFilePath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxTest\\GizboxTest.csproj",
+  "expectedPackageFiles": [],
+  "logs": []
 }
