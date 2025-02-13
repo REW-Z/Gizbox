@@ -303,8 +303,13 @@ namespace Gizbox.LanguageServices
 
             List<Completion> result = new List<Completion>();
 
+            //标识符边界(包含空格)
             char wordedgeChar = ' ';
             int wordedgeIdx = curr - 1;
+            //分割边界  
+            char splitChar = ' ';
+            int splitCharIdx = curr - 1;
+
             for(int i = curr - 1; i > 0; --i)
             {
                 char c = sourceB[i];
@@ -315,16 +320,34 @@ namespace Gizbox.LanguageServices
                     break;
                 }
             }
+            for (int i = curr - 1; i > 0; --i)
+            {
+                char c = sourceB[i];
+                if (Utils_IsSplitChar(c))
+                {
+                    splitChar = c;
+                    splitCharIdx = i;
+                    break;
+                }
+            }
 
 
             //DEBUG  
             result.Add(new Completion()
             {
-                label = "DEBUG_SHOW_WORD_EDGE:" + wordedgeChar,
+                label = "DEBUG_SHOW_WORD_EDGE:" + Utils_CharToPrintFormat(wordedgeChar),
                 kind = ComletionKind.Class,
                 detail = "",
                 documentation = "",
-                insertText = ""
+                insertText = "DEBUG_SHOW_WORD_EDGE:" + Utils_CharToPrintFormat(wordedgeChar),
+            });
+            result.Add(new Completion()
+            {
+                label = "DEBUG_SHOW_SPLIT:" + Utils_CharToPrintFormat(splitChar),
+                kind = ComletionKind.Class,
+                detail = "",
+                documentation = "",
+                insertText = "DEBUG_SHOW_SPLIT:" + Utils_CharToPrintFormat(splitChar),
             });
 
             string errMsg = "";
@@ -337,7 +360,7 @@ namespace Gizbox.LanguageServices
                     kind = ComletionKind.Class,
                     detail = "",
                     documentation = "",
-                    insertText = ""
+                    insertText = "DEBUG_SHOW_ENV:" + currEnv.name,
                 });
             }
             else
@@ -362,7 +385,7 @@ namespace Gizbox.LanguageServices
 
 
             // *** 类名/变量名自动提示 ***   
-            if(wordedgeChar == ';' || wordedgeChar == '\n')
+            if(splitChar != '.')
             {
                 if(persistentGlobalEnvs != null && persistentAST != null)
                 {
@@ -370,12 +393,21 @@ namespace Gizbox.LanguageServices
                     sourceB.CopyTo(wordedgeIdx + 1, chararr, 0, curr - wordedgeIdx - 1);
                     string prefix = new string(chararr);
 
+                    result.Add(new Completion()
+                    {
+                        label = "DEBUG_GLOABL_PREFIX:" + prefix,
+                        kind = ComletionKind.Class,
+                        detail = "",
+                        documentation = "",
+                        insertText = "DEBUG_GLOABL_PREFIX:" + prefix,
+                    });
+
                     //从符号表链收集  
                     TraversalEnvChain(currEnv, curre => CollectCompletionInEnv(curre, prefix, result));
                 }
             }
             // *** 成员自动提示 ***   
-            else if(wordedgeChar == '.' && persistentAST != null)
+            else if(splitChar == '.' && persistentAST != null)
             {
                 int objNameEnd = wordedgeIdx;
                 int objNameStart = wordedgeIdx;
@@ -406,72 +438,6 @@ namespace Gizbox.LanguageServices
                         insertText = "DEBUG_OBJNAME"
                     });
 
-                    //foreach(var idNode in persistentAST.identityNodes)
-                    //{
-                    //    if(idNode.FullName.EndsWith(objName) && idNode.attributes.ContainsKey("def_at_env"))
-                    //    {
-                    //        var env = (idNode.attributes["def_at_env"] as SymbolTable);
-
-                    //        SymbolTable identifierEnv = env;
-                    //        SymbolTable globalEnv = null;
-                    //        SymbolTable.Record rec = default;
-                    //        int count = 0;
-                    //        while(identifierEnv != null)
-                    //        {
-                    //            if(count++ > 99)
-                    //                throw new Exception("Env Loop err !");
-
-                    //            if(identifierEnv.parent == null)
-                    //            {
-                    //                globalEnv = identifierEnv;
-                    //            }
-
-                    //            if(rec == default && env.ContainRecordRawName(objName))
-                    //            {
-                    //                rec = env.GetRecord(objName);
-                    //            }
-                    //            else
-                    //            {
-                    //                identifierEnv = identifierEnv.parent;
-                    //            }
-                    //        }
-
-
-                    //        if(rec != default && globalEnv != null && globalEnv.ContainRecordName(rec.typeExpression))
-                    //        {
-                    //            var classEnv = globalEnv.GetRecord(rec.typeExpression).envPtr;
-                    //            if(classEnv != null)
-                    //            {
-                    //                var members = classEnv.records.Values;
-                    //                foreach(var member in members)
-                    //                {
-                    //                    if(member.category == SymbolTable.RecordCatagory.Variable || member.category == SymbolTable.RecordCatagory.Param)
-                    //                    {
-                    //                        result.Add(new Completion()
-                    //                        {
-                    //                            label = member.rawname,
-                    //                            kind = ComletionKind.Field,
-                    //                            detail = "obj:(" + objName + ")len(" + objName.Length + ")",
-                    //                            documentation = "",
-                    //                            insertText = member.rawname,
-                    //                        });
-                    //                    }
-                    //                    else if(member.category == SymbolTable.RecordCatagory.Function)
-                    //                    {
-                    //                        result.Add(new Completion()
-                    //                        {
-                    //                            label = member.rawname,
-                    //                            kind = ComletionKind.Method,
-                    //                            detail = "obj:(" + objName + ")len(" + objName.Length + ")",
-                    //                            documentation = "",
-                    //                            insertText = member.rawname,
-                    //                        });
-                    //                    }
-                    //                }
-                    //            }
-                    //        }
-                    //    }
-                    //}
 
                     //从符号表链对象名  
                     SymbolTable.Record idRec = null;
@@ -498,18 +464,24 @@ namespace Gizbox.LanguageServices
                                 {
                                     label = member.rawname,
                                     kind = ComletionKind.Field,
-                                    detail = "obj:(" + objName + ")len(" + objName.Length + ")",
+                                    detail = $"{member.typeExpression} {member.rawname}",
                                     documentation = "",
                                     insertText = member.rawname,
                                 });
                             }
                             else if(member.category == SymbolTable.RecordCatagory.Function)
                             {
+                                string paramStr = Utils_ConcatWithComma(
+                                    member.envPtr.records.Values
+                                    .Where(r => r.category == SymbolTable.RecordCatagory.Param)
+                                    .Select(p => p.typeExpression + " " + p.name)
+                                    );
+
                                 result.Add(new Completion()
                                 {
-                                    label = member.rawname,
+                                    label = $"{member.rawname}({paramStr})",
                                     kind = ComletionKind.Method,
-                                    detail = "obj:(" + objName + ")len(" + objName.Length + ")",
+                                    detail = $"{member.rawname}({paramStr})",
                                     documentation = "",
                                     insertText = member.rawname,
                                 });
@@ -581,8 +553,12 @@ namespace Gizbox.LanguageServices
         {
             //从局部符号表链收集  
             var curre = fromEnv;
+
+            int loopCounter = 0;
             while(curre != null)
             {
+                if (loopCounter++ > 99) throw new Exception("Infinite Loop !");
+
                 if(curre.tableCatagory == SymbolTable.TableCatagory.GlobalScope)
                     break;
 
@@ -665,26 +641,23 @@ namespace Gizbox.LanguageServices
                     {
                         label = completionStr,
                         kind = ComletionKind.Class,
-                        detail = "class",
+                        detail = $"class {completionStr}",
                         documentation = "",
                         insertText = completionStr
                     });
                 }
                 else if(rec.category == SymbolTable.RecordCatagory.Function)
                 {
-                    string paramStr = "";
-                    foreach(var local in rec.envPtr.records.Values)
-                    {
-                        if(local.category == SymbolTable.RecordCatagory.Param)
-                        {
-                            paramStr += local.typeExpression + " " + local.name + ", ";
-                        }
-                    }
+                    string paramStr = Utils_ConcatWithComma(
+                        rec.envPtr.records.Values
+                        .Where(r => r.category == SymbolTable.RecordCatagory.Param)
+                        .Select(p => p.typeExpression + " " + p.name)
+                        );
                     result.Add(new Completion()
                     {
-                        label = completionStr,
+                        label = $"{completionStr}({paramStr})",
                         kind = ComletionKind.Function,
-                        detail = rec.rawname + "(" + paramStr + ")",
+                        detail = $"{rec.rawname}({paramStr})",
                         documentation = "",
                         insertText = completionStr
                     });
@@ -695,7 +668,7 @@ namespace Gizbox.LanguageServices
                     {
                         label = completionStr,
                         kind = ComletionKind.Variable,
-                        detail = rec.typeExpression + " " + rec.rawname,
+                        detail = $"{rec.typeExpression} {rec.rawname}",
                         documentation = "",
                         insertText = completionStr
                     });
@@ -706,7 +679,18 @@ namespace Gizbox.LanguageServices
                     {
                         label = completionStr,
                         kind = ComletionKind.Variable,
-                        detail = rec.typeExpression + " " + rec.rawname,
+                        detail = $"{rec.typeExpression} {rec.rawname}",
+                        documentation = "",
+                        insertText = completionStr
+                    });
+                }
+                else if (rec.category == SymbolTable.RecordCatagory.Constant)
+                {
+                    result.Add(new Completion()
+                    {
+                        label = completionStr,
+                        kind = ComletionKind.Constant,
+                        detail = $"{rec.typeExpression} {rec.rawname}",
                         documentation = "",
                         insertText = completionStr
                     });
@@ -717,7 +701,7 @@ namespace Gizbox.LanguageServices
                     {
                         label = completionStr,
                         kind = ComletionKind.Text,
-                        detail = rec.typeExpression + " " + rec.rawname,
+                        detail = $"{rec.typeExpression} {rec.rawname}",
                         documentation = "",
                         insertText = completionStr
                     });
@@ -751,16 +735,21 @@ namespace Gizbox.LanguageServices
 
 
 
-            //寻找叶子节点
-            SyntaxTree.Node tgtNode = null;
+            //寻找最深节点
+            SyntaxTree.Node deepestNode = null;
             {
                 SyntaxTree.Node currNode = this.persistentAST.rootNode;
-                while(currNode.Children.Length > 0)
+
+                int loop = 0;
+                while(currNode.Children.Length > 0)//非叶子节点  
                 {
-                    bool hit = false;
+                    if (loop++ > 99) throw new Exception("Infinite Loop!"); 
+
+                    bool anyChildHit = false;
 
                     var startToken = currNode.StartToken();
                     var endToken = currNode.EndToken();
+                    //Is in currNode  
                     if(Utils_InRange(startToken, endToken, line, character))
                     {
                         foreach(var child in currNode.Children)
@@ -772,40 +761,48 @@ namespace Gizbox.LanguageServices
                                 if(Utils_InRange(childstartToken, childendToken, line, character))
                                 {
                                     currNode = child;
-                                    hit = true;
-                                    break;
+                                    deepestNode = child;
+                                    anyChildHit = true;
+                                    break;//hit child  
                                 }
                             }
                         }
+
+                        if (anyChildHit)
+                        {
+                            // auto continue  
+                        }
+                        else
+                        {
+                            break;//end
+                        }
                     }
+                    //Not in currNode  
                     else
                     {
-                        break;
-                    }
-
-
-
-                    if(hit == false)
-                    {
-                        tgtNode = currNode;
-                        break;
+                        deepestNode = null;
+                        break;//end
                     }
                 }
             }
 
             //DEBUG
-            if(tgtNode == null)
+            if(deepestNode == null)
             {
                 msg += "node null." ;
             }
             //获取符号表链  
             SymbolTable env = null;
-            if(tgtNode != null)
+            if(deepestNode != null)
             {
                 string chain = "";
-                var currNode = tgtNode;
+                var currNode = deepestNode;
+
+                int loop = 0;
                 while(currNode != null)
                 {
+                    if (loop++ > 99) throw new Exception("Infinite Loop!");
+
                     chain += ("-" + currNode.GetType().Name);
                     if(currNode.attributes.ContainsKey("env"))
                     {
@@ -813,13 +810,13 @@ namespace Gizbox.LanguageServices
                         break;
                     }
 
-                    currNode = tgtNode.Parent;
+                    currNode = currNode.Parent;
                 }
 
                 //DEBUG
                 if(env == null)
                 {
-                    msg += "env null. tgtNode:" + tgtNode.GetType().Name + "  parent chain:" + chain;
+                    msg += "env null. tgtNode:" + deepestNode.GetType().Name + "  parent chain:" + chain;
                 }
             }
 
@@ -910,14 +907,15 @@ namespace Gizbox.LanguageServices
                         {
                             var firstToken = semanticEx.node.StartToken();
                             var lastToken = semanticEx.node.EndToken();
+                            
                             this.tempDiagnosticInfo = new DiagnosticInfo()
                             {
                                 code = "0003",
 
-                                startLine = firstToken.line - 1,
-                                startChar = firstToken.start,
-                                endLine = lastToken.line - 1,
-                                endChar = lastToken.start + lastToken.attribute.Length,
+                                startLine = firstToken != null ? (firstToken.line - 1) : 0,
+                                startChar = firstToken != null ? (firstToken.start) : 0,
+                                endLine = lastToken != null ? (lastToken.line - 1) : GetEndLine(),
+                                endChar = lastToken != null ? (lastToken.start + lastToken.attribute.Length) : GetEndCharacter(),
                                 message = semanticEx.Message,
                                 severity = 2,
                             };
@@ -1038,13 +1036,41 @@ namespace Gizbox.LanguageServices
 
             return false;
         }
-        public static bool Utils_IsWordedgeChar(char c)
+
+        public static string Utils_ConcatWithComma(IEnumerable<string> input)
+        {
+            StringBuilder sb = new StringBuilder();
+
+            int index = 0;
+            foreach(var str in input)
+            {
+                if(index != 0)
+                    sb.Append(", ");
+
+                sb.Append(str);
+
+                index++;
+            }
+
+            return sb.ToString();
+        }
+
+        public static string Utils_CharToPrintFormat(char c)
+        {
+            switch(c)
+            {
+                case ' ': return "space";
+                case '\t': return "tab";
+                case '\n': return "\\ n";
+                case '\r': return "\\ r";
+                default: return c.ToString();
+            }
+        }
+
+        public static bool Utils_IsSplitChar(char c)
         {
             switch (c)
             {
-                case ' '://
-                case '\t'://
-                case '\n'://
                 case '.'://
                 case ';'://
                 case ','://
@@ -1069,6 +1095,25 @@ namespace Gizbox.LanguageServices
                 case '%'://
                 case '?'://
 
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        public static bool Utils_IsWordedgeChar(char c)
+        {
+            if(Utils_IsSplitChar(c))
+            {
+                return true;
+            }
+
+            switch (c)
+            {
+                case ' ':
+                case '\t':
+                case '\n':
+                case '\r':
                     return true;
                 default:
                     return false;

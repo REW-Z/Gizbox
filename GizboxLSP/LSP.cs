@@ -15,6 +15,8 @@ using static System.Net.Mime.MediaTypeNames;
 using Gizbox.LanguageServices;
 using System.IO.Enumeration;
 using System.Security.AccessControl;
+using System.Runtime.CompilerServices;
+using System.Net.Http.Headers;
 
 
 namespace Gizbox.LSP
@@ -28,6 +30,7 @@ namespace Gizbox.LSP
         public static Stream outputStream = Console.OpenStandardOutput();
 
         public static string? currentDocUri = null;
+
 
         //日志 
         public static string? logPath;
@@ -47,6 +50,8 @@ namespace Gizbox.LSP
         private static System.Diagnostics.Stopwatch watch = new System.Diagnostics.Stopwatch();
 
 
+        //常量参数  
+        private static double heartbeatInterval = 4f;
 
 
 
@@ -57,6 +62,7 @@ namespace Gizbox.LSP
             //!关闭编译器的ConsoleLog(否则会当作LSP响应发送到Client)    
             Gizbox.GixConsole.enableSystemConsole = false;
 
+
             //接收器  
             Console.OutputEncoding = Encoding.UTF8;
             var buffer = new byte[1024 * 64];
@@ -66,11 +72,7 @@ namespace Gizbox.LSP
             watch.Start();
 
             //Log Clean
-            logPath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop) + "//lsplog_" + System.DateTime.Now.Minute + "_" + System.DateTime.Now.Second + ".txt";
-            if(System.IO.File.Exists(logPath))
-            {
-                System.IO.File.Delete(logPath);
-            }
+            CleanFileLog();
 
             //写入流启动    
             _ = Task.Run(StartWriteQueueToOutstream);
@@ -79,10 +81,29 @@ namespace Gizbox.LSP
             _ = Task.Run(StartDiagnosticSystem);
 
 
-            while(true)
+            //心跳相关  
+             LogToStream("HEARTBEAT(START):" + System.DateTime.Now.ToString());
+            DateTime lastLoop = DateTime.Now;
+            TimeSpan timeTemp = default;
+
+            while (true)
             {
+                //心跳  
+                Thread.Sleep(10);
+                var deltaTime = DateTime.Now - lastLoop;
+                lastLoop = DateTime.Now;
+                timeTemp += deltaTime;
+                if (timeTemp.TotalSeconds > Program.heartbeatInterval)
+                {
+                    timeTemp -= TimeSpan.FromSeconds(Program.heartbeatInterval);
+                     LogToStream("HEARTBEAT:" + System.DateTime.Now.ToString());
+                }
+
+                //处理请求  
                 try
                 {
+                    //读取输入流  
+                    LogToFile("读取输入中...");
                     var bytesRead = await inputStream.ReadAsync(buffer, 0, buffer.Length);
                     if(bytesRead == 0)
                     {
@@ -93,7 +114,6 @@ namespace Gizbox.LSP
                     string messagePart = Encoding.UTF8.GetString(buffer, 0, bytesRead);
                     messageBuilder.Append(messagePart);
 
-                    //Log("\n\n[Receive]\n\n\n" + messagePart);
 
                     var messageContents = SplitJson(messageBuilder.ToString());
                     if(messageContents.Count == 0)
@@ -104,11 +124,12 @@ namespace Gizbox.LSP
 
                     foreach(var content in messageContents)
                     {
-                        //Log("\n\n[Split]\n\n\n" + content);
                     }
 
 
-                    foreach(var messageContent in messageContents)
+                    LogToFile("读取完毕...一共" + messageContents.Count + "条");
+
+                    foreach (var messageContent in messageContents)
                     {
                         var lspRequest = JObject.Parse(messageContent);
 
@@ -118,8 +139,9 @@ namespace Gizbox.LSP
 
                             if(methodName == "initialize")
                             {
-                                //Log("\n\n[Handling Init...]\n\n\n");
+                                LogToFile("Start Handle Init...");
                                 await HandleInitialize(lspRequest);
+                                LogToFile("End Handle Init...");
                             }
                             else if(methodName == "textDocument/didOpen")
                             {
@@ -131,22 +153,24 @@ namespace Gizbox.LSP
                                     currentDocUri = uri;
                                 }
 
-                                //Log("\n\n[Handling didOpen...]\n\n\n");
+                                LogToFile("Start Handle DidOpen...");
                                 await HandleDidOpen(lspRequest);
+                                LogToFile("End Handle DidOpen...");
 
                                 //第一次诊断  
-                                if(string.IsNullOrEmpty(currentDocUri) == false)
+                                if (string.IsNullOrEmpty(currentDocUri) == false)
                                 {
                                     await Diagnostics(currentDocUri);
                                 }
                             }
                             else if(methodName == "textDocument/didChange")
                             {
-                                //Log("\n\n[Handling didChange...]\n\n\n");
+                                LogToFile("Start Handle DidChange...");
                                 await HandleDidChange(lspRequest);
+                                LogToFile("End Handle DidChange...");
 
                                 //打字时候暂缓发送诊断  
-                                if(currentDocUri != null)
+                                if (currentDocUri != null)
                                 {
                                     _ = DiagnosticsAfter(currentDocUri, 1000);
                                 }
@@ -162,8 +186,9 @@ namespace Gizbox.LSP
                                 }
 
 
-                                //Log("\n\n[Handling completion....]\n\n\n");
+                                LogToFile("Start Handle Completion...");
                                 await HandleCompletion(lspRequest);
+                                LogToFile("End Handle Completion...");
                             }
                             else if(methodName == "textDocument/documentHighlight")
                             {
@@ -175,8 +200,9 @@ namespace Gizbox.LSP
                                     currentDocUri = uri;
                                 }
 
-                                //Log("\n\n[Handling highlighting....]\n\n\n");
+                                LogToFile("Start Handle Highlighting...");
                                 await HandleHighlighting(lspRequest);
+                                LogToFile("End Handle Highlighting...");
                             }
                         }
                     }
@@ -187,10 +213,13 @@ namespace Gizbox.LSP
                 catch(Exception ex)
                 {
                     messageBuilder.Clear();
-                    await LogToStream(" LSP Err:" + ex.ToString());
+                    LogToFile("LSP Catch Err:" + ex.ToString());
+                    LogToStream(" LSP Catch Err:" + ex.ToString());
                 }
             }
+
         }
+
 
         public static void StartWriteQueueToOutstream()
         {
@@ -227,6 +256,7 @@ namespace Gizbox.LSP
                 }
             }
         }
+
 
         public static List<string> SplitJson(string input)
         {
@@ -271,69 +301,75 @@ namespace Gizbox.LSP
 
         private static async Task HandleInitialize(JObject request)
         {
-            string logStr = "";
-            //set folder  
-            var folderInfos = (JArray?)request["params"]?["workspaceFolders"];
-            if(folderInfos != null && folderInfos.Count > 0)
+            try
             {
-                string? uri = folderInfos[0]["uri"]?.ToObject<string>();
-                if(string.IsNullOrEmpty(uri) == false)
+                string logStr = "";
+                //set folder  
+                var folderInfos = (JArray?)request["params"]?["workspaceFolders"];
+                if (folderInfos != null && folderInfos.Count > 0)
                 {
-                    Uri uriObj = new Uri(uri);
-                    string finalPath = uriObj.LocalPath;
-                    if(finalPath[0] == '/')
-                        finalPath = finalPath.Substring(1);
-
-                    try
+                    string? uri = folderInfos[0]["uri"]?.ToObject<string>();
+                    if (string.IsNullOrEmpty(uri) == false)
                     {
-                        gizboxService.SetWorkFolder(finalPath);
+                        Uri uriObj = new Uri(uri);
+                        string finalPath = uriObj.LocalPath;
+                        if (finalPath[0] == '/')
+                            finalPath = finalPath.Substring(1);
 
-                        logStr = ("Set Work Folder:" + finalPath);
+                        try
+                        {
+                            gizboxService.SetWorkFolder(finalPath);
+
+                            logStr = ("Set Work Folder:" + finalPath);
+                        }
+                        catch
+                        {
+                            logStr = ("Invalid Work Folder:" + finalPath);
+                        }
                     }
-                    catch
+                    else
                     {
-                        logStr = ("Invalid Work Folder:" + finalPath);
+                        logStr = ("Set Work Folder (uri null)");
                     }
                 }
                 else
                 {
-                    logStr = ("Set Work Folder (uri null)");
+                    logStr = ("Set Work Folder (workspaceFolders null)");
                 }
-            }
-            else
-            {
-                logStr = ("Set Work Folder (workspaceFolders null)");
-            }
 
 
-            //response  
-            var response = new
-            {
-                jsonrpc = "2.0",
-                id = (int?)request["id"],
-                result = new
+                //response  
+                var response = new
                 {
-                    capabilities = new
+                    jsonrpc = "2.0",
+                    id = (int?)request["id"],
+                    result = new
                     {
-                        textDocumentSync = 2,//同步    0 、 1 、 2
-                        completionProvider = new { resolveProvider = true },
-                        hoverProvider = true
+                        capabilities = new
+                        {
+                            textDocumentSync = 2,//同步    0 、 1 、 2
+                            completionProvider = new { resolveProvider = true },
+                            hoverProvider = true
+                        }
                     }
+                };
+
+                var responseJson = JsonConvert.SerializeObject(response);
+
+                var responseMessage = LSPUtils.HttpResponsePlainText(Encoding.UTF8.GetByteCount(responseJson), responseJson);// $"Content-Length: {Encoding.UTF8.GetByteCount(responseJson)}\r\n\r\n{responseJson}";
+                                                                                                                             //var responseBytes = Encoding.UTF8.GetBytes(responseMessage);
+                                                                                                                             //await outputStream.WriteAsync(responseBytes, 0, responseBytes.Length);
+                lock (writeQueue)
+                {
+                    writeQueue.Enqueue(responseMessage);
                 }
-            };
-
-            var responseJson = JsonConvert.SerializeObject(response);
-
-            var responseMessage = LSPUtils.HttpResponsePlainText(Encoding.UTF8.GetByteCount(responseJson), responseJson);// $"Content-Length: {Encoding.UTF8.GetByteCount(responseJson)}\r\n\r\n{responseJson}";
-            //var responseBytes = Encoding.UTF8.GetBytes(responseMessage);
-            //await outputStream.WriteAsync(responseBytes, 0, responseBytes.Length);
-            lock(writeQueue)
-            {
-                writeQueue.Enqueue(responseMessage);
             }
-
-
-            //await LogToStream("Server Inited... " + logStr);
+            catch(Exception e)
+            {
+                LogToStream("!!! Err Handle Init");
+                LogToFile("!!! Err Handle Init");
+                throw new Exception("Catch Err When Handle Init:" + e.ToString());
+            }
         }
 
         private static async Task HandleDidOpen(JObject request)
@@ -345,176 +381,205 @@ namespace Gizbox.LSP
         }
         private static async Task HandleDidChange(JObject request)
         {
-            var changes = (JArray)request["params"]["contentChanges"];
-            if(changes == null)
+            try
             {
-                throw new Exception("没有contentChanges字段：" + request.ToString());
-            }
+                var changes = (JArray)request["params"]["contentChanges"];
+                if (changes == null)
+                {
+                    throw new Exception("没有contentChanges字段：" + request.ToString());
+                }
 
-            //Log("\n change count:" + changes.Count  + "\n");
-            for(int i = 0; i < changes.Count; i++)
+                for (int i = 0; i < changes.Count; i++)
+                {
+                    var change = (JObject)changes[i];
+                    var jRange = (JObject)(change["range"]);
+
+                    bool fullUpdate = false;
+                    if (jRange == null)
+                    {
+                        fullUpdate = true;
+                    }
+
+                    //增量更新  
+                    if (fullUpdate == false)
+                    {
+                        int start_line = (int)jRange["start"]["line"];
+                        int start_char = (int)jRange["start"]["character"];
+                        int end_line = (int)jRange["end"]["line"];
+                        int end_char = (int)jRange["end"]["character"];
+                        string text = (string)change["text"];
+
+                        gizboxService.DidChange(
+                            start_line,
+                            start_char,
+                            end_line,
+                            end_char,
+                            text);
+                    }
+                    //全量更新  
+                    else
+                    {
+                        string text = (string)change["text"];
+                        gizboxService.DidChange(
+                            -1,
+                            -1,
+                            -1,
+                            -1,
+                            text);
+                    }
+                }
+
+                 LogToStream("Handle did changes....current : " + gizboxService.sourceB[gizboxService.sourceB.Length - 1]);
+            }
+            catch(Exception e)
             {
-                var change = (JObject)changes[i];
-                var jRange = (JObject)(change["range"]);
-
-                bool fullUpdate = false;
-                if(jRange == null)
-                {
-                    fullUpdate = true;
-                }
-
-                //增量更新  
-                if(fullUpdate == false)
-                {
-                    int start_line = (int)jRange["start"]["line"];
-                    int start_char = (int)jRange["start"]["character"];
-                    int end_line = (int)jRange["end"]["line"];
-                    int end_char = (int)jRange["end"]["character"];
-                    string text = (string)change["text"];
-
-                    gizboxService.DidChange(
-                        start_line,
-                        start_char,
-                        end_line,
-                        end_char,
-                        text);
-                }
-                //全量更新  
-                else
-                {
-                    string text = (string)change["text"];
-                    gizboxService.DidChange(
-                        -1,
-                        -1,
-                        -1,
-                        -1,
-                        text);
-                }
+                LogToStream("!!ERR Handle did changes");
+                LogToFile("!!ERR Handle did changes");
+                throw new Exception("Catch Err When Handle DidChange:" + e.ToString());
             }
-
-            //await LogToStream("did changes....current : " + gizboxService.sourceB[gizboxService.sourceB.Length - 1]);
         }
 
         private static async Task HandleCompletion(JObject request)
         {
-            var jposition = request["params"]?["position"]?.ToObject<JObject>();
-            List<Completion> result;
-            if(jposition != null)
+            try
             {
-                int line = jposition["line"]?.ToObject<int>() ?? 0;
-                int character = jposition["character"]?.ToObject<int>() ?? 0;
+                var jposition = request["params"]?["position"]?.ToObject<JObject>();
 
-                try
-                {
-                    result = gizboxService.GetCompletion(line, character);
-                }
-                catch(Exception ex)
-                {
-                    result = new List<Completion>() { new Completion() {
-                        label = "DEBUG_ERR:" + ex.ToString(),
-                        detail = ex.ToString(),
-                        insertText = "Debug_Err"
-                        }
-                    };
-                }
-            }
-            else
-            {
-                result = new List<Completion>();
+                List<Completion> result;
 
-                if(result.Count == 0)
+                if (jposition != null)
                 {
-                    result.Add(new Completion()
+                    int line = jposition["line"]?.ToObject<int>() ?? 0;
+                    int character = jposition["character"]?.ToObject<int>() ?? 0;
+
+                    try
                     {
-                        label = "DEBUG_NO_COMPLETION",
-                        kind = ComletionKind.Field,
-                        detail = "no completion",
-                        documentation = "",
-                        insertText = "",
-                    });
+                        result = gizboxService.GetCompletion(line, character);
+                    }
+                    catch (Exception ex)
+                    {
+                        result = new List<Completion>() {
+                            new Completion() {
+                                label = "DEBUG_ERR:" + ex.ToString(),
+                                detail = ex.ToString(),
+                                insertText = "DEBUG_ERR:" + ex.ToString(),
+                            }
+                        };
+                        LogToFile("!!GetCompletionErr:" + ex.ToString());
+                    }
                 }
-            }
-
-
-            var objArr = result.Select(c => new
-            {
-                label = c.label,
-                kind = (int)c.kind,
-                detail = c.detail,
-                documentation = c.documentation,
-                insertText = c.insertText,
-            });
-
-            var response = new
-            {
-                jsonrpc = "2.0",
-                id = (int?)request["id"],
-                result = new
+                else
                 {
-                    isIncomplete = false,
-                    items = objArr
+                    result = new List<Completion>();
+
+                    if (result.Count == 0)
+                    {
+                        result.Add(new Completion()
+                        {
+                            label = "DEBUG_NO_COMPLETION",
+                            kind = ComletionKind.Field,
+                            detail = "no completion",
+                            documentation = "",
+                            insertText = "",
+                        });
+                    }
                 }
-            };
 
-            var responseJson = JsonConvert.SerializeObject(response);
 
-            var responseMessage = LSPUtils.HttpResponsePlainText(Encoding.UTF8.GetByteCount(responseJson), responseJson);// $"Content-Length: {Encoding.UTF8.GetByteCount(responseJson)}\r\n\r\n{responseJson}";
+                var objArr = result.Select(c => new
+                {
+                    label = c.label,
+                    kind = (int)c.kind,
+                    detail = c.detail,
+                    documentation = c.documentation,
+                    insertText = c.insertText,
+                });
 
-            lock(writeQueue)
-            {
-                writeQueue.Enqueue(responseMessage);
+                var response = new
+                {
+                    jsonrpc = "2.0",
+                    id = (int?)request["id"],
+                    result = new
+                    {
+                        isIncomplete = false,
+                        items = objArr
+                    }
+                };
+
+                var responseJson = JsonConvert.SerializeObject(response);
+
+                var responseMessage = LSPUtils.HttpResponsePlainText(Encoding.UTF8.GetByteCount(responseJson), responseJson);// $"Content-Length: {Encoding.UTF8.GetByteCount(responseJson)}\r\n\r\n{responseJson}";
+
+                lock (writeQueue)
+                {
+                    writeQueue.Enqueue(responseMessage);
+                }
+
+                LogToStream($"Handle Completion:{result?.Count ?? 0}");
             }
-
-            await LogToStream($"send response: Completion:{result?.Count ?? 0}");
+            catch(Exception e)
+            {
+                LogToStream("!!ERR Handle Completion");
+                LogToFile("!!ERR Handle Completion");
+                throw new Exception("Catch Err When Handle Completion:" + e.ToString());
+            }
         }
 
         private static async Task HandleHighlighting(JObject request)
         {
-            var line = request["params"]["position"]["line"].ToObject<int>();
-            var character = request["params"]["position"]["character"].ToObject<int>();
-
-            List<HighLightToken> highlights = gizboxService.GetHighlights(line, character);
-            var response = new
+            try
             {
-                jsonrpc = "2.0",
-                id = (int?)request["id"],
-                result = highlights.Select(h => new
+                var line = request["params"]["position"]["line"].ToObject<int>();
+                var character = request["params"]["position"]["character"].ToObject<int>();
+
+                List<HighLightToken> highlights = gizboxService.GetHighlights(line, character);
+                var response = new
                 {
-                    range = new
+                    jsonrpc = "2.0",
+                    id = (int?)request["id"],
+                    result = highlights.Select(h => new
                     {
-                        start = new
+                        range = new
                         {
-                            line = h.startLine,
-                            character = h.startChar,
+                            start = new
+                            {
+                                line = h.startLine,
+                                character = h.startChar,
+                            },
+                            end = new
+                            {
+                                line = h.endLine,
+                                character = h.endChar,
+                            }
                         },
-                        end = new
-                        {
-                            line = h.endLine,
-                            character = h.endChar,
-                        }
-                    },
-                    kind = h.kind
+                        kind = h.kind
 
-                }).ToArray()
-            };
+                    }).ToArray()
+                };
 
-            var responseJson = JsonConvert.SerializeObject(response);
+                var responseJson = JsonConvert.SerializeObject(response);
 
-            var responseMessage = LSPUtils.HttpResponsePlainText(Encoding.UTF8.GetByteCount(responseJson), responseJson);// $"Content-Length: {Encoding.UTF8.GetByteCount(responseJson)}\r\n\r\n{responseJson}";
+                var responseMessage = LSPUtils.HttpResponsePlainText(Encoding.UTF8.GetByteCount(responseJson), responseJson);// $"Content-Length: {Encoding.UTF8.GetByteCount(responseJson)}\r\n\r\n{responseJson}";
 
 
-            lock(writeQueue)
-            {
-                writeQueue.Enqueue(responseMessage);
+                lock (writeQueue)
+                {
+                    writeQueue.Enqueue(responseMessage);
+                }
+
+                 LogToStream($"Handle Highlight:{highlights.Count}");
             }
-
-            await LogToStream($"send response: Highlight:{highlights.Count}");
+            catch (Exception e)
+            {
+                LogToStream("!!ERR Handle Highlight");
+                LogToFile("!!ERR Handle Highlight");
+                throw new Exception("Catch Err When Handle Highlight:" + e.ToString());
+            }
         }
 
         private static async Task DiagnosticsAfter(string uri, long milisecDelay)
         {
             needDiagnosticInMilisec = milisecDelay;
-
             watch.Restart();
         }
 
@@ -523,19 +588,21 @@ namespace Gizbox.LSP
             if(string.IsNullOrEmpty(uri))
                 return;
 
-            object response;
-
-            if(gizboxService.tempDiagnosticInfo != null)
+            try
             {
-                response = new
+                object response;
+
+                if (gizboxService.tempDiagnosticInfo != null)
                 {
-                    jsonrpc = "2.0",
-                    method = "textDocument/publishDiagnostics",
-                    @params = new
+                    response = new
                     {
-                        uri = uri,
-                        diagnostics = new[]
+                        jsonrpc = "2.0",
+                        method = "textDocument/publishDiagnostics",
+                        @params = new
                         {
+                            uri = uri,
+                            diagnostics = new[]
+                            {
                         new {
                             range = new{
                                 start = new {
@@ -553,34 +620,41 @@ namespace Gizbox.LSP
                             message = Escape(gizboxService.tempDiagnosticInfo.message),
                         }
                     }
-                    }
-                };
-            }
-            else
-            {
-                response = new
+                        }
+                    };
+                }
+                else
                 {
-                    jsonrpc = "2.0",
-                    method = "textDocument/publishDiagnostics",
-                    @params = new
+                    response = new
                     {
-                        uri = uri,
-                        diagnostics = new object[0]
-                    }
-                };
+                        jsonrpc = "2.0",
+                        method = "textDocument/publishDiagnostics",
+                        @params = new
+                        {
+                            uri = uri,
+                            diagnostics = new object[0]
+                        }
+                    };
+                }
+
+
+                var responseJson = JsonConvert.SerializeObject(response);
+
+                var responseMessage = LSPUtils.HttpResponsePlainText(Encoding.UTF8.GetByteCount(responseJson), responseJson);// $"Content-Length: {Encoding.UTF8.GetByteCount(responseJson)}\r\n\r\n{responseJson}";
+
+                lock (writeQueue)
+                {
+                    writeQueue.Enqueue(responseMessage);
+                }
+
+                LogToStream($"Handle Diagnostics severity: {(gizboxService.tempDiagnosticInfo != null ? gizboxService.tempDiagnosticInfo.severity.ToString() : "none")}");
             }
-
-
-            var responseJson = JsonConvert.SerializeObject(response);
-
-            var responseMessage = LSPUtils.HttpResponsePlainText(Encoding.UTF8.GetByteCount(responseJson), responseJson);// $"Content-Length: {Encoding.UTF8.GetByteCount(responseJson)}\r\n\r\n{responseJson}";
-
-            lock(writeQueue)
+            catch(Exception e)
             {
-                writeQueue.Enqueue(responseMessage);
+                LogToStream("!!ERR Handle Diagnostics");
+                LogToFile("!!ERR Handle Diagnostics");
+                throw new Exception("Catch Err When Handle Diagnostics:" + e.ToString());
             }
-
-            await LogToStream($"send response: Diagnostics severity: { (gizboxService.tempDiagnosticInfo != null ? gizboxService.tempDiagnosticInfo.severity.ToString() : "none") }");
         }
 
         private static string Escape(string input)
@@ -591,7 +665,7 @@ namespace Gizbox.LSP
             return result;
         }
 
-        private static async Task LogToStream(string text)
+        private static void LogToStream(string text)
         {
             var response = new
             {
@@ -599,7 +673,7 @@ namespace Gizbox.LSP
                 method = "debug/log",
                 @params = new
                 {
-                    text = Escape(text),
+                    text = $"{Escape(text)} ({System.DateTime.Now.ToString()})",
                 }
             };
 
@@ -613,6 +687,32 @@ namespace Gizbox.LSP
             }
         }
 
+        private static void CleanFileLog()
+        {
+            return;
+
+            string path = System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop) + "\\lsp_log.txt";
+            if(System.IO.File.Exists(path))
+            {
+                System.IO.File.WriteAllText(path, string.Empty);
+            }
+        }
+        private static void LogToFile(string text)
+        {
+            return;
+
+            string path = System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop) + "\\lsp_log.txt";
+            string content = "[" + System.DateTime.Now + "]" + text + Environment.NewLine;
+            if (System.IO.File.Exists(path))
+            {
+                System.IO.File.AppendAllText(path, content);
+            }
+            else
+            {
+                System.IO.File.WriteAllText(path, content);
+            }
+            
+        }
     }
 
 
