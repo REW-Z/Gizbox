@@ -348,11 +348,20 @@ namespace Gizbox.LanguageServices
                     kind = ComletionKind.Class,
                     detail = "",
                     documentation = "",
-                    insertText = ""
+                    insertText = "DEBUG_SHOW_ENV:" + "(no env!:" + errMsg + ")"
                 });
             }
+            result.Add(new Completion()
+            {
+                label = "DEBUG_GLOABL_ENV_COUNT:" + "(" + ((persistentGlobalEnvs != null) ? persistentGlobalEnvs.Count : "null") + ") rec-counts:" + (string.Concat(persistentGlobalEnvs.Select(e => e.records.Values.Count + ", "))),
+                kind = ComletionKind.Class,
+                detail = "",
+                documentation = "",
+                insertText = "DEBUG_GLOABL_ENV_COUNT:" + "(" + ((persistentGlobalEnvs != null) ? persistentGlobalEnvs.Count : "null") + ") rec-counts:" + (string.Concat(persistentGlobalEnvs.Select(e => e.records.Values.Count + ", ")))
+            });
 
-            //类名/变量名自动提示  
+
+            // *** 类名/变量名自动提示 ***   
             if(wordedgeChar == ';' || wordedgeChar == '\n')
             {
                 if(persistentGlobalEnvs != null && persistentAST != null)
@@ -362,23 +371,10 @@ namespace Gizbox.LanguageServices
                     string prefix = new string(chararr);
 
                     //从符号表链收集  
-                    var curre = currEnv;
-                    while(curre != null)
-                    {
-                        if(curre.tableCatagory == SymbolTable.TableCatagory.GlobalScope)
-                            break;
-                        CollectCompletionInEnv(curre, prefix, result);
-                        curre = curre.parent;
-                    }
-
-                    //从全局作用域收集  
-                    foreach(var env in persistentGlobalEnvs)
-                    {
-                        CollectCompletionInEnv(env, prefix, result);
-                    }
+                    TraversalEnvChain(currEnv, curre => CollectCompletionInEnv(curre, prefix, result));
                 }
             }
-            //成员自动提示  
+            // *** 成员自动提示 ***   
             else if(wordedgeChar == '.' && persistentAST != null)
             {
                 int objNameEnd = wordedgeIdx;
@@ -401,325 +397,235 @@ namespace Gizbox.LanguageServices
 
 
 
-                    //result.Add(new Completion()
-                    //{
-                    //    label = "DEBUG_OBJNAME",
-                    //    kind = ComletionKind.Text,
-                    //    detail = "obj:(" + objName + ")len(" + objName.Length + ")",
-                    //    documentation = "",
-                    //    insertText = "DEBUG_OBJNAME"
-                    //});
-
-                    foreach(var idNode in persistentAST.identityNodes)
+                    result.Add(new Completion()
                     {
-                        if(idNode.FullName.EndsWith(objName) && idNode.attributes.ContainsKey("def_at_env"))
+                        label = $"DEBUG_SHOW_OBJNAME:{objName}",
+                        kind = ComletionKind.Text,
+                        detail = "",
+                        documentation = "",
+                        insertText = "DEBUG_OBJNAME"
+                    });
+
+                    //foreach(var idNode in persistentAST.identityNodes)
+                    //{
+                    //    if(idNode.FullName.EndsWith(objName) && idNode.attributes.ContainsKey("def_at_env"))
+                    //    {
+                    //        var env = (idNode.attributes["def_at_env"] as SymbolTable);
+
+                    //        SymbolTable identifierEnv = env;
+                    //        SymbolTable globalEnv = null;
+                    //        SymbolTable.Record rec = default;
+                    //        int count = 0;
+                    //        while(identifierEnv != null)
+                    //        {
+                    //            if(count++ > 99)
+                    //                throw new Exception("Env Loop err !");
+
+                    //            if(identifierEnv.parent == null)
+                    //            {
+                    //                globalEnv = identifierEnv;
+                    //            }
+
+                    //            if(rec == default && env.ContainRecordRawName(objName))
+                    //            {
+                    //                rec = env.GetRecord(objName);
+                    //            }
+                    //            else
+                    //            {
+                    //                identifierEnv = identifierEnv.parent;
+                    //            }
+                    //        }
+
+
+                    //        if(rec != default && globalEnv != null && globalEnv.ContainRecordName(rec.typeExpression))
+                    //        {
+                    //            var classEnv = globalEnv.GetRecord(rec.typeExpression).envPtr;
+                    //            if(classEnv != null)
+                    //            {
+                    //                var members = classEnv.records.Values;
+                    //                foreach(var member in members)
+                    //                {
+                    //                    if(member.category == SymbolTable.RecordCatagory.Variable || member.category == SymbolTable.RecordCatagory.Param)
+                    //                    {
+                    //                        result.Add(new Completion()
+                    //                        {
+                    //                            label = member.rawname,
+                    //                            kind = ComletionKind.Field,
+                    //                            detail = "obj:(" + objName + ")len(" + objName.Length + ")",
+                    //                            documentation = "",
+                    //                            insertText = member.rawname,
+                    //                        });
+                    //                    }
+                    //                    else if(member.category == SymbolTable.RecordCatagory.Function)
+                    //                    {
+                    //                        result.Add(new Completion()
+                    //                        {
+                    //                            label = member.rawname,
+                    //                            kind = ComletionKind.Method,
+                    //                            detail = "obj:(" + objName + ")len(" + objName.Length + ")",
+                    //                            documentation = "",
+                    //                            insertText = member.rawname,
+                    //                        });
+                    //                    }
+                    //                }
+                    //            }
+                    //        }
+                    //    }
+                    //}
+
+                    //从符号表链对象名  
+                    SymbolTable.Record idRec = null;
+                    SymbolTable.Record typeRec = null;
+                    
+                    //查找对象Record  
+                    TraversalEnvChain(currEnv, curre =>  FindIdentifierRecInEnv(curre, objName, out idRec));
+
+
+                    //查找对象类型Record
+                    if(idRec != null)
+                    {
+                        string classname = idRec.typeExpression;
+                        TraversalEnvChain(currEnv, curre => FindTypeRecInEnv(curre, classname, out typeRec));
+                    }
+                    if(typeRec != null && typeRec.envPtr != null)
+                    {
+                        var members = typeRec.envPtr.records.Values;
+                        foreach(var member in members)
                         {
-                            var env = (idNode.attributes["def_at_env"] as SymbolTable);
-
-                            SymbolTable identifierEnv = env;
-                            SymbolTable globalEnv = null;
-                            SymbolTable.Record rec = default;
-                            int count = 0;
-                            while(identifierEnv != null)
+                            if(member.category == SymbolTable.RecordCatagory.Variable || member.category == SymbolTable.RecordCatagory.Param)
                             {
-                                if(count++ > 10)
-                                    throw new Exception("CURR ENV LOOP !");
-
-                                if(identifierEnv.parent == null)
+                                result.Add(new Completion()
                                 {
-                                    globalEnv = identifierEnv;
-                                }
-
-                                if(rec == default && env.ContainRecordRawName(objName))
-                                {
-                                    rec = env.GetRecord(objName);
-                                }
-                                else
-                                {
-                                    identifierEnv = identifierEnv.parent;
-                                }
+                                    label = member.rawname,
+                                    kind = ComletionKind.Field,
+                                    detail = "obj:(" + objName + ")len(" + objName.Length + ")",
+                                    documentation = "",
+                                    insertText = member.rawname,
+                                });
                             }
-
-
-                            if(rec != default && globalEnv != null && globalEnv.ContainRecordName(rec.typeExpression))
+                            else if(member.category == SymbolTable.RecordCatagory.Function)
                             {
-                                var classEnv = globalEnv.GetRecord(rec.typeExpression).envPtr;
-                                if(classEnv != null)
+                                result.Add(new Completion()
                                 {
-                                    var members = classEnv.records.Values;
-                                    foreach(var member in members)
-                                    {
-                                        if(member.category == SymbolTable.RecordCatagory.Variable || member.category == SymbolTable.RecordCatagory.Param)
-                                        {
-                                            result.Add(new Completion()
-                                            {
-                                                label = member.rawname,
-                                                kind = ComletionKind.Field,
-                                                detail = "obj:(" + objName + ")len(" + objName.Length + ")",
-                                                documentation = "",
-                                                insertText = member.rawname,
-                                            });
-                                        }
-                                        else if(member.category == SymbolTable.RecordCatagory.Function)
-                                        {
-                                            result.Add(new Completion()
-                                            {
-                                                label = member.rawname,
-                                                kind = ComletionKind.Method,
-                                                detail = "obj:(" + objName + ")len(" + objName.Length + ")",
-                                                documentation = "",
-                                                insertText = member.rawname,
-                                            });
-                                        }
-                                    }
-                                }
+                                    label = member.rawname,
+                                    kind = ComletionKind.Method,
+                                    detail = "obj:(" + objName + ")len(" + objName.Length + ")",
+                                    documentation = "",
+                                    insertText = member.rawname,
+                                });
                             }
                         }
-                    }
-
-                }
-            }
-
-            return result;
-        }
-
-        [System.Obsolete] public List<Completion> GetCompletionLegacy(int line, int character)
-        {
-            int curr = lineStartsList[line] + character;
-            if (curr <= 1 || curr > sourceB.Length) return new List<Completion>();//注意：光标没有对应的字符（越界光标）  
-            if (line > lineStartsList.Count - 1) return new List<Completion>();
-
-            List<Completion> result = new List<Completion>();
-
-            char wordedgeChar = ' ';
-            int wordedgeIdx = curr - 1;
-            for (int i = curr - 1; i > 0; --i)
-            {
-                char c = sourceB[i];
-                if (Utils_IsWordedgeChar(c))
-                {
-                    wordedgeChar = c;
-                    wordedgeIdx = i;
-                    break;
-                }
-            }
 
 
-            //DEBUG  
-            result.Add(new Completion()
-            {
-                label = "DEBUG_SHOW_WORDEDGE:" + wordedgeChar,
-                kind = ComletionKind.Class,
-                detail = "",
-                documentation = "",
-                insertText = ""
-            });
-
-            //类名/变量名自动提示  
-            if (wordedgeChar == ';' || wordedgeChar == '\n')
-            {
-                //result.Add(new Completion()
-                //{
-                //    label = "DEBUG_GLOBAL",
-                //    kind = ComletionKind.Class,
-                //    detail = "persistent env?" + (persistentGlobalEnvs != null),
-                //    documentation = "",
-                //    insertText = ""
-                //});
-
-
-                if (persistentGlobalEnvs != null && persistentAST != null)
-                {
-                    char[] chararr = new char[curr - wordedgeIdx - 1];
-                    sourceB.CopyTo(wordedgeIdx + 1, chararr, 0, curr - wordedgeIdx - 1);
-                    string prefix = new string(chararr);
-
-
-                    foreach (var env in persistentGlobalEnvs)
-                    {
-                        foreach (var globalDef in env.records.Values)
+                        result.Add(new Completion()
                         {
-                            //尝试名称空间    
-                            bool valid = false;
-                            int offsetNamespace = 0;
-                            if (globalDef.rawname.StartsWith(prefix))
+                            label = "DEBUG_OBJ_TYPE_MEMBRES:" + string.Concat(typeRec.envPtr.records.Values.Select(r => r.name + ", ")),
+                            kind = ComletionKind.Method,
+                            detail = "obj:(" + objName + ")len(" + objName.Length + ")",
+                            documentation = "",
+                            insertText = "DEBUG_OBJ_TYPE_MEMBRES???:" + string.Concat(typeRec.envPtr.records.Values.Select(r => r.name + ", ")),
+                        });
+                    }
+                    else
+                    {
+                        if(idRec == null)
+                        {
+                            result.Add(new Completion()
                             {
-                                valid = true;
-                                offsetNamespace = 0;
+                                label = "DEBUG_OBJ_IDENTIFIER_NOT_FIND:" + objName,
+                                kind = ComletionKind.Method,
+                                detail = "obj:(" + objName + ")len(" + objName.Length + ")",
+                                documentation = "",
+                                insertText = "DEBUG_OBJ_IDENTIFIER_NOT_FIND:" + objName,
+                            });
+                        }
+                        else
+                        {
+                            if(typeRec == null)
+                            {
+                                result.Add(new Completion()
+                                {
+                                    label = "DEBUG_OBJ_TYPE_NOT_FIND:" + idRec.typeExpression,
+                                    kind = ComletionKind.Method,
+                                    detail = "obj:(" + objName + ")len(" + objName.Length + ")",
+                                    documentation = "",
+                                    insertText = "DEBUG_OBJ_TYPE_NOT_FIND:" + idRec.typeExpression,
+                                });
                             }
                             else
                             {
-                                foreach (var nameUsingNode in persistentAST.rootNode.usingNamespaceNodes)
+                                if(typeRec.envPtr == null)
                                 {
-                                    string namespaceName = nameUsingNode.namespaceNameNode.token.attribute;
-                                    if (Utils_CheckPrefixUseNamespace(namespaceName, prefix, globalDef.rawname))
+                                    result.Add(new Completion()
                                     {
-                                        valid = true;
-                                        offsetNamespace = namespaceName.Length + 2;
-                                        break;
-                                    }
-                                }
-                            }
-                            if (valid == false) continue;//所有命名空间都不合适  
-
-
-                            int offsetPrefix = 0;
-                            if(prefix.Contains(":")) offsetPrefix = prefix.LastIndexOf(':') + 1;
-                            string completionStr = globalDef.rawname.Substring(offsetNamespace + offsetPrefix);
-
-                            if (globalDef.category == SymbolTable.RecordCatagory.Class)
-                            {
-                                result.Add(new Completion()
-                                {
-                                    label = completionStr,
-                                    kind = ComletionKind.Class,
-                                    detail = "class",
-                                    documentation = "",
-                                    insertText = completionStr
-                                });
-                            }
-                            else if (globalDef.category == SymbolTable.RecordCatagory.Function)
-                            {
-                                string paramStr = "";
-                                foreach (var local in globalDef.envPtr.records.Values)
-                                {
-                                    if (local.category == SymbolTable.RecordCatagory.Param)
-                                    {
-                                        paramStr += local.typeExpression + " " + local.name + ", ";
-                                    }
-                                }
-                                result.Add(new Completion()
-                                {
-                                    label = completionStr,
-                                    kind = ComletionKind.Function,
-                                    detail = globalDef.rawname + "(" + paramStr + ")",
-                                    documentation = "",
-                                    insertText = completionStr
-                                });
-                            }
-                            else if (globalDef.category == SymbolTable.RecordCatagory.Variable)
-                            {
-                                result.Add(new Completion()
-                                {
-                                    label = completionStr,
-                                    kind = ComletionKind.Variable,
-                                    detail = globalDef.typeExpression + " " + globalDef.rawname,
-                                    documentation = "",
-                                    insertText = completionStr
-                                });
-                            }
-                        }
-                    }
-
-                }
-
-            }
-
-            //成员自动提示  
-            if (wordedgeChar == '.' && persistentAST != null)
-            {
-                int objNameEnd = wordedgeIdx;
-                int objNameStart = wordedgeIdx;
-                for (int i = wordedgeIdx - 1; i > 0; --i)
-                {
-                    if (Utils_IsPartOfIdentifier(sourceB[i]) == false)
-                    {
-                        objNameStart = i + 1;
-                        break;
-                    }
-                }
-
-                int length = objNameEnd - objNameStart;
-                if (length > 0)
-                {
-                    char[] objNameBuffer = new char[length];
-                    sourceB.CopyTo(objNameStart, objNameBuffer, 0, length);
-                    string objName = new string(objNameBuffer);
-
-
-
-                    //result.Add(new Completion()
-                    //{
-                    //    label = "DEBUG_OBJNAME",
-                    //    kind = ComletionKind.Text,
-                    //    detail = "obj:(" + objName + ")len(" + objName.Length + ")",
-                    //    documentation = "",
-                    //    insertText = "DEBUG_OBJNAME"
-                    //});
-
-                    foreach (var idNode in persistentAST.identityNodes)
-                    {
-                        if (idNode.FullName.EndsWith(objName) && idNode.attributes.ContainsKey("def_at_env"))
-                        {
-                            var env = (idNode.attributes["def_at_env"] as SymbolTable);
-
-                            SymbolTable currEnv = env;
-                            SymbolTable globalEnv = null;
-                            SymbolTable.Record rec = default;
-                            int count = 0;
-                            while (currEnv != null)
-                            {
-                                if (count++ > 10) throw new Exception("CURR ENV LOOP !");
-
-                                if (currEnv.parent == null)
-                                {
-                                    globalEnv = currEnv;
-                                }
-
-                                if (rec == default && env.ContainRecordRawName(objName))
-                                {
-                                    rec = env.GetRecord(objName);
-                                }
-                                else
-                                {
-                                    currEnv = currEnv.parent;
-                                }
-                            }
-
-
-                            if (rec != default && globalEnv != null && globalEnv.ContainRecordName(rec.typeExpression))
-                            {
-                                var classEnv = globalEnv.GetRecord(rec.typeExpression).envPtr;
-                                if (classEnv != null)
-                                {
-                                    var members = classEnv.records.Values;
-                                    foreach (var member in members)
-                                    {
-                                        if (member.category == SymbolTable.RecordCatagory.Variable || member.category == SymbolTable.RecordCatagory.Param)
-                                        {
-                                            result.Add(new Completion()
-                                            {
-                                                label = member.rawname,
-                                                kind = ComletionKind.Field,
-                                                detail = "obj:(" + objName + ")len(" + objName.Length + ")",
-                                                documentation = "",
-                                                insertText = member.rawname,
-                                            });
-                                        }
-                                        else if (member.category == SymbolTable.RecordCatagory.Function)
-                                        {
-                                            result.Add(new Completion()
-                                            {
-                                                label = member.rawname,
-                                                kind = ComletionKind.Method,
-                                                detail = "obj:(" + objName + ")len(" + objName.Length + ")",
-                                                documentation = "",
-                                                insertText = member.rawname,
-                                            });
-                                        }
-                                    }
+                                        label = "DEBUG_OBJ_TYPE_ENVPTR_NULL:" + idRec.typeExpression,
+                                        kind = ComletionKind.Method,
+                                        detail = "obj:(" + objName + ")len(" + objName.Length + ")",
+                                        documentation = "",
+                                        insertText = "DEBUG_OBJ_TYPE_ENVPTR_NULL:" + idRec.typeExpression,
+                                    });
                                 }
                             }
                         }
                     }
 
+
+                    //...
                 }
             }
 
             return result;
         }
 
-        private void CollectCompletionInEnv(SymbolTable env, string prefix, List<Completion> result)
+        private void TraversalEnvChain(SymbolTable fromEnv, Func<SymbolTable, bool> action)
+        {
+            //从局部符号表链收集  
+            var curre = fromEnv;
+            while(curre != null)
+            {
+                if(curre.tableCatagory == SymbolTable.TableCatagory.GlobalScope)
+                    break;
+
+                bool end = action(curre);
+                if(end) return;
+
+                curre = curre.parent;
+            }
+
+
+            //从全局作用域收集  
+            if(persistentGlobalEnvs != null)
+            {
+                foreach(var env in persistentGlobalEnvs)
+                {
+                    bool end = action(env);
+                    if(end) return;
+                }
+            }
+        }
+        private bool FindIdentifierRecInEnv(SymbolTable env, string objName, out SymbolTable.Record rec)
+        {
+            if(env.ContainRecordRawName(objName))
+            {
+                rec = env.GetRecord(objName);
+                return true;
+            }
+
+            rec = null;
+            return false;
+        }
+        private bool FindTypeRecInEnv(SymbolTable env, string typeExpression, out SymbolTable.Record rec)
+        {
+            if(env.ContainRecordName(typeExpression))
+            {
+                rec = env.GetRecord(typeExpression);
+                return true;
+            }
+
+            rec = null;
+            return false;
+        }
+        private bool CollectCompletionInEnv(SymbolTable env, string prefix, List<Completion> result)
         {
             foreach(var rec in env.records.Values)
             {
@@ -817,6 +723,8 @@ namespace Gizbox.LanguageServices
                     });
                 }
             }
+
+            return false;
         }
 
         private SymbolTable GetCurrEnv(int line, int character, ref string msg)
@@ -1102,8 +1010,8 @@ namespace Gizbox.LanguageServices
 
         public static bool Utils_InRange(Token startToken, Token endToken, int line, int character)
         {
-            bool leftInRange = line > startToken.line ? true : (line == startToken.line && character >= startToken.start);
-            bool rightInRange = line < endToken.line ? true : (line == endToken.line && character <= (endToken.start + endToken.length));
+            bool leftInRange = line > startToken.line ? true : (line == startToken.line && character >= (startToken.start + startToken.length));
+            bool rightInRange = line < endToken.line ? true : (line == endToken.line && character <= (endToken.start));
             return leftInRange && rightInRange;
         }
         public static bool Utils_CheckPrefixUseNamespace(string namesp, string prefix, string fullname)

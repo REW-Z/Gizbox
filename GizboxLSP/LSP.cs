@@ -186,8 +186,8 @@ namespace Gizbox.LSP
                 }
                 catch(Exception ex)
                 {
-                    //Log("\n\n[ERR]:\n\n" + ex.ToString());
                     messageBuilder.Clear();
+                    await LogToStream(" LSP Err:" + ex.ToString());
                 }
             }
         }
@@ -458,18 +458,14 @@ namespace Gizbox.LSP
 
             var responseJson = JsonConvert.SerializeObject(response);
 
-            //Log("\n[Completion Respons:]\n" + responseJson);
-
             var responseMessage = LSPUtils.HttpResponsePlainText(Encoding.UTF8.GetByteCount(responseJson), responseJson);// $"Content-Length: {Encoding.UTF8.GetByteCount(responseJson)}\r\n\r\n{responseJson}";
-            //var responseBytes = Encoding.UTF8.GetBytes(responseMessage);
-            //await outputStream.WriteAsync(responseBytes, 0, responseBytes.Length);
+
             lock(writeQueue)
             {
                 writeQueue.Enqueue(responseMessage);
             }
 
-            //int takeCount = Math.Min(5, result.Count);
-            //await LogToStream("complete items sent:" + string.Concat(result.Take(takeCount).Select(c => c.label + ",")) );
+            await LogToStream($"send response: Completion:{result?.Count ?? 0}");
         }
 
         private static async Task HandleHighlighting(JObject request)
@@ -506,15 +502,13 @@ namespace Gizbox.LSP
 
             var responseMessage = LSPUtils.HttpResponsePlainText(Encoding.UTF8.GetByteCount(responseJson), responseJson);// $"Content-Length: {Encoding.UTF8.GetByteCount(responseJson)}\r\n\r\n{responseJson}";
 
-            //Log("\n[Highlights MSG]\n" + responseMessage);
 
-
-            //var responseBytes = Encoding.UTF8.GetBytes(responseMessage);
-            //await outputStream.WriteAsync(responseBytes, 0, responseBytes.Length);
             lock(writeQueue)
             {
                 writeQueue.Enqueue(responseMessage);
             }
+
+            await LogToStream($"send response: Highlight:{highlights.Count}");
         }
 
         private static async Task DiagnosticsAfter(string uri, long milisecDelay)
@@ -580,12 +574,13 @@ namespace Gizbox.LSP
             var responseJson = JsonConvert.SerializeObject(response);
 
             var responseMessage = LSPUtils.HttpResponsePlainText(Encoding.UTF8.GetByteCount(responseJson), responseJson);// $"Content-Length: {Encoding.UTF8.GetByteCount(responseJson)}\r\n\r\n{responseJson}";
-            //var responseBytes = Encoding.UTF8.GetBytes(responseMessage);
-            //await outputStream.WriteAsync(responseBytes, 0, responseBytes.Length);
+
             lock(writeQueue)
             {
                 writeQueue.Enqueue(responseMessage);
             }
+
+            await LogToStream($"send response: Diagnostics severity: { (gizboxService.tempDiagnosticInfo != null ? gizboxService.tempDiagnosticInfo.severity.ToString() : "none") }");
         }
 
         private static string Escape(string input)
@@ -611,9 +606,11 @@ namespace Gizbox.LSP
             var responseJson = JsonConvert.SerializeObject(response);
 
             var responseMessage = LSPUtils.HttpResponsePlainText(Encoding.UTF8.GetByteCount(responseJson), responseJson);// $"Content-Length: {Encoding.UTF8.GetByteCount(responseJson)}\r\n\r\n{responseJson}";
-            //var responseBytes = Encoding.UTF8.GetBytes(responseMessage);
-            //await outputStream.WriteAsync(responseBytes, 0, responseBytes.Length);
-            writeQueue.Enqueue(responseMessage);
+
+            lock(writeQueue)
+            {
+                writeQueue.Enqueue(responseMessage);
+            }
         }
 
     }

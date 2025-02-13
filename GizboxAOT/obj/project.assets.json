@@ -489,24 +489,19 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\leona\\.nuget\\packages\\": {},
-    "E:\\Visual Studio 2019\\Shared\\NuGetPackages": {}
+    "C:\\Users\\saus\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxAOT\\GizboxAOT.csproj",
+      "projectUniqueName": "F:\\ZQJ\\GizboxAndTools\\Gizbox\\GizboxAOT\\GizboxAOT.csproj",
       "projectName": "GizboxAOT",
-      "projectPath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxAOT\\GizboxAOT.csproj",
-      "packagesPath": "C:\\Users\\leona\\.nuget\\packages\\",
-      "outputPath": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxAOT\\obj\\",
+      "projectPath": "F:\\ZQJ\\GizboxAndTools\\Gizbox\\GizboxAOT\\GizboxAOT.csproj",
+      "packagesPath": "C:\\Users\\saus\\.nuget\\packages\\",
+      "outputPath": "F:\\ZQJ\\GizboxAndTools\\Gizbox\\GizboxAOT\\obj\\",
       "projectStyle": "PackageReference",
-      "fallbackFolders": [
-        "E:\\Visual Studio 2019\\Shared\\NuGetPackages"
-      ],
       "configFilePaths": [
-        "C:\\Users\\leona\\AppData\\Roaming\\NuGet\\NuGet.Config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+        "C:\\Users\\saus\\AppData\\Roaming\\NuGet\\NuGet.Config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
       "originalTargetFrameworks": [
@@ -520,8 +515,8 @@
         "netstandard2.0": {
           "targetAlias": "netstandard2.0",
           "projectReferences": {
-            "F:\\Legacy\\MyProjects\\Gizbox\\Gizbox\\Gizbox.csproj": {
-              "projectPath": "F:\\Legacy\\MyProjects\\Gizbox\\Gizbox\\Gizbox.csproj"
+            "F:\\ZQJ\\GizboxAndTools\\Gizbox\\Gizbox\\Gizbox.csproj": {
+              "projectPath": "F:\\ZQJ\\GizboxAndTools\\Gizbox\\Gizbox\\Gizbox.csproj"
             }
           }
         }
@@ -530,11 +525,6 @@
         "warnAsError": [
           "NU1605"
         ]
-      },
-      "restoreAuditProperties": {
-        "enableAudit": "true",
-        "auditLevel": "low",
-        "auditMode": "direct"
       }
     },
     "frameworks": {
@@ -563,7 +553,7 @@
         ],
         "assetTargetFallback": true,
         "warn": true,
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.205\\RuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.100\\RuntimeIdentifierGraph.json"
       }
     }
   }
