@@ -915,7 +915,7 @@ namespace Gizbox.LanguageServices
                                 startLine = firstToken != null ? (firstToken.line - 1) : 0,
                                 startChar = firstToken != null ? (firstToken.start) : 0,
                                 endLine = lastToken != null ? (lastToken.line - 1) : GetEndLine(),
-                                endChar = lastToken != null ? (lastToken.start + lastToken.attribute.Length) : GetEndCharacter(),
+                                endChar = lastToken != null ? (lastToken.start + lastToken.length) : GetEndCharacter(),
                                 message = semanticEx.Message,
                                 severity = 2,
                             };
