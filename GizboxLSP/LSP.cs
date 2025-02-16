@@ -82,7 +82,7 @@ namespace Gizbox.LSP
 
 
             //心跳相关  
-             LogToStream("HEARTBEAT(START):" + System.DateTime.Now.ToString());
+             LogToClient("HEARTBEAT(START):" + System.DateTime.Now.ToString());
             DateTime lastLoop = DateTime.Now;
             TimeSpan timeTemp = default;
 
@@ -96,7 +96,7 @@ namespace Gizbox.LSP
                 if (timeTemp.TotalSeconds > Program.heartbeatInterval)
                 {
                     timeTemp -= TimeSpan.FromSeconds(Program.heartbeatInterval);
-                     LogToStream("HEARTBEAT:" + System.DateTime.Now.ToString());
+                     LogToClient("HEARTBEAT:" + System.DateTime.Now.ToString());
                 }
 
                 //处理请求  
@@ -214,7 +214,7 @@ namespace Gizbox.LSP
                 {
                     messageBuilder.Clear();
                     LogToFile("LSP Catch Err:" + ex.ToString());
-                    LogToStream(" LSP Catch Err:" + ex.ToString());
+                    LogToClient(" LSP Catch Err:" + ex.ToString());
                 }
             }
 
@@ -366,7 +366,7 @@ namespace Gizbox.LSP
             }
             catch(Exception e)
             {
-                LogToStream("!!! Err Handle Init");
+                LogToClient("!!! Err Handle Init");
                 LogToFile("!!! Err Handle Init");
                 throw new Exception("Catch Err When Handle Init:" + e.ToString());
             }
@@ -377,7 +377,7 @@ namespace Gizbox.LSP
             string txt = (string)request["params"]["textDocument"]["text"];
             gizboxService.DidOpen(txt);
 
-            //Log("\n[open text....current]\n" + gizboxService.Current());
+            LogToClient($"Handle DidOpen...textLen:{txt.Length}");
         }
         private static async Task HandleDidChange(JObject request)
         {
@@ -427,13 +427,13 @@ namespace Gizbox.LSP
                             -1,
                             text);
                     }
-                }
 
-                 LogToStream("Handle did changes....current : " + gizboxService.sourceB[gizboxService.sourceB.Length - 1]);
+                    LogToClient($"Handle did changes[{i}]....isfullupdate:{fullUpdate}    textLength:{((string)change["text"]).Length}");
+                }
             }
             catch(Exception e)
             {
-                LogToStream("!!ERR Handle did changes");
+                LogToClient("!!ERR Handle did changes");
                 LogToFile("!!ERR Handle did changes");
                 throw new Exception("Catch Err When Handle DidChange:" + e.ToString());
             }
@@ -515,11 +515,11 @@ namespace Gizbox.LSP
                     writeQueue.Enqueue(responseMessage);
                 }
 
-                LogToStream($"Handle Completion:{result?.Count ?? 0}");
+                LogToClient($"Handle Completion:{result?.Count ?? 0}");
             }
             catch(Exception e)
             {
-                LogToStream("!!ERR Handle Completion");
+                LogToClient("!!ERR Handle Completion");
                 LogToFile("!!ERR Handle Completion");
                 throw new Exception("Catch Err When Handle Completion:" + e.ToString());
             }
@@ -567,11 +567,11 @@ namespace Gizbox.LSP
                     writeQueue.Enqueue(responseMessage);
                 }
 
-                 LogToStream($"Handle Highlight:{highlights.Count}");
+                LogToClient($"Handle Highlight:{highlights.Count}");
             }
             catch (Exception e)
             {
-                LogToStream("!!ERR Handle Highlight");
+                LogToClient("!!ERR Handle Highlight");
                 LogToFile("!!ERR Handle Highlight");
                 throw new Exception("Catch Err When Handle Highlight:" + e.ToString());
             }
@@ -647,11 +647,11 @@ namespace Gizbox.LSP
                     writeQueue.Enqueue(responseMessage);
                 }
 
-                LogToStream($"Handle Diagnostics severity: {(gizboxService.tempDiagnosticInfo != null ? gizboxService.tempDiagnosticInfo.severity.ToString() : "none")}");
+                LogToClient($"Handle Diagnostics severity: {(gizboxService.tempDiagnosticInfo != null ? gizboxService.tempDiagnosticInfo.severity.ToString() : "none")}");
             }
             catch(Exception e)
             {
-                LogToStream("!!ERR Handle Diagnostics");
+                LogToClient("!!ERR Handle Diagnostics");
                 LogToFile("!!ERR Handle Diagnostics");
                 throw new Exception("Catch Err When Handle Diagnostics:" + e.ToString());
             }
@@ -665,7 +665,7 @@ namespace Gizbox.LSP
             return result;
         }
 
-        private static void LogToStream(string text)
+        private static void LogToClient(string text)
         {
             var response = new
             {

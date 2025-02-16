@@ -36,7 +36,7 @@ obj.a = 1; //对象字段赋值测试
 obj.b = 2; //对象属性赋值测试  
 int btmp = obj.b; //对象属性取值测试
 
-Console::Log("Log测试: " + (string)btmp);
+Console::Log("Log测试: " + (string)btmp);//
 
 //全局常量测试  
 int sizeofInt = Core::Integer::size;

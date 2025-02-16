@@ -65,7 +65,7 @@ namespace Gizbox
             keywords.Add(new TokenPattern("null", "null\\W", 1));
 
             keywords.Add(new TokenPattern(",", ",", 0));
-            keywords.Add(new TokenPattern(";", ";[\\s|\\t|\\n]", 1));
+            keywords.Add(new TokenPattern(";", ";", 0));
             keywords.Add(new TokenPattern("new", "new\\W", 1));
             keywords.Add(new TokenPattern("delete", "delete\\W", 1));
             keywords.Add(new TokenPattern("while", "while\\W", 1));
