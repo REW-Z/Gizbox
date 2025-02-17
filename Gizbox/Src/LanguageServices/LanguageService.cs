@@ -145,10 +145,12 @@ namespace Gizbox.LanguageServices
             this.tempAST = null;
             this.tempDiagnosticInfo = null;
 
-            UpdateUnit();
 
             sourceB.Clear();
             sourceB.Append(str);
+
+            UpdateUnit();
+
             UpdateLineInfos();
         }
 

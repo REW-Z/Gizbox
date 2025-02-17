@@ -377,7 +377,7 @@ namespace Gizbox.LSP
             string txt = (string)request["params"]["textDocument"]["text"];
             gizboxService.DidOpen(txt);
 
-            LogToClient($"Handle DidOpen...textLen:{txt.Length}");
+            LogToClient($"Handle DidOpen...textLen:{txt.Length}  debug:AnyDiagnostic:{(gizboxService.tempDiagnosticInfo != null)}");
         }
         private static async Task HandleDidChange(JObject request)
         {

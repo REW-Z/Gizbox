@@ -153,7 +153,7 @@ namespace Gizbox.LRParse
                     this.remainingInput.Enqueue(token);
                 }
                 //添加$符号  
-                if (input.LastOrDefault().name != "$")
+                if (input.LastOrDefault()?.name != "$")
                 {
                     this.remainingInput.Enqueue(new Token("$", PatternType.Keyword, null, -99, 0, 0));
                 }
