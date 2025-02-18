@@ -2,6 +2,8 @@
 
 实参为null时无法找到对应函数重载。（"null"被mangle为函数名一部分了）    
 
+里氏替换。    
+
 操作符重载。  应该在代码生成层面实现而不是解释器层面。        
 
 ******* LSP TODO ********
@@ -12,3 +14,20 @@
 
 使用哈希表优化LALR生成算法。  
 
+
+******* Prospects ********
+
+模式匹配（Pattern Matching）  
+管道操作符（Pipeline Operator）
+解构赋值（Destructuring Assignment）
+内置并发支持（Built-in Concurrency Support）
+类型推断（Type Inference）
+可选链（Optional Chaining）
+函数式编程(惰性求值（Lazy Evaluation）、无副作用函数)
+函数头等公民  
+
+元编程和宏（类似Lisp和Rust的宏）  
+
+响应式编程原生支持  
+
+借鉴（Haskell、LISP、Prolog、Rust）  

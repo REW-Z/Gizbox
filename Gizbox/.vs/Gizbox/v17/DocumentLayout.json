@@ -3,28 +3,28 @@
   "WorkspaceRootPath": "F:\\Legacy\\MyProjects\\Gizbox\\Gizbox\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{19ACE2EC-C36E-456E-91EE-C0ACCD3F9D41}|..\\GizboxTest\\GizboxTest.csproj|f:\\legacy\\myprojects\\gizbox\\gizboxtest\\note.txt||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{48385E83-C0CE-4F16-8408-7C6EADB1BFEA}|..\\GizboxLSP\\GizboxLSP.csproj|f:\\legacy\\myprojects\\gizbox\\gizboxlsp\\lsp.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{19ACE2EC-C36E-456E-91EE-C0ACCD3F9D41}|..\\GizboxTest\\GizboxTest.csproj|f:\\legacy\\myprojects\\gizbox\\gizboxtest\\test.gix||{8B382828-6202-11D1-8870-0000F87579D2}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{3F6178C1-3C2A-4945-A499-339F6CFBBCF0}|Gizbox.csproj|f:\\legacy\\myprojects\\gizbox\\gizbox\\src\\scanner.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{3F6178C1-3C2A-4945-A499-339F6CFBBCF0}|Gizbox.csproj|F:\\Legacy\\MyProjects\\Gizbox\\Gizbox\\src\\scanner.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{3F6178C1-3C2A-4945-A499-339F6CFBBCF0}|Gizbox.csproj|solutionrelative:src\\scanner.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{48385E83-C0CE-4F16-8408-7C6EADB1BFEA}|..\\GizboxLSP\\GizboxLSP.csproj|F:\\Legacy\\MyProjects\\Gizbox\\gizboxlsp\\lsp.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{19ACE2EC-C36E-456E-91EE-C0ACCD3F9D41}|..\\GizboxTest\\GizboxTest.csproj|f:\\legacy\\myprojects\\gizbox\\gizboxtest\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{3F6178C1-3C2A-4945-A499-339F6CFBBCF0}|Gizbox.csproj|f:\\legacy\\myprojects\\gizbox\\gizbox\\src\\languageservices\\languageservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{3F6178C1-3C2A-4945-A499-339F6CFBBCF0}|Gizbox.csproj|F:\\Legacy\\MyProjects\\Gizbox\\Gizbox\\src\\languageservices\\languageservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{3F6178C1-3C2A-4945-A499-339F6CFBBCF0}|Gizbox.csproj|solutionrelative:src\\languageservices\\languageservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{3F6178C1-3C2A-4945-A499-339F6CFBBCF0}|Gizbox.csproj|F:\\Legacy\\MyProjects\\Gizbox\\Gizbox\\src\\syntaxtree.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{3F6178C1-3C2A-4945-A499-339F6CFBBCF0}|Gizbox.csproj|solutionrelative:src\\syntaxtree.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{19ACE2EC-C36E-456E-91EE-C0ACCD3F9D41}|..\\GizboxTest\\GizboxTest.csproj|f:\\legacy\\myprojects\\gizbox\\gizboxtest\\note.txt||{8B382828-6202-11D1-8870-0000F87579D2}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{F0136D52-B54B-4558-83F0-7C0564900880}|..\\GizboxAOT\\GizboxAOT.csproj|f:\\legacy\\myprojects\\gizbox\\gizboxaot\\test.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
@@ -44,7 +44,7 @@
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 6,
               "Title": "SyntaxTree.cs",
               "DocumentMoniker": "F:\\Legacy\\MyProjects\\Gizbox\\Gizbox\\Src\\SyntaxTree.cs",
               "RelativeDocumentMoniker": "Src\\SyntaxTree.cs",
@@ -52,12 +52,11 @@
               "RelativeToolTip": "Src\\SyntaxTree.cs",
               "ViewState": "AQIAAFMAAAAAAAAAAAAiwGoAAAAaAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-02-13T16:50:55.227Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-02-13T16:50:55.227Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 1,
               "Title": "LSP.cs",
               "DocumentMoniker": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxLSP\\LSP.cs",
               "RelativeDocumentMoniker": "..\\GizboxLSP\\LSP.cs",
@@ -70,7 +69,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 5,
               "Title": "LanguageService.cs",
               "DocumentMoniker": "F:\\Legacy\\MyProjects\\Gizbox\\Gizbox\\Src\\LanguageServices\\LanguageService.cs",
               "RelativeDocumentMoniker": "Src\\LanguageServices\\LanguageService.cs",
@@ -78,18 +77,17 @@
               "RelativeToolTip": "Src\\LanguageServices\\LanguageService.cs",
               "ViewState": "AQIAAKEAAAAAAAAAAAAjwLoAAAAeAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-02-13T16:38:05.616Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-02-13T16:38:05.616Z"
             }
           ]
         },
         {
           "DockedWidth": 598,
-          "SelectedChildIndex": 0,
+          "SelectedChildIndex": 1,
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 2,
               "Title": "test.gix",
               "DocumentMoniker": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxTest\\test.gix",
               "RelativeDocumentMoniker": "..\\GizboxTest\\test.gix",
@@ -97,25 +95,24 @@
               "RelativeToolTip": "..\\GizboxTest\\test.gix",
               "ViewState": "AQIAAAkAAAAAAAAAAADwvyYAAAApAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
-              "WhenOpened": "2025-02-16T19:26:43.417Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-02-16T19:26:43.417Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
+              "DocumentIndex": 0,
               "Title": "Note.txt",
               "DocumentMoniker": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxTest\\Note.txt",
               "RelativeDocumentMoniker": "..\\GizboxTest\\Note.txt",
               "ToolTip": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxTest\\Note.txt",
               "RelativeToolTip": "..\\GizboxTest\\Note.txt",
-              "ViewState": "AQIAAAAAAAAAAAAAAADwvxAAAAAAAAAA",
+              "ViewState": "AQIAAAAAAAAAAAAAAAAAACAAAAAeAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003109|",
               "WhenOpened": "2025-02-13T12:16:51.629Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 3,
               "Title": "Scanner.cs",
               "DocumentMoniker": "F:\\Legacy\\MyProjects\\Gizbox\\Gizbox\\Src\\Scanner.cs",
               "RelativeDocumentMoniker": "Src\\Scanner.cs",
@@ -123,8 +120,7 @@
               "RelativeToolTip": "Src\\Scanner.cs",
               "ViewState": "AQIAAC0AAAAAAAAAAADwvzEAAABDAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-02-16T19:26:33.154Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-02-16T19:26:33.154Z"
             },
             {
               "$type": "Document",
@@ -151,7 +147,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 4,
               "Title": "Program.cs",
               "DocumentMoniker": "F:\\Legacy\\MyProjects\\Gizbox\\GizboxTest\\Program.cs",
               "RelativeDocumentMoniker": "..\\GizboxTest\\Program.cs",
@@ -159,8 +155,7 @@
               "RelativeToolTip": "..\\GizboxTest\\Program.cs",
               "ViewState": "AQIAADkAAAAAAAAAAAAAAEEAAAAPAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-02-10T16:12:15.586Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-02-10T16:12:15.586Z"
             }
           ]
         }
