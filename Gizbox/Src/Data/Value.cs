@@ -261,15 +261,15 @@ namespace Gizbox
                 case GizType.Float: return AsFloat.ToString();
                 case GizType.StringRef:
                     {
-                        return "GizType-String";
+                        return $"GizString(ptr:{this.AsPtr})";
                     }
                 case GizType.ArrayRef:
                     {
-                        return "GizType-Array";
+                        return $"GizArray(ptr:{this.AsPtr})";
                     }
                 case GizType.ObjectRef:
                     {
-                        return "GizType-Object";
+                        return $"GizObject(ptr:{this.AsPtr})";
                     }
                 default:
                     {

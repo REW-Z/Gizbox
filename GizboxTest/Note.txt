@@ -14,6 +14,8 @@
 
 ******* 优化 *******    
 
+优化外部函数调用效率。使用CreateDelegate？  
+
 使用哈希表优化LALR生成算法。  
 
 
@@ -35,10 +37,7 @@
 借鉴（Haskell、LISP、Prolog、Rust）  
 
 
-
-
-
-
 ******* DEBUG ********  
 (DONE) 无法从StmtBlock中Return  
-if-else中Return会报错不是所有路径都有返回值。(SemanticAnalyzer.cs: 1986)
+(DONE) if-else中Return会报错不是所有路径都有返回值。(SemanticAnalyzer.cs: 1986)  
+(DONE) 字符串连接、字符串比较都作为内置重载。  

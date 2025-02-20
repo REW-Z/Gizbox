@@ -1402,12 +1402,24 @@ namespace Gizbox.ScriptEngine
 
         public Value CalBinary(string op, Value v1, Value v2)
         {
-            //固有的操作符重载    
-            if(v1.Type == GizType.StringRef && v2.Type == GizType.StringRef)
+            //内置的操作符重载    
+            //字符串    
+            if (v1.Type == GizType.StringRef && v2.Type == GizType.StringRef)
             {
-                //Log("字符串连接：str1: " + (string)engine.DeReference(v1.AsPtr) + " ptr1 : " + v1.AsPtr + "  str2: " + (string)engine.DeReference(v2.AsPtr) + "  ptr2 : " + v2.AsPtr);
-                string newstring = (string)engine.DeReference(v1.AsPtr) + (string)engine.DeReference(v2.AsPtr);
-                return engine.NewString(newstring);
+                if(op == "+")
+                {
+                    //Log("字符串连接：str1: " + (string)engine.DeReference(v1.AsPtr) + " ptr1 : " + v1.AsPtr + "  str2: " + (string)engine.DeReference(v2.AsPtr) + "  ptr2 : " + v2.AsPtr);
+                    string newstring = (string)engine.DeReference(v1.AsPtr) + (string)engine.DeReference(v2.AsPtr);
+                    return engine.NewString(newstring);
+                }
+                else if(op == "==")
+                {
+                    return (string)engine.DeReference(v1.AsPtr) == (string)engine.DeReference(v2.AsPtr);
+                }
+                else if(op == "!=")
+                {
+                    return (string)engine.DeReference(v1.AsPtr) != (string)engine.DeReference(v2.AsPtr);
+                }
             }
 
 

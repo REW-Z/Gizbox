@@ -1695,8 +1695,6 @@ namespace Gizbox.SemanticRule
                             TryCompleteType(funcDeclNode.returnTypeNode);
 
 
-
-
                             //隐藏的this参数加入符号表    
                             if (isMethod)
                             {
@@ -1715,7 +1713,6 @@ namespace Gizbox.SemanticRule
                                 Pass2_CollectOtherSymbols(stmtNode);
                             }
 
-
                             //离开函数作用域  
                             envStack.Pop();
                         }
@@ -1726,7 +1723,6 @@ namespace Gizbox.SemanticRule
                     {
                         //Id at env
                         externFuncDeclNode.identifierNode.attributes["def_at_env"] = envStack.Peek();
-
 
 
                         //PASS1止于添加符号条目  
@@ -1769,7 +1765,6 @@ namespace Gizbox.SemanticRule
                     {
                         //Id at env
                         classDeclNode.classNameNode.attributes["def_at_env"] = envStack.Peek();
-
 
 
                         //PASS1止于添加符号条目  
@@ -1983,12 +1978,18 @@ namespace Gizbox.SemanticRule
                         //返回值类型检查（仅限非void的函数）  
                         if (!(funcDeclNode.returnTypeNode is SyntaxTree.PrimitiveTypeNode && (funcDeclNode.returnTypeNode as SyntaxTree.PrimitiveTypeNode).token.name == "void"))
                         {
-                            //检查返回语句和返回表达式    
-                            var returnStmt = funcDeclNode.statementsNode.statements.FirstOrDefault(s => s is SyntaxTree.ReturnStmtNode);
-                            if (returnStmt == null) throw new SemanticException(ExceptioName.MissingReturnStatement, funcDeclNode, "");
+                            ////检查返回语句和返回表达式    
+                            if (CheckReturnStmt(funcDeclNode.statementsNode, funcDeclNode.returnTypeNode.TypeExpression()) == false)
+                            {
+                                throw new SemanticException(ExceptioName.MissingReturnStatement, funcDeclNode, "");
+                            }
 
-                            bool valid = CheckType(funcDeclNode.returnTypeNode.TypeExpression(), (returnStmt as SyntaxTree.ReturnStmtNode).returnExprNode);
-                            if (!valid) throw new SemanticException(ExceptioName.ReturnTypeError, funcDeclNode.returnTypeNode, "");
+                            ////检查返回语句和返回表达式（临时）    
+                            //var returnStmt = funcDeclNode.statementsNode.statements.FirstOrDefault(s => s is SyntaxTree.ReturnStmtNode);
+                            //if (returnStmt == null) throw new SemanticException(ExceptioName.MissingReturnStatement, funcDeclNode, "");
+
+                            //bool valid = CheckType(funcDeclNode.returnTypeNode.TypeExpression(), (returnStmt as SyntaxTree.ReturnStmtNode).returnExprNode);
+                            //if (!valid) throw new SemanticException(ExceptioName.ReturnTypeError, funcDeclNode.returnTypeNode, "");
                         }
 
 
@@ -2613,6 +2614,80 @@ namespace Gizbox.SemanticRule
             }
 
             return null;
+        }
+
+        private bool CheckReturnStmt(SyntaxTree.Node node, string returnType)
+        {
+            switch(node)
+            {
+                //语句块节点
+                case SyntaxTree.StatementBlockNode stmtBlockNode:
+                    {
+                        bool anyReturnStmt = false;
+                        for(int i = stmtBlockNode.statements.Count - 1; i > -1; --i)
+                        {
+                            var stmt = stmtBlockNode.statements[i];
+                            if (CheckReturnStmt(stmt, returnType))
+                            {
+                                anyReturnStmt = true;//不break，确保所有return节点都被检查  
+                            }
+                        }
+                        return anyReturnStmt;
+                    }
+                case SyntaxTree.StatementsNode stmtsNode:
+                    {
+                        bool anyReturnStmt = false;
+                        for (int i = stmtsNode.statements.Count - 1; i > -1; --i)
+                        {
+                            var stmt = stmtsNode.statements[i];
+                            if (CheckReturnStmt(stmt, returnType))
+                            {
+                                anyReturnStmt = true;
+                            }
+                        }
+                        return anyReturnStmt;
+                    }
+
+                //分支节点  
+                case SyntaxTree.IfStmtNode ifNode:
+                    {
+                        //没有else的if语法 ->不通过检查  
+                        if(ifNode.elseClause == null)
+                        {
+                            return false;
+                        }
+
+                        //有else的if语法 ->检查所有路径是否能通过检查  
+                        bool allPathValid = true;
+                        if(CheckReturnStmt(ifNode.elseClause.stmt, returnType) == false)
+                        {
+                            return false;
+                        }
+                        foreach(var conditionClause in ifNode.conditionClauseList)
+                        {
+                            if (CheckReturnStmt(conditionClause.thenNode, returnType) == false)
+                            {
+                                allPathValid = false;
+                                break;
+                            }
+                        }
+                        return allPathValid;
+                    }
+
+                //返回节点  
+                case SyntaxTree.ReturnStmtNode retNode:
+                    {
+                        //类型检查  
+                        bool typeValid = CheckType(returnType, retNode.returnExprNode);
+                        if(typeValid == false)
+                            throw new SemanticException(ExceptioName.ReturnTypeError, retNode, "");
+
+                        return true;
+                    }
+                //其他节点  
+                default:
+                    return false;
+            }
         }
 
         private bool TryQueryIgnoreMangle(string name)

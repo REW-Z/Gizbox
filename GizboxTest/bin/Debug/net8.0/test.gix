@@ -15,15 +15,16 @@ namespace Creature
     {
         if(type == "Human")
         {
+            Console::Log("Create Human...");
             Human inst = new Human();
             Creature::totalCount ++;
             return (Creature)inst;  
         }
         else
         {
-            return new Creature();
+            Console::Log("Create Abstract Creature...");
+            //return new Creature();
         }
-        return new Creature();
     }
     void Die(Creature c)
     {
