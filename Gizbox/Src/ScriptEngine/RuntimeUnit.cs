@@ -114,7 +114,7 @@ namespace Gizbox.ScriptEngine
             string lex = str.Substring(splitIndex + 1);
             switch (baseType)
             {
-                case "LITNULL": this.val =  Value.Void; break;
+                case "LITNULL": this.val =  Value.NULL; break;
                 case "LITBOOL": this.val = bool.Parse(lex); break;
                 case "LITINT": this.val = int.Parse(lex); break;
                 case "LITFLOAT": this.val = float.Parse(lex.Substring(0, lex.Length - 1)); break;//去除F标记  
@@ -411,7 +411,8 @@ namespace Gizbox.ScriptEngine
         //读取常量值    
         public object ReadConst(long ptr)
         {
-            if (ptr >= 0) throw new GizboxException(ExceptioName.NotPointerToConstant);
+            if (ptr == 0) return null;
+            if (ptr > 0) throw new GizboxException(ExceptioName.NotPointerToConstant);
             
             long truePtr = Math.Abs(ptr) - 1;
             int unitId = (int)(truePtr / __constdataOffset);

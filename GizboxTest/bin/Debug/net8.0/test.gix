@@ -1,45 +1,73 @@
-﻿import <"core">
-import <"stdlib">    
+﻿import <"core">  
+import <"stdlib">  
+
 using Core;  
 using Console;
+using Collections;
 
-//类定义  
-class Student
+GC::Disable();
+
+namespace Creature
 {
-    int a = 0;
+    int totalCount = 0;
 
-    //get  
-    int b()
+    Creature Born(string type)
     {
-        return 99;
+        if(type == "Human")
+        {
+            Human inst = new Human();
+            Creature::totalCount ++;
+            return (Creature)inst;  
+        }
+        else
+        {
+            return new Creature();
+        }
+        return new Creature();
     }
-    //set  
-    void b(int newv)
+    void Die(Creature c)
     {
-    }
-
-    void Test()
-    {
-        Console::Log("Test");
+        if(c != null)
+        {
+            delete c;
+            Creature::totalCount --;
+        }
     }
 }
-
-namespace Student
+class Creature
+{    
+    string name = "";
+    int age = 0;
+}
+namespace Human::Job
 {
-    const int totalcount = 9; 
+    const int Undefined = 0;
+    const int Student = 2;
+    const int Teacher = 4;
+    const int Engineer = 8;
+    const int Cook = 16;
+}
+class Human : Creature
+{
+    int job = 0;
 }
 
 
-//AAAA
-Student obj = new Student(); //创建对象测试
-obj.a = 1; //对象字段赋值测试  
-obj.b = 2; //对象属性赋值测试  
-int btmp = obj.b; //对象属性取值测试
+//Test  
+Human sam = (Human)Creature::Born("Human");
+sam.name = "Sam";
+sam.age = 20;
+sam.job = Human::Job::Student;
 
-Console::Log("Log测试: " + (string)btmp);//
+for(int i = 0; i < 99; i++)
+{
+    sam.age += 1;
+    Console::Log(sam.name + " is now " + (string)(sam.age) + " years old!");
 
-//全局常量测试  
-int sizeofInt = Core::Integer::size;
-int totalStu = Student::totalcount;
-Console::Log("size:" + (string)sizeofInt);
-Console::Log("totalstu:" + (string)totalStu);
+    if(sam.age > 90)
+    {
+        Creature::Die((Creature)sam);
+        break;
+    }
+}
+Console::Log("Test Finish...");

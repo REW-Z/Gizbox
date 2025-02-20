@@ -175,7 +175,7 @@ namespace Gizbox.Interop.CSharp
             {
                 return null;
             }
-            else if (gzVal.Type == GizType.GizObject)
+            else if (gzVal.Type == GizType.ObjectRef)
             {
                 var gizobj =  ((GizObject)engine.DeReference(gzVal.AsPtr));
 
@@ -210,7 +210,7 @@ namespace Gizbox.Interop.CSharp
                     return csVal;
                 }
             }
-            else if (gzVal.Type == GizType.GizArray)
+            else if (gzVal.Type == GizType.ArrayRef)
             {
                 Value[] gzarr = engine.DeReference(gzVal.AsPtr) as Value[];
                 object[] csArr = new object[gzarr.Length]; 

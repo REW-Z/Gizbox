@@ -14,7 +14,7 @@ namespace Gizbox.ScriptEngine
     //堆区  
     public class Heap
     {
-        private List<object> data = new List<object>(100);
+        private List<object> data;
 
         public int HeapSize => data.Count;
 
@@ -25,15 +25,22 @@ namespace Gizbox.ScriptEngine
         private int gcThreshold = 50;
 
 
+        public Heap() 
+        {
+            data = new List<object>();
+            data.Add(null);//0指针位置设置为NULL    
+        }
+
+
         public object Read(long addr)
         {
-            if (addr < 0 || addr >= data.Count) return null;
+            if (addr <= 0 || addr >= data.Count) return null;
             return data[(int)addr];
         }
 
         public long Alloc(object obj)
         {
-            for (int i = 0; i < data.Count; ++i)
+            for (int i = 1; i < data.Count; ++i)
             {
                 if (data[i] == null)
                 {
@@ -50,7 +57,7 @@ namespace Gizbox.ScriptEngine
 
         public object Write(long addr, object val)
         {
-            if (addr < 0 || addr >= data.Count) throw new GizboxException(ExceptioName.InvalidHeapWrite);
+            if (addr <= 0 || addr >= data.Count) throw new GizboxException(ExceptioName.InvalidHeapWrite);
 
             if (data[(int)addr] == null && val != null)//写入新对象  
             {
@@ -69,7 +76,7 @@ namespace Gizbox.ScriptEngine
         public int GetObjectCount()
         {
             int count = 0;
-            for (int i = 0; i < data.Count; ++i)
+            for (int i = 1; i < data.Count; ++i)
             {
                 if (data[i] != null)
                 {
@@ -101,7 +108,7 @@ namespace Gizbox.ScriptEngine
         public void Print()
         {
             GixConsole.LogLine("堆区(" + this.data.Count + ")");
-            for (int i = 0; i < this.data.Count; ++i)
+            for (int i = 1; i < this.data.Count; ++i)
             {
                 GixConsole.LogLine("(" + i + ")" + this.data[i]);
             }
@@ -386,7 +393,7 @@ namespace Gizbox.ScriptEngine
                         {
                             retRegister = GetValue(code.arg1);
                         }
-                        var jumpAddr = mainUnit.QueryLabel("exit", envStack.Peek().name, currUnit);
+                        var jumpAddr = mainUnit.QueryLabel("exit", QueryEnv(SymbolTable.TableCatagory.FuncScope).name, currUnit);
                         int exitLine = jumpAddr.Item2;
                         int endLine = exitLine - 1;    
                         
@@ -465,7 +472,7 @@ namespace Gizbox.ScriptEngine
                         //获取this参数  
                         if (this.callStack[this.callStack.Top + 1].args.Count == 0) throw new RuntimeException(ExceptioName.ScriptRuntimeError, GetCurrentCode(), "method call doesnt has \"this\" argument！");
                         var arg_this = this.callStack[this.callStack.Top + 1].args.Peek();
-                        if (arg_this.Type != GizType.GizObject) throw new RuntimeException(ExceptioName.ScriptRuntimeError, GetCurrentCode(), "method call doesnt has \"this\" argument！");
+                        if (arg_this.Type != GizType.ObjectRef) throw new RuntimeException(ExceptioName.ScriptRuntimeError, GetCurrentCode(), "method call doesnt has \"this\" argument！");
                         string trueType = (this.DeReference(arg_this.AsPtr)as GizObject).truetype;
 
 
@@ -560,7 +567,7 @@ namespace Gizbox.ScriptEngine
                 case "DEL":
                     {
                         var objPtr = GetValue(code.arg1);
-                        if(objPtr.IsPtr && objPtr.AsPtr >= 0)
+                        if(objPtr.IsRefType && objPtr.AsPtr >= 0)
                         {
                             this.heap.Write(objPtr.AsPtr, null);
                         }
@@ -799,7 +806,7 @@ namespace Gizbox.ScriptEngine
                         string fieldName = memb.fieldname;
 
                         if ((objptr.IsVoid)) throw new RuntimeException(ExceptioName.AccessedObjectNotFound, GetCurrentCode(), "when access member \"" + fieldName +  "\"");
-                        if (objptr.Type != GizType.GizObject) throw new RuntimeException(ExceptioName.ObjectTypeError, GetCurrentCode(), "not gizbox object");
+                        if (objptr.Type != GizType.ObjectRef) throw new RuntimeException(ExceptioName.ObjectTypeError, GetCurrentCode(), "not gizbox object");
 
                         var fields = (this.DeReference(objptr.AsPtr) as GizObject).fields;
                         if (fields.ContainsKey(fieldName) == false) throw new RuntimeException(ExceptioName.ObjectFieldNotInitialized,GetCurrentCode(), fieldName);
@@ -855,8 +862,7 @@ namespace Gizbox.ScriptEngine
                         string fieldName = memb.fieldname;
 
                         if ((objptr.IsVoid)) throw new RuntimeException(ExceptioName.AccessedObjectNotFound, GetCurrentCode(), "when acess member \"" + fieldName + "\"");
-                        if (objptr.Type != GizType.GizObject) throw new RuntimeException(ExceptioName.ScriptRuntimeError, GetCurrentCode(), "not gizbox object");
-
+                        if (objptr.Type != GizType.ObjectRef) throw new RuntimeException(ExceptioName.ScriptRuntimeError, GetCurrentCode(), "not gizbox object");
 
                         (this.DeReference(objptr.AsPtr) as GizObject).fields[fieldName] = val;
                         //Log((this.DeReference(objptr.AsPtr) as GizObject).truetype + "类型的" + memb.str + "的值被设置为" + val);
@@ -911,7 +917,7 @@ namespace Gizbox.ScriptEngine
                 case GizType.Double: return v.AsDouble;
                 case GizType.Char: return v.AsChar;
 
-                case GizType.String:
+                case GizType.StringRef:
                     {
                         return this.DeReference(v.AsPtr);
                     }
@@ -922,9 +928,17 @@ namespace Gizbox.ScriptEngine
 
             }
         }
+
+        /// <summary>
+        /// 解引用  
+        /// </summary>
         public object DeReference(long ptr)
         {
-            if (ptr >= 0)
+            if (ptr == 0)
+            {
+                return null;
+            }
+            else if (ptr > 0)
             {
                 return this.heap.Read(ptr);
             }
@@ -1057,6 +1071,18 @@ namespace Gizbox.ScriptEngine
 
             Log("在符号表链中未找到：" + symbolName + "符号表链：" + string.Concat(envStack.ToList().Select(e => e.name + " - ")) + " 当前行数：" + curr);
             tableFound = null;
+            return null;
+        }
+        private SymbolTable QueryEnv(SymbolTable.TableCatagory tableCatagory)
+        {
+            //本编译单元查找  
+            for(int i = envStack.Count - 1; i > -1; --i)
+            {
+                if(envStack[i].tableCatagory == tableCatagory)
+                {
+                    return envStack[i];
+                }
+            }
             return null;
         }
 
@@ -1252,7 +1278,7 @@ namespace Gizbox.ScriptEngine
         {
             foreach (var key in this.mainUnit.globalData.Keys)
             {
-                if (this.mainUnit.globalData[key].IsPtr)
+                if (this.mainUnit.globalData[key].IsRefType)
                 {
                     var newVal = TraversingObject(this.mainUnit.globalData[key], op);
                     this.mainUnit.globalData[key] = newVal;
@@ -1264,7 +1290,7 @@ namespace Gizbox.ScriptEngine
                 var argList = this.callStack[i].args.ToList();
                 for (int a = 0; a < argList.Count; ++a)
                 {
-                    if (argList[a].IsPtr)
+                    if (argList[a].IsRefType)
                     {
                         var newVal = TraversingObject(argList[a], op);
                         argList[a] = newVal;
@@ -1272,7 +1298,7 @@ namespace Gizbox.ScriptEngine
                 }
                 foreach (var key in this.callStack[i].localVariables.Keys)
                 {
-                    if (this.callStack[i].localVariables[key].IsPtr)
+                    if (this.callStack[i].localVariables[key].IsRefType)
                     {
                         var newVal = TraversingObject(this.callStack[i].localVariables[key], op);
                         this.callStack[i].localVariables[key] = newVal;
@@ -1288,7 +1314,7 @@ namespace Gizbox.ScriptEngine
                 var fieldDic = (obj as GizObject).fields;
                 foreach (var key in fieldDic.Keys)
                 {
-                    if (fieldDic[key].IsPtr)
+                    if (fieldDic[key].IsRefType)
                     {
                         var newVal = TraversingObject(fieldDic[key], op);
                         fieldDic[key] = newVal;
@@ -1300,7 +1326,7 @@ namespace Gizbox.ScriptEngine
                 var arr = (obj as Value[]);
                 for (int i = 0; i < arr.Length; ++i)
                 {
-                    if (arr[i].IsPtr)
+                    if (arr[i].IsRefType)
                     {
                         var newVal = TraversingObject(arr[i], op);
                         arr[i] = newVal;
@@ -1311,6 +1337,7 @@ namespace Gizbox.ScriptEngine
             var newPtrVal  = op(objPtr);
             return newPtrVal;
         }
+
 
 
         //DEBUG  
@@ -1376,7 +1403,7 @@ namespace Gizbox.ScriptEngine
         public Value CalBinary(string op, Value v1, Value v2)
         {
             //固有的操作符重载    
-            if(v1.Type == GizType.String && v2.Type == GizType.String)
+            if(v1.Type == GizType.StringRef && v2.Type == GizType.StringRef)
             {
                 //Log("字符串连接：str1: " + (string)engine.DeReference(v1.AsPtr) + " ptr1 : " + v1.AsPtr + "  str2: " + (string)engine.DeReference(v2.AsPtr) + "  ptr2 : " + v2.AsPtr);
                 string newstring = (string)engine.DeReference(v1.AsPtr) + (string)engine.DeReference(v2.AsPtr);
@@ -1458,7 +1485,7 @@ namespace Gizbox.ScriptEngine
                         }
                     }
                     break;
-                case GizType.String:
+                case GizType.StringRef:
                     {
                         switch (toType)
                         {
@@ -1466,7 +1493,7 @@ namespace Gizbox.ScriptEngine
                         }
                     }
                     break;
-                case GizType.GizObject:
+                case GizType.ObjectRef:
                     {
                         switch (toType)
                         {
@@ -1486,7 +1513,7 @@ namespace Gizbox.ScriptEngine
                         }
                     }
                     break;
-                case GizType.GizArray:
+                case GizType.ArrayRef:
                     {
                         switch (toType)
                         {
@@ -1516,7 +1543,7 @@ namespace Gizbox.ScriptEngine
             string str = "";
             switch(value.Type)
             {
-                case GizType.String:
+                case GizType.StringRef:
                     {
                         return value;
                     }
@@ -1527,8 +1554,8 @@ namespace Gizbox.ScriptEngine
                 case GizType.Float:
                 case GizType.Double:
                 case GizType.Char:
-                case GizType.GizObject:
-                case GizType.GizArray:
+                case GizType.ObjectRef:
+                case GizType.ArrayRef:
                     {
                         str = value.ToString();
                     }

@@ -1,5 +1,7 @@
 ﻿******* Gizbox TODO *******      
 
+(DONE)Value比较时，不能将null和任意引用类型比较。    
+
 实参为null时无法找到对应函数重载。（"null"被mangle为函数名一部分了）    
 
 里氏替换。    
@@ -31,3 +33,12 @@
 响应式编程原生支持  
 
 借鉴（Haskell、LISP、Prolog、Rust）  
+
+
+
+
+
+
+******* DEBUG ********  
+(DONE) 无法从StmtBlock中Return  
+if-else中Return会报错不是所有路径都有返回值。(SemanticAnalyzer.cs: 1986)

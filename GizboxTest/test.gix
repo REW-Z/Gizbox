@@ -7,30 +7,39 @@ using Collections;
 
 GC::Disable();
 
-namespace Person
+namespace Creature
 {
-    int totalPersonCount = 0;
+    int totalCount = 0;
 
-    Person PersonBorn(string personName)
+    Creature Born(string type)
     {
-        Person newPerson = new Person();
-        newPerson.age = 0;
-        newPerson.name = personName;
-        newPerson.job = Person::Job::Undefined;
-        Person::totalPersonCount++;
-        return newPerson;
-    }
-
-    void PersonDie(Person person)
-    {
-        if(person != null)
+        if(type == "Human")
         {
-            delete person;
-            Person::totalPersonCount--;
+            Human inst = new Human();
+            Creature::totalCount ++;
+            return (Creature)inst;  
+        }
+        else
+        {
+            return new Creature();
+        }
+        return new Creature();
+    }
+    void Die(Creature c)
+    {
+        if(c != null)
+        {
+            delete c;
+            Creature::totalCount --;
         }
     }
 }
-namespace Person::Job
+class Creature
+{    
+    string name = "";
+    int age = 0;
+}
+namespace Human::Job
 {
     const int Undefined = 0;
     const int Student = 2;
@@ -38,17 +47,17 @@ namespace Person::Job
     const int Engineer = 8;
     const int Cook = 16;
 }
-class Person
+class Human : Creature
 {
     int job = 0;
-    string name = "";
-    int age = 0;
 }
 
-//create instance  
-Person sam = Person::PersonBorn("Sam");
-sam.age = 25;
-sam.job = Person::Job::Student;
+
+//Test  
+Human sam = (Human)Creature::Born("Human");
+sam.name = "Sam";
+sam.age = 20;
+sam.job = Human::Job::Student;
 
 for(int i = 0; i < 99; i++)
 {
@@ -57,7 +66,8 @@ for(int i = 0; i < 99; i++)
 
     if(sam.age > 90)
     {
-        Person::PersonDie(sam);
+        Creature::Die((Creature)sam);
         break;
     }
 }
+Console::Log("Test Finish...");

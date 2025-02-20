@@ -9,14 +9,18 @@ namespace Gizbox
     public enum GizType : byte
     {
         Void,
+
+        //ValueType  
         Int,
         Float,
         Double,
         Bool,
         Char,
-        String,
-        GizObject,
-        GizArray,
+
+        //RefType  
+        StringRef,
+        ObjectRef,
+        ArrayRef,
     }
 
 
@@ -64,11 +68,15 @@ namespace Gizbox
 
         public GizType Type => this.type;
 
-        public bool IsPtr => (this.type == GizType.GizObject || this.type == GizType.GizArray || this.type == GizType.String);
+        public bool IsRefType => (this.type == GizType.ObjectRef || this.type == GizType.ArrayRef || this.type == GizType.StringRef);
+        
+        public bool IsValueType => (IsRefType == false && IsVoid == false);
 
         public bool IsVoid => (this.type == GizType.Void);
 
         public static Value Void => new Value() { type = GizType.Void };
+
+        public static Value NULL => new Value() { type = GizType.ObjectRef, AsPtr = 0 };
 
 
         // ---------- ASSIGN --------------
@@ -95,21 +103,21 @@ namespace Gizbox
 
         public static Value FromConstStringPtr(long ptr)
         {
-            return new Value() { type = GizType.String, AsPtr = (-ptr) - 1 };
+            return new Value() { type = GizType.StringRef, AsPtr = (-ptr) - 1 };
         }
         public static Value FromStringPtr(long ptr)
         {
-            return new Value() { type = GizType.String, AsPtr = ptr };
+            return new Value() { type = GizType.StringRef, AsPtr = ptr };
         }
 
         public static Value FromGizObjectPtr(long ptr)
         {
-            return new Value() { type = GizType.GizObject, AsPtr = ptr };
+            return new Value() { type = GizType.ObjectRef, AsPtr = ptr };
         }
 
         public static Value FromArrayPtr(long arrayPtr)
         {
-            return new Value() { type = GizType.GizArray, AsPtr = arrayPtr };
+            return new Value() { type = GizType.ArrayRef, AsPtr = arrayPtr };
         }
 
 
@@ -208,6 +216,11 @@ namespace Gizbox
         }
         public static Value operator ==(Value v1, Value v2)
         {
+            //引用类型指针比较  
+            if(v1.IsRefType && v2.IsRefType) 
+                return v1.AsPtr == v2.AsPtr;
+
+            //值类型比较  
             if (v1.type != v2.type) throw new GizboxException(ExceptioName.OperationTypeError);
             switch (v1.type)
             {
@@ -220,7 +233,12 @@ namespace Gizbox
         }
         public static Value operator !=(Value v1, Value v2)
         {
-            if (v1.type != v2.type) throw new GizboxException(ExceptioName.OperationTypeError);
+            //引用类型指针比较  
+            if(v1.IsRefType && v2.IsRefType)
+                return v1.AsPtr != v2.AsPtr;
+
+            //值类型比较  
+            if(v1.type != v2.type) throw new GizboxException(ExceptioName.OperationTypeError);
             switch (v1.type)
             {
                 case GizType.Bool: return v1.AsBool != v2.AsBool;
@@ -241,15 +259,15 @@ namespace Gizbox
                 case GizType.Bool: return AsBool.ToString();
                 case GizType.Int: return AsInt.ToString();
                 case GizType.Float: return AsFloat.ToString();
-                case GizType.String:
+                case GizType.StringRef:
                     {
                         return "GizType-String";
                     }
-                case GizType.GizArray:
+                case GizType.ArrayRef:
                     {
                         return "GizType-Array";
                     }
-                case GizType.GizObject:
+                case GizType.ObjectRef:
                     {
                         return "GizType-Object";
                     }
