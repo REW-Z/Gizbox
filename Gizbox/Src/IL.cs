@@ -258,6 +258,31 @@ namespace Gizbox.IL
 
             return null;
         }
+        public void QueryAllTopSymbol(string name, List<SymbolTable.Record> result, bool ignoreMangle = false)
+        {
+            //本单元查找  
+            if(ignoreMangle == false)
+            {
+                if(globalScope.env.ContainRecordName(name))
+                {
+                    result.Add(globalScope.env.GetRecord(name));
+                }
+            }
+            else
+            {
+                globalScope.env.GetAllRecordByRawname(name, result);
+            }
+
+            //依赖中查找  
+            if(this.dependencyLibs != null)
+            {
+                foreach(var dep in dependencyLibs)
+                {
+                    dep.QueryAllTopSymbol(name, result, ignoreMangle);
+                }
+            }
+        }
+
 
         //查询虚函数表  
         public VTable QueryVTable(string name)

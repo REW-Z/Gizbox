@@ -22,14 +22,14 @@ namespace Creature
         }
         else
         {
-            Console::Log("Create Abstract Creature...");
-            return new Creature();
+            return null;
         }
     }
     void Die(Creature c)
     {
         if(c != null)
         {
+            Console::Log("Delete Creature:" + c.name);
             delete c;
             Creature::totalCount --;
         }
@@ -39,6 +39,11 @@ class Creature
 {    
     string name = "";
     int age = 0;
+
+    void Move()
+    {
+        Console::Log(this.name + " move...");
+    }
 }
 namespace Human::Job
 {
@@ -51,8 +56,12 @@ namespace Human::Job
 class Human : Creature
 {
     int job = 0;
+    
+    void Move()
+    {
+        Console::Log(this.name + " walk...");
+    }
 }
-
 
 //Test  
 Human sam = (Human)Creature::Born("Human");
@@ -60,15 +69,36 @@ sam.name = "Sam";
 sam.age = 20;
 sam.job = Human::Job::Student;
 
+sam.Move();
+
 for(int i = 0; i < 99; i++)
 {
     sam.age += 1;
-    Console::Log(sam.name + " is now " + (string)(sam.age) + " years old!");
+
+    if((sam.age % 10) == 0)
+    {
+        Console::Log(sam.name + " is now " + (string)(sam.age) + " years old!");
+    }
 
     if(sam.age > 90)
     {
-        Creature::Die((Creature)sam);
+        Creature::Die(sam);
         break;
     }
 }
+
+
+Human[] GetHumans()
+{
+    Human[] humans = new Human[1];
+    humans[0] = new Human();
+    humans[0].name = "aaa";
+    return humans;
+}
+
+Human[] allHumans = GetHumans();
+Human first = allHumans[0];
+Console::Log("First..." + first.name);
+
+
 Console::Log("Test Finish...");

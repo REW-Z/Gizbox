@@ -38,5 +38,17 @@ namespace Gizbox
         {
             return typeExpr.Contains("->");
         }
+
+        public static bool IsClassType(string typeExpr)
+        {
+            if(IsPrimitiveType(typeExpr)) 
+                return false;
+            if(IsArrayType(typeExpr))
+                return false;
+            if(IsFunType(typeExpr))
+                return false;
+
+            return true;
+        }
     }
 }

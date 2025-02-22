@@ -281,8 +281,6 @@ namespace Gizbox.IL
                         GenNode(varDeclNode.initializerNode);
 
                         var tac = GenerateCode("=", GetRet(varDeclNode.identifierNode), GetRet(varDeclNode.initializerNode));
-                        Gizbox.GixConsole.LogLine("");
-                        Gizbox.GixConsole.LogLine(tac.ToExpression());
                     }
                     break;
 
@@ -719,7 +717,7 @@ namespace Gizbox.IL
             }
             else
             {
-                throw new SemanticException(ExceptioName.LiteralTypeUnknown, literalNode, "");
+                throw new SemanticException(ExceptioName.LiteralTypeUnknown, literalNode, literalNode.token.ToString());
             }
 
 

@@ -102,9 +102,9 @@ namespace Gizbox
         public class Record
         {
             [DataMember]
-            public string name;
+            public string name;//唯一  
             [DataMember]
-            public string rawname;
+            public string rawname;//不唯一 如果是functionname则不应该包含mangle部分  
             [DataMember]
             public RecordCatagory category;
             [DataMember]
@@ -171,9 +171,9 @@ namespace Gizbox
         public bool ContainRecordRawName(string rawname)
         {
             if (records.ContainsKey(rawname)) return true;
-            foreach (var val in records.Values)
+            foreach (var kv in records)
             {
-                if (val.rawname == rawname) return true;
+                if (kv.Value.rawname == rawname) return true;
             }
             return false;
         }
@@ -191,33 +191,85 @@ namespace Gizbox
         }
         public Record GetRecordByRawname(string rawSymbolName)
         {
-            foreach (var val in records.Values)
+            foreach (var kv in records)
             {
-                if (val.rawname == rawSymbolName) return val;
+                if (kv.Value.rawname == rawSymbolName) return kv.Value;
             }
             throw new Exception(this.name + "表中获取不到记录原名：" + rawSymbolName);
         }
-
-        //在本符号表和基类符号表中查找  
-        public Record GetMemberRecordInChain(string symbolName)
+        public void GetAllRecordByRawname(string rawSymbolName, List<SymbolTable.Record> result)
         {
-            if (this.tableCatagory != TableCatagory.ClassScope) throw new Exception("进类的符号表支持基类查找");
+            foreach(var kv in records)
+            {
+                if(kv.Value.rawname == rawSymbolName)
+                    result.Add(kv.Value);
+            }
+        }
+
+        //（仅为类符号表时）是子类
+        public bool Class_IsSubClassOf(string baseClassName)
+        {
+            if(this.name == baseClassName) return true;
+
+            if(records.ContainsKey("base") == true)
+            {
+                return records["base"].envPtr.Class_IsSubClassOf(baseClassName);
+            }
+
+            return false;
+        }
+        //（仅为类符号表时）在本类的符号表和基类符号表中查找  
+        public Record Class_GetMemberRecordInChain(string symbolName)
+        {
+            if (this.tableCatagory != TableCatagory.ClassScope) 
+                throw new Exception("必须是类的符号表");
+
 
             if (records.ContainsKey(symbolName))
             {
-                GixConsole.LogLine("has symbol:" + symbolName + " in " + this.name);
                 return records[symbolName];
             }
             else
             {
                 if(records.ContainsKey("base") == true)
                 {
-                    return records["base"].envPtr.GetMemberRecordInChain(symbolName);
+                    return records["base"].envPtr.Class_GetMemberRecordInChain(symbolName);
                 }
                 else
                 {
                     return null;
                 }
+            }
+        }
+        public void Class_GetAllMemberRecordInChain(string symbolName, List<Record> result)
+        {
+            if(this.tableCatagory != TableCatagory.ClassScope)
+                throw new Exception("必须是类的符号表");
+
+            if(records.ContainsKey(symbolName))
+            {
+                result.Add(records[symbolName]);
+            }
+
+            if(records.ContainsKey("base") == true)
+            {
+                records["base"].envPtr.Class_GetAllMemberRecordInChain(symbolName, result);
+            }
+        }
+        public void Class_GetAllMemberRecordInChainByRawname(string rawname, List<Record> result)
+        {
+            if(this.tableCatagory != TableCatagory.ClassScope)
+                throw new Exception("必须是类的符号表");
+
+            foreach(var kv in records)
+            {
+                if(kv.Value.rawname == rawname)
+                    result.Add(kv.Value);
+            }
+
+            if(records.ContainsKey("base") == true)
+            {
+                records["base"].envPtr.Class_GetAllMemberRecordInChainByRawname(rawname,result);
             }
         }
 
@@ -617,6 +669,13 @@ namespace Gizbox
 
 
 
+    public static class Debug
+    {
+        public static void Log(object content)
+        {
+            Gizbox.GixConsole.LogLine(content);
+        }
+    }
     public static class GixConsole
     {
         public static bool enableSystemConsole = true;

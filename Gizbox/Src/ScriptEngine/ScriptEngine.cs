@@ -409,7 +409,7 @@ namespace Gizbox.ScriptEngine
                     }
                 case "EXTERN_IMPL":
                     {
-                        List<Value> arguments = callStack[callStack.Top].args.ToList();
+                        List<Value> arguments = callStack[callStack.Top].args.AsList();
                         arguments.Reverse();
 
                         Value result = csharpInteropContext.ExternCall(OperandString.GetString(code.arg1), arguments);
@@ -1069,7 +1069,7 @@ namespace Gizbox.ScriptEngine
             }
 
 
-            Log("在符号表链中未找到：" + symbolName + "符号表链：" + string.Concat(envStack.ToList().Select(e => e.name + " - ")) + " 当前行数：" + curr);
+            Log("在符号表链中未找到：" + symbolName + "符号表链：" + string.Concat(envStack.AsList().Select(e => e.name + " - ")) + " 当前行数：" + curr);
             tableFound = null;
             return null;
         }
@@ -1287,7 +1287,7 @@ namespace Gizbox.ScriptEngine
 
             for (int i = 0; i <= this.callStack.Top; ++i)
             {
-                var argList = this.callStack[i].args.ToList();
+                var argList = this.callStack[i].args.AsList();
                 for (int a = 0; a < argList.Count; ++a)
                 {
                     if (argList[a].IsRefType)
@@ -1349,7 +1349,7 @@ namespace Gizbox.ScriptEngine
             {
                 Log(i.ToString() + "(top:" + callStack.Top + ")" + new string('-', 20));
                 Log("Arguments:");
-                foreach(var k in callStack[i].args.ToList())
+                foreach(var k in callStack[i].args.AsList())
                 {
                     Log(k.GetType().Name + ":" + k.ToString());
                 }

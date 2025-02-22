@@ -43,7 +43,7 @@ namespace Gizbox
             this.data.Clear();
         }
 
-        public List<T> ToList()
+        public List<T> AsList()
         {
             return data;
         }

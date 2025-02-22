@@ -1,12 +1,9 @@
-﻿******* Gizbox TODO *******      
+﻿
+******* Gizbox TODO *******      
 
 (DONE)Value比较时，不能将null和任意引用类型比较。    
-
-实参为null时无法找到对应函数重载。（"null"被mangle为函数名一部分了）    
-
-里氏替换。    
-
-操作符重载。  应该在代码生成层面实现而不是解释器层面。        
+(DONE)函数调用时的里氏替换。    
+(DONE)实参为null时无法找到对应函数重载。（"null"被mangle为函数名一部分了）    
 
 ******* LSP TODO ********
 
@@ -21,6 +18,7 @@
 
 ******* Prospects ********
 
+操作符重载(代码生成层面 or 解释器层面)    
 模式匹配（Pattern Matching）  
 管道操作符（Pipeline Operator）
 解构赋值（Destructuring Assignment）
@@ -29,15 +27,14 @@
 可选链（Optional Chaining）
 函数式编程(惰性求值（Lazy Evaluation）、无副作用函数)
 函数头等公民  
-
 元编程和宏（类似Lisp和Rust的宏）  
-
 响应式编程原生支持  
-
 借鉴（Haskell、LISP、Prolog、Rust）  
 
 
 ******* DEBUG ********  
+
 (DONE) 无法从StmtBlock中Return  
 (DONE) if-else中Return会报错不是所有路径都有返回值。(SemanticAnalyzer.cs: 1986)  
 (DONE) 字符串连接、字符串比较都作为内置重载。  
+数组封送有bug。
