@@ -8,9 +8,10 @@ using Gizbox;
 using Gizbox.LRParse;
 using Gizbox.LALRGenerator;
 using Gizbox.SemanticRule;
-using Gizbox.IL;
 using System.Runtime.CompilerServices;
 using static Gizbox.SyntaxTree;
+using Gizbox.IR;
+using System.Xml.Linq;
 
 
 
@@ -952,7 +953,6 @@ namespace Gizbox.SemanticRule
 
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.ElementAccessNode()
                 {
-                    isMemberAccessContainer = false,
                     containerNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes["id"],
                     indexNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes["optidx"],
 
@@ -965,7 +965,6 @@ namespace Gizbox.SemanticRule
 
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.ElementAccessNode()
                 {
-                    isMemberAccessContainer = true,
                     containerNode = (SyntaxTree.ObjectMemberAccessNode)psr.stack[psr.stack.Top - 3].attributes["ast_node"],
                     indexNode = ((SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"]),
 
@@ -1212,7 +1211,7 @@ namespace Gizbox.SemanticRule
 
         public SyntaxTree ast;
 
-        public IL.ILUnit ilUnit;
+        public ILUnit ilUnit;
 
         private Gizbox.GStack<SymbolTable> envStack;
 
@@ -1231,7 +1230,7 @@ namespace Gizbox.SemanticRule
         /// <summary>
         /// 构造  
         /// </summary>
-        public SemanticAnalyzer(SyntaxTree ast, IL.ILUnit ilUnit, Compiler compilerContext)
+        public SemanticAnalyzer(SyntaxTree ast, ILUnit ilUnit, Compiler compilerContext)
         {
             this.compilerContext = compilerContext;
 
@@ -1892,8 +1891,6 @@ namespace Gizbox.SemanticRule
         /// </summary>
         private void Pass3_AnalysisNode(SyntaxTree.Node node)
         {
-
-
             switch (node)
             {
                 case SyntaxTree.ProgramNode programNode:
@@ -2103,11 +2100,6 @@ namespace Gizbox.SemanticRule
                     break;
 
                 // ********************* 其他节点检查 *********************************
-                case SyntaxTree.IndexerNode indexerNode:
-                    {
-                        Pass3_AnalysisNode(indexerNode.indexNode);
-                    }
-                    break;
 
 
                 // ********************* 表达式检查 *********************************
@@ -2117,7 +2109,9 @@ namespace Gizbox.SemanticRule
                     {
                         var rec = Query(idNode.FullName);
                         if (rec == null)
-                            throw new SemanticException(ExceptioName.IdentifierNotFound, idNode, "");
+                            rec = Query_IgnoreMangle(idNode.FullName);
+                        if (rec == null)
+                            throw new SemanticException(ExceptioName.IdentifierNotFound, idNode, idNode.FullName);
 
                         //常量替换  
                         if (rec.category == SymbolTable.RecordCatagory.Constant)
@@ -2181,11 +2175,15 @@ namespace Gizbox.SemanticRule
                             Pass3_AnalysisNode(argNode);
                         }
 
-                        //名称分析补全  
+                        //名称分析补全（是不是不应该放在Pass3 ??）  
                         if (callNode.isMemberAccessFunction == false && callNode.funcNode is SyntaxTree.IdentityNode)
                         {
                             TryCompleteIdenfier((callNode.funcNode as SyntaxTree.IdentityNode));
                         }
+
+                        //函数分析(需要先补全名称)  
+                        callNode.funcNode.attributes["not_a_property"] = null;//防止被当作属性替换  
+                        Pass3_AnalysisNode(callNode.funcNode);
 
 
                         //Func分析  
@@ -2257,6 +2255,7 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.ObjectMemberAccessNode objMemberAccessNode:
                     {
                         //!!getter属性替换  
+                        if (objMemberAccessNode.attributes.ContainsKey("not_a_property") == false)
                         {
                             var className = AnalyzeTypeExpression(objMemberAccessNode.objectNode);
 
@@ -2348,7 +2347,6 @@ namespace Gizbox.SemanticRule
         }
 
 
-
         /// <summary>
         /// 获取表达式的类型表达式  
         /// </summary>
@@ -2376,6 +2374,8 @@ namespace Gizbox.SemanticRule
                         }
 
                         var result = Query(idNode.FullName);
+                        if (result == null)
+                            result = Query_IgnoreMangle(idNode.FullName);
                         if (result == null)
                         {
                             throw new SemanticException(ExceptioName.IdentifierNotFound, idNode, "");
@@ -2410,7 +2410,7 @@ namespace Gizbox.SemanticRule
                         var classEnv = classRec.envPtr;
                         if (classEnv == null) throw new SemanticException(ExceptioName.ClassScopeNotFound, accessNode.objectNode, "");
 
-                        var memberRec = classEnv.GetRecord(accessNode.memberNode.FullName);
+                        var memberRec = classEnv.GetRecordByRawname(accessNode.memberNode.FullName);//使用RawName以防找不到成员为函数时找不到    
                         if (memberRec == null) throw new SemanticException(ExceptioName.MemberFieldNotFound, accessNode.objectNode, accessNode.memberNode.FullName);
 
                         accessNode.attributes["class"] = className;//记录memberAccess节点的点左边类型
@@ -2421,28 +2421,12 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.ElementAccessNode eleAccessNode:
                     {
-                        string containerTypeExpr;
-                        if (eleAccessNode.isMemberAccessContainer)
-                        {
-                            containerTypeExpr = AnalyzeTypeExpression(eleAccessNode.containerNode as SyntaxTree.ObjectMemberAccessNode);
-                        }
-                        else
-                        {
-                            var funcId = (eleAccessNode.containerNode as SyntaxTree.IdentityNode);
-                            var idRec = Query(funcId.FullName);
-                            if (idRec == null) throw new SemanticException(ExceptioName.FunctionNotFound, eleAccessNode.containerNode, funcId.FullName);
+                        string containerTypeExpr = AnalyzeTypeExpression(eleAccessNode.containerNode);
 
-                            containerTypeExpr = idRec.typeExpression;
-                        }
-
-                        if (containerTypeExpr.EndsWith("[]"))
-                        {
-                            nodeTypeExprssion = containerTypeExpr.Substring(0, containerTypeExpr.Length - 2);
-                        }
-                        else
-                        {
+                        if (containerTypeExpr.EndsWith("[]") == false)
                             throw new SemanticException(ExceptioName.Unknown, eleAccessNode, "only array can use [] operator");
-                        }
+
+                        nodeTypeExprssion = containerTypeExpr.Substring(0, containerTypeExpr.Length - 2);
                     }
                     break;
                 case SyntaxTree.CallNode callNode:
@@ -2742,6 +2726,30 @@ namespace Gizbox.SemanticRule
             foreach (var lib in this.ilUnit.dependencyLibs)
             {
                 var result = lib.QueryTopSymbol(name);
+                if (result != null)
+                {
+                    return result;
+                }
+            }
+
+            return null;
+        }
+
+        private SymbolTable.Record Query_IgnoreMangle(string rawname)
+        {
+            //符号表链查找  
+            var toList = envStack.AsList();
+            for (int i = toList.Count - 1; i > -1; --i)
+            {
+                if (toList[i].ContainRecordRawName(rawname))
+                {
+                    return toList[i].GetRecordByRawname(rawname);
+                }
+            }
+            //库依赖中查找  
+            foreach (var lib in this.ilUnit.dependencyLibs)
+            {
+                var result = lib.QueryTopSymbol(rawname, ignoreMangle:true);
                 if (result != null)
                 {
                     return result;

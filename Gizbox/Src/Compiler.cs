@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Gizbox.IR;
 
 namespace Gizbox
 {
@@ -21,7 +22,7 @@ namespace Gizbox
         public string parserDataPath;
 
         //lib info  
-        public Dictionary<string, Gizbox.IL.ILUnit> libsCache = new Dictionary<string, IL.ILUnit>();
+        public Dictionary<string, ILUnit> libsCache = new Dictionary<string, ILUnit>();
         public List<string> libPathFindList = new List<string>();
 
         //CTOR  
@@ -85,7 +86,7 @@ namespace Gizbox
             GixConsole.Pause();
         }
 
-        public void AddLib(string libname, Gizbox.IL.ILUnit lib)
+        public void AddLib(string libname, ILUnit lib)
         {
             this.libsCache[libname] = lib;
         }
@@ -100,7 +101,7 @@ namespace Gizbox
         /// <summary>
         /// 载入或者编译库（语义分析用）  
         /// </summary>
-        public Gizbox.IL.ILUnit LoadLib(string libname)
+        public ILUnit LoadLib(string libname)
         {
             //编译器中查找  
             if (this.libsCache.ContainsKey(libname))
@@ -121,7 +122,7 @@ namespace Gizbox
                         {
                             if (System.IO.Path.GetExtension(f.Name).EndsWith("gixlib"))
                             {
-                                var unit = Gizbox.IL.ILSerializer.Deserialize(f.FullName);
+                                var unit = Gizbox.IR.ILSerializer.Deserialize(f.FullName);
 
                                 if (unit.name != libname)
                                 {
@@ -199,7 +200,7 @@ namespace Gizbox
         {
             var ir = this.Compile(source);
             ir.name = libName;
-            Gizbox.IL.ILSerializer.Serialize(savePath, ir);
+            Gizbox.IR.ILSerializer.Serialize(savePath, ir);
 
             Gizbox.GixConsole.LogLine($"Lib {libName} Complete Finish!");
         }
@@ -207,11 +208,11 @@ namespace Gizbox
         /// <summary>
         /// 编译  
         /// </summary>
-        public IL.ILUnit Compile(string source)
+        public ILUnit Compile(string source)
         {
             if (string.IsNullOrEmpty(this.parserDataPath) && parserDataHardcode == false) throw new Exception("语法分析器数据源没有设置");
 
-            IL.ILUnit ilUnit = new IL.ILUnit();
+            ILUnit ilUnit = new IR.ILUnit();
 
             //词法分析  
             Scanner scanner = new Scanner();
@@ -244,7 +245,7 @@ namespace Gizbox
 
 
             //中间代码生成    
-            Gizbox.IL.ILGenerator ilGenerator = new IL.ILGenerator(syntaxTree, ilUnit);
+            ILGenerator ilGenerator = new IR.ILGenerator(syntaxTree, ilUnit);
             ilGenerator.Generate();
 
 

@@ -1,62 +1,91 @@
-﻿import <"stdlib">
+﻿import <"core">  
+import <"stdlib">  
 
+using Core;  
 using Console;
-using GizTest;
+using Collections;
 
-namespace GizTest
+GC::Disable();
+
+namespace Creature
 {
-	class Person
-	{
-		int age = 18;
-	
-		void Test()
-		{
-			Log("my true type is person");
-		}
-	}
-	
-	class Student : Person
-	{
-		int score = 99;
+    int totalCount = 0;
 
-		Person father = null;
+    Creature Born(string type)
+    {
+        if(type == "Human")
+        {
+            Console::Log("Create Human...");
+            Human inst = new Human();
+            Creature::totalCount ++;
+            return (Creature)inst;  
+        }
+        else
+        {
+            return null;
+        }
+    }
+    void Die(Creature c)
+    {
+        if(c != null)
+        {
+            Console::Log("Delete Creature:" + c.name);
+            delete c;
+            Creature::totalCount --;
+        }
+    }
+}
+class Creature
+{    
+    string name = "";
+    int age = 0;
 
-		Person mother = null;
-		
-		void Test()
-		{
-			Log("my true type is student");
-		}
-	}
-
+    void Move()
+    {
+        Console::Log(this.name + " move...");
+    }
+}
+namespace Human::Job
+{
+    const int Undefined = 0;
+    const int Student = 2;
+    const int Teacher = 4;
+    const int Engineer = 8;
+    const int Cook = 16;
+}
+class Human : Creature
+{
+    int job = 0;
+    
+    void Move()
+    {
+        Console::Log(this.name + " walk...");
+    }
 }
 
-Log("----------------------------");
+//Test  
+Human sam = (Human)Creature::Born("Human");
+sam.name = "Sam";
+sam.age = 20;
+sam.job = Human::Job::Student;
 
-Student stu = new Student();
-Person p = (Person)stu;
-p.Test();
+sam.Move();
 
-Log("----------------------------");
+for(int i = 0; i < 99; i++)
+{
+    sam.age += 1;
 
-stu.mother = new Person();
-stu.father = null;
+    if((sam.age % 10) == 0)
+    {
+        Console::Log(sam.name + " is now " + (string)(sam.age) + " years old!");
+    }
 
-stu.mother.age = 50;
-Log("mother age" + (string)stu.mother.age);
-
-Log("----------------------------");
-
-Log("age  " + (string)stu.age);
-Log("score " + (string)stu.score);
-
-Log("----------------------------");
+    if(sam.age > 90)
+    {
+        Creature::Die(sam);
+        break;
+    }
+}
 
 
-string[] arrTest = new string[2];
-arrTest[0] = "Hello";
-arrTest[1] = "Gizbox";
-Log(arrTest[0] + arrTest[1]);
-delete arrTest;
-
-Log("----------------------------");
+Console::Log("Test Finish...");

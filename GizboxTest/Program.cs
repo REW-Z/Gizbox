@@ -12,6 +12,7 @@ using Gizbox.Interop.CSharp;
 using GizboxTest;
 
 
+
 ////测试
 
 string[] cmds = {
@@ -129,47 +130,30 @@ namespace GizboxTest
         {
             Console.WriteLine("GizboxTest >>>" + text);
         }
+
+        public static TestClass[] GetObjects()
+        {
+            var objs = new TestClass[1];
+            objs[0] = new TestClass();
+            objs[0].id = 233;
+            return objs;
+        }
+        public static TestClass GetObject(int id)
+        {
+            return new TestClass() { id = id };
+        }
+        public static System.Int32 GizboxTest__TestClass_get_id(GizboxTest.TestClass obj)
+        {
+            return obj.id;
+        }
+        public static void GizboxTest__TestClass_set_id(GizboxTest.TestClass obj, System.Int32 newv)
+        {
+            obj.id = newv;
+        }
     }
 
     public class TestClass
     {
-        public enum EEE
-        {
-            AAA = 100,
-            BBB = 200,
-        }
-
-        public EEE e1;
-
-        public EEE e2 { get; set; }
-
-
-        public EEE e3Test(EEE newe)
-        {
-            return default;
-        }
-
-        public static EEE StaticFuncTest(EEE a)
-        {
-            return default;
-        }
-        public NestedClass2 MethodTest(NestedClass1 obj1)
-        {
-            return null;
-        }
-
-        public class NestedClass1
-        {
-            public int a;
-
-            public EEE TestAAA(EEE e)
-            {
-                return default;
-            }
-        }
-        public class NestedClass2
-        {
-            public int b;
-        }
+        public int id = 0;
     }
 }

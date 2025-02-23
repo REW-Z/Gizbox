@@ -5,9 +5,9 @@ using System.Linq;
 using System.Text;
 using System.Runtime.InteropServices;
 using Gizbox;
-using Gizbox.IL;
 using Gizbox.Interop.CSharp;
 using System.Runtime.CompilerServices;
+using Gizbox.IR;
 
 namespace Gizbox.ScriptEngine
 {
@@ -221,7 +221,7 @@ namespace Gizbox.ScriptEngine
         }
 
 
-        public void Load(Gizbox.IL.ILUnit ir)
+        public void Load(ILUnit ir)
         {
             Log("载入主程序");
             //运行时
@@ -241,7 +241,7 @@ namespace Gizbox.ScriptEngine
             this.envStack = this.mainUnit.GetEnvStack(-1, 0); 
         }
 
-        public void Execute(Gizbox.IL.ILUnit ir)
+        public void Execute(ILUnit ir)
         {
             Load(ir);
 
@@ -680,7 +680,7 @@ namespace Gizbox.ScriptEngine
                     {
                         if (System.IO.Path.GetExtension(f.Name).EndsWith("gixlib"))
                         {
-                            var unit = Gizbox.IL.ILSerializer.Deserialize(f.FullName);
+                            var unit = Gizbox.IR.ILSerializer.Deserialize(f.FullName);
                             Log("导入库文件：" + f.Name + " 库名：" + unit.name);
                             return unit;
                         }

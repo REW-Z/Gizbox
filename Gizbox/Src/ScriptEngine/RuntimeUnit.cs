@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Text;
 using Gizbox;
 using Gizbox.ScriptEngine;
-using Gizbox.IL;
+using Gizbox.IR;
 
 namespace Gizbox.ScriptEngine
 {

@@ -494,8 +494,6 @@ namespace Gizbox
 
         public class ElementAccessNode : ExprNode
         {
-            public bool isMemberAccessContainer;
-
             public ExprNode containerNode;//id or memberaccesss  
 
             public ExprNode indexNode;
@@ -571,11 +569,6 @@ namespace Gizbox
             public IdentityNode identifierNode;
         }
 
-
-        public class IndexerNode : Node
-        {
-            public ExprNode indexNode;
-        }
 
         
         // ******************** Instance Members ******************************

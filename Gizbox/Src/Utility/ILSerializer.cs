@@ -4,8 +4,9 @@ using System.Text;
 using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Runtime.Serialization;
+using Gizbox.IR;
 
-namespace Gizbox.IL
+namespace Gizbox.IR
 {
     public class ILSerializer
     {

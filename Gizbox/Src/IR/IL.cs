@@ -3,10 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Runtime.Serialization;
-using Gizbox;
 using static Gizbox.SyntaxTree;
 
-namespace Gizbox.IL
+namespace Gizbox.IR
 {
     [DataContract]
     public class TAC
@@ -27,7 +26,7 @@ namespace Gizbox.IL
         {
             string str = "";
 
-            if(showlabel)
+            if (showlabel)
             {
                 if (string.IsNullOrEmpty(label))
                 {
@@ -40,17 +39,17 @@ namespace Gizbox.IL
             }
             str += op;
 
-            if(string.IsNullOrEmpty(arg1) == false)
+            if (string.IsNullOrEmpty(arg1) == false)
             {
-                str += (" " + arg1);
+                str += " " + arg1;
             }
             if (string.IsNullOrEmpty(arg2) == false)
             {
-                str += (" " + arg2);
+                str += " " + arg2;
             }
             if (string.IsNullOrEmpty(arg3) == false)
             {
-                str += (" " + arg3);
+                str += " " + arg3;
             }
             return str;
         }
@@ -104,7 +103,7 @@ namespace Gizbox.IL
 
         //行数 -> 符号表链 查询表
         [DataMember]
-        public Dictionary<int, Gizbox.GStack<SymbolTable>> stackDic;
+        public Dictionary<int, GStack<SymbolTable>> stackDic;
 
         //静态数据区 - 常量  
         [DataMember]
@@ -123,7 +122,7 @@ namespace Gizbox.IL
         public ILUnit()
         {
             var globalSymbolTable = new SymbolTable("global", SymbolTable.TableCatagory.GlobalScope);
-            this.globalScope = new Scope() { env = globalSymbolTable };
+            globalScope = new Scope() { env = globalSymbolTable };
         }
 
 
@@ -133,8 +132,8 @@ namespace Gizbox.IL
         {
             if (dep == null) throw new GizboxException(ExceptioName.LibraryDependencyCannotBeEmpty);
 
-            if (this.dependencyLibs == null) this.dependencyLibs = new List<ILUnit>();
-            this.dependencyLibs.Add(dep);
+            if (dependencyLibs == null) dependencyLibs = new List<ILUnit>();
+            dependencyLibs.Add(dep);
 
             if (dep.libsDenpendThis == null) dep.libsDenpendThis = new List<ILUnit>();
             dep.libsDenpendThis.Add(this);
@@ -156,10 +155,10 @@ namespace Gizbox.IL
         {
             scopes.Sort((s1, s2) => s1.env.depth - s2.env.depth);
 
-            this.scopeStatusArr = new int[this.codes.Count];
-            for (int i = 0; i < this.scopeStatusArr.Length; i++)
+            scopeStatusArr = new int[codes.Count];
+            for (int i = 0; i < scopeStatusArr.Length; i++)
             {
-                this.scopeStatusArr[i] = 0;
+                scopeStatusArr[i] = 0;
             }
             int status = 0; ;
             foreach (var scope in scopes)
@@ -167,7 +166,7 @@ namespace Gizbox.IL
                 status++;
                 for (int i = scope.lineFrom; i <= scope.lineTo; ++i)
                 {
-                    this.scopeStatusArr[i] = status;
+                    scopeStatusArr[i] = status;
                 }
             }
         }
@@ -187,14 +186,14 @@ namespace Gizbox.IL
         //缓存符号表栈  
         private void CacheEnvStack()
         {
-            this.stackDic = new Dictionary<int, GStack<SymbolTable>>();
+            stackDic = new Dictionary<int, GStack<SymbolTable>>();
 
             List<SymbolTable> tempList = new List<SymbolTable>();
 
             int prevStatus = -1;
-            for (int i = 0; i < this.codes.Count; ++i)
+            for (int i = 0; i < codes.Count; ++i)
             {
-                if(scopeStatusArr[i] != prevStatus)
+                if (scopeStatusArr[i] != prevStatus)
                 {
                     int newstate = scopeStatusArr[i];
                     if (stackDic.ContainsKey(newstate) == false)
@@ -218,9 +217,9 @@ namespace Gizbox.IL
         {
             envs.Clear();
             envs.Add(globalScope.env);
-            foreach(var scope in scopes)
+            foreach (var scope in scopes)
             {
-                if(scope.lineFrom <= currentLine && currentLine <= scope.lineTo)
+                if (scope.lineFrom <= currentLine && currentLine <= scope.lineTo)
                 {
                     envs.Add(scope.env);
                 }
@@ -231,7 +230,7 @@ namespace Gizbox.IL
         public SymbolTable.Record QueryTopSymbol(string name, bool ignoreMangle = false)
         {
             //本单元查找  
-            if(ignoreMangle == false)
+            if (ignoreMangle == false)
             {
                 if (globalScope.env.ContainRecordName(name))
                 {
@@ -247,7 +246,7 @@ namespace Gizbox.IL
             }
 
             //依赖中查找  
-            if(this.dependencyLibs != null)
+            if (dependencyLibs != null)
             {
                 foreach (var dep in dependencyLibs)
                 {
@@ -261,9 +260,9 @@ namespace Gizbox.IL
         public void QueryAllTopSymbol(string name, List<SymbolTable.Record> result, bool ignoreMangle = false)
         {
             //本单元查找  
-            if(ignoreMangle == false)
+            if (ignoreMangle == false)
             {
-                if(globalScope.env.ContainRecordName(name))
+                if (globalScope.env.ContainRecordName(name))
                 {
                     result.Add(globalScope.env.GetRecord(name));
                 }
@@ -274,9 +273,9 @@ namespace Gizbox.IL
             }
 
             //依赖中查找  
-            if(this.dependencyLibs != null)
+            if (dependencyLibs != null)
             {
-                foreach(var dep in dependencyLibs)
+                foreach (var dep in dependencyLibs)
                 {
                     dep.QueryAllTopSymbol(name, result, ignoreMangle);
                 }
@@ -294,7 +293,7 @@ namespace Gizbox.IL
             }
 
             //依赖中查找  
-            if (this.dependencyLibs != null)
+            if (dependencyLibs != null)
             {
                 foreach (var dep in dependencyLibs)
                 {
@@ -319,7 +318,7 @@ namespace Gizbox.IL
             if (list.Contains(unit.globalScope.env)) return;
 
             list.Add(unit.globalScope.env);
-            foreach (var dep in this.dependencyLibs)
+            foreach (var dep in dependencyLibs)
             {
                 AddGlobalEnvsToList(dep, list);
             }
@@ -329,17 +328,17 @@ namespace Gizbox.IL
         //打印  
         public void Print()
         {
-            GixConsole.LogLine("中间代码输出：(" + this.codes.Count + "行)");
+            GixConsole.LogLine("中间代码输出：(" + codes.Count + "行)");
             GixConsole.LogLine(new string('-', 50));
-            for (int i = 0; i < this.codes.Count; ++i)
+            for (int i = 0; i < codes.Count; ++i)
             {
-                GixConsole.LogLine($"{i.ToString().PadRight(4)}|status {this.scopeStatusArr[i].ToString().PadRight(3)}|{this.codes[i].ToExpression()}");
+                GixConsole.LogLine($"{i.ToString().PadRight(4)}|status {scopeStatusArr[i].ToString().PadRight(3)}|{codes[i].ToExpression()}");
             }
             GixConsole.LogLine(new string('-', 50));
 
 
             GixConsole.LogLine("作用域：");
-            foreach (var scope in this.scopes)
+            foreach (var scope in scopes)
             {
                 GixConsole.LogLine("scope:" + scope.env.name + ":  " + scope.lineFrom + " ~ " + scope.lineTo);
             }

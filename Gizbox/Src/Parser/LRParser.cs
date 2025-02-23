@@ -8,7 +8,7 @@ using Gizbox;
 using Gizbox.LRParse;
 using Gizbox.LALRGenerator;
 using Gizbox.SemanticRule;
-using Gizbox.IL;
+using Gizbox.IR;
 using System.Runtime.CompilerServices;
 using static Gizbox.SyntaxTree;
 

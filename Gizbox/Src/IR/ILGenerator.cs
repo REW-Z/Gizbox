@@ -1,11 +1,10 @@
-﻿using Gizbox.IL;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using static Gizbox.SyntaxTree;
 
-namespace Gizbox.IL
+namespace Gizbox.IR
 {
     /// <summary>
     /// 中间代码生成器  
@@ -19,7 +18,7 @@ namespace Gizbox.IL
 
 
         //temp info  
-        private Gizbox.GStack<SymbolTable> envStack = new GStack<SymbolTable>();
+        private GStack<SymbolTable> envStack = new GStack<SymbolTable>();
 
         //status  
         private int tmpCounter = 0;//临时变量自增    
@@ -34,9 +33,9 @@ namespace Gizbox.IL
 
         public void Generate()
         {
-            this.tmpCounter = 0;
+            tmpCounter = 0;
 
-            this.envStack.Push(ilUnit.globalScope.env);
+            envStack.Push(ilUnit.globalScope.env);
 
 
             //从根节点生成   
@@ -45,13 +44,13 @@ namespace Gizbox.IL
             //生成一个空指令  
             GenerateCode("");
 
-            this.ilUnit.Complete();
+            ilUnit.Complete();
 
 
             if (Compiler.enableLogILGenerator) ilUnit.globalScope.env.Print();
             Compiler.Pause("符号表建立完毕");
 
-            this.PrintCodes();
+            PrintCodes();
             Compiler.Pause("中间代码生成完毕");
 
         }
@@ -68,17 +67,17 @@ namespace Gizbox.IL
             //节点代码生成  
             switch (node)
             {
-                case SyntaxTree.ProgramNode programNode:
+                case ProgramNode programNode:
                     {
                         GenNode(programNode.statementsNode);
                     }
                     break;
-                case SyntaxTree.NamespaceNode namespaceNode:
+                case NamespaceNode namespaceNode:
                     {
                         GenNode(namespaceNode.stmtsNode);
                     }
                     break;
-                case SyntaxTree.StatementsNode stmtsNode:
+                case StatementsNode stmtsNode:
                     {
                         foreach (var stmt in stmtsNode.statements)
                         {
@@ -86,7 +85,7 @@ namespace Gizbox.IL
                         }
                     }
                     break;
-                case SyntaxTree.StatementBlockNode blockNode:
+                case StatementBlockNode blockNode:
                     {
                         Log("--------------------");
                         foreach (var key in blockNode.attributes.Keys)
@@ -111,7 +110,7 @@ namespace Gizbox.IL
 
 
                 //类声明  
-                case SyntaxTree.ClassDeclareNode classDeclNode:
+                case ClassDeclareNode classDeclNode:
                     {
                         string className = classDeclNode.classNameNode.FullName;
                         GenerateCode("JUMP", "exit:" + className);
@@ -148,9 +147,9 @@ namespace Gizbox.IL
                             //成员变量初始化
                             foreach (var memberDecl in classDeclNode.memberDelareNodes)
                             {
-                                if (memberDecl is SyntaxTree.VarDeclareNode)
+                                if (memberDecl is VarDeclareNode)
                                 {
-                                    var fieldDecl = memberDecl as SyntaxTree.VarDeclareNode;
+                                    var fieldDecl = memberDecl as VarDeclareNode;
 
                                     GenNode(fieldDecl.initializerNode);
                                     GenerateCode("=", "[this." + fieldDecl.identifierNode.FullName + "]", GetRet(fieldDecl.initializerNode));
@@ -170,9 +169,9 @@ namespace Gizbox.IL
                         //成员函数
                         foreach (var memberDecl in classDeclNode.memberDelareNodes)
                         {
-                            if (memberDecl is SyntaxTree.FuncDeclareNode)
+                            if (memberDecl is FuncDeclareNode)
                             {
-                                GenNode(memberDecl as SyntaxTree.FuncDeclareNode);
+                                GenNode(memberDecl as FuncDeclareNode);
                             }
                         }
 
@@ -184,7 +183,7 @@ namespace Gizbox.IL
                     }
                     break;
                 //函数声明
-                case SyntaxTree.FuncDeclareNode funcDeclNode:
+                case FuncDeclareNode funcDeclNode:
                     {
                         //是否是实例成员函数  
                         bool isMethod = envStack.Peek().tableCatagory == SymbolTable.TableCatagory.ClassScope;
@@ -221,7 +220,7 @@ namespace Gizbox.IL
                         }
 
 
-                        if (funcDeclNode.statementsNode.statements.Any(s => s is SyntaxTree.ReturnStmtNode) == false)
+                        if (funcDeclNode.statementsNode.statements.Any(s => s is ReturnStmtNode) == false)
                             GenerateCode("RETURN");
 
 
@@ -238,7 +237,7 @@ namespace Gizbox.IL
                     }
                     break;
                 //extern函数声明  
-                case SyntaxTree.ExternFuncDeclareNode externFuncDeclNode:
+                case ExternFuncDeclareNode externFuncDeclNode:
                     {
                         //函数全名    
                         string funcFullName = (string)externFuncDeclNode.attributes["mangled_name"];
@@ -269,13 +268,13 @@ namespace Gizbox.IL
                     }
                     break;
                 //常量声明
-                case SyntaxTree.ConstantDeclareNode constDeclNode:
+                case ConstantDeclareNode constDeclNode:
                     {
                         //不生成中间代码  
                     }
                     break;
                 //变量声明
-                case SyntaxTree.VarDeclareNode varDeclNode:
+                case VarDeclareNode varDeclNode:
                     {
                         GenNode(varDeclNode.identifierNode);
                         GenNode(varDeclNode.initializerNode);
@@ -284,7 +283,7 @@ namespace Gizbox.IL
                     }
                     break;
 
-                case SyntaxTree.ReturnStmtNode returnNode:
+                case ReturnStmtNode returnNode:
                     {
                         if (returnNode.returnExprNode != null)
                         {
@@ -297,24 +296,24 @@ namespace Gizbox.IL
                         }
                     }
                     break;
-                case SyntaxTree.DeleteStmtNode deleteNode:
+                case DeleteStmtNode deleteNode:
                     {
                         GenNode(deleteNode.objToDelete);
                         GenerateCode("DEL", GetRet(deleteNode.objToDelete));
                     }
                     break;
 
-                case SyntaxTree.SingleExprStmtNode singleExprNode:
+                case SingleExprStmtNode singleExprNode:
                     {
                         GenNode(singleExprNode.exprNode);
                     }
                     break;
 
-                case SyntaxTree.IfStmtNode ifNode:
+                case IfStmtNode ifNode:
                     {
                         int ifCounter = (int)ifNode.attributes["uid"];
 
-                        GenerateCode(" ").label = ("If_" + ifCounter);
+                        GenerateCode(" ").label = "If_" + ifCounter;
 
                         var elseClause = ifNode.elseClause;
 
@@ -325,17 +324,17 @@ namespace Gizbox.IL
                             string falseGotoLabel;
                             if (i != ifNode.conditionClauseList.Count - 1)
                             {
-                                falseGotoLabel = ("IfCondition_" + ifCounter + "_" + (i + 1));
+                                falseGotoLabel = "IfCondition_" + ifCounter + "_" + (i + 1);
                             }
                             else
                             {
                                 if (elseClause != null)
                                 {
-                                    falseGotoLabel = ("ElseStmt_" + ifCounter);
+                                    falseGotoLabel = "ElseStmt_" + ifCounter;
                                 }
                                 else
                                 {
-                                    falseGotoLabel = ("EndIf_" + ifCounter);
+                                    falseGotoLabel = "EndIf_" + ifCounter;
                                 }
                             }
 
@@ -344,28 +343,28 @@ namespace Gizbox.IL
                             GenNode(clause.conditionNode);
                             GenerateCode("IF_FALSE_JUMP", GetRet(clause.conditionNode), falseGotoLabel);
 
-                            GenerateCode(" ").label = ("IfStmt_" + ifCounter + "_" + i);
+                            GenerateCode(" ").label = "IfStmt_" + ifCounter + "_" + i;
 
                             GenNode(clause.thenNode);
 
-                            GenerateCode("JUMP", ("EndIf_" + ifCounter));
+                            GenerateCode("JUMP", "EndIf_" + ifCounter);
                         }
 
                         if (elseClause != null)
                         {
-                            GenerateCode(" ").label = ("ElseStmt_" + ifCounter);
+                            GenerateCode(" ").label = "ElseStmt_" + ifCounter;
                             GenNode(elseClause.stmt);
                         }
 
 
-                        GenerateCode(" ").label = ("EndIf_" + ifCounter);
+                        GenerateCode(" ").label = "EndIf_" + ifCounter;
                     }
                     break;
-                case SyntaxTree.WhileStmtNode whileNode:
+                case WhileStmtNode whileNode:
                     {
                         int whileCounter = (int)whileNode.attributes["uid"];
 
-                        GenerateCode(" ").label = ("While_" + whileCounter);
+                        GenerateCode(" ").label = "While_" + whileCounter;
 
                         GenNode(whileNode.conditionNode);
 
@@ -377,12 +376,12 @@ namespace Gizbox.IL
 
                         loopExitStack.Pop();
 
-                        GenerateCode("JUMP", ("While_" + whileCounter));
+                        GenerateCode("JUMP", "While_" + whileCounter);
 
                         GenerateCode(" ").label = "EndWhile_" + whileCounter;
                     }
                     break;
-                case SyntaxTree.ForStmtNode forNode:
+                case ForStmtNode forNode:
                     {
                         int forCounter = (int)forNode.attributes["uid"];
 
@@ -393,7 +392,7 @@ namespace Gizbox.IL
                         GenNode(forNode.initializerNode);
 
                         //start loop  
-                        GenerateCode(" ").label = ("For_" + forCounter);
+                        GenerateCode(" ").label = "For_" + forCounter;
 
                         //condition  
                         GenNode(forNode.conditionNode);
@@ -409,7 +408,7 @@ namespace Gizbox.IL
 
                         loopExitStack.Pop();
 
-                        GenerateCode("JUMP", ("For_" + forCounter));
+                        GenerateCode("JUMP", "For_" + forCounter);
 
                         GenerateCode(" ").label = "EndFor_" + forCounter;
 
@@ -418,7 +417,7 @@ namespace Gizbox.IL
                     }
                     break;
 
-                case SyntaxTree.BreakStmtNode breakNode:
+                case BreakStmtNode breakNode:
                     {
                         GenerateCode("JUMP", loopExitStack.Peek());
                     }
@@ -430,25 +429,25 @@ namespace Gizbox.IL
 
                 // *******************  表达式节点 *********************************
 
-                case SyntaxTree.IdentityNode idNode:
+                case IdentityNode idNode:
                     {
                         //标识符表达式的返回变量（本身）    
                         SetRet(idNode, "[" + idNode.FullName + "]");
                     }
                     break;
-                case SyntaxTree.ThisNode thisnode:
+                case ThisNode thisnode:
                     {
                         SetRet(thisnode, "[this]");
                     }
                     break;
-                case SyntaxTree.LiteralNode literalNode:
+                case LiteralNode literalNode:
                     {
                         var litret = GenLitOperandStr(literalNode);
 
                         SetRet(literalNode, litret);
                     }
                     break;
-                case SyntaxTree.ObjectMemberAccessNode objMemberAccess:
+                case ObjectMemberAccessNode objMemberAccess:
                     {
                         GenNode(objMemberAccess.objectNode);
 
@@ -457,7 +456,7 @@ namespace Gizbox.IL
                         SetRet(objMemberAccess, "[" + obj + "." + objMemberAccess.memberNode.FullName + "]");
                     }
                     break;
-                case SyntaxTree.CastNode castNode:
+                case CastNode castNode:
                     {
                         GenNode(castNode.factorNode);
 
@@ -467,7 +466,7 @@ namespace Gizbox.IL
                         GenerateCode("CAST", GetRet(castNode), castNode.typeNode.TypeExpression(), GetRet(castNode.factorNode));
                     }
                     break;
-                case SyntaxTree.BinaryOpNode binaryOp:
+                case BinaryOpNode binaryOp:
                     {
                         GenNode(binaryOp.leftNode);
                         GenNode(binaryOp.rightNode);
@@ -484,7 +483,7 @@ namespace Gizbox.IL
                         GenerateCode(binaryOp.op, GetRet(binaryOp), GetRet(binaryOp.leftNode), GetRet(binaryOp.rightNode));
                     }
                     break;
-                case SyntaxTree.UnaryOpNode unaryOp:
+                case UnaryOpNode unaryOp:
                     {
                         GenNode(unaryOp.exprNode);
 
@@ -494,7 +493,7 @@ namespace Gizbox.IL
                         GenerateCode(unaryOp.op, GetRet(unaryOp), GetRet(unaryOp));
                     }
                     break;
-                case SyntaxTree.AssignNode assignNode:
+                case AssignNode assignNode:
                     {
                         GenNode(assignNode.lvalueNode);
                         GenNode(assignNode.rvalueNode);
@@ -504,7 +503,7 @@ namespace Gizbox.IL
                         GenerateCode(assignNode.op, GetRet(assignNode.lvalueNode), GetRet(assignNode.rvalueNode));
                     }
                     break;
-                case SyntaxTree.CallNode callNode:
+                case CallNode callNode:
                     {
                         if (callNode.attributes.ContainsKey("mangled_name") == false)
                             throw new SemanticException(ExceptioName.FunctionObfuscationNameNotSet, callNode, "");
@@ -540,9 +539,9 @@ namespace Gizbox.IL
                         //this实参计算（成员方法）    
                         if (callNode.isMemberAccessFunction == true)
                         {
-                            if (callNode.funcNode is SyntaxTree.ObjectMemberAccessNode)
+                            if (callNode.funcNode is ObjectMemberAccessNode)
                             {
-                                var objNode = (callNode.funcNode as SyntaxTree.ObjectMemberAccessNode).objectNode;
+                                var objNode = (callNode.funcNode as ObjectMemberAccessNode).objectNode;
                                 GenNode(objNode);
                             }
                         }
@@ -555,9 +554,9 @@ namespace Gizbox.IL
                         //this实参压栈（成员方法）    
                         if (callNode.isMemberAccessFunction == true)
                         {
-                            if (callNode.funcNode is SyntaxTree.ObjectMemberAccessNode)
+                            if (callNode.funcNode is ObjectMemberAccessNode)
                             {
-                                var objNode = (callNode.funcNode as SyntaxTree.ObjectMemberAccessNode).objectNode;
+                                var objNode = (callNode.funcNode as ObjectMemberAccessNode).objectNode;
                                 GenerateCode("PARAM", GetRet(objNode));
                             }
                             else
@@ -580,26 +579,17 @@ namespace Gizbox.IL
                         }
                     }
                     break;
-                case SyntaxTree.ElementAccessNode eleAccessNode:
+                case ElementAccessNode eleAccessNode:
                     {
                         GenNode(eleAccessNode.indexNode);
 
-                        string rightval;
-                        if (eleAccessNode.isMemberAccessContainer == true)
-                        {
-                            GenNode(eleAccessNode.containerNode);
-                            rightval = "[" + TrimName(GetRet(eleAccessNode.containerNode)) + "[" + TrimName(GetRet(eleAccessNode.indexNode)) + "]" + "]";
-                        }
-                        else
-                        {
-                            GenNode(eleAccessNode.containerNode);
-                            rightval = "[" + TrimName(GetRet(eleAccessNode.containerNode)) + "[" + TrimName(GetRet(eleAccessNode.indexNode)) + "]" + "]";
-                        }
+                        GenNode(eleAccessNode.containerNode);
+                        string rightval = "[" + TrimName(GetRet(eleAccessNode.containerNode)) + "[" + TrimName(GetRet(eleAccessNode.indexNode)) + "]" + "]";
 
                         SetRet(eleAccessNode, rightval);
                     }
                     break;
-                case SyntaxTree.NewObjectNode newObjNode:
+                case NewObjectNode newObjNode:
                     {
                         string className = newObjNode.className.FullName;
 
@@ -611,7 +601,7 @@ namespace Gizbox.IL
                         GenerateCode("CALL", "[" + className + ".ctor]", "LITINT:" + 1);
                     }
                     break;
-                case SyntaxTree.NewArrayNode newArrNode:
+                case NewArrayNode newArrNode:
                     {
                         //长度计算  
                         GenNode(newArrNode.lengthNode);
@@ -622,7 +612,7 @@ namespace Gizbox.IL
                         GenerateCode("ALLOC_ARRAY", GetRet(newArrNode), GetRet(newArrNode.lengthNode));
                     }
                     break;
-                case SyntaxTree.IncDecNode incDecNode:
+                case IncDecNode incDecNode:
                     {
                         string identifierName = incDecNode.identifierNode.FullName;
                         if (incDecNode.isOperatorFront)//++i
@@ -697,8 +687,8 @@ namespace Gizbox.IL
                     {
                         string lex = literalNode.token.attribute;
                         string conststr = lex.Substring(1, lex.Length - 2);
-                        this.ilUnit.constData.Add(conststr);
-                        int ptr = this.ilUnit.constData.Count - 1;
+                        ilUnit.constData.Add(conststr);
+                        int ptr = ilUnit.constData.Count - 1;
 
                         if (Compiler.enableLogILGenerator)
                             Log("新的字符串常量：" + lex + " 指针：" + ptr);

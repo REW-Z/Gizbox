@@ -5,10 +5,10 @@ using System.Text;
 using System.Linq;
 using Gizbox;
 using Gizbox.LRParse;
-using Gizbox.IL;
 using Gizbox.Utility;
 using Gizbox.SemanticRule;
 using System.Runtime.CompilerServices;
+using Gizbox.IR;
 
 
 namespace Gizbox.LanguageServices
@@ -90,7 +90,7 @@ namespace Gizbox.LanguageServices
         public int lineCount = 0;
 
         //临时数据
-        public Gizbox.IL.ILUnit tempUnitCompiled;
+        public ILUnit tempUnitCompiled;
         public List<Token> tempTokens;
         public SyntaxTree tempAST;
 
@@ -834,7 +834,7 @@ namespace Gizbox.LanguageServices
         {
             try
             {
-                IL.ILUnit unit = new IL.ILUnit();
+                ILUnit unit = new IR.ILUnit();
 
                 //词法分析  
                 Scanner scanner = new Scanner();

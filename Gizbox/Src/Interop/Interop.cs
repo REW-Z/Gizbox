@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Runtime.InteropServices;
 using Gizbox;
-using Gizbox.IL;
+using Gizbox.IR;
 
 
 
@@ -256,9 +256,9 @@ namespace Gizbox.Interop.CSharp
                 {
                     gzarr[i] = Marshal2Giz(csArr.GetValue(i));
                 }
-
-                //return Value.FromArray(gzarr); //TODO: FromArray  
-                return Value.Void;
+                long newptr = engine.heap.Alloc(gzarr);
+                //NewBinding(newptr, gzarr, csArr);//不绑定数组  
+                return Value.FromArrayPtr(newptr);
             }
             else
             {
