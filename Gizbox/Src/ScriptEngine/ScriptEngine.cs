@@ -169,7 +169,7 @@ namespace Gizbox.ScriptEngine
     //脚本引擎  
     public class ScriptEngine
     {
-        //运行时  
+        //运行时单元  
         public Gizbox.ScriptEngine.RuntimeUnit mainUnit;
 
         //符号表堆栈  
@@ -184,7 +184,7 @@ namespace Gizbox.ScriptEngine
         //调用堆栈  
         private CallStack callStack = new CallStack();
 
-        //返回值寄存器（虚拟）(实际在x86架构通常为EAX寄存器 x86-64架构通常为RAX寄存器)
+        //返回值寄存器（虚拟）
         private Value retRegister = Value.Void;
 
 

@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Text;
 using Gizbox;
 using Gizbox.ScriptEngine;
+using Gizbox.ScriptEngineV2;
 using Gizbox.Interop.CSharp;
 using GizboxTest;
 
@@ -20,6 +21,7 @@ string[] cmds = {
     "1.生成库文件",
     "2.生成分析器硬编码",
     "3.执行Test脚本",
+    "4.测试新解释器",
     };
 
 Console.ForegroundColor = ConsoleColor.Gray;
@@ -115,6 +117,31 @@ switch(cmdIdx)
             Compiler.Pause("Execute End");
         }
         break;
+    case 4:
+        {
+            //测试脚本Test  
+            Console.WriteLine("测试新解释引擎");
+            string source = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\test.gix");
+            Gizbox.Compiler compiler = new Compiler();
+            compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
+            compiler.ConfigParserDataSource(hardcode: true);
+            //compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
+            var il = compiler.Compile(source);
+
+            Compiler.Pause("Compile End");
+
+            ScriptEngineV2 engineV2 = new ScriptEngineV2();
+            engineV2.AddLibSearchDirectory(AppDomain.CurrentDomain.BaseDirectory);
+            engineV2.csharpInteropContext.ConfigExternCallClasses(new Type[] {
+                typeof(TestExternCalls),
+            });
+            engineV2.Execute(il);
+
+
+
+            Compiler.Pause("Execute End");
+        }
+        break;
 }
 
 Console.WriteLine("测试结束");
@@ -155,5 +182,12 @@ namespace GizboxTest
     public class TestClass
     {
         public int id = 0;
+    }
+
+    public struct TestStruct
+    {
+        public int id;
+        public double _a;
+        public double _b;
     }
 }
