@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("GizboxLSP")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9cb86e0ca2a533ddfc63065a48fb1d825d87bea8")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+92091be291763a7ea5115d657e26376c03c05f83")]
 [assembly: System.Reflection.AssemblyProductAttribute("GizboxLSP")]
 [assembly: System.Reflection.AssemblyTitleAttribute("GizboxLSP")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
