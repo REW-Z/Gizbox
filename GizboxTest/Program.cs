@@ -121,25 +121,50 @@ switch(cmdIdx)
         {
             //测试脚本Test  
             Console.WriteLine("测试新解释引擎");
-            string source = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\test.gix");
-            Gizbox.Compiler compiler = new Compiler();
-            compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
-            compiler.ConfigParserDataSource(hardcode: true);
-            //compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
-            var il = compiler.Compile(source);
+            unsafe
+            {
+                SimMemory mem = new SimMemory(10, 10);
+                MyStruct s1 = new MyStruct() { id = 111, _a = 100d, _b = 10000d };
+                MyStruct s2 = new MyStruct() { id = 222, _a = 200d, _b = 20000d };
+                MyStruct* pS3 = mem.new_<MyStruct>();
+                pS3->id = 333;
+                pS3->_a = 300d;
+                pS3->_b = 30000d;
 
-            Compiler.Pause("Compile End");
+                byte* ptr1 = mem.stack_malloc(sizeof(MyStruct));
+                mem.write<MyStruct>(ptr1, s1);
 
-            ScriptEngineV2 engineV2 = new ScriptEngineV2();
-            engineV2.AddLibSearchDirectory(AppDomain.CurrentDomain.BaseDirectory);
-            engineV2.csharpInteropContext.ConfigExternCallClasses(new Type[] {
-                typeof(TestExternCalls),
-            });
-            engineV2.Execute(il);
+                byte* ptr2 = mem.heap_malloc(sizeof(MyStruct));
+                mem.write<MyStruct>(ptr2, s2);
+
+                var ret1 = mem.read<MyStruct>(ptr1);
+                var ret2 = mem.read<MyStruct>(ptr2);
+
+                Console.WriteLine("ret1:" + ret1.id + "  " + ret1._a + "  " + ret1._b);
+                Console.WriteLine("ret2:" + ret2.id + "  " + ret2._a + "  " + ret2._b);
+                Console.WriteLine("ret3:" + pS3->id + "  " + pS3->_a + "  " + pS3->_b);
+
+            }
+            break;  
+            //string source = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\test.gix");
+            //Gizbox.Compiler compiler = new Compiler();
+            //compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
+            //compiler.ConfigParserDataSource(hardcode: true);
+            ////compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
+            //var il = compiler.Compile(source);
+
+            //Compiler.Pause("Compile End");
+
+            //ScriptEngineV2 engineV2 = new ScriptEngineV2();
+            //engineV2.AddLibSearchDirectory(AppDomain.CurrentDomain.BaseDirectory);
+            //engineV2.csharpInteropContext.ConfigExternCallClasses(new Type[] {
+            //    typeof(TestExternCalls),
+            //});
+            //engineV2.Execute(il);
 
 
 
-            Compiler.Pause("Execute End");
+            //Compiler.Pause("Execute End");
         }
         break;
 }
@@ -184,7 +209,7 @@ namespace GizboxTest
         public int id = 0;
     }
 
-    public struct TestStruct
+    public struct MyStruct
     {
         public int id;
         public double _a;
