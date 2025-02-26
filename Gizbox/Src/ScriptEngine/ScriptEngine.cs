@@ -362,30 +362,6 @@ namespace Gizbox.ScriptEngine
                         
                         return;
                     }
-                case "METHOD_BEGIN":
-                    {
-                        ////进入类作用域、方法作用域    
-                        //string className = code.arg1.Split('.')[0];
-                        //string methodName = code.arg1.Split('.')[1];
-
-                        //新的栈帧
-                        this.callStack.Top += 1;
-                    }
-                    break;
-                case "METHOD_END":
-                    {
-                        //返回地址  
-                        this.currUnit = this.callStack[callStack.Top].returnPtr.Item1;
-                        this.curr = this.callStack[callStack.Top].returnPtr.Item2;
-
-                        //返回原栈帧  
-                        this.callStack.Top -= 1;
-
-                        //销毁移出栈栈帧  
-                        this.callStack.DestoryFrame(this.callStack.Top + 1);
-
-                        return;
-                    }
                 case "RETURN":
                     {
                         var retValue = code.arg1;
@@ -495,64 +471,40 @@ namespace Gizbox.ScriptEngine
                     }
                     break;
                 case "+=":
-                    {
                         SetValue(code.arg1, caculator.CalBinary("+", GetValue(code.arg1), GetValue(code.arg2)));
-                    }
                     break;
                 case "-=":
-                    {
                         SetValue(code.arg1, caculator.CalBinary("-", GetValue(code.arg1), GetValue(code.arg2)));
-                    }
                     break;
                 case "*=":
-                    {
                         SetValue(code.arg1, caculator.CalBinary("*", GetValue(code.arg1), GetValue(code.arg2)));
-                    }
                     break;
                 case "/=":
-                    {
                         SetValue(code.arg1, caculator.CalBinary("/", GetValue(code.arg1), GetValue(code.arg2)));
-                    }
                     break;
                 case "%=":
-                    {
                         SetValue(code.arg1, caculator.CalBinary("%", GetValue(code.arg1), GetValue(code.arg2)));
-                    }
                     break;
                 case "+":
-                    {
                         SetValue(code.arg1, caculator.CalBinary("+", GetValue(code.arg2), GetValue(code.arg3)));
-                    }
                     break;
                 case "-":
-                    {
                         SetValue(code.arg1, caculator.CalBinary("-", GetValue(code.arg2), GetValue(code.arg3)));
-                    }
                     break;
                 case "*":
-                    {
                         SetValue(code.arg1, caculator.CalBinary("*", GetValue(code.arg2), GetValue(code.arg3)));
-                    }
                     break;
                 case "/":
-                    {
                         SetValue(code.arg1, caculator.CalBinary("/", GetValue(code.arg2), GetValue(code.arg3)));
-                    }
                     break;
                 case "%":
-                    {
                         SetValue(code.arg1, caculator.CalBinary("%", GetValue(code.arg2), GetValue(code.arg3)));
-                    }
                     break;
                 case "NEG":
-                    {
                         SetValue(code.arg1, caculator.CalNegtive(GetValue(code.arg2)));
-                    }
                     break;
                 case "!":
-                    {
                         SetValue(code.arg1, caculator.CalNot(GetValue(code.arg2)));
-                    }
                     break;
                 case "ALLOC":
                     {
@@ -601,34 +553,22 @@ namespace Gizbox.ScriptEngine
                         }
                     }
                 case "<":
-                    {
                         SetValue(code.arg1, caculator.CalBinary("<", GetValue(code.arg2), GetValue(code.arg3)));
-                    }
                     break;
                 case "<=":
-                    {
                         SetValue(code.arg1, caculator.CalBinary("<=", GetValue(code.arg2), GetValue(code.arg3)));
-                    }
                     break;
                 case ">":
-                    {
                         SetValue(code.arg1, caculator.CalBinary(">", GetValue(code.arg2), GetValue(code.arg3)));
-                    }
                     break;
                 case ">=":
-                    {
                         SetValue(code.arg1, caculator.CalBinary(">=", GetValue(code.arg2), GetValue(code.arg3)));
-                    }
                     break;
                 case "==":
-                    {
                         SetValue(code.arg1, caculator.CalBinary("==", GetValue(code.arg2), GetValue(code.arg3)));
-                    }
                     break;
                 case "!=":
-                    {
                         SetValue(code.arg1, caculator.CalBinary("!=", GetValue(code.arg2), GetValue(code.arg3)));
-                    }
                     break;
                 case "++":
                     {

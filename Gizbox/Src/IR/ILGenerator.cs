@@ -131,7 +131,7 @@ namespace Gizbox.IR
                             //函数开始    
                             GenerateCode(" ").label = "entry:" + funcFullName;
                             EnvBegin(envStack.Peek().GetTableInChildren(classDeclNode.classNameNode.FullName + ".ctor"));
-                            GenerateCode("METHOD_BEGIN", funcFullName);
+                            GenerateCode("FUNC_BEGIN", funcFullName);
 
                             //基类构造函数调用  
                             if (classDeclNode.baseClassNameNode != null)
@@ -161,7 +161,7 @@ namespace Gizbox.IR
 
                             GenerateCode("RETURN");
 
-                            GenerateCode("METHOD_END");
+                            GenerateCode("FUNC_END");
                             EnvEnd(envStack.Peek().GetTableInChildren(classDeclNode.classNameNode.FullName + ".ctor"));
                             GenerateCode(" ").label = "exit:" + funcFullName;
                         }
@@ -207,11 +207,13 @@ namespace Gizbox.IR
                         envStack.Push(funcDeclNode.attributes["env"] as SymbolTable);
                         EnvBegin(funcDeclNode.attributes["env"] as SymbolTable);
 
-                        if (isMethod)
-                            GenerateCode("METHOD_BEGIN", funcFinalName);
-                        else
-                            GenerateCode("FUNC_BEGIN", funcFinalName);
+                        //不再使用METHOD_BEGIN
+                        //if (isMethod)
+                        //    GenerateCode("METHOD_BEGIN", funcFinalName);
+                        //else
+                        //    GenerateCode("FUNC_BEGIN", funcFinalName);
 
+                        GenerateCode("FUNC_BEGIN", funcFinalName);
 
                         //语句  
                         foreach (var stmt in funcDeclNode.statementsNode.statements)
@@ -223,12 +225,13 @@ namespace Gizbox.IR
                         if (funcDeclNode.statementsNode.statements.Any(s => s is ReturnStmtNode) == false)
                             GenerateCode("RETURN");
 
+                        //不再使用METHOD_END
+                        //if (isMethod)
+                        //    GenerateCode("METHOD_END", funcFinalName);
+                        //else
+                        //    GenerateCode("FUNC_END", funcFinalName);
 
-                        if (isMethod)
-                            GenerateCode("METHOD_END", funcFinalName);
-                        else
-                            GenerateCode("FUNC_END", funcFinalName);
-
+                        GenerateCode("FUNC_END", funcFinalName);
 
                         EnvEnd(funcDeclNode.attributes["env"] as SymbolTable);
                         envStack.Pop();

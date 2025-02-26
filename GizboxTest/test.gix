@@ -4,37 +4,88 @@ import <"stdlib">
 using Core;  
 using Console;
 using Collections;
-using GizboxTest;
 
 GC::Disable();
 
-
-extern int GizboxTest__TestClass_get_id(GizboxTest::TestClass gizboxtest__testclass);
-extern void GizboxTest__TestClass_set_id(GizboxTest::TestClass gizboxtest__testclass, int newv);
-
-class GizboxTest::TestClass
+namespace Creature
 {
-	int id()
-	{
-		return GizboxTest__TestClass_get_id(this);
-	}
-	void id(int newv)
-	{
-		GizboxTest__TestClass_set_id(this, newv);
-	}
+    int totalCount = 0;
+
+    Creature Born(string type)
+    {
+        if(type == "Human")
+        {
+            Console::Log("Create Human...");
+            Human inst = new Human();
+            Creature::totalCount ++;
+            return (Creature)inst;  
+        }
+        else
+        {
+            return null;
+        }
+    }
+    void Die(Creature c)
+    {
+        if(c != null)
+        {
+            Console::Log("Delete Creature:" + c.name);
+            delete c;
+            Creature::totalCount --;
+        }
+    }
+}
+class Creature
+{    
+    string name = "";
+    int age = 0;
+
+    void Move()
+    {
+        Console::Log(this.name + " move...");
+    }
+}
+namespace Human::Job
+{
+    const int Undefined = 0;
+    const int Student = 2;
+    const int Teacher = 4;
+    const int Engineer = 8;
+    const int Cook = 16;
+}
+class Human : Creature
+{
+    int job = 0;
+    
+    void Move()
+    {
+        Console::Log(this.name + " walk...");
+    }
+}
+
+//Test  
+Human sam = (Human)Creature::Born("Human");
+sam.name = "Sam";
+sam.age = 20;
+sam.job = Human::Job::Student;
+
+sam.Move();
+
+for(int i = 0; i < 99; i++)
+{
+    sam.age += 1;
+
+    if((sam.age % 10) == 0)
+    {
+        Console::Log(sam.name + " is now " + (string)(sam.age) + " years old!");
+    }
+
+    if(sam.age > 90)
+    {
+        Creature::Die(sam);
+        break;
+    }
 }
 
 
-
-
-extern GizboxTest::TestClass[]   GetObjects();
-extern GizboxTest::TestClass   GetObject(int id);
-
-
-TestClass result1 = GetObject(999);
-
-Console::Log("result1 got：" + (string)result1.id());
-
-TestClass[] result2 = GetObjects();
-
-Console::Log("result2 got：" + (string)result2[0].id());
+Console::Log("Test Finish...");

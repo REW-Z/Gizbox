@@ -11,10 +11,11 @@ using Gizbox.ScriptEngineV2;
 
 namespace Gizbox.ScriptEngineV2
 {
+    //栈帧  
     public unsafe class Frame
     {
-        public readonly long startPtr;
-        public readonly long size;
+        public readonly long startPtr;//高内存位  
+        public readonly long endPtr;//低内存位  
 
         public Frame(long startPtr, long size)
         {
@@ -23,9 +24,11 @@ namespace Gizbox.ScriptEngineV2
         }
     }
 
+    //调用堆栈  
     public unsafe class CallStack
     {
         public Frame[] frames;
+
 
         public CallStack(int frameMax)
         {
@@ -33,6 +36,7 @@ namespace Gizbox.ScriptEngineV2
         }
     }
 
+    
     public unsafe class ScriptEngineV2
     {
         //运行时单元  
@@ -213,14 +217,6 @@ namespace Gizbox.ScriptEngineV2
                     }
                     break;
                 case "FUNC_END":
-                    {
-                    }
-                    break;
-                case "METHOD_BEGIN":
-                    {
-                    }
-                    break;
-                case "METHOD_END":
                     {
                     }
                     break;
