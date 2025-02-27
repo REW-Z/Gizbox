@@ -20,7 +20,7 @@ namespace Gizbox.ScriptEngineV2
         public Frame(long startPtr, long size)
         {
             this.startPtr = startPtr;
-            this.size = size;
+            this.endPtr = this.startPtr + size - 1;
         }
     }
 

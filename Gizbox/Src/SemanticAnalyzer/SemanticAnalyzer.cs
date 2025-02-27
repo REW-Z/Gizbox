@@ -1202,6 +1202,28 @@ namespace Gizbox.SemanticRule
     }
 
 
+    public class SymbolTableInfo
+    {
+        public SymbolTable env;
+        
+        public int align = 16;
+        
+        public SymbolTableInfo(SymbolTable env)
+        {
+            this.env = env;
+        }
+
+        public long AllocParamAddr(int size, int align)
+        {
+            if(align > this.align)
+                this.align = align;
+
+
+
+            return default;
+        }
+    }
+
     /// <summary>
     /// 语义分析器  
     /// </summary>
@@ -1215,6 +1237,9 @@ namespace Gizbox.SemanticRule
 
         private Gizbox.GStack<SymbolTable> envStack;
 
+
+        //symbol table info  
+        public Dictionary<SymbolTable, SymbolTableInfo> symbolTableInfoDict = new Dictionary<SymbolTable, SymbolTableInfo>();
 
         //temp  
         private int blockCounter = 0;//Block自增  
@@ -2709,6 +2734,23 @@ namespace Gizbox.SemanticRule
                 default:
                     return false;
             }
+        }
+
+        private long CalcAddrOffset(SymbolTable.Record rec, SymbolTable env)
+        {
+            switch(rec.category)
+            {
+                case SymbolTable.RecordCatagory.Param:
+                    {
+                    }
+                    break;
+                case SymbolTable.RecordCatagory.Variable:
+                    {
+                    }
+                    break;
+            }
+
+            return default;
         }
 
         private SymbolTable.Record Query(string name)
