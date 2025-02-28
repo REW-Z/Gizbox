@@ -1206,20 +1206,18 @@ namespace Gizbox.SemanticRule
     {
         public SymbolTable env;
         
-        public int align = 16;
-        
+        public const int align = 16; //x86-64的System V ABI 要求
+
+        private int offsetPrev = 0;
+
         public SymbolTableInfo(SymbolTable env)
         {
             this.env = env;
         }
 
-        public long AllocParamAddr(int size, int align)
+        public long CalcAddrOffset(int size, int align)
         {
-            if(align > this.align)
-                this.align = align;
-
-
-
+            //offsetPrev += size;
             return default;
         }
     }
