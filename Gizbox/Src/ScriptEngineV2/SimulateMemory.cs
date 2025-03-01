@@ -7,120 +7,69 @@ using System.Runtime.InteropServices;
 
 namespace Gizbox.ScriptEngineV2
 {
-    public class SimMemUtility
+    public unsafe class SimlateX64
     {
-        private static void MemLayoutTest(long currSP, object[] argsToLayout, out long[] allocAddrs, out long newSP)
+        //参数的寄存器分配示例：  
+        //func3(int a, double b, int c, float d, int e, float f);
+        // a in RCX, b in XMM1, c in R8, d in XMM3, f then e pushed on stack
+
+        //func4(__m64 a, __m128 b, struct c, float d, __m128 e, __m128 f);
+        // a in RCX, ptr to b in RDX, ptr to c in R8, d in XMM3,
+        // ptr to f pushed on stack, then ptr to e pushed on stack
+
+
+        //registers  
+        private readonly byte[] RAX;//return value
+
+        private readonly byte[] RCX;//integer or ptr arg 0
+        private readonly byte[] RDX;//integer or ptr arg 1
+        private readonly byte[] R8;//integer or ptr arg 2
+        private readonly byte[] R9;//integer or ptr arg 3
+
+        private readonly byte[] RBP;//frame pointer
+        private readonly byte[] RSP;//stack pointer
+
+
+        private readonly byte[] XMM0;//float arg 0
+        private readonly byte[] XMM1;//float arg 1
+        private readonly byte[] XMM2;//float arg 2
+        private readonly byte[] XMM3;//float arg 3
+
+
+
+        //handles  
+        public List<GCHandle> handles = new List<GCHandle>();
+
+
+        public SimlateX64()
         {
-            foreach(var arg in argsToLayout)
-            {
-                if(!arg.GetType().IsValueType)
-                    throw new ArgumentException("All arguments must be value types");
-            }
-
-            allocAddrs = new long[argsToLayout.Length];
-            long ptr_sp = currSP;
-
-            // 强制初始栈指针16字节对齐（模拟x86-64 System V ABI）
-            ptr_sp = AlignDown(ptr_sp, 16);
-
-            // 按从右到左顺序压栈参数（C调用约定）
-            for(int i = argsToLayout.Length - 1; i >= 0; i--)
-            {
-                Type type = argsToLayout[i].GetType();
-                int size = GetTypeSize(type);
-                int alignment = GetTypeAlignment(type);
-
-                // 计算新的栈指针（考虑对齐）
-                ptr_sp = AlignDown(ptr_sp - size, alignment);
-                allocAddrs[i] = ptr_sp; // 记录当前参数的起始地址
-
-                // 可视化调试输出
-                Console.WriteLine($"Param {i} ({type.Name}):");
-                Console.WriteLine($"  Size: {size}, Alignment: {alignment}");
-                Console.WriteLine($"  Address: 0x{ptr_sp:X8}");
-            }
-
-            // 最终栈指针必须保持16字节对齐（System V ABI要求）
-            ptr_sp = AlignDown(ptr_sp, 16);
+            RAX = new byte[8];
+            handles.Add(GCHandle.Alloc(RAX, GCHandleType.Pinned));
 
 
-            //TODO:  
-            newSP = default;
+            RCX = new byte[8];
+            handles.Add(GCHandle.Alloc(RCX, GCHandleType.Pinned));
+            RDX = new byte[8];
+            handles.Add(GCHandle.Alloc(RDX, GCHandleType.Pinned));
+            R8 = new byte[8];
+            handles.Add(GCHandle.Alloc(R8, GCHandleType.Pinned));
+            R9 = new byte[8];
+            handles.Add(GCHandle.Alloc(R9, GCHandleType.Pinned));
+
+
+            XMM0 = new byte[16];
+            handles.Add(GCHandle.Alloc(XMM0, GCHandleType.Pinned));
+            XMM1 = new byte[16];
+            handles.Add(GCHandle.Alloc(XMM1, GCHandleType.Pinned));
+            XMM2 = new byte[16];
+            handles.Add(GCHandle.Alloc(XMM2, GCHandleType.Pinned));
+            XMM3 = new byte[16];
+            handles.Add(GCHandle.Alloc(XMM3, GCHandleType.Pinned));
+
         }
-
-        // 内存对齐计算函数
-        private static long AlignDown(long value, int alignment)
-        {
-            if(alignment <= 0 || (alignment & (alignment - 1)) != 0)
-                throw new ArgumentException("Alignment must be power of two");
-            return value & ~(alignment - 1);
-        }
-
-        // 类型大小计算
-        private static int GetTypeSize(Type type)
-        {
-            if(type.IsPrimitive)
-            {
-                return System.Runtime.InteropServices.Marshal.SizeOf(type);
-            }
-
-            if(type.IsValueType)
-            {
-                int size = 0;
-                int maxAlignment = 1;
-
-                foreach(var field in type.GetFields())
-                {
-                    int fieldSize = GetTypeSize(field.FieldType);
-                    int fieldAlignment = GetTypeAlignment(field.FieldType);
-
-                    // 添加填充以满足字段对齐
-                    int padding = (fieldAlignment - (size % fieldAlignment)) % fieldAlignment;
-                    size += padding + fieldSize;
-
-                    maxAlignment = Math.Max(maxAlignment, fieldAlignment);
-                }
-
-                // 结构体尾部填充
-                int tailPadding = (maxAlignment - (size % maxAlignment)) % maxAlignment;
-                return size + tailPadding;
-            }
-
-            throw new NotSupportedException($"Unsupported type: {type}");
-        }
-
-        // 类型对齐计算
-        private static int GetTypeAlignment(Type type)
-        {
-            if(type.IsPrimitive)
-            {
-                return type switch
-                {
-                    _ when type == typeof(byte) => 1,
-                    _ when type == typeof(short) => 2,
-                    _ when type == typeof(int) => 4,
-                    _ when type == typeof(long) => 8,
-                    _ when type == typeof(float) => 4,
-                    _ when type == typeof(double) => 8,
-                    _ => throw new NotSupportedException()
-                };
-            }
-
-            if(type.IsValueType)
-            {
-                int maxAlignment = 1;
-                foreach(var field in type.GetFields())
-                {
-                    maxAlignment = Math.Max(maxAlignment, GetTypeAlignment(field.FieldType));
-                }
-                return maxAlignment;
-            }
-
-            throw new NotSupportedException($"Unsupported type: {type}");
-        }
-
     }
-    public unsafe class SimMemory : IDisposable
+
+    public unsafe class SimulateMemory : IDisposable
     {
         //unmanaged约束是不包含任何引用类型的值类型，比struct约束更严格  
         public unsafe class StackMem : IDisposable
@@ -258,7 +207,7 @@ namespace Gizbox.ScriptEngineV2
         private long stack_size;
         private long stack_bottom;
 
-        public SimMemory(int heapSizeMB, int stackSizeMB)
+        public SimulateMemory(int heapSizeMB, int stackSizeMB)
         {
             heap = new HeapMem(heapSizeMB);
             stack = new StackMem(stackSizeMB);
@@ -310,4 +259,105 @@ namespace Gizbox.ScriptEngineV2
             return *(T*)ptr;
         }
     }
+
+
+    public class SimMemUtility
+    {
+        public static void MemLayoutTest(long sp, (int, int)[] argArr, out long[] allocAddrs, out long spmovement)
+        {
+            allocAddrs = new long[argArr.Length];
+            long ptr_sp = sp;
+
+            // 强制初始栈指针16字节对齐（模拟x86-64 System V ABI）
+            ptr_sp = AlignDown(ptr_sp, 16);
+
+            // 按从右到左顺序压栈参数（C调用约定）
+            for(int i = argArr.Length - 1; i >= 0; i--)
+            {
+                int size = argArr[i].Item1;
+                int alignment = argArr[i].Item2;
+
+                // 计算新的栈指针（考虑对齐）
+                ptr_sp = AlignDown(ptr_sp - size, alignment);
+                allocAddrs[i] = ptr_sp; // 记录当前参数的起始地址
+            }
+
+            // 最终栈指针必须保持16字节对齐（System V ABI要求）
+            ptr_sp = AlignDown(ptr_sp, 16);
+            spmovement = ptr_sp - sp;
+        }
+
+        // 内存对齐计算函数
+        public static long AlignDown(long value, int alignment)
+        {
+            if(alignment <= 0 || (alignment & (alignment - 1)) != 0)
+                throw new ArgumentException("Alignment must be power of two");
+            return value & ~(alignment - 1);
+        }
+
+        // 类型大小计算
+        public static int GetTypeSize(Type type)
+        {
+            if(type.IsPrimitive)
+            {
+                return System.Runtime.InteropServices.Marshal.SizeOf(type);
+            }
+
+            if(type.IsValueType)
+            {
+                int size = 0;
+                int maxAlignment = 1;
+
+                foreach(var field in type.GetFields())
+                {
+                    int fieldSize = GetTypeSize(field.FieldType);
+                    int fieldAlignment = GetTypeAlignment(field.FieldType);
+
+                    // 添加填充以满足字段对齐
+                    int padding = (fieldAlignment - (size % fieldAlignment)) % fieldAlignment;
+                    size += padding + fieldSize;
+
+                    maxAlignment = Math.Max(maxAlignment, fieldAlignment);
+                }
+
+                // 结构体尾部填充
+                int tailPadding = (maxAlignment - (size % maxAlignment)) % maxAlignment;
+                return size + tailPadding;
+            }
+
+            throw new NotSupportedException($"Unsupported type: {type}");
+        }
+
+        // 类型对齐计算
+        public static int GetTypeAlignment(Type type)
+        {
+            if(type.IsPrimitive)
+            {
+                return type switch
+                {
+                    _ when type == typeof(byte) => 1,
+                    _ when type == typeof(short) => 2,
+                    _ when type == typeof(int) => 4,
+                    _ when type == typeof(long) => 8,
+                    _ when type == typeof(float) => 4,
+                    _ when type == typeof(double) => 8,
+                    _ => throw new NotSupportedException()
+                };
+            }
+
+            if(type.IsValueType)
+            {
+                int maxAlignment = 1;
+                foreach(var field in type.GetFields())
+                {
+                    maxAlignment = Math.Max(maxAlignment, GetTypeAlignment(field.FieldType));
+                }
+                return maxAlignment;
+            }
+
+            throw new NotSupportedException($"Unsupported type: {type}");
+        }
+
+    }
+
 }

@@ -1215,10 +1215,10 @@ namespace Gizbox.SemanticRule
             this.env = env;
         }
 
-        public long CalcAddrOffset(int size, int align)
+        public void AllocateParamOffsets()
         {
             //offsetPrev += size;
-            return default;
+            return;
         }
     }
 

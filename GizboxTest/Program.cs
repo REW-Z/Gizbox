@@ -123,7 +123,7 @@ switch(cmdIdx)
             Console.WriteLine("测试新解释引擎");
             unsafe
             {
-                SimMemory mem = new SimMemory(10, 10);
+                SimulateMemory mem = new SimulateMemory(10, 10);
                 MyStruct s1 = new MyStruct() { id = 111, _a = 100d, _b = 10000d };
                 MyStruct s2 = new MyStruct() { id = 222, _a = 200d, _b = 20000d };
                 MyStruct* pS3 = mem.new_<MyStruct>();
@@ -143,6 +143,57 @@ switch(cmdIdx)
                 Console.WriteLine("ret1:" + ret1.id + "  " + ret1._a + "  " + ret1._b);
                 Console.WriteLine("ret2:" + ret2.id + "  " + ret2._a + "  " + ret2._b);
                 Console.WriteLine("ret3:" + pS3->id + "  " + pS3->_a + "  " + pS3->_b);
+
+
+                long sp = 10000;
+                object[] testargs = { 233, (byte)1, 2.33d };
+                string[] names = { "a", "b", "c" };
+
+                long[] addrs;
+                long spmovement;
+                SimMemUtility.MemLayoutTest(sp, testargs, out addrs, out spmovement);
+
+
+                System.Text.StringBuilder strb = new System.Text.StringBuilder();
+                strb.AppendLine($"newsp:{sp + spmovement}  ~  sp:{sp}");
+
+                int remainLength = 0;
+                bool first = false;
+                string argName = "";
+                for(long a = sp + spmovement; a <= sp; ++a)
+                {
+                    for(int j = 0; j < testargs.Length; ++j)
+                    {
+                        if(addrs[j] == a)
+                        {
+                            argName = names[j];
+                            remainLength = SimMemUtility.GetTypeSize(testargs[j].GetType());
+                            first = true;
+                        }
+                    }
+
+
+                    if(remainLength > 0)
+                    {
+                        if(first)
+                        {
+                            first = false;
+                            strb.Append(argName.ToUpper().ToString());
+                        }
+                        else
+                        {
+                            strb.Append(argName.ToString());
+                        }
+
+                        remainLength--;
+                    }
+                    else
+                    {
+                        strb.Append("0");
+                    }
+                }
+
+                Console.WriteLine(strb.ToString());
 
             }
             break;  
