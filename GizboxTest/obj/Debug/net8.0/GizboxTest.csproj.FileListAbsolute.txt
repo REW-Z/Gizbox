@@ -38,9 +38,9 @@ F:\ZQJ\GizboxAndTools\Gizbox\GizboxTest\obj\Debug\net8.0\GizboxTest.AssemblyInfo
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxTest\obj\Debug\net8.0\GizboxTest.AssemblyInfo.cs
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxTest\obj\Debug\net8.0\GizboxTest.csproj.CoreCompileInputs.cache
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxTest\obj\Debug\net8.0\GizboxTest.sourcelink.json
-F:\ZQJ\GizboxAndTools\Gizbox\GizboxTest\obj\Debug\net8.0\GizboxTest.csproj.CopyComplete
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxTest\obj\Debug\net8.0\GizboxTest.dll
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxTest\obj\Debug\net8.0\refint\GizboxTest.dll
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxTest\obj\Debug\net8.0\GizboxTest.pdb
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxTest\obj\Debug\net8.0\GizboxTest.genruntimeconfig.cache
 F:\ZQJ\GizboxAndTools\Gizbox\GizboxTest\obj\Debug\net8.0\ref\GizboxTest.dll
+F:\ZQJ\GizboxAndTools\Gizbox\GizboxTest\obj\Debug\net8.0\GizboxTest.csproj.Up2Date

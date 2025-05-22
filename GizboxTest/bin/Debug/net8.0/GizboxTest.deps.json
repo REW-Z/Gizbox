@@ -16,7 +16,10 @@
       },
       "Gizbox/1.0.0": {
         "runtime": {
-          "Gizbox.dll": {}
+          "Gizbox.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
         }
       }
     }

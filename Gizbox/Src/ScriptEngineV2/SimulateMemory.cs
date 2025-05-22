@@ -263,7 +263,21 @@ namespace Gizbox.ScriptEngineV2
 
     public class SimMemUtility
     {
-        public static void MemLayoutTest(long sp, (int, int)[] argArr, out long[] allocAddrs, out long spmovement)
+        public static void MemLayoutTest(long sp, object[] argArr, out long[] allocAddrs, out long spmovement)
+        {
+            //调用另一个重载
+            (int size, int align)[] argArr2 = new (int size, int align)[argArr.Length];
+            for(int i = 0; i < argArr.Length; i++)
+            {
+                Type type = argArr[i].GetType();
+                int size = GetTypeSize(type);
+                int align = GetTypeAlignment(type);
+                argArr2[i] = (size, align);
+            }
+            MemLayoutTest(sp, argArr2, out allocAddrs, out spmovement);
+        }
+
+        public static void MemLayoutTest(long sp, (int size, int align)[] argArr, out long[] allocAddrs, out long spmovement)
         {
             allocAddrs = new long[argArr.Length];
             long ptr_sp = sp;
@@ -274,8 +288,8 @@ namespace Gizbox.ScriptEngineV2
             // 按从右到左顺序压栈参数（C调用约定）
             for(int i = argArr.Length - 1; i >= 0; i--)
             {
-                int size = argArr[i].Item1;
-                int alignment = argArr[i].Item2;
+                int size = argArr[i].size;
+                int alignment = argArr[i].align;
 
                 // 计算新的栈指针（考虑对齐）
                 ptr_sp = AlignDown(ptr_sp - size, alignment);
