@@ -545,6 +545,13 @@ namespace Gizbox
             }
         }
 
+        public class InferTypeNode : TypeNode
+        {
+            public override string TypeExpression()
+            {
+                return "var";
+            }
+        }
 
 
         // ******************** OTHER NODES ******************************

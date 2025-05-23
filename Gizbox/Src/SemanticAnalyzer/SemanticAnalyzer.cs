@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Text;
 
 using Gizbox;
@@ -594,6 +595,13 @@ namespace Gizbox.SemanticRule
             });
             AddActionAtTail("type -> stype", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes["ast_node"];
+            });
+            AddActionAtTail("type -> var", (psr, production) =>
+            {
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.InferTypeNode()
+                {
+                    attributes = psr.newElement.attributes,
+                };
             });
 
             AddActionAtTail("arrtype -> stypeBracket", (psr, production) => {
@@ -1202,25 +1210,6 @@ namespace Gizbox.SemanticRule
     }
 
 
-    public class SymbolTableInfo
-    {
-        public SymbolTable env;
-        
-        public const int align = 16; //x86-64的System V ABI 要求
-
-        private int offsetPrev = 0;
-
-        public SymbolTableInfo(SymbolTable env)
-        {
-            this.env = env;
-        }
-
-        public void AllocateParamOffsets()
-        {
-            //offsetPrev += size;
-            return;
-        }
-    }
 
     /// <summary>
     /// 语义分析器  
@@ -1235,9 +1224,6 @@ namespace Gizbox.SemanticRule
 
         private Gizbox.GStack<SymbolTable> envStack;
 
-
-        //symbol table info  
-        public Dictionary<SymbolTable, SymbolTableInfo> symbolTableInfoDict = new Dictionary<SymbolTable, SymbolTableInfo>();
 
         //temp  
         private int blockCounter = 0;//Block自增  
@@ -1963,6 +1949,10 @@ namespace Gizbox.SemanticRule
                         //分析常量字面值
                         Pass3_AnalysisNode(constDeclNode.litValNode);
 
+                        //常量类型不支持推断  
+                        if (constDeclNode.typeNode is SyntaxTree.InferTypeNode)
+                            throw new SemanticException(ExceptioName.SemanticAnalysysError, constDeclNode.typeNode, "");
+
                         //类型检查（初始值）  
                         bool valid = CheckType_Equal(constDeclNode.typeNode.TypeExpression(), AnalyzeTypeExpression(constDeclNode.litValNode));
                         if (!valid)
@@ -1974,9 +1964,20 @@ namespace Gizbox.SemanticRule
                         //分析初始化表达式  
                         Pass3_AnalysisNode(varDeclNode.initializerNode);
 
+                        //类型推断  
+                        if (varDeclNode.typeNode is InferTypeNode typeNode)
+                        {
+                            var typeExpr = InferType(typeNode, varDeclNode.initializerNode);
+                            var record = envStack.Peek().GetRecord(varDeclNode.identifierNode.FullName);
+                            record.typeExpression = typeExpr;
+                        }
                         //类型检查（初始值）  
-                        bool valid = CheckType_Equal(varDeclNode.typeNode.TypeExpression(), varDeclNode.initializerNode);
-                        if (!valid) throw new SemanticException(ExceptioName.VariableTypeDeclarationError, varDeclNode, "type:" + varDeclNode.typeNode.TypeExpression() + "  intializer type:" + AnalyzeTypeExpression(varDeclNode.initializerNode));
+                        else
+                        {
+                            bool valid = CheckType_Equal(varDeclNode.typeNode.TypeExpression(), varDeclNode.initializerNode);
+                            if(!valid)
+                                throw new SemanticException(ExceptioName.VariableTypeDeclarationError, varDeclNode, "type:" + varDeclNode.typeNode.TypeExpression() + "  intializer type:" + AnalyzeTypeExpression(varDeclNode.initializerNode));
+                        }
                     }
                     break;
                 case SyntaxTree.FuncDeclareNode funcDeclNode:
@@ -1996,6 +1997,10 @@ namespace Gizbox.SemanticRule
                         {
                             Pass3_AnalysisNode(stmtNode);
                         }
+
+                        //返回类型不支持推断  
+                        if(funcDeclNode.returnTypeNode is SyntaxTree.InferTypeNode)
+                            throw new SemanticException(ExceptioName.SemanticAnalysysError, funcDeclNode.returnTypeNode, "");
 
                         //返回值类型检查（仅限非void的函数）  
                         if (!(funcDeclNode.returnTypeNode is SyntaxTree.PrimitiveTypeNode && (funcDeclNode.returnTypeNode as SyntaxTree.PrimitiveTypeNode).token.name == "void"))
@@ -2030,6 +2035,13 @@ namespace Gizbox.SemanticRule
                         {
                             Pass3_AnalysisNode(paramNode);
                         }
+
+
+                        //返回类型不支持推断  
+                        if(externFuncDeclNode.returnTypeNode is SyntaxTree.InferTypeNode)
+                            throw new SemanticException(ExceptioName.SemanticAnalysysError, externFuncDeclNode.returnTypeNode, "");
+
+
                         //离开作用域  
                         envStack.Pop();
                     }
@@ -2578,6 +2590,20 @@ namespace Gizbox.SemanticRule
         }
 
         /// <summary>
+        /// 类型推断
+        /// </summary>
+        private string InferType(SyntaxTree.InferTypeNode typeNode, SyntaxTree.ExprNode exprNode)
+        {
+            var initializerType = AnalyzeTypeExpression(exprNode);
+            if (initializerType == "null")
+            {
+                throw new SemanticException(ExceptioName.SemanticAnalysysError, typeNode, "");
+            }
+            typeNode.attributes["type"] = initializerType;
+            return initializerType;
+        }
+
+        /// <summary>
         /// 检查类型
         /// </summary>
         private bool CheckType_Equal(string typeExpr, SyntaxTree.ExprNode exprNode)
@@ -2734,22 +2760,6 @@ namespace Gizbox.SemanticRule
             }
         }
 
-        private long CalcAddrOffset(SymbolTable.Record rec, SymbolTable env)
-        {
-            switch(rec.category)
-            {
-                case SymbolTable.RecordCatagory.Param:
-                    {
-                    }
-                    break;
-                case SymbolTable.RecordCatagory.Variable:
-                    {
-                    }
-                    break;
-            }
-
-            return default;
-        }
 
         private SymbolTable.Record Query(string name)
         {

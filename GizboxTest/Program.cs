@@ -88,7 +88,6 @@ switch(cmdIdx)
             Gizbox.Compiler compilerTest = new Compiler();
             compilerTest.ConfigParserDataSource(hardcode: false);
             compilerTest.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
-            //compilerTest.SaveParserHardcodeToDesktop();//改为直接插入到代码文件  
             compilerTest.InsertParserHardcodeToSourceFile("F:\\ZQJ\\GizboxAndTools\\Gizbox\\Gizbox\\Src\\Parser\\ParserHardcoder.cs");
             Console.WriteLine("生成硬编码完成");
             return;
@@ -151,7 +150,7 @@ switch(cmdIdx)
 
                 long[] addrs;
                 long spmovement;
-                SimMemUtility.MemLayoutTest(sp, testargs, out addrs, out spmovement);
+                SimMemUtility.MemLayout(sp, testargs, out addrs, out spmovement);
 
 
                 System.Text.StringBuilder strb = new System.Text.StringBuilder();
@@ -167,7 +166,7 @@ switch(cmdIdx)
                         if(addrs[j] == a)
                         {
                             argName = names[j];
-                            remainLength = SimMemUtility.GetTypeSize(testargs[j].GetType());
+                            remainLength = SimMemUtility.GetCSTypeSize(testargs[j].GetType());
                             first = true;
                         }
                     }

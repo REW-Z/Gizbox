@@ -138,8 +138,8 @@ namespace Gizbox.ScriptEngine
 
         public int Top
         {
-            get { return top; }
-            set { top = value; }
+            get => top;
+            set => top = value;
         }
 
         public Frame this[int idx]

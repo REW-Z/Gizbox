@@ -7,6 +7,26 @@ using System.Runtime.InteropServices;
 
 namespace Gizbox.ScriptEngineV2
 {
+    public enum AddrType
+    {
+        Stack,
+
+        RAX,
+
+        RCX,
+        RDX,
+        R8,
+        R9,
+
+        RBP,
+        RSP,
+
+        XMM0,
+        XMM1,
+        XMM2,
+        XMM3,
+    }
+
     public unsafe class SimlateX64
     {
         //参数的寄存器分配示例：  
@@ -30,10 +50,11 @@ namespace Gizbox.ScriptEngineV2
         private readonly byte[] RSP;//stack pointer
 
 
-        private readonly byte[] XMM0;//float arg 0
-        private readonly byte[] XMM1;//float arg 1
-        private readonly byte[] XMM2;//float arg 2
-        private readonly byte[] XMM3;//float arg 3
+        private readonly byte[] XMM0;//float arg 0      128
+        private readonly byte[] XMM1;//float arg 1      128
+        private readonly byte[] XMM2;//float arg 2      128
+        private readonly byte[] XMM3;//float arg 3      128
+
 
 
 
@@ -68,6 +89,8 @@ namespace Gizbox.ScriptEngineV2
 
         }
     }
+
+
 
     public unsafe class SimulateMemory : IDisposable
     {
@@ -263,21 +286,20 @@ namespace Gizbox.ScriptEngineV2
 
     public class SimMemUtility
     {
-        public static void MemLayoutTest(long sp, object[] argArr, out long[] allocAddrs, out long spmovement)
+        public static void MemLayout(long sp, object[] argArr, out long[] allocAddrs, out long spmovement)
         {
-            //调用另一个重载
             (int size, int align)[] argArr2 = new (int size, int align)[argArr.Length];
             for(int i = 0; i < argArr.Length; i++)
             {
                 Type type = argArr[i].GetType();
-                int size = GetTypeSize(type);
-                int align = GetTypeAlignment(type);
+                int size = GetCSTypeSize(type);
+                int align = GetCSTypeAlignment(type);
                 argArr2[i] = (size, align);
             }
-            MemLayoutTest(sp, argArr2, out allocAddrs, out spmovement);
+            MemLayout(sp, argArr2, out allocAddrs, out spmovement);
         }
 
-        public static void MemLayoutTest(long sp, (int size, int align)[] argArr, out long[] allocAddrs, out long spmovement)
+        public static void MemLayout(long sp, (int size, int align)[] argArr, out long[] allocAddrs, out long spmovement)
         {
             allocAddrs = new long[argArr.Length];
             long ptr_sp = sp;
@@ -310,7 +332,7 @@ namespace Gizbox.ScriptEngineV2
         }
 
         // 类型大小计算
-        public static int GetTypeSize(Type type)
+        public static int GetCSTypeSize(Type type)
         {
             if(type.IsPrimitive)
             {
@@ -324,8 +346,8 @@ namespace Gizbox.ScriptEngineV2
 
                 foreach(var field in type.GetFields())
                 {
-                    int fieldSize = GetTypeSize(field.FieldType);
-                    int fieldAlignment = GetTypeAlignment(field.FieldType);
+                    int fieldSize = GetCSTypeSize(field.FieldType);
+                    int fieldAlignment = GetCSTypeAlignment(field.FieldType);
 
                     // 添加填充以满足字段对齐
                     int padding = (fieldAlignment - (size % fieldAlignment)) % fieldAlignment;
@@ -343,7 +365,7 @@ namespace Gizbox.ScriptEngineV2
         }
 
         // 类型对齐计算
-        public static int GetTypeAlignment(Type type)
+        public static int GetCSTypeAlignment(Type type)
         {
             if(type.IsPrimitive)
             {
@@ -364,7 +386,7 @@ namespace Gizbox.ScriptEngineV2
                 int maxAlignment = 1;
                 foreach(var field in type.GetFields())
                 {
-                    maxAlignment = Math.Max(maxAlignment, GetTypeAlignment(field.FieldType));
+                    maxAlignment = Math.Max(maxAlignment, GetCSTypeAlignment(field.FieldType));
                 }
                 return maxAlignment;
             }

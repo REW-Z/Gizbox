@@ -6,6 +6,10 @@ using Gizbox;
 using Gizbox.ScriptEngineV2;
 using Gizbox.IR;
 
+#if DEBUG
+using System.Runtime.InteropServices;
+#endif
+
 namespace Gizbox.ScriptEngineV2
 {
     public class Operand
@@ -286,6 +290,20 @@ namespace Gizbox.ScriptEngineV2
             return str;
         }
     }
+
+
+    public class RuntimeAddr
+    {
+        public const int align = 16;//x86-64
+
+        public AddrType addrType;
+
+        public long addrOffset;
+
+        public long addrReal;//大结构体  
+    }
+
+
     public class RuntimeUnitV2
     {
         public const long __constdataOffset = 10000000000L;
@@ -306,7 +324,7 @@ namespace Gizbox.ScriptEngineV2
         private Dictionary<string, int> entryLabels = new Dictionary<string, int>();
         private Dictionary<string, int> exitLabels = new Dictionary<string, int>();
 
-
+        public Dictionary<SymbolTable.Record, RuntimeAddr> symbolInfoCacheDict = new();
 
         public List<RuntimeUnitV2> allUnits = new List<RuntimeUnitV2>();
         public Dictionary<string, Value> globalData = new Dictionary<string, Value>();
@@ -353,7 +371,73 @@ namespace Gizbox.ScriptEngineV2
                     exitLabels[exitKey] = kv.Value;
                 }
             }
+
+            //Init Symbol infos  
+            InitSymbolInfos();
         }
+
+        private void InitSymbolInfos()
+        {
+            foreach(var scope in scopes)
+            {
+                switch(scope.env.tableCatagory)
+                {
+                    //类成员内存布局  
+                    case SymbolTable.TableCatagory.ClassScope:
+                        {
+                            var fieldRecs = scope.env.records.Where(pair => pair.Value.category == SymbolTable.RecordCatagory.Variable).Select(pair => pair.Value).ToArray();
+                            (int size, int align)[] sizeAlignInfos = fieldRecs.Select(rec => GetSizeAndAlign(rec)).ToArray();
+                            long[] addrs;
+                            long spmovement;
+                            SimMemUtility.MemLayout(0, sizeAlignInfos, out addrs, out spmovement);
+                            for(int i = 0; i < fieldRecs.Length; i++)
+                            {
+                                symbolInfoCacheDict[fieldRecs[i]] = new RuntimeAddr()
+                                {
+                                    addrType = AddrType.Stack,
+                                    addrOffset = addrs[i],
+                                };
+                            }
+                        }
+                        break;
+                    //局部变量内存布局
+                    case SymbolTable.TableCatagory.FuncScope:
+                        {
+                            var parameters = scope.env.records.Where(p => p.Value.category == SymbolTable.RecordCatagory.Param).Select(p => p.Value).ToArray();
+                            var localVariables = scope.env.records.Where(p => p.Value.category == SymbolTable.RecordCatagory.Variable).Select(p => p.Value).ToArray();
+
+                            AddrType regTemp1 = AddrType.RCX;
+                            AddrType regTemp2 = AddrType.XMM0;
+
+                            foreach(var param in parameters)
+                            {
+                                if(ShouldAllocOnRegXXM(param) && regTemp2 <= AddrType.XMM3)
+                                {
+                                    symbolInfoCacheDict[param] = new RuntimeAddr()
+                                    {
+                                        addrType = regTemp2,
+                                    };
+                                    regTemp2 += 1;
+                                }
+                                else if(reg)
+                                {
+                                    symbolInfoCacheDict[param] = new RuntimeAddr()
+                                    {
+                                        addrType = regTemp1,
+                                    };
+                                    regTemp1++;
+                                }
+                            }
+                        }
+                        break;
+                    default:
+                        break;
+                }
+
+            }
+        }
+
+
 
         //动态链接（递归）（处理常量数据区的访问方式）  
         public void MainUnitLinkLibs()
@@ -423,6 +507,39 @@ namespace Gizbox.ScriptEngineV2
         }
 
 
+
+        public (int size, int align) GetSizeAndAlign(SymbolTable.Record rec)
+        {
+            if(rec.category != SymbolTable.RecordCatagory.Variable && rec.category != SymbolTable.RecordCatagory.Constant)
+                return default;
+
+            switch(rec.typeExpression)
+            {
+                case "int":
+                    return (4, 4);
+                case "float":
+                    return (4, 4);
+                case "double":
+                    return (8, 8);
+                case "bool":
+                    return (1, 1);
+                case "char":
+                    return (2, 2);
+                case "string":
+                    return (8, 8); // 指针
+                default:
+                    return (8, 8);// 类类型，指针
+            }
+        }
+        public bool ShouldAllocOnRegXXM(SymbolTable.Record rec)
+        {
+            return rec.typeExpression switch
+            {
+                "double" => true,
+                "float" => true,
+                _ => false
+            };
+        }
 
         //读取常量值    
         public object ReadConst(long ptr)
@@ -678,5 +795,35 @@ namespace Gizbox.ScriptEngineV2
 
             return null;
         }
+    }
+
+    public static class BasicTypeInfo
+    {
+#if DEBUG
+        public static void PrintBasicTypeSizes()
+        {
+            Console.WriteLine("C# 基本数据类型的字节大小和内存对齐：");
+            PrintTypeInfo<bool>("bool");
+            PrintTypeInfo<byte>("byte");
+            PrintTypeInfo<sbyte>("sbyte");
+            PrintTypeInfo<short>("short");
+            PrintTypeInfo<ushort>("ushort");
+            PrintTypeInfo<int>("int");
+            PrintTypeInfo<uint>("uint");
+            PrintTypeInfo<long>("long");
+            PrintTypeInfo<ulong>("ulong");
+            PrintTypeInfo<char>("char");
+            PrintTypeInfo<float>("float");
+            PrintTypeInfo<double>("double");
+            PrintTypeInfo<decimal>("decimal");
+        }
+
+        private static void PrintTypeInfo<T>(string typeName)
+        {
+            int size = Marshal.SizeOf<T>();
+            Console.WriteLine($"{typeName,-8}: Size = {size} bytes");
+            // .NET 默认对齐方式依赖于平台和结构体布局，基础类型通常对齐到其自身大小或平台字长
+        }
+#endif
     }
 }

@@ -150,6 +150,7 @@ namespace Gizbox
 
             "type -> arrtype",
             "type -> stype",
+            "type -> var",
             "arrtype -> stypeBracket",
             "stype -> primitive",
             "stype -> ID",
