@@ -7,91 +7,6 @@ using System.Runtime.InteropServices;
 
 namespace Gizbox.ScriptEngineV2
 {
-    public enum AddrType
-    {
-        Stack,
-
-        RAX,
-
-        RCX,
-        RDX,
-        R8,
-        R9,
-
-        RBP,
-        RSP,
-
-        XMM0,
-        XMM1,
-        XMM2,
-        XMM3,
-    }
-
-    public unsafe class SimlateX64
-    {
-        //参数的寄存器分配示例：  
-        //func3(int a, double b, int c, float d, int e, float f);
-        // a in RCX, b in XMM1, c in R8, d in XMM3, f then e pushed on stack
-
-        //func4(__m64 a, __m128 b, struct c, float d, __m128 e, __m128 f);
-        // a in RCX, ptr to b in RDX, ptr to c in R8, d in XMM3,
-        // ptr to f pushed on stack, then ptr to e pushed on stack
-
-
-        //registers  
-        private readonly byte[] RAX;//return value
-
-        private readonly byte[] RCX;//integer or ptr arg 0
-        private readonly byte[] RDX;//integer or ptr arg 1
-        private readonly byte[] R8;//integer or ptr arg 2
-        private readonly byte[] R9;//integer or ptr arg 3
-
-        private readonly byte[] RBP;//frame pointer
-        private readonly byte[] RSP;//stack pointer
-
-
-        private readonly byte[] XMM0;//float arg 0      128
-        private readonly byte[] XMM1;//float arg 1      128
-        private readonly byte[] XMM2;//float arg 2      128
-        private readonly byte[] XMM3;//float arg 3      128
-
-
-
-
-        //handles  
-        public List<GCHandle> handles = new List<GCHandle>();
-
-
-        public SimlateX64()
-        {
-            RAX = new byte[8];
-            handles.Add(GCHandle.Alloc(RAX, GCHandleType.Pinned));
-
-
-            RCX = new byte[8];
-            handles.Add(GCHandle.Alloc(RCX, GCHandleType.Pinned));
-            RDX = new byte[8];
-            handles.Add(GCHandle.Alloc(RDX, GCHandleType.Pinned));
-            R8 = new byte[8];
-            handles.Add(GCHandle.Alloc(R8, GCHandleType.Pinned));
-            R9 = new byte[8];
-            handles.Add(GCHandle.Alloc(R9, GCHandleType.Pinned));
-
-
-            XMM0 = new byte[16];
-            handles.Add(GCHandle.Alloc(XMM0, GCHandleType.Pinned));
-            XMM1 = new byte[16];
-            handles.Add(GCHandle.Alloc(XMM1, GCHandleType.Pinned));
-            XMM2 = new byte[16];
-            handles.Add(GCHandle.Alloc(XMM2, GCHandleType.Pinned));
-            XMM3 = new byte[16];
-            handles.Add(GCHandle.Alloc(XMM3, GCHandleType.Pinned));
-
-        }
-    }
-
-
-
     public unsafe class SimulateMemory : IDisposable
     {
         //unmanaged约束是不包含任何引用类型的值类型，比struct约束更严格  
@@ -304,7 +219,7 @@ namespace Gizbox.ScriptEngineV2
             allocAddrs = new long[argArr.Length];
             long ptr_sp = sp;
 
-            // 强制初始栈指针16字节对齐（模拟x86-64 System V ABI）
+            // 强制初始栈指针16字节对齐  
             ptr_sp = AlignDown(ptr_sp, 16);
 
             // 按从右到左顺序压栈参数（C调用约定）
@@ -318,7 +233,7 @@ namespace Gizbox.ScriptEngineV2
                 allocAddrs[i] = ptr_sp; // 记录当前参数的起始地址
             }
 
-            // 最终栈指针必须保持16字节对齐（System V ABI要求）
+            // 最终栈指针必须保持16字节对齐  
             ptr_sp = AlignDown(ptr_sp, 16);
             spmovement = ptr_sp - sp;
         }
@@ -328,6 +243,12 @@ namespace Gizbox.ScriptEngineV2
         {
             if(alignment <= 0 || (alignment & (alignment - 1)) != 0)
                 throw new ArgumentException("Alignment must be power of two");
+
+            // 1. (alignment - 1): 获取低位掩码
+            //    例如: alignment=8 (1000)，则 (alignment-1)=7 (0111)
+            // 2. ~(alignment - 1): 取反获得高位掩码
+            //    例如: ~7 = ~(0111) = ...11111000
+            // 3. value & ~(alignment - 1): 按位与操作清除低位，保留高位
             return value & ~(alignment - 1);
         }
 

@@ -41,7 +41,6 @@ namespace Gizbox
             HardCodeKeyValue(ExceptioName.UnknownLiteral.ToString(), null, "未知字面量");
             HardCodeKeyValue(ExceptioName.NotPointerToConstant.ToString(), null, "不是指向常量的指针");
             HardCodeKeyValue(ExceptioName.InvalidHeapWrite.ToString(), null, "堆写入无效");
-            HardCodeKeyValue(ExceptioName.StackOverflow.ToString(), null, "堆栈溢出");
             HardCodeKeyValue(ExceptioName.NoInstructionsToExecute.ToString(), null, "没有指令要执行");
             HardCodeKeyValue(ExceptioName.ArgumentError.ToString(), null, "实参错误");
             HardCodeKeyValue(ExceptioName.AccessError.ToString(), null, "错误的访问");
@@ -85,6 +84,8 @@ namespace Gizbox
 
 
             HardCodeKeyValue(ExceptioName.ScriptRuntimeError.ToString(), null, "脚本运行时错误");
+            HardCodeKeyValue(ExceptioName.StackOverflow.ToString(), null, "堆栈溢出");
+            HardCodeKeyValue(ExceptioName.StackOverflow.ToString(), null, "脚本运行时错误");
             HardCodeKeyValue(ExceptioName.OnlyHeapObjectsCanBeFreed.ToString(), null, "只能对堆中的对象进行释放");
             HardCodeKeyValue(ExceptioName.AccessedObjectNotFound.ToString(), null, "找不到要访问的对象");
             HardCodeKeyValue(ExceptioName.ObjectTypeError.ToString(), null, "对象类型错误");

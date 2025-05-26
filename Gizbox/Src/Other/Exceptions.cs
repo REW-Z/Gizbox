@@ -26,7 +26,6 @@ namespace Gizbox
         UnknownLiteral,
         NotPointerToConstant,
         InvalidHeapWrite,
-        StackOverflow,
         NoInstructionsToExecute,
         ArgumentError,
         AccessError,
@@ -76,6 +75,7 @@ namespace Gizbox
 
         //4.
         ScriptRuntimeError,
+        StackOverflow,
         OnlyHeapObjectsCanBeFreed,
         AccessedObjectNotFound,
         ObjectTypeError,

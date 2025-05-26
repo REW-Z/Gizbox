@@ -294,13 +294,9 @@ namespace Gizbox.ScriptEngineV2
 
     public class RuntimeAddr
     {
-        public const int align = 16;//x86-64
-
-        public AddrType addrType;
+        public const int align = 16;
 
         public long addrOffset;
-
-        public long addrReal;//大结构体  
     }
 
 
@@ -394,7 +390,6 @@ namespace Gizbox.ScriptEngineV2
                             {
                                 symbolInfoCacheDict[fieldRecs[i]] = new RuntimeAddr()
                                 {
-                                    addrType = AddrType.Stack,
                                     addrOffset = addrs[i],
                                 };
                             }
@@ -406,27 +401,34 @@ namespace Gizbox.ScriptEngineV2
                             var parameters = scope.env.records.Where(p => p.Value.category == SymbolTable.RecordCatagory.Param).Select(p => p.Value).ToArray();
                             var localVariables = scope.env.records.Where(p => p.Value.category == SymbolTable.RecordCatagory.Variable).Select(p => p.Value).ToArray();
 
-                            AddrType regTemp1 = AddrType.RCX;
-                            AddrType regTemp2 = AddrType.XMM0;
-
-                            foreach(var param in parameters)
+                            var allRecs = parameters.Concat(localVariables).ToArray();
+                            (int size, int align)[] sizeAlignInfos = allRecs.Select(rec => GetSizeAndAlign(rec)).ToArray();
+                            long[] addrs;
+                            long spmovement;
+                            SimMemUtility.MemLayout(0, sizeAlignInfos, out addrs, out spmovement);
+                            for(int i = 0; i < allRecs.Length; i++)
                             {
-                                if(ShouldAllocOnRegXXM(param) && regTemp2 <= AddrType.XMM3)
+                                symbolInfoCacheDict[allRecs[i]] = new RuntimeAddr()
                                 {
-                                    symbolInfoCacheDict[param] = new RuntimeAddr()
-                                    {
-                                        addrType = regTemp2,
-                                    };
-                                    regTemp2 += 1;
-                                }
-                                else if(reg)
+                                    addrOffset = addrs[i],
+                                };
+                            }
+                        }
+                        break;
+                    //全局变量内存布局
+                    case SymbolTable.TableCatagory.GlobalScope:
+                        {
+                            var globalRecs = scope.env.records.Where(p => p.Value.category == SymbolTable.RecordCatagory.Variable).Select(p => p.Value).ToArray();
+                            (int size, int align)[] sizeAlignInfos = globalRecs.Select(rec => GetSizeAndAlign(rec)).ToArray();
+                            long[] addrs;
+                            long spmovement;
+                            SimMemUtility.MemLayout(0, sizeAlignInfos, out addrs, out spmovement);
+                            for(int i = 0; i < globalRecs.Length; i++)
+                            {
+                                symbolInfoCacheDict[globalRecs[i]] = new RuntimeAddr()
                                 {
-                                    symbolInfoCacheDict[param] = new RuntimeAddr()
-                                    {
-                                        addrType = regTemp1,
-                                    };
-                                    regTemp1++;
-                                }
+                                    addrOffset = addrs[i],
+                                };
                             }
                         }
                         break;
@@ -647,7 +649,7 @@ namespace Gizbox.ScriptEngineV2
 
 
         //查询标号  
-        public Tuple<int, int> QueryLabel(string labelp0, string labelp1, int priorityUnit)
+        public (int unit, int line) QueryLabel(string labelp0, string labelp1, int priorityUnit)
         {
             //入口标签
             if(labelp0 == "entry")
@@ -657,13 +659,13 @@ namespace Gizbox.ScriptEngineV2
                 {
                     if(allUnits[priorityUnit].entryLabels.ContainsKey(labelp1))
                     {
-                        return new Tuple<int, int>(priorityUnit, allUnits[priorityUnit].entryLabels[labelp1]);
+                        return new ValueTuple<int, int>(priorityUnit, allUnits[priorityUnit].entryLabels[labelp1]);
                     }
                 }
                 //正常查找顺序  
                 if(entryLabels.ContainsKey(labelp1) == true)
                 {
-                    return new Tuple<int, int>(-1, entryLabels[labelp1]);
+                    return new ValueTuple<int, int>(-1, entryLabels[labelp1]);
                 }
                 else
                 {
@@ -671,7 +673,7 @@ namespace Gizbox.ScriptEngineV2
                     {
                         if(allUnits[i].entryLabels.ContainsKey(labelp1))
                         {
-                            return new Tuple<int, int>(i, allUnits[i].entryLabels[labelp1]);
+                            return new ValueTuple<int, int>(i, allUnits[i].entryLabels[labelp1]);
                         }
                     }
                 }
@@ -684,13 +686,13 @@ namespace Gizbox.ScriptEngineV2
                 {
                     if(allUnits[priorityUnit].exitLabels.ContainsKey(labelp1))
                     {
-                        return new Tuple<int, int>(priorityUnit, allUnits[priorityUnit].exitLabels[labelp1]);
+                        return new ValueTuple<int, int>(priorityUnit, allUnits[priorityUnit].exitLabels[labelp1]);
                     }
                 }
                 //正常查找顺序  
                 if(exitLabels.ContainsKey(labelp1) == true)
                 {
-                    return new Tuple<int, int>(-1, exitLabels[labelp1]);
+                    return new ValueTuple<int, int>(-1, exitLabels[labelp1]);
                 }
                 else
                 {
@@ -698,7 +700,7 @@ namespace Gizbox.ScriptEngineV2
                     {
                         if(allUnits[i].exitLabels.ContainsKey(labelp1))
                         {
-                            return new Tuple<int, int>(i, allUnits[i].exitLabels[labelp1]);
+                            return new ValueTuple<int, int>(i, allUnits[i].exitLabels[labelp1]);
                         }
                     }
                 }
@@ -712,14 +714,14 @@ namespace Gizbox.ScriptEngineV2
                 {
                     if(allUnits[priorityUnit].label2Line.ContainsKey(label))
                     {
-                        return new Tuple<int, int>(priorityUnit, allUnits[priorityUnit].label2Line[label]);
+                        return new ValueTuple<int, int>(priorityUnit, allUnits[priorityUnit].label2Line[label]);
                     }
                 }
 
                 //正常查找顺序  
                 if(label2Line.ContainsKey(label) == true)
                 {
-                    return new Tuple<int, int>(-1, label2Line[label]);
+                    return new ValueTuple<int, int>(-1, label2Line[label]);
                 }
                 else
                 {
@@ -727,7 +729,7 @@ namespace Gizbox.ScriptEngineV2
                     {
                         if(allUnits[i].label2Line.ContainsKey(label))
                         {
-                            return new Tuple<int, int>(i, allUnits[i].label2Line[label]);
+                            return new ValueTuple<int, int>(i, allUnits[i].label2Line[label]);
                         }
                     }
                 }

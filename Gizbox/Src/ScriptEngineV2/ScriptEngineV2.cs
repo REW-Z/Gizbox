@@ -29,31 +29,58 @@ using Gizbox.ScriptEngineV2;
 namespace Gizbox.ScriptEngineV2
 {
     //栈帧  
-    public unsafe class Frame
+    public unsafe class FrameInfo
     {
         public readonly long startPtr;//高内存位  
         public readonly long endPtr;//低内存位  
 
-        public Frame(long startPtr, long size)
+        public FrameInfo(long startPtr)
         {
             this.startPtr = startPtr;
-            this.endPtr = this.startPtr + size - 1;
+            this.endPtr = startPtr;
         }
     }
 
     //调用堆栈  
     public unsafe class CallStack
     {
-        public Frame[] frames;
-
+        public FrameInfo[] frameInfos;
+        private int top;
 
         public CallStack(int frameMax)
         {
-            frames = new Frame[frameMax];
+            frameInfos = new FrameInfo[frameMax];
+            top = 0;
+        }
+
+        public void Push()
+        {
+            if(top >= frameInfos.Length)
+                throw new GizboxException(ExceptioName.StackOverflow, "CallStack overflow");
+
+            var prevFrame = frameInfos[top];
+            var ptr = prevFrame.endPtr; //更新上一个栈帧的结束指针
+
+            //下一个栈帧对齐16字节  
+            var newptr = SimMemUtility.AlignDown(ptr, 16);
+
+            //新的栈帧
+            top++;
+            frameInfos[top] = new FrameInfo(newptr); //假设每个栈帧大小为16字节
+
+            //存储返回地址
+
+        }
+        public FrameInfo Pop()
+        {
+            if(top <= 0)
+                return null;
+            top--;
+            return frameInfos[top];
         }
     }
 
-    
+
     public unsafe class ScriptEngineV2
     {
         //运行时单元  
@@ -231,6 +258,8 @@ namespace Gizbox.ScriptEngineV2
                     }
                 case "FUNC_BEGIN":
                     {
+                        //新的栈帧  
+                        this.callStack.Push();
                     }
                     break;
                 case "FUNC_END":
