@@ -299,6 +299,17 @@ namespace Gizbox.ScriptEngineV2
         public long addrOffset;
     }
 
+    public class ClassSizeInfo
+    {
+        public int size;
+    }
+
+    public class FrameSizeInfo
+    {
+        public int paramsAndRetAddrOffset;
+        public int localVarsEndOffset;
+    }
+
 
     public class RuntimeUnitV2
     {
@@ -321,6 +332,9 @@ namespace Gizbox.ScriptEngineV2
         private Dictionary<string, int> exitLabels = new Dictionary<string, int>();
 
         public Dictionary<SymbolTable.Record, RuntimeAddr> symbolInfoCacheDict = new();
+        public Dictionary<Scope, ClassSizeInfo> classScopeSizeDict = new Dictionary<Scope, ClassSizeInfo>();
+        public Dictionary<Scope, FrameSizeInfo> FuncScopeSizeDict = new Dictionary<Scope, FrameSizeInfo>();
+
 
         public List<RuntimeUnitV2> allUnits = new List<RuntimeUnitV2>();
         public Dictionary<string, Value> globalData = new Dictionary<string, Value>();
@@ -385,7 +399,8 @@ namespace Gizbox.ScriptEngineV2
                             (int size, int align)[] sizeAlignInfos = fieldRecs.Select(rec => GetSizeAndAlign(rec)).ToArray();
                             long[] addrs;
                             long spmovement;
-                            SimMemUtility.MemLayout(0, sizeAlignInfos, out addrs, out spmovement);
+
+                            MemUtility.MemLayout(0, sizeAlignInfos, out addrs, out spmovement);
                             for(int i = 0; i < fieldRecs.Length; i++)
                             {
                                 symbolInfoCacheDict[fieldRecs[i]] = new RuntimeAddr()
@@ -393,26 +408,53 @@ namespace Gizbox.ScriptEngineV2
                                     addrOffset = addrs[i],
                                 };
                             }
+
+                            //类的size 
+                            classScopeSizeDict[scope] = new ClassSizeInfo()
+                            {
+                                size = MemUtility.AddPadding(8 + (int)spmovement, 8)  //类的大小 = 字段大小 + 8字节的虚函数表指针  (8字节对齐)
+                            };
                         }
                         break;
                     //局部变量内存布局
                     case SymbolTable.TableCatagory.FuncScope:
                         {
-                            var parameters = scope.env.records.Where(p => p.Value.category == SymbolTable.RecordCatagory.Param).Select(p => p.Value).ToArray();
+                            var parametersReversed = scope.env.records.Where(p => p.Value.category == SymbolTable.RecordCatagory.Param).Reverse().Select(p => p.Value).ToArray();
                             var localVariables = scope.env.records.Where(p => p.Value.category == SymbolTable.RecordCatagory.Variable).Select(p => p.Value).ToArray();
 
-                            var allRecs = parameters.Concat(localVariables).ToArray();
-                            (int size, int align)[] sizeAlignInfos = allRecs.Select(rec => GetSizeAndAlign(rec)).ToArray();
+                            //参数偏移信息  
+                            (int size, int align)[] paramSizeAlign = parametersReversed.Select(rec => GetSizeAndAlign(rec)).ToArray();
                             long[] addrs;
                             long spmovement;
-                            SimMemUtility.MemLayout(0, sizeAlignInfos, out addrs, out spmovement);
-                            for(int i = 0; i < allRecs.Length; i++)
+                            MemUtility.MemLayout(0, paramSizeAlign, out addrs, out spmovement);//上一帧fp指针占8字节64位
+                            int totalSizeOfParamsAndRet = MemUtility.AddPadding((int)spmovement + 8, 16);//参数后8字节的返回地址
+                            for(int i = 0 ; i < parametersReversed.Length; i++)
                             {
-                                symbolInfoCacheDict[allRecs[i]] = new RuntimeAddr()
+                                symbolInfoCacheDict[parametersReversed[i]] = new RuntimeAddr()
+                                {
+                                    addrOffset = addrs[i] - totalSizeOfParamsAndRet,
+                                };
+                            }
+
+                            //本地变量偏移信息
+                            (int size, int align)[] localVarsSizeAlign = localVariables.Select(rec => GetSizeAndAlign(rec)).ToArray();
+                            //long[] addrs;
+                            //long spmovement;
+                            MemUtility.MemLayout(8, localVarsSizeAlign, out addrs, out spmovement);//上一帧fp指针占8字节64位  
+                            for(int i = 0; i < localVariables.Length; i++)
+                            {
+                                symbolInfoCacheDict[localVariables[i]] = new RuntimeAddr()
                                 {
                                     addrOffset = addrs[i],
                                 };
                             }
+
+                            //栈帧的size
+                            FuncScopeSizeDict[scope] = new FrameSizeInfo()
+                            {
+                                paramsAndRetAddrOffset = totalSizeOfParamsAndRet, //参数和返回地址的大小
+                                localVarsEndOffset = 8 + (int)spmovement, 
+                            };
                         }
                         break;
                     //全局变量内存布局
@@ -422,7 +464,7 @@ namespace Gizbox.ScriptEngineV2
                             (int size, int align)[] sizeAlignInfos = globalRecs.Select(rec => GetSizeAndAlign(rec)).ToArray();
                             long[] addrs;
                             long spmovement;
-                            SimMemUtility.MemLayout(0, sizeAlignInfos, out addrs, out spmovement);
+                            MemUtility.MemLayout(0, sizeAlignInfos, out addrs, out spmovement);
                             for(int i = 0; i < globalRecs.Length; i++)
                             {
                                 symbolInfoCacheDict[globalRecs[i]] = new RuntimeAddr()

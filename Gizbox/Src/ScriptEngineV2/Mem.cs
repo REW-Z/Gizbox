@@ -7,18 +7,29 @@ using System.Runtime.InteropServices;
 
 namespace Gizbox.ScriptEngineV2
 {
-    public unsafe class SimulateMemory : IDisposable
+    public unsafe class Mem : IDisposable
     {
-        //unmanaged约束是不包含任何引用类型的值类型，比struct约束更严格  
+        //实现一个单例模式
+        private static Mem _instance;
+        public static Mem Instance
+        {
+            get
+            {
+                if(_instance == null)
+                {
+                    _instance = new Mem(64, 64); //默认堆栈大小64MB
+                }
+                return _instance;
+            }
+        }
+
+        
         public unsafe class StackMem : IDisposable
         {
             private readonly byte[] _memory;
             private readonly GCHandle _handle;
             private readonly byte* _base_ptr;
-            private readonly byte* _bottom_ptr;
-
             private readonly long _totalSize;
-            private byte* _top;
 
             public StackMem(int sizeMB)
             {
@@ -26,18 +37,16 @@ namespace Gizbox.ScriptEngineV2
                 _memory = new byte[_totalSize];
                 _handle = GCHandle.Alloc(_memory, GCHandleType.Pinned);
                 _base_ptr = (byte*)_handle.AddrOfPinnedObject().ToPointer();
-                _bottom_ptr = _base_ptr + _totalSize - 1;
-                _top = _bottom_ptr;
             }
             public void Dispose()
             {
                 _handle.Free();
             }
 
-            public byte* stack_malloc(int length)
+            public void GetBasePtrAndSize(out byte* ptr, out long size)
             {
-                _top -= length;
-                return _top;
+                ptr = _base_ptr;
+                size = _totalSize;
             }
         }
         public unsafe class HeapMem : IDisposable
@@ -64,6 +73,7 @@ namespace Gizbox.ScriptEngineV2
                 _allocatedBlocks = new List<(long, long)>();
                 _freeBlocks = new List<(long, long)> { (0, totalSize) };
             }
+
             public void Dispose()
             {
                 _handle.Free();
@@ -145,7 +155,7 @@ namespace Gizbox.ScriptEngineV2
         private long stack_size;
         private long stack_bottom;
 
-        public SimulateMemory(int heapSizeMB, int stackSizeMB)
+        public Mem(int heapSizeMB, int stackSizeMB)
         {
             heap = new HeapMem(heapSizeMB);
             stack = new StackMem(stackSizeMB);
@@ -159,13 +169,14 @@ namespace Gizbox.ScriptEngineV2
             heap.Dispose();
         }
 
-
-        public byte* stack_malloc(int length)
+        public void GetStackBasePtrAndSize(out byte* ptr, out long size)
         {
-            return stack.stack_malloc(length);
+            stack.GetBasePtrAndSize(out byte* p, out long s);
+            ptr = p;
+            size = s;
         }
 
-        public T* new_<T>() where T : unmanaged
+        public T* new_<T>() where T : unmanaged //unmanaged约束是不包含任何引用类型的值类型，比struct约束更严格  
         {
             return (T*)heap_malloc(sizeof(T));
         }
@@ -180,7 +191,7 @@ namespace Gizbox.ScriptEngineV2
         }
 
 
-        public void write<T>(byte* ptr, T data) where T : unmanaged
+        public static void write<T>(byte* ptr, T data) where T : unmanaged
         {
             int size = sizeof(T);
 
@@ -188,7 +199,7 @@ namespace Gizbox.ScriptEngineV2
 
             *(T*)ptr = data;
         }
-        public T read<T>(byte* ptr) where T : unmanaged
+        public static T read<T>(byte* ptr) where T : unmanaged
         {
             int size = sizeof(T);
 
@@ -199,7 +210,7 @@ namespace Gizbox.ScriptEngineV2
     }
 
 
-    public class SimMemUtility
+    public class MemUtility
     {
         public static void MemLayout(long sp, object[] argArr, out long[] allocAddrs, out long spmovement)
         {
@@ -219,9 +230,6 @@ namespace Gizbox.ScriptEngineV2
             allocAddrs = new long[argArr.Length];
             long ptr_sp = sp;
 
-            // 强制初始栈指针16字节对齐  
-            ptr_sp = AlignDown(ptr_sp, 16);
-
             // 按从右到左顺序压栈参数（C调用约定）
             for(int i = argArr.Length - 1; i >= 0; i--)
             {
@@ -234,7 +242,6 @@ namespace Gizbox.ScriptEngineV2
             }
 
             // 最终栈指针必须保持16字节对齐  
-            ptr_sp = AlignDown(ptr_sp, 16);
             spmovement = ptr_sp - sp;
         }
 
@@ -251,6 +258,18 @@ namespace Gizbox.ScriptEngineV2
             // 3. value & ~(alignment - 1): 按位与操作清除低位，保留高位
             return value & ~(alignment - 1);
         }
+
+        //填充
+        public static int AddPadding(int oldSize, int toAlign)
+        {
+            if(toAlign <= 0 || (toAlign & (toAlign - 1)) != 0)
+                throw new ArgumentException("Alignment must be power of two");
+
+            // 计算填充量
+            int padding = (toAlign - (oldSize % toAlign)) % toAlign;
+            return oldSize + padding;
+        }
+
 
         // 类型大小计算
         public static int GetCSTypeSize(Type type)

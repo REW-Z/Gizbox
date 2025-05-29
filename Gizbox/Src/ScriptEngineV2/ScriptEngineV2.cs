@@ -10,20 +10,30 @@ using Gizbox.ScriptEngineV2;
 
 
 
-/// 调用者的栈操作步骤  
-/// - **Step 1**: 计算结构体大小（含填充），并确保其满足对齐要求。
-///   - 例如，结构体大小为20字节（需要8字节对齐），实际分配时会扩展为24字节（8的倍数）。
-/// - **Step 2**: 调整栈指针（SP）以预留空间，并保证栈指针的值在压入参数前满足对齐。
 
-
-///X64相关： 
+///约定：（主要参考X64） 
 ///栈帧以16位对齐。  
 ///数组的对齐方式与数组中某个元素的对齐方式相同。
 ///结构或联合的开头的对齐方式是任何单个成员的最大对齐方式。结构或联合中的每个成员都必须按照上表中定义的正确对齐方式放置，这可能需要隐式内部填充，具体取决于前一个成员。
 ///结构大小必须是其对齐方式的整数倍，这可能需要在最后一个成员之后填充。由于结构和联合可以分组到数组中，因此结构或联合的每个数组元素必须以先前确定的正确对齐方式开始和结束。
 ///超过8字节的用引用传递。  
 ///前面几个参数使用寄存器传递，但是在堆栈上依然保留。    
+///在堆栈上传递的所有参数都是 8 字节对齐的。（超过8字节仅传递指针）
 
+
+///----------------------
+///        参数2(8字节)...
+///----------------------
+///        参数1(8字节)
+///----------------------
+///       返回地址
+///----------------------  新栈帧开始位置
+///        保存FP
+///----------------------
+///       局部变量1
+///----------------------
+///       局部变量2...
+///----------------------
 
 
 namespace Gizbox.ScriptEngineV2
@@ -31,13 +41,11 @@ namespace Gizbox.ScriptEngineV2
     //栈帧  
     public unsafe class FrameInfo
     {
-        public readonly long startPtr;//高内存位  
-        public readonly long endPtr;//低内存位  
+        public long startPtr;//高内存位  
 
         public FrameInfo(long startPtr)
         {
             this.startPtr = startPtr;
-            this.endPtr = startPtr;
         }
     }
 
@@ -53,23 +61,10 @@ namespace Gizbox.ScriptEngineV2
             top = 0;
         }
 
-        public void Push()
+        public void Push(ref byte* currSP, long retAddrLine)
         {
-            if(top >= frameInfos.Length)
-                throw new GizboxException(ExceptioName.StackOverflow, "CallStack overflow");
-
-            var prevFrame = frameInfos[top];
-            var ptr = prevFrame.endPtr; //更新上一个栈帧的结束指针
-
-            //下一个栈帧对齐16字节  
-            var newptr = SimMemUtility.AlignDown(ptr, 16);
-
-            //新的栈帧
-            top++;
-            frameInfos[top] = new FrameInfo(newptr); //假设每个栈帧大小为16字节
-
-            //存储返回地址
-
+            Mem.write<long>(currSP, retAddrLine);
+            currSP = currSP + 8;
         }
         public FrameInfo Pop()
         {
@@ -86,9 +81,6 @@ namespace Gizbox.ScriptEngineV2
         //运行时单元  
         public RuntimeUnitV2 mainUnit;
 
-        //模拟内存
-        public SimulateMemory mem;
-
         //调用堆栈  
         private CallStack callStack;
 
@@ -96,6 +88,14 @@ namespace Gizbox.ScriptEngineV2
         //符号表堆栈  
         public GStack<SymbolTable> envStack;
 
+        //帧指针  
+        private byte* fp;
+
+        //栈指针  
+        private byte* sp;
+
+        //返回值寄存  
+        private readonly byte[] ret;
 
         //C#互操作上下文  
         public Gizbox.Interop.CSharp.InteropContext csharpInteropContext;
@@ -127,7 +127,11 @@ namespace Gizbox.ScriptEngineV2
 
         public ScriptEngineV2()
         {
-            mem = new SimulateMemory(10, 10);
+            byte* basePtr;
+            long stackSize;
+            Mem.Instance.GetStackBasePtrAndSize(out basePtr, out stackSize);
+            sp = (byte*)MemUtility.AlignDown(((long)basePtr) + stackSize, 16);
+
             //csharpInteropContext = new Interop.CSharp.InteropContext(this);
         }
 
@@ -259,11 +263,23 @@ namespace Gizbox.ScriptEngineV2
                 case "FUNC_BEGIN":
                     {
                         //新的栈帧  
-                        this.callStack.Push();
+                        int low4 = curr;
+                        int high4 = currUnit;
+                        long ret = ((long)low4) | (((long)high4) << 32);
+                        this.callStack.Push(ref sp, ret);
                     }
                     break;
                 case "FUNC_END":
                     {
+                        //返回地址  
+                        var retAddr = Mem.read<long>(sp - 8);
+                        int retUnit = (int)(retAddr >> 32);
+                        int retLine = (int)(retAddr & 0xFFFFFFFF);
+
+                        //存的上一个fp  
+                        var old_fp = (byte*)Mem.read<long>(fp);
+
+
                     }
                     break;
                 case "RETURN":
