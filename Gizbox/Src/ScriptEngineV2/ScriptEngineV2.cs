@@ -22,9 +22,9 @@ using Gizbox.ScriptEngineV2;
 
 
 ///----------------------
-///        参数2(8字节)...
-///----------------------
-///        参数1(8字节)
+///        参数2(8字节值或者指针)
+///---------------------- 
+///        参数1(8字节值或者指针)
 ///----------------------
 ///       返回地址
 ///----------------------  新栈帧开始位置
@@ -47,6 +47,10 @@ namespace Gizbox.ScriptEngineV2
         {
             this.startPtr = startPtr;
         }
+        public void Reset()
+        {
+            this.startPtr = default;
+        }
     }
 
     //调用堆栈  
@@ -58,20 +62,51 @@ namespace Gizbox.ScriptEngineV2
         public CallStack(int frameMax)
         {
             frameInfos = new FrameInfo[frameMax];
-            top = 0;
+            top = -1;
         }
 
-        public void Push(ref byte* currSP, long retAddrLine)
+        public FrameInfo Push(ref byte* currSP, ref byte* currFP, long retAddrLine)
         {
+            if(top >= frameInfos.Length)
+            {
+                throw new GizboxException(ExceptioName.StackOverflow, "调用堆栈溢出，最大帧数：" + frameInfos.Length);
+            }
+
+            //上一帧末尾写入返回地址  
             Mem.write<long>(currSP, retAddrLine);
+
+            //sp移动到栈起始位置
             currSP = currSP + 8;
+
+            //旧的fp指针保存  
+            Mem.write<long>(currSP, (long)currFP);
+
+            //fp指针指向新的栈帧起始位置
+            currFP = currSP;
+
+
+            top++;
+            if(frameInfos[top] == null)
+            {
+                //如果是第一次使用这个栈帧  
+                frameInfos[top] = new FrameInfo((long)currSP);
+            }
+            else
+            {
+                //如果是复用这个栈帧  
+                frameInfos[top].Reset();
+                frameInfos[top].startPtr = (long)currSP;
+            }
+
+
+            return frameInfos[top];
         }
-        public FrameInfo Pop()
+        public void Pop()
         {
             if(top <= 0)
-                return null;
+                return;
+            frameInfos[top].Reset();
             top--;
-            return frameInfos[top];
         }
     }
 
@@ -271,15 +306,21 @@ namespace Gizbox.ScriptEngineV2
                     break;
                 case "FUNC_END":
                     {
+                        //存的上一个fp  
+                        var old_fp = (byte*)Mem.read<long>(fp);
+
                         //返回地址  
                         var retAddr = Mem.read<long>(sp - 8);
                         int retUnit = (int)(retAddr >> 32);
                         int retLine = (int)(retAddr & 0xFFFFFFFF);
 
-                        //存的上一个fp  
-                        var old_fp = (byte*)Mem.read<long>(fp);
+                        //还原fp
+                        fp = old_fp;
+                        //还原sp
 
-
+                        //返回调用函数的指令地址
+                        this.currUnit = retUnit;
+                        this.curr = retLine;
                     }
                     break;
                 case "RETURN":
@@ -299,6 +340,22 @@ namespace Gizbox.ScriptEngineV2
                     }
                     break;
                 case "MCALL":
+                    {
+                    }
+                    break;
+                case "ALLOC":
+                    {
+                    }
+                    break;
+                case "DEL":
+                    {
+                    }
+                    break;
+                case "ALLOC_ARRAY":
+                    {
+                    }
+                    break;
+                case "IF_FALSE_JUMP":
                     {
                     }
                     break;
@@ -351,22 +408,6 @@ namespace Gizbox.ScriptEngineV2
                     }
                     break;
                 case "!":
-                    {
-                    }
-                    break;
-                case "ALLOC":
-                    {
-                    }
-                    break;
-                case "DEL":
-                    {
-                    }
-                    break;
-                case "ALLOC_ARRAY":
-                    {
-                    }
-                    break;
-                case "IF_FALSE_JUMP":
                     {
                     }
                     break;

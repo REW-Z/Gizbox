@@ -219,7 +219,7 @@ namespace Gizbox.ScriptEngine
             caculator = new Calculator(this);
             csharpInteropContext = new Interop.CSharp.InteropContext(this);
         }
-
+ 
 
         public void Load(ILUnit ir)
         {
@@ -465,6 +465,52 @@ namespace Gizbox.ScriptEngine
 
                         return;
                     }
+                case "ALLOC":
+                    {
+                        string className = OperandString.GetString(code.arg2);
+                        SymbolTable tableFound;
+                        var rec = Query(className, out tableFound);
+                        GizObject newfanObj = new GizObject(className, rec.envPtr, mainUnit.QueryVTable(className));
+                        var ptr = heap.Alloc(newfanObj);
+                        SetValue(code.arg1, Value.FromGizObjectPtr(ptr));
+                    }
+                    break;
+                case "DEL":
+                    {
+                        var objPtr = GetValue(code.arg1);
+                        if(objPtr.IsRefType && objPtr.AsPtr >= 0)
+                        {
+                            this.heap.Write(objPtr.AsPtr, null);
+                        }
+                        else
+                        {
+                            throw new RuntimeException(ExceptioName.OnlyHeapObjectsCanBeFreed, GetCurrentCode(), "");
+                        }
+                    }
+                    break;
+                case "ALLOC_ARRAY":
+                    {
+                        Value[] arr = new Value[GetValue(code.arg2).AsInt];
+                        var ptr = heap.Alloc(arr);
+                        SetValue(code.arg1, Value.FromArrayPtr(ptr));
+                    }
+                    break;
+                case "IF_FALSE_JUMP":
+                    {
+                        bool conditionTrue = GetValue(code.arg1).AsBool;
+                        if(conditionTrue == false)
+                        {
+                            var jumpAddr = mainUnit.QueryLabel(OperandString.GetString(code.arg2), "", currUnit);
+
+                            this.curr = jumpAddr.Item2;
+                            this.currUnit = jumpAddr.Item1;
+                            return;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
                 case "=":
                     {
                         SetValue(code.arg1, GetValue(code.arg2)); 
@@ -506,52 +552,6 @@ namespace Gizbox.ScriptEngine
                 case "!":
                         SetValue(code.arg1, caculator.CalNot(GetValue(code.arg2)));
                     break;
-                case "ALLOC":
-                    {
-                        string className = OperandString.GetString(code.arg2);
-                        SymbolTable tableFound; 
-                        var rec = Query(className, out tableFound);
-                        GizObject newfanObj = new GizObject(className, rec.envPtr, mainUnit.QueryVTable(className));
-                        var ptr = heap.Alloc(newfanObj);
-                        SetValue(code.arg1, Value.FromGizObjectPtr(ptr));
-                    }
-                    break;
-                case "DEL":
-                    {
-                        var objPtr = GetValue(code.arg1);
-                        if(objPtr.IsRefType && objPtr.AsPtr >= 0)
-                        {
-                            this.heap.Write(objPtr.AsPtr, null);
-                        }
-                        else
-                        {
-                            throw new RuntimeException(ExceptioName.OnlyHeapObjectsCanBeFreed, GetCurrentCode(), "");
-                        }
-                    }
-                    break;
-                case "ALLOC_ARRAY":
-                    {
-                        Value[] arr = new Value[GetValue(code.arg2).AsInt];
-                        var ptr = heap.Alloc(arr);
-                        SetValue(code.arg1, Value.FromArrayPtr(ptr));
-                    }
-                    break;
-                case "IF_FALSE_JUMP":
-                    {
-                        bool conditionTrue = GetValue(code.arg1).AsBool;
-                        if(conditionTrue == false)
-                        {
-                            var jumpAddr = mainUnit.QueryLabel(OperandString.GetString(code.arg2), "", currUnit);
-                            
-                            this.curr = jumpAddr.Item2;
-                            this.currUnit = jumpAddr.Item1;
-                            return;
-                        }
-                        else
-                        {
-                            break;
-                        }
-                    }
                 case "<":
                         SetValue(code.arg1, caculator.CalBinary("<", GetValue(code.arg2), GetValue(code.arg3)));
                     break;

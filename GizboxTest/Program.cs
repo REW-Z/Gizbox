@@ -103,8 +103,9 @@ switch(cmdIdx)
             compiler.ConfigParserDataSource(hardcode: true);
             //compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
             var il = compiler.Compile(source);
-
             Compiler.Pause("Compile End");
+
+            il.Print();
 
             ScriptEngine engine = new ScriptEngine();
             engine.AddLibSearchDirectory(AppDomain.CurrentDomain.BaseDirectory);
