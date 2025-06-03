@@ -301,7 +301,7 @@ namespace Gizbox.ScriptEngineV2
                         int low4 = curr;
                         int high4 = currUnit;
                         long ret = ((long)low4) | (((long)high4) << 32);
-                        this.callStack.Push(ref sp, ret);
+                        this.callStack.Push(ref sp, ref fp, ret);
                     }
                     break;
                 case "FUNC_END":
@@ -314,13 +314,17 @@ namespace Gizbox.ScriptEngineV2
                         int retUnit = (int)(retAddr >> 32);
                         int retLine = (int)(retAddr & 0xFFFFFFFF);
 
-                        //还原fp
-                        fp = old_fp;
-                        //还原sp
+                        //弹出栈帧  
+                        this.callStack.Pop();
 
                         //返回调用函数的指令地址
                         this.currUnit = retUnit;
                         this.curr = retLine;
+
+                        //还原fp
+                        fp = old_fp;
+                        //还原sp（清理参数的栈空间）  
+
                     }
                     break;
                 case "RETURN":
