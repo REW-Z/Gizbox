@@ -1,0 +1,12 @@
+﻿################################################################################
+# 此 .gitignore 文件已由 Microsoft(R) Visual Studio 自动创建。
+################################################################################
+
+Gizbox/bin
+Gizbox/obj
+GizboxAOT/bin
+GizboxAOT/obj
+GizboxLSP/bin
+GizboxLSP/obj
+GizboxTest/bin
+GizboxTest/obj
