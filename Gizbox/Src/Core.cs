@@ -290,6 +290,21 @@ namespace Gizbox
             return result;
         }
 
+        //获取某类型记录
+        public int GetRecCount(RecordCatagory catagory)
+        {
+            int count = 0;
+            foreach (var key in records.Keys)
+            {
+                if (records[key].category == catagory)
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+
         //新的条目  
         public Record NewRecord(string synbolName, RecordCatagory catagory, string typeExpr, SymbolTable envPtr = null, long addr = 9999, string initValue = default)
         {

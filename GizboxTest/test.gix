@@ -94,3 +94,162 @@ var inferNum2 = inferNum1;
 Console::Log((string)(inferNum1 + inferNum2));
 
 Console::Log("Test Finish...");
+
+
+
+
+
+
+
+
+//  --------------------------------------------------
+//  0   |status 0  |                    CALL [Core::GC::Disable@] LITINT:0
+//  1   |status 0  |                    = [tmp0] RET
+//  2   |status 0  |                    = [Creature::totalCount] LITINT:0
+//  3   |status 0  |                    JUMP exit:Creature::Born@_string
+//  4   |status 0  |entry:Creature::Born@_string:
+//  5   |status 1  |                    FUNC_BEGIN Creature::Born@_string
+//  6   |status 1  |If_0:
+//  7   |status 1  |IfCondition_0_0:
+//  8   |status 1  |                    == [tmp1] [type] CONSTSTRING:0
+//  9   |status 1  |                    IF_FALSE_JUMP [tmp1] ElseStmt_0
+//  10  |status 1  |IfStmt_0_0:
+//  11  |status 6  |                    PARAM CONSTSTRING:1
+//  12  |status 6  |                    CALL [Console::Log@_string] LITINT:1
+//  13  |status 6  |                    = [tmp2] RET
+//  14  |status 6  |                    ALLOC [tmp3] Human
+//  15  |status 6  |                    PARAM [tmp3]
+//  16  |status 6  |                    CALL [Human.ctor] LITINT:1
+//  17  |status 6  |                    = [inst] [tmp3]
+//  18  |status 6  |                    = [tmp4] [Creature::totalCount]
+//  19  |status 6  |                    ++ [Creature::totalCount]
+//  20  |status 6  |                    CAST [tmp5] Creature [inst]
+//  21  |status 6  |                    RETURN [tmp5]
+//  22  |status 1  |                    JUMP EndIf_0
+//  23  |status 1  |ElseStmt_0:
+//  24  |status 7  |                    RETURN LITNULL:
+//  25  |status 1  |EndIf_0:
+//  26  |status 1  |                    RETURN
+//  27  |status 1  |                    FUNC_END Creature::Born@_string
+//  28  |status 0  |exit:Creature::Born@_string:
+//  29  |status 0  |                    JUMP exit:Creature::Die@_Creature
+//  30  |status 0  |entry:Creature::Die@_Creature:
+//  31  |status 2  |                    FUNC_BEGIN Creature::Die@_Creature
+//  32  |status 2  |If_1:
+//  33  |status 2  |IfCondition_1_0:
+//  34  |status 2  |                    != [tmp6] [c] LITNULL:
+//  35  |status 2  |                    IF_FALSE_JUMP [tmp6] EndIf_1
+//  36  |status 2  |IfStmt_1_0:
+//  37  |status 8  |                    + [tmp8] CONSTSTRING:2 [c.name]
+//  38  |status 8  |                    PARAM [tmp8]
+//  39  |status 8  |                    CALL [Console::Log@_string] LITINT:1
+//  40  |status 8  |                    = [tmp7] RET
+//  41  |status 8  |                    DEL [c]
+//  42  |status 8  |                    = [tmp9] [Creature::totalCount]
+//  43  |status 8  |                    -- [Creature::totalCount]
+//  44  |status 2  |                    JUMP EndIf_1
+//  45  |status 2  |EndIf_1:
+//  46  |status 2  |                    RETURN
+//  47  |status 2  |                    FUNC_END Creature::Die@_Creature
+//  48  |status 0  |exit:Creature::Die@_Creature:
+//  49  |status 0  |                    JUMP exit:Creature
+//  50  |status 0  |Creature:
+//  51  |status 3  |                    JUMP exit:Creature.ctor
+//  52  |status 3  |entry:Creature.ctor:
+//  53  |status 9  |                    FUNC_BEGIN Creature.ctor
+//  54  |status 9  |                    = [this.name] CONSTSTRING:3
+//  55  |status 9  |                    = [this.age] LITINT:0
+//  56  |status 9  |                    RETURN
+//  57  |status 9  |                    FUNC_END
+//  58  |status 3  |exit:Creature.ctor:
+//  59  |status 3  |                    JUMP exit:Creature.Move@
+//  60  |status 3  |entry:Creature.Move@:
+//  61  |status 10 |                    FUNC_BEGIN Creature.Move@
+//  62  |status 10 |                    + [tmp11] [this.name] CONSTSTRING:4
+//  63  |status 10 |                    PARAM [tmp11]
+//  64  |status 10 |                    CALL [Console::Log@_string] LITINT:1
+//  65  |status 10 |                    = [tmp10] RET
+//  66  |status 10 |                    RETURN
+//  67  |status 10 |                    FUNC_END Creature.Move@
+//  68  |status 3  |exit:Creature.Move@:
+//  69  |status 0  |exit:Creature:
+//  70  |status 0  |                    JUMP exit:Human
+//  71  |status 0  |Human:
+//  72  |status 4  |                    JUMP exit:Human.ctor
+//  73  |status 4  |entry:Human.ctor:
+//  74  |status 11 |                    FUNC_BEGIN Human.ctor
+//  75  |status 11 |                    PARAM [this]
+//  76  |status 11 |                    CALL [Creature.ctor] LITINT:1
+//  77  |status 11 |                    = [this.job] LITINT:0
+//  78  |status 11 |                    RETURN
+//  79  |status 11 |                    FUNC_END
+//  80  |status 4  |exit:Human.ctor:
+//  81  |status 4  |                    JUMP exit:Human.Move@
+//  82  |status 4  |entry:Human.Move@:
+//  83  |status 12 |                    FUNC_BEGIN Human.Move@
+//  84  |status 12 |                    + [tmp13] [this.name] CONSTSTRING:5
+//  85  |status 12 |                    PARAM [tmp13]
+//  86  |status 12 |                    CALL [Console::Log@_string] LITINT:1
+//  87  |status 12 |                    = [tmp12] RET
+//  88  |status 12 |                    RETURN
+//  89  |status 12 |                    FUNC_END Human.Move@
+//  90  |status 4  |exit:Human.Move@:
+//  91  |status 0  |exit:Human:
+//  92  |status 0  |                    PARAM CONSTSTRING:6
+//  93  |status 0  |                    CALL [Creature::Born@_string] LITINT:1
+//  94  |status 0  |                    = [tmp14] RET
+//  95  |status 0  |                    CAST [tmp15] Human [tmp14]
+//  96  |status 0  |                    = [sam] [tmp15]
+//  97  |status 0  |                    = [sam.name] CONSTSTRING:7
+//  98  |status 0  |                    = [sam.age] LITINT:20
+//  99  |status 0  |                    = [sam.job] LITINT:2
+//  100 |status 0  |                    PARAM [sam]
+//  101 |status 0  |                    MCALL [Move@] LITINT:1
+//  102 |status 0  |                    = [tmp16] RET
+//  103 |status 5  |                    = [i] LITINT:0
+//  104 |status 5  |For_0:
+//  105 |status 5  |                    < [tmp17] [i] LITINT:99
+//  106 |status 5  |                    IF_FALSE_JUMP [tmp17] EndFor_0
+//  107 |status 13 |                    += [sam.age] LITINT:1
+//  108 |status 13 |If_2:
+//  109 |status 13 |IfCondition_2_0:
+//  110 |status 13 |                    % [tmp18] [sam.age] LITINT:10
+//  111 |status 13 |                    == [tmp19] [tmp18] LITINT:0
+//  112 |status 13 |                    IF_FALSE_JUMP [tmp19] EndIf_2
+//  113 |status 13 |IfStmt_2_0:
+//  114 |status 14 |                    + [tmp21] [sam.name] CONSTSTRING:8
+//  115 |status 14 |                    CAST [tmp22] string [sam.age]
+//  116 |status 14 |                    + [tmp23] [tmp21] [tmp22]
+//  117 |status 14 |                    + [tmp24] [tmp23] CONSTSTRING:9
+//  118 |status 14 |                    PARAM [tmp24]
+//  119 |status 14 |                    CALL [Console::Log@_string] LITINT:1
+//  120 |status 14 |                    = [tmp20] RET
+//  121 |status 13 |                    JUMP EndIf_2
+//  122 |status 13 |EndIf_2:
+//  123 |status 13 |If_3:
+//  124 |status 13 |IfCondition_3_0:
+//  125 |status 13 |                    > [tmp25] [sam.age] LITINT:90
+//  126 |status 13 |                    IF_FALSE_JUMP [tmp25] EndIf_3
+//  127 |status 13 |IfStmt_3_0:
+//  128 |status 15 |                    PARAM [sam]
+//  129 |status 15 |                    CALL [Creature::Die@_Creature] LITINT:1
+//  130 |status 15 |                    = [tmp26] RET
+//  131 |status 15 |                    JUMP EndFor_0
+//  132 |status 13 |                    JUMP EndIf_3
+//  133 |status 13 |EndIf_3:
+//  134 |status 5  |                    = [tmp27] [i]
+//  135 |status 5  |                    ++ [i]
+//  136 |status 5  |                    JUMP For_0
+//  137 |status 5  |EndFor_0:
+//  138 |status 0  |                    = [inferNum1] LITINT:111
+//  139 |status 0  |                    = [inferNum2] [inferNum1]
+//  140 |status 0  |                    + [tmp29] [inferNum1] [inferNum2]
+//  141 |status 0  |                    CAST [tmp30] string [tmp29]
+//  142 |status 0  |                    PARAM [tmp30]
+//  143 |status 0  |                    CALL [Console::Log@_string] LITINT:1
+//  144 |status 0  |                    = [tmp28] RET
+//  145 |status 0  |                    PARAM CONSTSTRING:10
+//  146 |status 0  |                    CALL [Console::Log@_string] LITINT:1
+//  147 |status 0  |                    = [tmp31] RET
+//  148 |status 0  |
+//  --------------------------------------------------

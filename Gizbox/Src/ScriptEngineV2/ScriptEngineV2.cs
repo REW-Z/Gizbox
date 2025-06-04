@@ -26,7 +26,7 @@ using Gizbox.ScriptEngineV2;
 ///---------------------- 
 ///        参数1(8字节值或者指针)
 ///----------------------
-///       返回地址
+///       返回地址(8字节)
 ///----------------------  新栈帧开始位置
 ///        保存FP
 ///----------------------
@@ -41,10 +41,12 @@ namespace Gizbox.ScriptEngineV2
     //栈帧  
     public unsafe class FrameInfo
     {
+        public string funcName;//函数名称
         public long startPtr;//高内存位  
 
-        public FrameInfo(long startPtr)
+        public FrameInfo(string funcName, long startPtr)
         {
+            this.funcName = funcName;
             this.startPtr = startPtr;
         }
         public void Reset()
@@ -65,7 +67,15 @@ namespace Gizbox.ScriptEngineV2
             top = -1;
         }
 
-        public FrameInfo Push(ref byte* currSP, ref byte* currFP, long retAddrLine)
+
+        public FrameInfo Peek()
+        {
+            if(top < 0)
+                throw new GizboxException(ExceptioName.StackOverflow, "调用堆栈为空，无法获取栈顶帧信息。");
+            return frameInfos[top];
+        }
+
+        public FrameInfo Push(string funcName, ref byte* currSP, ref byte* currFP, long retAddrLine)
         {
             if(top >= frameInfos.Length)
             {
@@ -89,7 +99,7 @@ namespace Gizbox.ScriptEngineV2
             if(frameInfos[top] == null)
             {
                 //如果是第一次使用这个栈帧  
-                frameInfos[top] = new FrameInfo((long)currSP);
+                frameInfos[top] = new FrameInfo(funcName, (long)currSP);
             }
             else
             {
@@ -111,8 +121,24 @@ namespace Gizbox.ScriptEngineV2
     }
 
 
+    public class Processer
+    {
+        //返回值寄存  
+        private readonly byte[] RET;
+        private GCHandle _handle;
+
+        public Processer()
+        {
+            //返回值寄存器  
+            RET = new byte[8]; //8字节寄存器  
+            _handle = GCHandle.Alloc(RET, GCHandleType.Pinned);
+        }
+    }
+
     public unsafe class ScriptEngineV2
     {
+        public Processer processer = new Processer();
+
         //运行时单元  
         public RuntimeUnitV2 mainUnit;
 
@@ -129,15 +155,10 @@ namespace Gizbox.ScriptEngineV2
         //栈指针  
         private byte* sp;
 
-        //返回值寄存  
-        private readonly byte[] ret;
 
         //C#互操作上下文  
         public Gizbox.Interop.CSharp.InteropContext csharpInteropContext;
 
-
-        //返回值寄存器（虚拟）(实际在x86架构通常为EAX寄存器 x86-64架构通常为RAX寄存器)
-        private Value retRegister = Value.Void;
 
         //GC相关  
         private bool gcEnabled = false;
@@ -290,23 +311,27 @@ namespace Gizbox.ScriptEngineV2
                     break;
                 case "JUMP":
                     {
-                        var jaddr = mainUnit.QueryLabel(((OperandString)code.arg1).str, "", currUnit);
+                        var jaddr = mainUnit.QueryLabel(((OperandStringV2)code.arg1).str, "", currUnit);
                         this.currUnit = jaddr.Item1;
                         this.curr = jaddr.Item2;
                         return;
                     }
                 case "FUNC_BEGIN":
                     {
+                        //函数名称  
+                        var funcName = ((OperandStringV2)code.arg1).str;
+
                         //新的栈帧  
                         int low4 = curr;
                         int high4 = currUnit;
                         long ret = ((long)low4) | (((long)high4) << 32);
-                        this.callStack.Push(ref sp, ref fp, ret);
+                        this.callStack.Push(funcName, ref sp, ref fp, ret);
                     }
                     break;
                 case "FUNC_END":
                     {
                         //存的上一个fp  
+                        var temp_fp = fp;
                         var old_fp = (byte*)Mem.read<long>(fp);
 
                         //返回地址  
@@ -324,11 +349,19 @@ namespace Gizbox.ScriptEngineV2
                         //还原fp
                         fp = old_fp;
                         //还原sp（清理参数的栈空间）  
-
+                        var funcTable = QueryEnv(SymbolTable.TableCatagory.FuncScope);
+                        var paramCount = funcTable.GetRecCount(SymbolTable.RecordCatagory.Param);
+                        sp = temp_fp - 8 - (paramCount * 8);
                     }
                     break;
                 case "RETURN":
                     {
+                        var retOprand = code.arg1;
+                        if(retOprand != null)
+                        {
+                            var retValue = GetValue(code.arg1);
+                            //processer.
+                        }
                     }
                     break;
                 case "EXTERN_IMPL":
@@ -497,6 +530,12 @@ namespace Gizbox.ScriptEngineV2
             throw new GizboxException(ExceptioName.LibraryFileNotFound, libname + ".gixlib");
         }
 
+        // ----------------------- Operations ---------------------------
+
+        private ValueV2 GetValue(OperandV2 operand)
+        {
+            return default;
+        }
         // ----------------------- Interfaces ---------------------------
 
         //...
@@ -519,6 +558,47 @@ namespace Gizbox.ScriptEngineV2
                 return;
         }
 
+
+        // ----------------------- Query -------------------------
+
+        private SymbolTable.Record Query(string symbolName, out SymbolTable tableFound)
+        {
+            //本编译单元查找  
+            for(int i = envStack.Count - 1; i > -1; --i)
+            {
+                if(envStack[i].ContainRecordName(symbolName))
+                {
+                    tableFound = envStack[i];
+                    return envStack[i].GetRecord(symbolName);
+                }
+            }
+
+            //导入库查找  
+            foreach(var lib in this.mainUnit.allUnits)
+            {
+                if(lib.globalScope.env.ContainRecordName(symbolName))
+                {
+                    tableFound = lib.globalScope.env;
+                    return lib.globalScope.env.GetRecord(symbolName);
+                }
+            }
+
+
+            Log("在符号表链中未找到：" + symbolName + "符号表链：" + string.Concat(envStack.AsList().Select(e => e.name + " - ")) + " 当前行数：" + curr);
+            tableFound = null;
+            return null;
+        }
+        private SymbolTable QueryEnv(SymbolTable.TableCatagory tableCatagory)
+        {
+            for(int i = envStack.Count - 1; i > -1; --i)
+            {
+                if(envStack[i].tableCatagory == tableCatagory)
+                {
+                    return envStack[i];
+                }
+            }
+            return null;
+        }
 
         // ----------------------- LOG ---------------------------
 

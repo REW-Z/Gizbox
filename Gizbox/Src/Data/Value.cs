@@ -317,5 +317,24 @@ namespace Gizbox
 
 
 
+    public enum GizType2
+    {
+        Void,
 
+        IntRef,
+        FloatRef,
+        DoubleRef,
+        BoolRef,
+        CharRef,
+
+        StringRef,
+        ObjectRef,
+        ArrayRef,
+    }
+
+    public struct ValueV2
+    {
+        public GizType2 type;
+        public long ptr;
+    }
 }

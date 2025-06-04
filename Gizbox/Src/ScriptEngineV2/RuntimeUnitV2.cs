@@ -12,23 +12,23 @@ using System.Runtime.InteropServices;
 
 namespace Gizbox.ScriptEngineV2
 {
-    public class Operand
+    public class OperandV2
     {
         public string str;
 
-        public Operand(string argStr)
+        public OperandV2(string argStr)
         {
             this.str = argStr;
         }
 
-        public static string GetString(Operand operand)
+        public static string GetString(OperandV2 operand)
         {
-            if((operand is OperandString) == false)
+            if((operand is OperandStringV2) == false)
                 throw new RuntimeException(ExceptioName.ScriptRuntimeError, null, "not StringOperand type !");
-            return ((OperandString)operand).str;
+            return ((OperandStringV2)operand).str;
         }
 
-        public static Operand Parse(string argStr)
+        public static OperandV2 Parse(string argStr)
         {
             if(string.IsNullOrEmpty(argStr))
             {
@@ -36,62 +36,62 @@ namespace Gizbox.ScriptEngineV2
             }
             else if(argStr == "RET")
             {
-                return new OperandRegister(argStr);
+                return new OperandRegisterV2(argStr);
             }
             else if(argStr.StartsWith("CONST"))
             {
-                return new OperandConst(argStr);
+                return new OperandConstV2(argStr);
             }
             else if(argStr.StartsWith("LIT"))
             {
-                return new OperandLiteralValue(argStr);
+                return new OperandLiteralValueV2(argStr);
             }
             else if(argStr[0] == '[' && argStr[argStr.Length - 1] == ']')
             {
                 string expr = argStr.Substring(1, argStr.Length - 2);
                 if(expr[expr.Length - 1] == ']')
                 {
-                    return new OperandElementAccess(expr);
+                    return new OperandElementAccessV2(expr);
                 }
                 else if(expr.Contains("."))
                 {
-                    return new OperandMemberAccess(expr);
+                    return new OperandMemberAccessV2(expr);
                 }
                 else
                 {
-                    return new OperandVariable(expr);
+                    return new OperandVariableV2(expr);
                 }
             }
             else
             {
-                return new OperandString(argStr);
+                return new OperandStringV2(argStr);
             }
 
             throw new GizboxException(ExceptioName.TacError);
         }
     }
-    public class OperandRegister : Operand
+    public class OperandRegisterV2 : OperandV2
     {
         public string registerName;
-        public OperandRegister(string str) : base(str)
+        public OperandRegisterV2(string str) : base(str)
         {
             this.registerName = str;
         }
     }
-    public class OperandString : Operand
+    public class OperandStringV2 : OperandV2
     {
-        public OperandString(string s) : base(s)
+        public OperandStringV2(string s) : base(s)
         {
         }
     }
-    public class OperandConst : Operand
+    public class OperandConstV2 : OperandV2
     {
         public long oldPtr;
         public long linkedPtr;
 
         public string giztype;
 
-        public OperandConst(string str) : base(str)
+        public OperandConstV2(string str) : base(str)
         {
             int splitIndex = str.IndexOf(':');
             string baseType = str.Substring(0, splitIndex);
@@ -109,10 +109,10 @@ namespace Gizbox.ScriptEngineV2
             }
         }
     }
-    public class OperandLiteralValue : Operand
+    public class OperandLiteralValueV2 : OperandV2
     {
         public Value val;
-        public OperandLiteralValue(string str) : base(str)
+        public OperandLiteralValueV2(string str) : base(str)
         {
             int splitIndex = str.IndexOf(':');
             string baseType = str.Substring(0, splitIndex);
@@ -143,12 +143,12 @@ namespace Gizbox.ScriptEngineV2
             }
         }
     }
-    public class OperandElementAccess : Operand
+    public class OperandElementAccessV2 : OperandV2
     {
-        public Operand array;
-        public Operand index;
+        public OperandV2 array;
+        public OperandV2 index;
 
-        public OperandElementAccess(string expr) : base(expr)
+        public OperandElementAccessV2(string expr) : base(expr)
         {
             int lbracket = expr.IndexOf('[');
             int rbracket = expr.IndexOf(']');
@@ -159,26 +159,26 @@ namespace Gizbox.ScriptEngineV2
 
             if(arrVarExpr[arrVarExpr.Length - 1] == ']')
             {
-                this.array = new OperandElementAccess(arrVarExpr);
+                this.array = new OperandElementAccessV2(arrVarExpr);
             }
             else if(arrVarExpr.Contains("."))
             {
-                this.array = new OperandMemberAccess(arrVarExpr);
+                this.array = new OperandMemberAccessV2(arrVarExpr);
             }
             else
             {
-                this.array = new OperandVariable(arrVarExpr);
+                this.array = new OperandVariableV2(arrVarExpr);
             }
 
-            this.index = Operand.Parse(idxExpr);
+            this.index = OperandV2.Parse(idxExpr);
         }
     }
-    public class OperandMemberAccess : Operand
+    public class OperandMemberAccessV2 : OperandV2
     {
-        public Operand obj;
+        public OperandV2 obj;
         public string fieldname;
 
-        public OperandMemberAccess(string expr) : base(expr)
+        public OperandMemberAccessV2(string expr) : base(expr)
         {
             int lastDot = expr.LastIndexOf('.');
             var variableExpr = expr.Substring(0, lastDot);
@@ -187,24 +187,24 @@ namespace Gizbox.ScriptEngineV2
 
             if(variableExpr[variableExpr.Length - 1] == ']')
             {
-                this.obj = new OperandElementAccess(variableExpr);
+                this.obj = new OperandElementAccessV2(variableExpr);
             }
             else if(variableExpr.Contains("."))
             {
-                this.obj = new OperandMemberAccess(variableExpr);
+                this.obj = new OperandMemberAccessV2(variableExpr);
             }
             else
             {
-                this.obj = new OperandVariable(variableExpr);
+                this.obj = new OperandVariableV2(variableExpr);
             }
 
             this.fieldname = fieldName;
         }
     }
-    public class OperandVariable : Operand
+    public class OperandVariableV2 : OperandV2
     {
         public string name;
-        public OperandVariable(string str) : base(str)
+        public OperandVariableV2(string str) : base(str)
         {
             this.name = str;
         }
@@ -221,9 +221,9 @@ namespace Gizbox.ScriptEngineV2
 
         public string op;
 
-        public Operand arg1;
-        public Operand arg2;
-        public Operand arg3;
+        public OperandV2 arg1;
+        public OperandV2 arg2;
+        public OperandV2 arg3;
 
         public RuntimeCodeV2(TAC tac)
         {
@@ -249,9 +249,9 @@ namespace Gizbox.ScriptEngineV2
 
             this.op = tac.op;
 
-            this.arg1 = Operand.Parse(tac.arg1);
-            this.arg2 = Operand.Parse(tac.arg2);
-            this.arg3 = Operand.Parse(tac.arg3);
+            this.arg1 = OperandV2.Parse(tac.arg1);
+            this.arg2 = OperandV2.Parse(tac.arg2);
+            this.arg3 = OperandV2.Parse(tac.arg3);
         }
 
         public string ToExpression(bool showlabel = true)
@@ -531,20 +531,20 @@ namespace Gizbox.ScriptEngineV2
             }
         }
 
-        private void SetPtrOffset(Operand operand, int unitId)
+        private void SetPtrOffset(OperandV2 operand, int unitId)
         {
             switch(operand)
             {
-                case OperandConst cnst:
+                case OperandConstV2 cnst:
                     cnst.linkedPtr = (__constdataOffset * unitId) + (cnst.oldPtr % __constdataOffset);
                     break;
 
 
-                case OperandElementAccess eleAccess:
+                case OperandElementAccessV2 eleAccess:
                     SetPtrOffset(eleAccess.array, unitId);
                     SetPtrOffset(eleAccess.index, unitId);
                     break;
-                case OperandMemberAccess membAccess:
+                case OperandMemberAccessV2 membAccess:
                     SetPtrOffset(membAccess.obj, unitId);
                     break;
             }
