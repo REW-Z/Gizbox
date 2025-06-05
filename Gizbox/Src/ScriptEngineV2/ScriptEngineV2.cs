@@ -380,8 +380,21 @@ namespace Gizbox.ScriptEngineV2
                         {
                             var retValue = GetValue(code.arg1);
                         }
+
+                        var jumpAddr = mainUnit.QueryLabel("exit", QueryEnv(SymbolTable.TableCatagory.FuncScope).name, currUnit);
+                        int exitLine = jumpAddr.Item2;
+                        int endLine = exitLine - 1;
+
+                        //不能使用ir判断
+                        //if(ir.codes[endLine].op != "METHOD_END" && ir.codes[endLine].op != "FUNC_END")
+                        //{
+                        //    throw new Exception("函数或方法的END没有紧接exit标签");  
+                        //}
+                        this.curr = endLine;
+                        this.currUnit = jumpAddr.Item1;
+
+                        return;
                     }
-                    break;
                 case "EXTERN_IMPL":
                     {
                     }
@@ -552,13 +565,24 @@ namespace Gizbox.ScriptEngineV2
 
         private ValueV2 GetValue(OperandV2 operand)
         {
+            switch(operand)
+            {
+                case OperandRegisterV2 reg:
+                    {
+                        string regName = reg.registerName;
+                        //processer.get
+                    }
+                    break;
+                default:
+                    break;
+            }
+
             return default;
         }
+
+
         // ----------------------- Interfaces ---------------------------
 
-        //...
-
-        // 
 
         //GC    
         public void GCEnable(bool enable)
