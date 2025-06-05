@@ -121,17 +121,36 @@ namespace Gizbox.ScriptEngineV2
     }
 
 
-    public class Processer
+    public unsafe class Processer
     {
         //返回值寄存  
-        private readonly byte[] RET;
-        private GCHandle _handle;
+        private readonly byte[] _RET;
+        private GCHandle _ret_handle;
 
         public Processer()
         {
             //返回值寄存器  
-            RET = new byte[8]; //8字节寄存器  
-            _handle = GCHandle.Alloc(RET, GCHandleType.Pinned);
+            _RET = new byte[8]; //8字节寄存器  
+            _ret_handle = GCHandle.Alloc(_RET, GCHandleType.Pinned);
+        }
+
+        public T read_RET<T>() where T : unmanaged
+        {
+            int size = sizeof(T);
+            if(size > 8)
+                throw new GizboxException(ExceptioName.ScriptRuntimeError, "返回值寄存器只能存储8字节以下的值。");
+
+            byte* ptr = (byte*)_ret_handle.AddrOfPinnedObject().ToPointer();
+            return *(T*)ptr;
+        }
+        public void write_RET<T>() where T : unmanaged
+        {
+            int size = sizeof(T);
+            if(size > 8)
+                throw new GizboxException(ExceptioName.ScriptRuntimeError, "返回值寄存器只能存储8字节以下的值。");
+
+            byte* ptr = (byte*)_ret_handle.AddrOfPinnedObject().ToPointer();
+            *(T*)ptr = default(T);
         }
     }
 
@@ -360,7 +379,6 @@ namespace Gizbox.ScriptEngineV2
                         if(retOprand != null)
                         {
                             var retValue = GetValue(code.arg1);
-                            //processer.
                         }
                     }
                     break;
