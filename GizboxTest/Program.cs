@@ -11,6 +11,7 @@ using Gizbox.ScriptEngine;
 using Gizbox.ScriptEngineV2;
 using Gizbox.Interop.CSharp;
 using GizboxTest;
+using Gizbox.Src.Backend;
 
 
 
@@ -22,6 +23,7 @@ string[] cmds = {
     "2.生成分析器硬编码",
     "3.执行Test脚本",
     "4.测试新解释器",
+    "5.测试x64目标代码生成",
     };
 
 Console.ForegroundColor = ConsoleColor.Gray;
@@ -142,6 +144,26 @@ switch(cmdIdx)
 
 
             //Compiler.Pause("Execute End");
+        }
+        break;
+    case 5:
+        {
+            Console.WriteLine("测试x64目标代码生成");
+
+
+            //测试脚本Test  
+            Console.WriteLine("测试脚本Test");
+            string source = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\test.gix");
+            Gizbox.Compiler compiler = new Compiler();
+            compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
+            compiler.ConfigParserDataSource(hardcode: true);
+            //compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
+            var il = compiler.Compile(source);
+            Compiler.Pause("Compile End");
+
+            il.Print();
+
+            x64Target.CodeGen(il);
         }
         break;
 }

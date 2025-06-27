@@ -691,7 +691,7 @@ namespace Gizbox
             Gizbox.GixConsole.LogLine(content);
         }
     }
-    public static class GixConsole
+    public static class GixConsole//LSP使用时需要disable  
     {
         public static bool enableSystemConsole = true;
 
