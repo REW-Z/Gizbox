@@ -9,29 +9,15 @@ using Gizbox.IR;
 
 namespace Gizbox.Src.Backend
 {
-    public enum InstructionType
-    {
-        mov,
-
-        add,
-        sub,
-        mul,
-        div,
-
-        jmp,
-        jnz,
-    }
-
-    public static class x64Target
+    public static class Win64Target
     {
         public static void CodeGen(ILUnit ir)
         {
-            x64CodeGenContext context = new x64CodeGenContext(ir);
+            Win64CodeGenContext context = new Win64CodeGenContext(ir);
 
             context.StartCodeGen();
         }
     }
-
 
     public class BasicBlock
     {
@@ -39,81 +25,8 @@ namespace Gizbox.Src.Backend
         public int endIdx;
     }
 
-    public class X64
-    {
-        public static X64Instruction jmp(string labelName)
-        {
-            return new X64Instruction()
-            {
-                type = InstructionType.jmp,
-                opand1 = labelName
-            };
-        }
-        public static X64Instruction mov(string opand1, string opand2)
-        {
-            return new X64Instruction()
-            {
-                type = InstructionType.mov,
-                opand1 = opand1,
-                opand2 = opand2
-            };
-        }
-        public static X64Instruction add(string opand1, string opand2)
-        {
-            return new X64Instruction()
-            {
-                type = InstructionType.add,
-                opand1 = opand1,
-                opand2 = opand2
-            };
-        }
-        public static X64Instruction sub(string opand1, string opand2)
-        {
-            return new X64Instruction()
-            {
-                type = InstructionType.sub,
-                opand1 = opand1,
-                opand2 = opand2
-            };
-        }
-        public static X64Instruction mul(string opand1, string opand2)
-        {
-            return new X64Instruction()
-            {
-                type = InstructionType.mul,
-                opand1 = opand1,
-                opand2 = opand2
-            };
-        }
-        public static X64Instruction div(string opand1, string opand2)
-        {
-            return new X64Instruction()
-            {
-                type = InstructionType.div,
-                opand1 = opand1,
-                opand2 = opand2
-            };
-        }
-        public static X64Instruction jnz(string labelName)
-        {
-            return new X64Instruction()
-            {
-                type = InstructionType.jnz,
-                opand1 = labelName
-            };
-        }
-    }
 
-
-    public class X64Instruction
-    {
-        public InstructionType type;
-        public string opand1;
-        public string opand2;
-        public string opand3;
-    }
-
-    public class x64CodeGenContext
+    public class Win64CodeGenContext
     {
         private ILUnit ir;
 
@@ -121,23 +34,35 @@ namespace Gizbox.Src.Backend
 
         private List<X64Instruction> instructions = new();//1-n  1-1  n-1
 
-        public x64CodeGenContext(ILUnit ir)
+        public Win64CodeGenContext(ILUnit ir)
         {
             this.ir = ir;
         }
 
         public void StartCodeGen()
         {
-            Pass0();
             Pass1();
             Pass2();
         }
 
 
-        /// <summary> ？ </summary>
-        private void Pass0()
-        {
-        }
+        /*
+bool condition;
+if (condition)
+{
+    // 空语句块
+}
+        
+
+
+         
+; 假设 condition 在 [rbp-4]
+mov eax, dword ptr [rbp-4]   ; 读取 condition 到 eax
+test eax, eax                ; 检查 eax 是否为0
+je  label_after_if           ; 如果为0（false），跳转到 if 之后
+; if 语句块内容（此处为空）
+label_after_if:
+         */
 
         /// <summary> 划分基本块 </summary>
         private void Pass1()
@@ -189,57 +114,80 @@ namespace Gizbox.Src.Backend
                         break;
                     case "JUMP":
                         {
-                            X64Instruction instruction = new X64Instruction()
-                            {
-                                type = InstructionType.jmp,
-                                opand1 = tac.arg1
-                            };
-                            instructions.Add(instruction);
+                            instructions.Add(X64.jmp(tac.arg1));
                         }
                         break;
                     case "FUNC_BEGIN":
                         {
-                            
+                            //函数序言
+                            instructions.Add(X64.push("rbp"));
+                            instructions.Add(X64.mov("rbp", "rsp"));
                         }
                         break;
                     case "FUNC_END":
                         {
+                            //函数尾声
+                            instructions.Add(X64.mov("rsp", "rbp"));
+                            instructions.Add(X64.pop("rbp"));
+                            instructions.Add(X64.ret());
                         }
                         break;
                     case "RETURN":
                         {
+                            //如果有返回值
+                            if(tac.arg1 != null)
+                            {
+                                instructions.Add(X64.mov("rax", tac.arg1)); //假设rax是返回值寄存器
+                            }
+
+                            //函数尾声
+                            instructions.Add(X64.mov("rsp", "rbp"));
+                            instructions.Add(X64.pop("rbp"));
+                            instructions.Add(X64.ret());
                         }
                         break;
-                    case "EXTERN_IMPL":
-                        {
-                        }
+                    case "EXTERN_IMPL"://无需处理
+                        { }
                         break;
                     case "PARAM":
                         {
+                            //第几个参数?
+                            //参数size?
                         }
                         break;
                     case "CALL":
                         {
+                            instructions.Add(X64.call(tac.arg1)); //保存调用前的栈帧指针
                         }
                         break;
                     case "MCALL":
                         {
+                            //todo:虚函数表查找调用
                         }
                         break;
                     case "ALLOC":
-                        {
+                        {//todo
                         }
                         break;
                     case "DEL":
-                        {
+                        {//todo
                         }
                         break;
                     case "ALLOC_ARRAY":
-                        {
+                        {//todo
                         }
                         break;
                     case "IF_FALSE_JUMP":
                         {
+                            var condition = tac.arg1;
+
+                            var jumpLabel = tac.arg2;
+
+                            //判断条件  
+                            //todo;
+
+                            //如果条件为假，则跳转到标签
+                            instructions.Add(X64.jnz(jumpLabel)); //假设条件在rax寄存器中
                         }
                         break;
                     case "=":
