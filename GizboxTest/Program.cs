@@ -163,7 +163,7 @@ switch(cmdIdx)
 
             il.Print();
 
-            x64Target.CodeGen(il);
+            Win64Target.CodeGen(il);
         }
         break;
 }

@@ -668,7 +668,7 @@ namespace Gizbox.IR
 
         public string NewTemp(string type)
         {
-            string tempVarName = "tmp" + tmpCounter++;
+            string tempVarName = "tmp@" + tmpCounter++;
 
             envStack.Peek().NewRecord(tempVarName, SymbolTable.RecordCatagory.Variable, type);
 

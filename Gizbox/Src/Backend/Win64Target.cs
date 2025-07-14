@@ -19,12 +19,6 @@ namespace Gizbox.Src.Backend
         }
     }
 
-    public class BasicBlock
-    {
-        public int startIdx;
-        public int endIdx;
-    }
-
 
     public class Win64CodeGenContext
     {
@@ -283,8 +277,6 @@ label_after_if:
                 }
             }
         }
-
-
 
 
 

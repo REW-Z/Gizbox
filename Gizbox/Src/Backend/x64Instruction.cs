@@ -4,6 +4,42 @@ using System.Text;
 
 namespace Gizbox.Src.Backend
 {
+    public enum RegisterEnum
+    {
+        RAX = 0,
+        RBX = 1,
+        RCX = 2,
+        RDX = 3,
+        RSI = 4,
+        RDI = 5,
+        RBP = 6,
+        RSP = 7,
+        R8 = 8,
+        R9 = 9,
+        R10 = 10,
+        R11 = 11,
+        R12 = 12,
+        R13 = 13,
+        R14 = 14,
+        R15 = 15,
+
+        XMM0 = 100,
+        XMM1 = 101,
+        XMM2 = 102,
+        XMM3 = 103,
+        XMM4 = 104,
+        XMM5 = 105,
+        XMM6 = 106,
+        XMM7 = 107,
+        XMM8 = 108,
+        XMM9 = 109,
+        XMM10 = 110,
+        XMM11 = 111,
+        XMM12 = 112,
+        XMM13 = 113,
+        XMM14 = 114,
+        XMM15 = 115,
+    }
     public enum InstructionType
     {
         mov,
