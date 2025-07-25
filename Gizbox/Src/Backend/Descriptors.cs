@@ -37,11 +37,13 @@ namespace Gizbox.Src.Backend
 
 
     /// <summary>
-    /// 流图  
+    /// 控制流图  
     /// </summary>
-    public class FlowGraph
+    public class ControlFlowGraph
     {
         public List<BasicBlock> blocks;
+        public BasicBlock entryBlock;
+        public BasicBlock exitBlock;
     }
     /// <summary>
     /// 基本块
@@ -59,14 +61,22 @@ namespace Gizbox.Src.Backend
         public List<BasicBlock> successors = new List<BasicBlock>();
 
         //变量使用信息
-        public Dictionary<SymbolTable.Record, List<int>> useDict = new();
+        public Dictionary<SymbolTable.Record, List<int>> USE = new();
         //变量定义/赋值信息
-        public Dictionary<SymbolTable.Record, List<int>> defDict = new();
+        public Dictionary<SymbolTable.Record, List<int>> DEF = new();
 
         //入口处活跃变量
-        public List<SymbolTable.Record> setIn = new();
+        public List<SymbolTable.Record> IN = new();
         //出口处活跃变量
-        public List<SymbolTable.Record> setOut = new();
+        public List<SymbolTable.Record> OUT = new();
     }
 
+
+
+    /// <summary>
+    /// 寄存器冲突图
+    /// </summary>
+    public class RegInterfGraph
+    {
+    }
 }
