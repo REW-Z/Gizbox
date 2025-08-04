@@ -35,28 +35,11 @@ namespace Gizbox.Src.Backend
 
         public void StartCodeGen()
         {
-            Pass1();
-            Pass2();
+            Pass1();//基本块和控制流图
+            Pass2();//指令选择
+            Pass3();//寄存器分配
         }
 
-
-        /*
-bool condition;
-if (condition)
-{
-    // 空语句块
-}
-        
-
-
-         
-; 假设 condition 在 [rbp-4]
-mov eax, dword ptr [rbp-4]   ; 读取 condition 到 eax
-test eax, eax                ; 检查 eax 是否为0
-je  label_after_if           ; 如果为0（false），跳转到 if 之后
-; if 语句块内容（此处为空）
-label_after_if:
-         */
 
         /// <summary> 划分基本块 </summary>
         private void Pass1()
@@ -77,20 +60,6 @@ label_after_if:
                     blocks.Add(b);
                     blockstart = i + 1;
                 }
-            }
-
-
-            for(int i = 0; i < blocks.Count; ++i)
-            {
-                var b = blocks[i];
-                Gizbox.Debug.Log("---------------------------------------------------------");
-                for (int j = b.startIdx; j <= b.endIdx; ++j)
-                {
-                    var tac = ir.codes[j];
-                    Gizbox.Debug.Log($" { (string.IsNullOrEmpty(tac.label) ? "    " : (tac.label + ":")) } \t\t  {tac.op} {tac.arg1} {tac.arg2} {tac.arg3} ");
-                }
-                Gizbox.Debug.Log("---------------------------------------------------------");
-                Gizbox.Debug.Log("\n\n");
             }
         }
 
@@ -128,16 +97,16 @@ label_after_if:
                         break;
                     case "RETURN":
                         {
-                            //如果有返回值
-                            if(tac.arg1 != null)
-                            {
-                                instructions.Add(X64.mov("rax", tac.arg1)); //假设rax是返回值寄存器
-                            }
+                            ////如果有返回值
+                            //if(tac.arg1 != null)
+                            //{
+                            //    instructions.Add(X64.mov("rax", tac.arg1)); //假设rax是返回值寄存器
+                            //}
 
-                            //函数尾声
-                            instructions.Add(X64.mov("rsp", "rbp"));
-                            instructions.Add(X64.pop("rbp"));
-                            instructions.Add(X64.ret());
+                            ////函数尾声
+                            //instructions.Add(X64.mov("rsp", "rbp"));
+                            //instructions.Add(X64.pop("rbp"));
+                            //instructions.Add(X64.ret());
                         }
                         break;
                     case "EXTERN_IMPL"://无需处理
@@ -151,7 +120,6 @@ label_after_if:
                         break;
                     case "CALL":
                         {
-                            instructions.Add(X64.call(tac.arg1)); //保存调用前的栈帧指针
                         }
                         break;
                     case "MCALL":
@@ -278,8 +246,12 @@ label_after_if:
             }
         }
 
-
-
+        // <summary> 寄存器分配 </summary>
+        private void Pass3()
+        {
+            //寄存器分配
+            //todo
+        }
 
 
         private class XUtils

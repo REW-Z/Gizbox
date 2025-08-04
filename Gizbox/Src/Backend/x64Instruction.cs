@@ -71,7 +71,6 @@ namespace Gizbox.Src.Backend
         public InstructionType type;
         public string opand1;
         public string opand2;
-        public string opand3;
     }
 
 
