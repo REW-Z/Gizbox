@@ -41,9 +41,18 @@ namespace Gizbox.Src.Backend
     /// </summary>
     public class ControlFlowGraph
     {
-        public List<BasicBlock> blocks;
+        public List<BasicBlock> blocks = new();
         public BasicBlock entryBlock;
         public BasicBlock exitBlock;
+
+        public List<(BasicBlock src, BasicBlock dst)> edges = new();
+
+        public void AddEdge(BasicBlock src, BasicBlock dst)
+        {
+            edges.Add((src, dst));
+            src.successors.Add(dst);
+            dst.predecessors.Add(src);
+        }
     }
     /// <summary>
     /// 基本块
@@ -54,6 +63,9 @@ namespace Gizbox.Src.Backend
         public int startIdx;
         //结束行
         public int endIdx;
+
+        //包含Label  
+        public string hasLabel;
 
         //前置节点
         public List<BasicBlock> predecessors = new List<BasicBlock>();

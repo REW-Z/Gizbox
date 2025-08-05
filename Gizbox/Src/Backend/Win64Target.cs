@@ -24,6 +24,8 @@ namespace Gizbox.Src.Backend
     {
         private ILUnit ir;
 
+        private ControlFlowGraph cfg;
+
         private List<BasicBlock> blocks;
 
         private List<X64Instruction> instructions = new();//1-n  1-1  n-1
@@ -44,21 +46,98 @@ namespace Gizbox.Src.Backend
         /// <summary> 划分基本块 </summary>
         private void Pass1()
         {
+            //基本块划分
             blocks = new List<BasicBlock>();
-
             int blockstart = 0;
+            string currentLabel = null;
             for(int i = 0; i < ir.codes.Count; ++i)
             {
                 var tac = ir.codes[i];
                 var nextTac = (i + 1 < ir.codes.Count) ? ir.codes[i + 1] : null;
 
-                if(XUtils.IsJump(tac) ||
-                    (nextTac != null &&  XUtils.HasLabel(tac)))
+                if(XUtils.IsJump(tac))
                 {
                     //Block End
                     BasicBlock b = new BasicBlock() { startIdx = blockstart, endIdx = i };
+                    if(currentLabel != null)
+                    {
+                        b.hasLabel = currentLabel;
+                        currentLabel = null;
+                    }
+
+
                     blocks.Add(b);
                     blockstart = i + 1;
+                    continue;
+                }
+
+                if((nextTac != null &&  XUtils.HasLabel(nextTac)))
+                {
+                    //Block End
+                    BasicBlock b = new BasicBlock() { startIdx = blockstart, endIdx = i };
+                    if(currentLabel != null)
+                    {
+                        b.hasLabel = currentLabel;
+                        currentLabel = null;
+                    }
+
+                    blocks.Add(b);
+                    blockstart = i + 1;
+                    currentLabel = nextTac.label;
+                    continue;
+                }
+            }
+
+
+            foreach(var b in blocks)
+            {
+                Console.WriteLine("\n\n---------block len" + (b.endIdx - b.startIdx) + "------------");
+                for(int i = b.startIdx; i <= b.endIdx; ++i)
+                {
+                    Console.WriteLine(ir.codes[i].ToExpression());
+                }
+                Console.WriteLine("---------------------");
+            }
+
+
+            //控制流图  
+            for(int i = 0; i < blocks.Count; ++i)
+            {
+                var currentBlock = blocks[i];
+                var lastTac = ir.codes[currentBlock.endIdx];
+
+                if(lastTac.op == "JUMP")
+                {
+                    string targetLabel = lastTac.arg1;
+                    var targetBlock = QueryBlockByLabel(targetLabel);
+                    if(targetBlock != null)
+                    {
+                        cfg.AddEdge(currentBlock, targetBlock);
+                    }
+                }
+                else if(lastTac.op == "IF_FALSE_JUMP")
+                {
+                    string targetLabel = lastTac.arg2;
+                    var targetBlock = QueryBlockByLabel(targetLabel);
+                    if(targetBlock != null)
+                    {
+                        cfg.AddEdge(currentBlock, targetBlock);
+                    }
+
+                    // 条件跳转还有一个顺序执行的后继
+                    if(i + 1 < blocks.Count)
+                    {
+                        cfg.AddEdge(currentBlock, blocks[i + 1]);
+                    }
+                }
+                else if(lastTac.op == "RETURN" || lastTac.op == "FUNC_END")
+                {
+                    //todo
+                }
+                // 其他
+                else if(i + 1 < blocks.Count)
+                {
+                    cfg.AddEdge(currentBlock, blocks[i + 1]);
                 }
             }
         }
@@ -253,6 +332,11 @@ namespace Gizbox.Src.Backend
             //todo
         }
 
+
+        private BasicBlock QueryBlockByLabel(string label)
+        {
+            return blocks.FirstOrDefault(b => b.hasLabel == label);
+        }
 
         private class XUtils
         {
