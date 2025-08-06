@@ -101,6 +101,7 @@ namespace Gizbox.Src.Backend
 
 
             //控制流图  
+            cfg ??= new();
             for(int i = 0; i < blocks.Count; ++i)
             {
                 var currentBlock = blocks[i];
@@ -109,7 +110,7 @@ namespace Gizbox.Src.Backend
                 if(lastTac.op == "JUMP")
                 {
                     string targetLabel = lastTac.arg1;
-                    var targetBlock = QueryBlockByLabel(targetLabel);
+                    var targetBlock = QueryBlockHasLabel(targetLabel);
                     if(targetBlock != null)
                     {
                         cfg.AddEdge(currentBlock, targetBlock);
@@ -118,21 +119,29 @@ namespace Gizbox.Src.Backend
                 else if(lastTac.op == "IF_FALSE_JUMP")
                 {
                     string targetLabel = lastTac.arg2;
-                    var targetBlock = QueryBlockByLabel(targetLabel);
+                    var targetBlock = QueryBlockHasLabel(targetLabel);
                     if(targetBlock != null)
                     {
+                        //分支False  
                         cfg.AddEdge(currentBlock, targetBlock);
                     }
-
-                    // 条件跳转还有一个顺序执行的后继
                     if(i + 1 < blocks.Count)
                     {
+                        //分支True
                         cfg.AddEdge(currentBlock, blocks[i + 1]);
                     }
                 }
-                else if(lastTac.op == "RETURN" || lastTac.op == "FUNC_END")
+                else if(lastTac.op == "RETURN")
                 {
-                    //todo
+                    var exitBlock = QueryFunctionEndBlock(currentBlock.endIdx);
+                    if(exitBlock != null)
+                    {
+                        cfg.AddEdge(currentBlock, exitBlock);
+                    }
+                }
+                else if(lastTac.op == "FUNC_END")
+                {
+                    //函数结束 ->无后继基本块  
                 }
                 // 其他
                 else if(i + 1 < blocks.Count)
@@ -333,16 +342,33 @@ namespace Gizbox.Src.Backend
         }
 
 
-        private BasicBlock QueryBlockByLabel(string label)
+        private BasicBlock QueryBlockHasLabel(string label)
         {
             return blocks.FirstOrDefault(b => b.hasLabel == label);
         }
+
+        private BasicBlock QueryFunctionEndBlock(int instructionIndex)
+        {
+            for(int i = instructionIndex + 1; i < ir.codes.Count; i++)
+            {
+                var tac = ir.codes[i];
+                if(tac.op == "FUNC_END")
+                {
+                    return blocks.FirstOrDefault(b => b.startIdx <= i && b.endIdx >= i);
+                }
+            }
+            return null;
+        }
+
 
         private class XUtils
         {
             public static bool IsJump(TAC tac)
             {
-                return tac.op == "IF_FALSE_JUMP" || tac.op == "JUMP";
+                return tac.op == "IF_FALSE_JUMP" ||
+                    tac.op == "JUMP" ||
+                    tac.op == "RETURN";
+                //过程调用一般不会中断基本块，因为过程内的控制流是隐藏的  
             }
             public static bool HasLabel(TAC tac)
             {
