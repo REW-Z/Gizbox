@@ -93,14 +93,29 @@ var inferNum2 = inferNum1;
 
 Console::Log((string)(inferNum1 + inferNum2));
 
-Console::Log("Test Finish...");
+Console::Log("Test1 Finish...");
 
+int[] arrtest = new int[10];
+int[] arrtest2 = new int[10];
+int a = arrtest[arrtest2[9]];
 
+class AAA
+{
+    BBB bbb = null;
+}
+class BBB
+{
+    CCC ccc = null;
+}
+class CCC
+{
+    int x = 0;
+}
 
+AAA aaa = new AAA();
+aaa.bbb.ccc.x = 123;
 
-
-
-
+Console::Log("Test2 Finish...");
 
 //  --------------------------------------------------
 //  0   |status 0  |                    CALL [Core::GC::Disable@] LITINT:0
