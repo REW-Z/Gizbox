@@ -6,6 +6,8 @@ namespace Gizbox.Src.Backend
 {
     public enum RegisterEnum
     {
+        Undefined = -1,
+
         RAX = 0,
         RBX = 1,
         RCX = 2,
@@ -49,52 +51,199 @@ namespace Gizbox.Src.Backend
 
         add,
         sub,
-        mul,
-        div,
+        imul,
+        idiv,
 
-        jmp,
-        jnz,
-        je,
+        inc,
+        dec,
+        neg,
+        not,
+
+        and,
+        or,
+        xor,
 
         cmp,
         test,
 
+        jmp,
+        jnz,
+        je,
+        jne,
+        jl,
+        jle,
+        jg,
+        jge,
+
         call,
-
         leave,
-
         ret,
+
+        lea,
+
+        setl,
+        setle,
+        setg,
+        setge,
+        sete,
+        setne,
+
+        cqo, // 符号扩展用于idiv
     }
 
     public class X64Instruction
     {
         public InstructionType type;
-        public string opand1;
-        public string opand2;
+        public X64Operand operand1;
+        public X64Operand operand2;
+    }
+
+
+
+    /// <summary>
+    /// X64操作数基类
+    /// </summary>
+    public abstract class X64Operand
+    {
+        public enum OperandType
+        {
+            Label,// 标签
+            Immediate,// 立即数
+            Reg,// 寄存器
+            Mem,// 内存
+            Rel,// RIP相对寻址
+        }
+        public abstract OperandType Type { get; }
+    }
+    public class X64Label : X64Operand
+    {
+        public override OperandType Type => OperandType.Label;
+        public string name;
+        public X64Label(string label)
+        {
+            name = label;
+        }
+    }
+    public class X64Immediate : X64Operand
+    {
+        public override OperandType Type => OperandType.Immediate;
+        public long value;
+    }
+    public class X64Reg : X64Operand
+    {
+        public override OperandType Type => OperandType.Reg;
+        public RegisterEnum reg;
+    }
+    public class X64Mem : X64Operand
+    {
+        public override OperandType Type => OperandType.Mem;
+        public RegisterEnum? baseReg; // 基址寄存器
+        public RegisterEnum? indexReg; // 索引寄存器
+        public int scale; // 缩放因子
+        public long displacement; // 偏移量
+        //x64寻址：[base + index * scale + displacement]
+        public X64Mem(RegisterEnum? baseReg = null, RegisterEnum? indexReg = null, int scale = 1, long displacement = 0)
+        {
+            this.baseReg = baseReg;
+            this.indexReg = indexReg;
+            this.scale = scale;
+            this.displacement = displacement;
+        }
+    }
+    public class X64Rel : X64Operand
+    {
+        public override OperandType Type => OperandType.Rel;
+        public string symbolName; // 符号名称
+        public long displacement; // 可选的偏移量
+
+        public X64Rel(string symbolName, long displacement = 0)
+        {
+            this.symbolName = symbolName;
+            this.displacement = displacement;
+        }
     }
 
 
     public static class X64
     {
-        public static X64Instruction jmp(string labelname) => new X64Instruction() { type = InstructionType.jmp, opand1 = labelname };
-        public static X64Instruction jnz(string labelname) => new X64Instruction() { type = InstructionType.jnz, opand1 = labelname };
-        public static X64Instruction je(string labelname) => new X64Instruction() { type = InstructionType.je, opand1 = labelname };
+        // 跳转指令
+        public static X64Instruction jmp(string labelname) => new() { type = InstructionType.jmp, operand1 = new X64Label(labelname) };
+        public static X64Instruction jnz(string labelname) => new() { type = InstructionType.jnz, operand1 = new X64Label(labelname) };
+        public static X64Instruction je(string labelname) => new() { type = InstructionType.je, operand1 = new X64Label(labelname) };
+        public static X64Instruction jne(string labelname) => new() { type = InstructionType.jne, operand1 = new X64Label(labelname) };
+        public static X64Instruction jl(string labelname) => new() { type = InstructionType.jl, operand1 = new X64Label(labelname) };
+        public static X64Instruction jle(string labelname) => new() { type = InstructionType.jle, operand1 = new X64Label(labelname) };
+        public static X64Instruction jg(string labelname) => new() { type = InstructionType.jg, operand1 = new X64Label(labelname) };
+        public static X64Instruction jge(string labelname) => new() { type = InstructionType.jge, operand1 = new X64Label(labelname) };
 
-        public static X64Instruction mov(string opand1, string opand2) => new X64Instruction() { type = InstructionType.mov, opand1 = opand1, opand2 = opand2 };
+        // 数据移动
+        public static X64Instruction mov(X64Operand dest, X64Operand src) => new() { type = InstructionType.mov, operand1 = dest, operand2 = src };
 
-        public static X64Instruction push(string opand1) => new X64Instruction() { type = InstructionType.push, opand1 = opand1 };
-        public static X64Instruction pop(string opand1) => new X64Instruction() { type = InstructionType.pop, opand1 = opand1 };
+        // 栈操作
+        public static X64Instruction push(X64Operand operand) => new() { type = InstructionType.push, operand1 = operand };
+        public static X64Instruction pop(X64Operand operand) => new() { type = InstructionType.pop, operand1 = operand };
 
-        public static X64Instruction add(string opand1, string opand2) => new X64Instruction() { type = InstructionType.add, opand1 = opand1, opand2 = opand2 };
-        public static X64Instruction sub(string opand1, string opand2) => new X64Instruction() { type = InstructionType.sub, opand1 = opand1, opand2 = opand2 };
+        // 算术运算
+        public static X64Instruction add(X64Operand dest, X64Operand src) => new() { type = InstructionType.add, operand1 = dest, operand2 = src };
+        public static X64Instruction sub(X64Operand dest, X64Operand src) => new() { type = InstructionType.sub, operand1 = dest, operand2 = src };
+        public static X64Instruction imul(X64Operand dest, X64Operand src) => new() { type = InstructionType.imul, operand1 = dest, operand2 = src };
+        public static X64Instruction idiv(X64Operand operand) => new() { type = InstructionType.idiv, operand1 = operand };
 
-        public static X64Instruction cmp(string opand1, string opand2) => new X64Instruction() { type = InstructionType.cmp, opand1 = opand1, opand2 = opand2 };
-        public static X64Instruction test(string opand1, string opand2) => new X64Instruction() { type = InstructionType.test, opand1 = opand1, opand2 = opand2 };
+        public static X64Instruction inc(X64Operand operand) => new() { type = InstructionType.inc, operand1 = operand };
+        public static X64Instruction dec(X64Operand operand) => new() { type = InstructionType.dec, operand1 = operand };
+        public static X64Instruction neg(X64Operand operand) => new() { type = InstructionType.neg, operand1 = operand };
+        public static X64Instruction not(X64Operand operand) => new() { type = InstructionType.not, operand1 = operand };
 
-        public static X64Instruction call(string labelname) => new X64Instruction() { type = InstructionType.call, opand1 = labelname };
+        // 逻辑运算
+        public static X64Instruction and(X64Operand dest, X64Operand src) => new() { type = InstructionType.and, operand1 = dest, operand2 = src };
+        public static X64Instruction or(X64Operand dest, X64Operand src) => new() { type = InstructionType.or, operand1 = dest, operand2 = src };
+        public static X64Instruction xor(X64Operand dest, X64Operand src) => new() { type = InstructionType.xor, operand1 = dest, operand2 = src };
 
-        public static X64Instruction leave() => new X64Instruction() { type = InstructionType.leave };
+        // 比较和测试
+        public static X64Instruction cmp(X64Operand op1, X64Operand op2) => new() { type = InstructionType.cmp, operand1 = op1, operand2 = op2 };
+        public static X64Instruction test(X64Operand op1, X64Operand op2) => new() { type = InstructionType.test, operand1 = op1, operand2 = op2 };
 
-        public static X64Instruction ret() => new X64Instruction() { type = InstructionType.ret };
+        // 函数调用
+        public static X64Instruction call(string labelname) => new() { type = InstructionType.call, operand1 = new X64Label(labelname) };
+
+        // 其他
+        public static X64Instruction leave() => new() { type = InstructionType.leave };
+        public static X64Instruction ret() => new() { type = InstructionType.ret };
+        public static X64Instruction lea(X64Operand dest, X64Operand src) => new() { type = InstructionType.lea, operand1 = dest, operand2 = src };
+
+        // 条件设置
+        public static X64Instruction setl(X64Operand operand) => new() { type = InstructionType.setl, operand1 = operand };
+        public static X64Instruction setle(X64Operand operand) => new() { type = InstructionType.setle, operand1 = operand };
+        public static X64Instruction setg(X64Operand operand) => new() { type = InstructionType.setg, operand1 = operand };
+        public static X64Instruction setge(X64Operand operand) => new() { type = InstructionType.setge, operand1 = operand };
+        public static X64Instruction sete(X64Operand operand) => new() { type = InstructionType.sete, operand1 = operand };
+        public static X64Instruction setne(X64Operand operand) => new() { type = InstructionType.setne, operand1 = operand };
+
+        public static X64Instruction cqo() => new() { type = InstructionType.cqo };
+
+        
+
+        //常用属性  
+        public static X64Reg rax => new() { reg = RegisterEnum.RAX };
+        public static X64Reg rbx => new() { reg = RegisterEnum.RBX };
+        public static X64Reg rcx => new() { reg = RegisterEnum.RCX };
+        public static X64Reg rdx => new() { reg = RegisterEnum.RDX };
+        public static X64Reg rsi => new() { reg = RegisterEnum.RSI };
+        public static X64Reg rdi => new() { reg = RegisterEnum.RDI };
+        public static X64Reg rbp => new() { reg = RegisterEnum.RBP };
+        public static X64Reg rsp => new() { reg = RegisterEnum.RSP };
+
+        public static X64Reg r8 => new() { reg = RegisterEnum.R8 };
+        public static X64Reg r9 => new() { reg = RegisterEnum.R9 };
+
+        public static X64Reg xmm0 => new() { reg = RegisterEnum.XMM0 };
+        public static X64Reg xmm1 => new() { reg = RegisterEnum.XMM1 };
+        public static X64Reg xmm2 => new() { reg = RegisterEnum.XMM2 };
+        public static X64Reg xmm3 => new() { reg = RegisterEnum.XMM3 };
+
+        public static X64Immediate imm(long val) => new() { value = val };
+        public static X64Mem mem(RegisterEnum? baseReg, RegisterEnum? indexReg, int scale, long displacement = 0) => new X64Mem(baseReg, indexReg, scale, displacement);
+        public static X64Label label(string name) => new(name);
+        public static X64Rel rel(string symbolName, long displacement = 0) => new X64Rel(symbolName, displacement);
     }
 }

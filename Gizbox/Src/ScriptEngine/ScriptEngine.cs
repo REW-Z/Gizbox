@@ -369,6 +369,10 @@ namespace Gizbox.ScriptEngine
                         {
                             retRegister = GetValue(code.arg1);
                         }
+
+                        //处理返回值后，跳转到exit:functionname前一行  
+                        //（未来考虑加个FUNC_END标号或者给RETURN增加FUNC_END的功能）  
+
                         var jumpAddr = mainUnit.QueryLabel("exit", QueryEnv(SymbolTable.TableCatagory.FuncScope).name, currUnit);
                         int exitLine = jumpAddr.Item2;
                         int endLine = exitLine - 1;    
