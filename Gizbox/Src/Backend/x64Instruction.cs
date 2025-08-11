@@ -6,8 +6,6 @@ namespace Gizbox.Src.Backend
 {
     public enum RegisterEnum
     {
-        Undefined = -1,
-
         RAX = 0,
         RBX = 1,
         RCX = 2,
@@ -110,6 +108,7 @@ namespace Gizbox.Src.Backend
             Label,// 标签
             Immediate,// 立即数
             Reg,// 寄存器
+            VReg,// 虚拟寄存器
             Mem,// 内存
             Rel,// RIP相对寻址
         }
@@ -133,6 +132,11 @@ namespace Gizbox.Src.Backend
     {
         public override OperandType Type => OperandType.Reg;
         public RegisterEnum reg;
+    }
+    public class X64VReg : X64Operand
+    {
+        public override OperandType Type => OperandType.VReg;
+        public SymbolTable.Record rec;
     }
     public class X64Mem : X64Operand
     {
@@ -241,9 +245,18 @@ namespace Gizbox.Src.Backend
         public static X64Reg xmm2 => new() { reg = RegisterEnum.XMM2 };
         public static X64Reg xmm3 => new() { reg = RegisterEnum.XMM3 };
 
+
+
         public static X64Immediate imm(long val) => new() { value = val };
         public static X64Mem mem(RegisterEnum? baseReg, RegisterEnum? indexReg, int scale, long displacement = 0) => new X64Mem(baseReg, indexReg, scale, displacement);
         public static X64Label label(string name) => new(name);
         public static X64Rel rel(string symbolName, long displacement = 0) => new X64Rel(symbolName, displacement);
+
+
+        public static X64VReg vreg(SymbolTable.Record varrec)
+        {
+            var xoperand = new X64VReg(){ rec = varrec };
+            return xoperand;
+        }
     }
 }

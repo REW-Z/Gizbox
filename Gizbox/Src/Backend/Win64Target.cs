@@ -398,7 +398,7 @@ namespace Gizbox.Src.Backend
                             // 保存调用者寄存器（易失性寄存器需Caller保存） (选择性保存)
                             // todo;
 
-                            // RAX, RCX, RDX, R8, R9, R10, R11、 XMM0-XMM5 是调用者保存寄存器
+                            // RAX, RCX, RDX, R8, R9, R10, R11、 XMM0-XMM5 是调用者保存的寄存器
                             // RBX、RBP、RDI、RSI、RSP、R12、R13、R14、R15 和 XMM6 - XMM15 由使用它们的函数保存和还原，视为非易失性。
 
                             // 实际的函数调用
@@ -420,7 +420,7 @@ namespace Gizbox.Src.Backend
                     case "ALLOC":
                         {//todo
                         }
-                        break;
+                        break; 
                     case "DEL":
                         {//todo
                         }
@@ -869,21 +869,31 @@ namespace Gizbox.Src.Backend
                 case IROperandExpr.Type.RET:
                     {
                         //todo
+                        if(irOperand.IsSSEType())
+                        {
+                            return X64.xmm0;
+                        }
+                        else
+                        {
+                            return X64.rax;
+                        }
                     }
                     break;
                 case IROperandExpr.Type.Var:
                     {
-                        //todo
-                        //return X64.vreg($"v_{expr}");
+                        string varName = iroperandExpr.segments[0];
+                        var varRec = irOperand.segmentRecs[0];
+                        return X64.vreg(varRec);
                     }
                     break;
                 case IROperandExpr.Type.ClassMemberAccess:
                     {
                         var objName = iroperandExpr.segments[0];
                         var fieldName = iroperandExpr.segments[1];
+                        var objRec = irOperand.segmentRecs[0];
+                        var fieldRec = irOperand.segmentRecs[1];
 
-                        //todo
-                        //return X64.mem($"{objName}_obj", 0);
+                        //return X64.mem();
                     }
                     break;
                 case IROperandExpr.Type.ArrayElementAccess:
@@ -891,7 +901,6 @@ namespace Gizbox.Src.Backend
                         var arrayName = iroperandExpr.segments[0];
                         var indexExpr = iroperandExpr.segments[1];
 
-                        // 这里简化处理，实际需要更复杂的地址计算
                         //return X64.mem($"{arrayName}_array", 0);
                     }
                     break;
