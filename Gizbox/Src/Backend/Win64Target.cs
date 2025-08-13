@@ -279,7 +279,6 @@ namespace Gizbox.Src.Backend
         private void Pass2()
         {
             //指令分析  
-            int currParamIdx = -1;
             for(int line = 0; line < ir.codes.Count; ++line)
             {
                 var tac = ir.codes[line];
@@ -288,21 +287,29 @@ namespace Gizbox.Src.Backend
                 AddTacInfo(tac, line);
                 var inf = GetTacInfo(tac);
 
-                //实参排序  
-                if(tac.op == "PARAM")
-                {
-                    currParamIdx += 1;
-                    inf.paramidx = currParamIdx; 
-                }
-                else
-                {
-                    currParamIdx = -1;
-                }
 
                 // 读取字符串字面量和浮点数字面量到静态常量数据区  
                 CollectReadOnlyData(tac.arg1, line);
                 CollectReadOnlyData(tac.arg2, line);
                 CollectReadOnlyData(tac.arg3, line);
+            }
+
+
+            //实参排序  
+            int currParamIdx = -1;
+            for(int line = ir.codes.Count - 1; line >= 0; line--)
+            {
+                var tac = ir.codes[line];
+                var inf = GetTacInfo(tac);
+                if(tac.op == "PARAM")
+                {
+                    currParamIdx += 1;
+                    inf.paramidx = currParamIdx;
+                }
+                else
+                {
+                    currParamIdx = -1;
+                }
             }
 
 
@@ -337,6 +344,9 @@ namespace Gizbox.Src.Backend
                             instructions.Add(X64.mov(X64.rsp, X64.rbp));
                             instructions.Add(X64.pop(X64.rbp));
                             instructions.Add(X64.ret());
+
+                            //恢复寄存器（非易失性需要由Callee保存）  
+                            //todo;
                         }
                         break;
                     case "RETURN":
@@ -366,6 +376,9 @@ namespace Gizbox.Src.Backend
                             instructions.Add(X64.mov(X64.rsp, X64.rbp));
                             instructions.Add(X64.pop(X64.rbp));
                             instructions.Add(X64.ret());
+
+                            //恢复寄存器（非易失性需要由Callee保存）  
+                            //todo;
                         }
                         break;
                     case "EXTERN_IMPL"://无需处理
@@ -389,22 +402,28 @@ namespace Gizbox.Src.Backend
                             // IRCall指令，第一参数是[函数名]，第二个参数是参数个数
                             string funcName = tac.arg1.Substring(1, tac.arg1.Length - 2);
                             instructions.Add(X64.call(funcName));
+                            int.TryParse(tac.arg2, out tacInf.paramCount);
 
+                            // 影子空间(32字节)
+                            instructions.Add(X64.sub(X64.rsp, X64.imm(32)));
 
-                            // 影子空间
-                            // todo;
-
+                            // 其他栈参数空间
+                            if(tacInf.paramCount > 4)
+                            {
+                                int len = (tacInf.paramCount - 4) * 8;
+                                instructions.Add(X64.sub(X64.rsp, X64.imm(len)));
+                            }
 
                             // 保存调用者寄存器（易失性寄存器需Caller保存） (选择性保存)
+                            // (RAX, RCX, RDX, R8, R9, R10, R11、 XMM0-XMM5 是调用者保存的寄存器)
+                            // (RBX、RBP、RDI、RSI、RSP、R12、R13、R14、R15 和 XMM6 - XMM15 由使用它们的函数保存和还原，视为非易失性。)
                             // todo;
 
-                            // RAX, RCX, RDX, R8, R9, R10, R11、 XMM0-XMM5 是调用者保存的寄存器
-                            // RBX、RBP、RDI、RSI、RSP、R12、R13、R14、R15 和 XMM6 - XMM15 由使用它们的函数保存和还原，视为非易失性。
 
                             // 实际的函数调用
-                            instructions.Add(X64.call(funcName));
+                                instructions.Add(X64.call(funcName));
 
-                            // 栈平衡：清理栈上的参数（如果有超过4个参数）
+                            // 清理栈上的参数（如果有超过4个参数）
                             if(tacInf.paramCount > 4)
                             {
                                 int stackParamCount = tacInf.paramCount - 4;
@@ -893,15 +912,52 @@ namespace Gizbox.Src.Backend
                         var objRec = irOperand.segmentRecs[0];
                         var fieldRec = irOperand.segmentRecs[1];
 
-                        //return X64.mem();
+                        if(objRec == null)
+                            throw new GizboxException(ExceptioName.Unknown, $"object not found for member access \"{objName}.{fieldName}\" at line {irOperand.owner.ownerline}");
+                        if(fieldRec == null)
+                            throw new GizboxException(ExceptioName.Unknown, $"field not found for member access \"{objName}.{fieldName}\" at line {irOperand.owner.ownerline}");
+
+                        // 对象变量是一个指针值，在虚拟寄存器
+                        var baseVreg = X64.vreg(objRec);
+
+                        // 生成内存操作数
+                        return X64.mem(baseVreg, displacement: fieldRec.addr);
                     }
                     break;
                 case IROperandExpr.Type.ArrayElementAccess:
                     {
                         var arrayName = iroperandExpr.segments[0];
                         var indexExpr = iroperandExpr.segments[1];
+                        var arrayRec = irOperand.segmentRecs[0];
+                        if(arrayRec == null)
+                            throw new GizboxException(ExceptioName.Unknown, $"array not found for element access \"{arrayName}[{indexExpr}]\" at line {irOperand.owner.ownerline}");
 
-                        //return X64.mem($"{arrayName}_array", 0);
+                        // 元素大小
+                        var elemType = UtilsW64.GetArrayElementType(arrayRec.typeExpression);
+                        int elemSize = UtilsW64.GetTypeSize(elemType);
+
+                        var baseV = X64.vreg(arrayRec);
+
+                        // 所有可能是LITINT或者变量  
+                        var idxRec = QueryVariable(indexExpr, irOperand.owner.ownerline);
+                        if(idxRec != null)
+                        {
+                            var idxV = X64.vreg(idxRec);
+                            return X64.mem(baseV, idxV, elemSize, 0);
+                        }
+                        else
+                        {
+                            long immIndex = 0;
+                            if(indexExpr != null && indexExpr.StartsWith("LITINT:"))
+                            {
+                                var lit = indexExpr.Substring("LITINT:".Length);
+                                immIndex = long.Parse(lit);
+                                long disp = checked(immIndex * elemSize);
+                                return X64.mem(baseV, displacement: disp);
+                            }
+
+                            throw new GizboxException(ExceptioName.Unknown, $"unsupported array index expression \"{indexExpr}\" at line {irOperand.owner.ownerline}");
+                        }
                     }
                     break;
             }
@@ -944,8 +1000,10 @@ namespace Gizbox.Src.Backend
                     {
                         //数组访问：[arr[x]]
                         var parts = operand.Split('[');
+                        var arrName = parts[0];
+                        var indexExpr = parts[1].Substring(0, parts[1].Length - 1);//去掉']'
                         irOperand.type = IROperandExpr.Type.ArrayElementAccess;
-                        irOperand.segments = parts;
+                        irOperand.segments = new[] { arrName, indexExpr };
                     }
                     else
                     {
@@ -1311,6 +1369,27 @@ namespace Gizbox.Src.Backend
                 throw new GizboxException(ExceptioName.Unknown, $"param cannot pass by register. idx:{paramIdx}");
             }
 
+            public static int GetTypeSize(string typeExpression)
+            {
+                switch(typeExpression)
+                {
+                    case "int":
+                        return 4;
+                    case "float":
+                        return 4;
+                    case "double":
+                        return 8;
+                    case "bool":
+                        return 1;
+                    case "char":
+                        return 2;
+                    case "string":
+                        return 8; // 字符串64位指针
+                    default:
+                        // 引用类型64位指针
+                        return 8;
+                }
+            }
 
         }
     }

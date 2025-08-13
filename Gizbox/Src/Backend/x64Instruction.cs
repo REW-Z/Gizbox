@@ -6,6 +6,8 @@ namespace Gizbox.Src.Backend
 {
     public enum RegisterEnum
     {
+        Undefined = -1,
+
         RAX = 0,
         RBX = 1,
         RCX = 2,
@@ -130,23 +132,40 @@ namespace Gizbox.Src.Backend
     }
     public class X64Reg : X64Operand
     {
-        public override OperandType Type => OperandType.Reg;
-        public RegisterEnum reg;
-    }
-    public class X64VReg : X64Operand
-    {
-        public override OperandType Type => OperandType.VReg;
-        public SymbolTable.Record rec;
+        public override OperandType Type => isVirtual ? OperandType.VReg : OperandType.Reg;
+
+        public bool isVirtual;
+        public RegisterEnum physReg;
+        public SymbolTable.Record vRegVar;
+
+        public X64Reg(RegisterEnum reg)
+        {
+            this.physReg = reg;
+            this.isVirtual = false;
+            this.vRegVar = null;
+        }
+        public X64Reg(SymbolTable.Record varRec)
+        {
+            this.vRegVar = varRec;
+            this.isVirtual = true;
+            this.physReg = default;
+        }
+        public void AllocPhysReg(RegisterEnum reg)
+        {
+            isVirtual = false;
+            physReg = reg;
+            vRegVar = null;
+        }
     }
     public class X64Mem : X64Operand
     {
         public override OperandType Type => OperandType.Mem;
-        public RegisterEnum? baseReg; // 基址寄存器
-        public RegisterEnum? indexReg; // 索引寄存器
+        public X64Reg baseReg; // 基址寄存器
+        public X64Reg indexReg; // 索引寄存器
         public int scale; // 缩放因子
         public long displacement; // 偏移量
         //x64寻址：[base + index * scale + displacement]
-        public X64Mem(RegisterEnum? baseReg = null, RegisterEnum? indexReg = null, int scale = 1, long displacement = 0)
+        public X64Mem(X64Reg baseReg = null, X64Reg indexReg = null, int scale = 1, long displacement = 0)
         {
             this.baseReg = baseReg;
             this.indexReg = indexReg;
@@ -225,38 +244,60 @@ namespace Gizbox.Src.Backend
 
         public static X64Instruction cqo() => new() { type = InstructionType.cqo };
 
-        
+
 
         //常用属性  
-        public static X64Reg rax => new() { reg = RegisterEnum.RAX };
-        public static X64Reg rbx => new() { reg = RegisterEnum.RBX };
-        public static X64Reg rcx => new() { reg = RegisterEnum.RCX };
-        public static X64Reg rdx => new() { reg = RegisterEnum.RDX };
-        public static X64Reg rsi => new() { reg = RegisterEnum.RSI };
-        public static X64Reg rdi => new() { reg = RegisterEnum.RDI };
-        public static X64Reg rbp => new() { reg = RegisterEnum.RBP };
-        public static X64Reg rsp => new() { reg = RegisterEnum.RSP };
+        public static X64Reg rax => new(RegisterEnum.RAX);
+        public static X64Reg rbx => new(RegisterEnum.RBX);
+        public static X64Reg rcx => new(RegisterEnum.RCX);
+        public static X64Reg rdx => new(RegisterEnum.RDX);
+        public static X64Reg rsi => new(RegisterEnum.RSI);
+        public static X64Reg rdi => new(RegisterEnum.RDI);
 
-        public static X64Reg r8 => new() { reg = RegisterEnum.R8 };
-        public static X64Reg r9 => new() { reg = RegisterEnum.R9 };
+        public static X64Reg r8 => new(RegisterEnum.R8);
+        public static X64Reg r9 => new(RegisterEnum.R9);
+        public static X64Reg r10 => new(RegisterEnum.R10);
+        public static X64Reg r11 => new(RegisterEnum.R11);
+        public static X64Reg r12 => new(RegisterEnum.R12);
+        public static X64Reg r13 => new(RegisterEnum.R13);
+        public static X64Reg r14 => new(RegisterEnum.R14);
+        public static X64Reg r15 => new(RegisterEnum.R15);
 
-        public static X64Reg xmm0 => new() { reg = RegisterEnum.XMM0 };
-        public static X64Reg xmm1 => new() { reg = RegisterEnum.XMM1 };
-        public static X64Reg xmm2 => new() { reg = RegisterEnum.XMM2 };
-        public static X64Reg xmm3 => new() { reg = RegisterEnum.XMM3 };
 
+        public static X64Reg rsp => new(RegisterEnum.RSP);
+        public static X64Reg rbp => new(RegisterEnum.RBP);
+
+        public static X64Reg xmm0 => new(RegisterEnum.XMM0);
+        public static X64Reg xmm1 => new(RegisterEnum.XMM1);
+        public static X64Reg xmm2 => new(RegisterEnum.XMM2);
+        public static X64Reg xmm3 => new(RegisterEnum.XMM3);
+        public static X64Reg xmm4 => new(RegisterEnum.XMM4);
+        public static X64Reg xmm5 => new(RegisterEnum.XMM5);
+        public static X64Reg xmm6 => new(RegisterEnum.XMM6);
+        public static X64Reg xmm7 => new(RegisterEnum.XMM7);
 
 
         public static X64Immediate imm(long val) => new() { value = val };
-        public static X64Mem mem(RegisterEnum? baseReg, RegisterEnum? indexReg, int scale, long displacement = 0) => new X64Mem(baseReg, indexReg, scale, displacement);
+        
         public static X64Label label(string name) => new(name);
         public static X64Rel rel(string symbolName, long displacement = 0) => new X64Rel(symbolName, displacement);
 
 
-        public static X64VReg vreg(SymbolTable.Record varrec)
+
+        public static X64Reg vreg(SymbolTable.Record varrec)
         {
-            var xoperand = new X64VReg(){ rec = varrec };
+            var xoperand = new X64Reg(varrec);
             return xoperand;
         }
+
+        public static X64Mem mem(RegisterEnum baseReg, RegisterEnum indexReg, int scale, long displacement = 0)
+        {
+            return new X64Mem(new X64Reg(baseReg), new X64Reg(indexReg), scale, displacement);
+        }
+        public static X64Mem mem(X64Reg baseVReg, X64Reg indexVReg = null, int scale = 1, long displacement = 0)
+        {
+            return new X64Mem(baseVReg, indexVReg, scale, displacement);
+        }
+
     }
 }
