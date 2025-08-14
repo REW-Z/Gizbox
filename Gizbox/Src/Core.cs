@@ -110,6 +110,8 @@ namespace Gizbox
             [DataMember]
             public string typeExpression;
             [DataMember]
+            public long size;
+            [DataMember]
             public long addr;
             [DataMember]
             public string initValue;

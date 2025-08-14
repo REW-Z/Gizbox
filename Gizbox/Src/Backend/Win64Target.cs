@@ -1,11 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections;
 using System.Text;
 using System.Linq;
 
 using Gizbox;
 using Gizbox.IR;
 
+
+
+//      (RAX, RCX, RDX, R8, R9, R10, R11、 XMM0-XMM5 是调用者保存的寄存器)
+//      (RBX、RBP、RDI、RSI、RSP、R12、R13、R14、R15 和 XMM6 - XMM15 由使用它们的函数保存和还原，视为非易失性。)
 
 namespace Gizbox.Src.Backend
 {
@@ -36,6 +41,13 @@ namespace Gizbox.Src.Backend
 
         private List<X64Instruction> instructions = new();//1-n  1-1  n-1
 
+        // 占位指令  
+        private HashSet<X64Instruction> callerSavePlaceHolders = new();//主调函数保存寄存器指令占位
+        private HashSet<X64Instruction> calleeSavePlaceHolders = new();//被调函数保存寄存器指令占位
+        private HashSet<X64Instruction> callerRestorePlaceHolders = new();//主调函数恢复寄存器占位
+        private HashSet<X64Instruction> calleeRestorePlaceHolders = new();//被调函数恢复寄存器占位
+
+
         public Win64CodeGenContext(ILUnit ir)
         {
             this.ir = ir;
@@ -43,11 +55,57 @@ namespace Gizbox.Src.Backend
 
         public void StartCodeGen()
         {
+            Pass0();//符号表信息补充
             Pass1();//基本块和控制流图
             Pass2();//指令选择
             Pass3();//寄存器分配
         }
 
+        /// <summary> 符号表信息补充 </summary>
+        private void Pass0()
+        {
+            var globalEnv = ir.globalScope.env;
+            foreach(var (k, r) in globalEnv.records)
+            {
+                switch(r.category)
+                {
+                    //类对象布局（Vptr在对象头占8字节）  
+                    case SymbolTable.RecordCatagory.Class:
+                        {
+                            var classEnv = r.envPtr;
+                            Console.WriteLine("---------" + classEnv.name + "----------");
+                            List<SymbolTable.Record> fieldRecs = new();
+                            foreach(var (memberName, memberRec) in classEnv.records)
+                            {
+                                if(memberRec.category != SymbolTable.RecordCatagory.Variable)
+                                    continue;
+                                fieldRecs.Add(memberRec);
+                            }
+                            (int size, int align)[] fieldSizeAndAlignArr = new (int size, int align)[fieldRecs.Count];
+                            //对象头是虚函数表指针  
+                            for(int i = 0; i < fieldRecs.Count; i++)
+                            {
+                                string typeExpress = fieldRecs[i].typeExpression;
+                                var size = MemUtility.GetGizboxTypeSize(typeExpress);
+                                var align = MemUtility.GetGizboxTypeSize(typeExpress);
+                                fieldRecs[i].size = size;
+                                fieldSizeAndAlignArr[i] = (size, align);
+                            }
+                            long classSize = MemUtility.ClassLayout(8, fieldSizeAndAlignArr, out var allocAddrs);
+                            for(int i = 0; i < fieldRecs.Count; i++)
+                            {
+                                fieldRecs[i].addr = allocAddrs[i];
+                            }
+
+                            r.size = classSize;
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            }
+            
+        }
 
         /// <summary> 划分基本块 </summary>
         private void Pass1()
@@ -314,6 +372,7 @@ namespace Gizbox.Src.Backend
 
 
             // 指令选择  
+            List<TACInfo> tempParamList = new();
             for(int i = 0; i < ir.codes.Count; ++i)
             {
                 var tac = ir.codes[i];
@@ -335,7 +394,9 @@ namespace Gizbox.Src.Backend
                             instructions.Add(X64.mov(X64.rbp, X64.rsp));
 
                             //保存寄存器（非易失性需要由Callee保存）  
-                            //todo;
+                            var placeholder = X64.placehold("callee_save");
+                            calleeSavePlaceHolders.Add(placeholder);
+                            instructions.Add(placeholder);
                         }
                         break;
                     case "FUNC_END":
@@ -344,9 +405,10 @@ namespace Gizbox.Src.Backend
                             instructions.Add(X64.mov(X64.rsp, X64.rbp));
                             instructions.Add(X64.pop(X64.rbp));
                             instructions.Add(X64.ret());
-
-                            //恢复寄存器（非易失性需要由Callee保存）  
-                            //todo;
+                            //恢复寄存器（非易失性需要由Callee保存） 
+                            var placeholder = X64.placehold("callee_restore");
+                            calleeRestorePlaceHolders.Add(placeholder);
+                            instructions.Add(placeholder);
                         }
                         break;
                     case "RETURN":
@@ -372,68 +434,171 @@ namespace Gizbox.Src.Backend
                                 }
                             }
 
-                            // 函数尾声（和FUNC_END相同操作）  
+                            //函数尾声
                             instructions.Add(X64.mov(X64.rsp, X64.rbp));
                             instructions.Add(X64.pop(X64.rbp));
                             instructions.Add(X64.ret());
-
-                            //恢复寄存器（非易失性需要由Callee保存）  
-                            //todo;
+                            //恢复寄存器（非易失性需要由Callee保存） 
+                            var placeholder = X64.placehold("callee_restore");
+                            calleeRestorePlaceHolders.Add(placeholder);
+                            instructions.Add(placeholder);
                         }
                         break;
                     case "EXTERN_IMPL"://无需处理
                         break;
                     case "PARAM":
                         {
-                            if(tacInf.paramidx < 4)
-                            {
-                                //寄存器传参  
-                                UtilsW64.GetParamReg(tacInf.paramidx, tacInf.oprand1.IsSSEType());
-                            }
-                            else
-                            {
-                                //栈帧传参(IR中PARAM指令已经是倒序)
-                                instructions.Add(X64.push(ParseOperand(tacInf.oprand1)));
-                            }
+                            //留到CALL指令中再做处理  
+                            tempParamList.Add(tacInf);
                         }
                         break;
                     case "CALL":
                         {
-                            // IRCall指令，第一参数是[函数名]，第二个参数是参数个数
+                            // 第一参数是 函数名，第二个参数是 参数个数
                             string funcName = tac.arg1.Substring(1, tac.arg1.Length - 2);
-                            instructions.Add(X64.call(funcName));
                             int.TryParse(tac.arg2, out tacInf.paramCount);
 
-                            // 影子空间(32字节)
-                            instructions.Add(X64.sub(X64.rsp, X64.imm(32)));
 
-                            // 其他栈参数空间
-                            if(tacInf.paramCount > 4)
+                            //调用前准备  
                             {
-                                int len = (tacInf.paramCount - 4) * 8;
-                                instructions.Add(X64.sub(X64.rsp, X64.imm(len)));
-                            }
+                                // 调用者保存寄存器（易失性寄存器需Caller保存） (选择性保存)
+                                var placeholderSave = X64.placehold("caller_save");
+                                instructions.Add(placeholderSave);
+                                callerSavePlaceHolders.Add(placeholderSave);
 
-                            // 保存调用者寄存器（易失性寄存器需Caller保存） (选择性保存)
-                            // (RAX, RCX, RDX, R8, R9, R10, R11、 XMM0-XMM5 是调用者保存的寄存器)
-                            // (RBX、RBP、RDI、RSI、RSP、R12、R13、R14、R15 和 XMM6 - XMM15 由使用它们的函数保存和还原，视为非易失性。)
-                            // todo;
+
+                                // 栈帧16字节对齐
+                                instructions.Add(X64.and(X64.rsp, X64.imm(-16)));
+                                // 如果是奇数个参数 -> 需要8字节对齐栈指针
+                                if(tacInf.paramCount % 2 != 0)
+                                {
+                                    // 如果是奇数个参数，先将rsp对齐到16字节
+                                    instructions.Add(X64.sub(X64.rsp, X64.imm(8)));
+                                }
+                                // 其他栈参数空间
+                                if(tacInf.paramCount > 4)
+                                {
+                                    int len = (tacInf.paramCount - 4) * 8;
+                                    instructions.Add(X64.sub(X64.rsp, X64.imm(len)));
+                                }
+                                // 影子空间(32字节)
+                                instructions.Add(X64.sub(X64.rsp, X64.imm(32)));
+
+
+                                // 参数赋值(IR中PARAM指令已经是倒序)  
+                                foreach(var paraminfo in tempParamList)
+                                {
+                                    //寄存器传参  
+                                    if(paraminfo.paramidx < 4)
+                                        UtilsW64.GetParamReg(paraminfo.paramidx, paraminfo.oprand1.IsSSEType());
+
+                                    //栈帧传参[rsp + 8]开始
+                                    int offset = (8 * (paraminfo.paramidx + 1));
+                                    instructions.Add(X64.mov(X64.mem(X64.rsp, displacement: offset), ParseOperand(paraminfo.oprand1)));
+                                }
+                                tempParamList.Clear();
+                            }
 
 
                             // 实际的函数调用
-                                instructions.Add(X64.call(funcName));
+                            // （CALL 指令会自动把返回地址（下一条指令的 RIP）压入栈顶）  
+                            instructions.Add(X64.call(funcName));
 
-                            // 清理栈上的参数（如果有超过4个参数）
-                            if(tacInf.paramCount > 4)
+                            //调用后处理
                             {
-                                int stackParamCount = tacInf.paramCount - 4;
-                                long stackCleanupBytes = stackParamCount * 8; // 每个参数8字节
-                                instructions.Add(X64.add(X64.rsp, X64.imm(stackCleanupBytes)));
+                                // 清理栈上的参数（如果有超过4个参数）
+                                if(tacInf.paramCount > 4)
+                                {
+                                    int stackParamCount = tacInf.paramCount - 4;
+                                    long stackCleanupBytes = stackParamCount * 8; // 每个参数8字节
+                                    instructions.Add(X64.add(X64.rsp, X64.imm(stackCleanupBytes)));
+                                }
+
+                                //还原保存的寄存器(占位)  
+                                var placeholderRestore = X64.placehold("caller_restore");
+                                instructions.Add(placeholderRestore);
+                                callerRestorePlaceHolders.Add(placeholderRestore);
                             }
                         }
                         break;
                     case "MCALL":
-                        {//todo:虚函数表查找调用
+                        {
+                            // 第一参数是 方法名（未混淆），第二个参数是参数个数
+                            string methodName = tac.arg1.Substring(1, tac.arg1.Length - 2);
+                            int.TryParse(tac.arg2, out tacInf.paramCount);
+
+
+                            //this参数载入寄存器  
+                            var codeParamObj = tempParamList.FirstOrDefault(c => c.paramidx == 0);
+                            var x64obj = ParseOperand(codeParamObj.oprand1);
+                            instructions.Add(X64.mov(X64.rcx, x64obj));
+
+                            //取Vptr  
+                            var methodRec = QueryVMethod(x64obj, methodName);
+                            instructions.Add(X64.mov(X64.rax, X64.mem(X64.rcx, displacement: 0)));
+                            instructions.Add(X64.mov(X64.rax, X64.mem(X64.rax, displacement: methodRec.addr)));//addr表示在虚函数表中的偏移(Index*8)
+
+
+                            //调用前准备(和CALL指令一致)  
+                            {
+                                // 调用者保存寄存器（易失性寄存器需Caller保存） (选择性保存)
+                                var placeholderSave = X64.placehold("caller_save");
+                                instructions.Add(placeholderSave);
+                                callerSavePlaceHolders.Add(placeholderSave);
+
+
+                                // 栈帧16字节对齐
+                                instructions.Add(X64.and(X64.rsp, X64.imm(-16)));
+                                // 如果是奇数个参数 -> 需要8字节对齐栈指针
+                                if(tacInf.paramCount % 2 != 0)
+                                {
+                                    // 如果是奇数个参数，先将rsp对齐到16字节
+                                    instructions.Add(X64.sub(X64.rsp, X64.imm(8)));
+                                }
+                                // 其他栈参数空间
+                                if(tacInf.paramCount > 4)
+                                {
+                                    int len = (tacInf.paramCount - 4) * 8;
+                                    instructions.Add(X64.sub(X64.rsp, X64.imm(len)));
+                                }
+                                // 影子空间(32字节)
+                                instructions.Add(X64.sub(X64.rsp, X64.imm(32)));
+
+
+                                // 参数赋值(IR中PARAM指令已经是倒序)  
+                                foreach(var paraminfo in tempParamList)
+                                {
+                                    //寄存器传参  
+                                    if(paraminfo.paramidx < 4)
+                                        UtilsW64.GetParamReg(paraminfo.paramidx, paraminfo.oprand1.IsSSEType());
+
+                                    //栈帧传参[rsp + 8]开始
+                                    int offset = (8 * (paraminfo.paramidx + 1));
+                                    instructions.Add(X64.mov(X64.mem(X64.rsp, displacement: offset), ParseOperand(paraminfo.oprand1)));
+                                }
+                                tempParamList.Clear();
+                            }
+
+
+                            //调用
+                            X64.call(X64.rax);
+
+
+                            //调用后处理
+                            {
+                                // 清理栈上的参数（如果有超过4个参数）
+                                if(tacInf.paramCount > 4)
+                                {
+                                    int stackParamCount = tacInf.paramCount - 4;
+                                    long stackCleanupBytes = stackParamCount * 8; // 每个参数8字节
+                                    instructions.Add(X64.add(X64.rsp, X64.imm(stackCleanupBytes)));
+                                }
+
+                                //还原保存的寄存器(占位)  
+                                var placeholderRestore = X64.placehold("caller_restore");
+                                instructions.Add(placeholderRestore);
+                                callerRestorePlaceHolders.Add(placeholderRestore);
+                            }
                         }
                         break;
                     case "ALLOC":
@@ -1065,6 +1230,10 @@ namespace Gizbox.Src.Backend
         #endregion
 
 
+        private SymbolTable.Record QueryVMethod(X64Operand obj, string methodName)
+        {
+            throw new Exception("Not Implement.");
+        }
         private SymbolTable.Record QueryVariable(string varName, int line)
         {
             var status = ir.scopeStatusArr[line];

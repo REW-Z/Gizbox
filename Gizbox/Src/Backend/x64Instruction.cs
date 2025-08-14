@@ -44,6 +44,8 @@ namespace Gizbox.Src.Backend
     }
     public enum InstructionType
     {
+        undefined = -1,//用于占位
+
         mov,
 
         push,
@@ -96,6 +98,7 @@ namespace Gizbox.Src.Backend
         public InstructionType type;
         public X64Operand operand1;
         public X64Operand operand2;
+        public string comment;//指令注释
     }
 
 
@@ -228,6 +231,7 @@ namespace Gizbox.Src.Backend
 
         // 函数调用
         public static X64Instruction call(string labelname) => new() { type = InstructionType.call, operand1 = new X64Label(labelname) };
+        public static X64Instruction call(X64Operand method) => new() { type = InstructionType.call, operand1 = method };
 
         // 其他
         public static X64Instruction leave() => new() { type = InstructionType.leave };
@@ -244,7 +248,11 @@ namespace Gizbox.Src.Backend
 
         public static X64Instruction cqo() => new() { type = InstructionType.cqo };
 
-
+        // 占位  
+        public static X64Instruction placehold(string comment)
+        {
+            return new X64Instruction() { type = InstructionType.undefined, operand1 = null, operand2 = null, comment = comment };
+        }
 
         //常用属性  
         public static X64Reg rax => new(RegisterEnum.RAX);
@@ -298,6 +306,5 @@ namespace Gizbox.Src.Backend
         {
             return new X64Mem(baseVReg, indexVReg, scale, displacement);
         }
-
     }
 }
