@@ -55,49 +55,38 @@ namespace Gizbox.Src.Backend
 
         public void StartCodeGen()
         {
-            Pass0();//符号表信息补充
+            Pass0();//静态信息补充
             Pass1();//基本块和控制流图
             Pass2();//指令选择
             Pass3();//寄存器分配
         }
 
-        /// <summary> 符号表信息补充 </summary>
+        /// <summary> 静态信息补充 </summary>
         private void Pass0()
         {
+            //指令分析（收集非直接数的字面量）    
+            for(int line = 0; line < ir.codes.Count; ++line)
+            {
+                var tac = ir.codes[line];
+                // 读取字符串字面量和浮点数字面量到静态常量数据区  
+                CollectReadOnlyData(tac.arg1, line);
+                CollectReadOnlyData(tac.arg2, line);
+                CollectReadOnlyData(tac.arg3, line);
+            }
+
+            //类布局和虚函数表布局
             var globalEnv = ir.globalScope.env;
             foreach(var (k, r) in globalEnv.records)
             {
                 switch(r.category)
                 {
-                    //类对象布局（Vptr在对象头占8字节）  
                     case SymbolTable.RecordCatagory.Class:
                         {
-                            var classEnv = r.envPtr;
-                            Console.WriteLine("---------" + classEnv.name + "----------");
-                            List<SymbolTable.Record> fieldRecs = new();
-                            foreach(var (memberName, memberRec) in classEnv.records)
-                            {
-                                if(memberRec.category != SymbolTable.RecordCatagory.Variable)
-                                    continue;
-                                fieldRecs.Add(memberRec);
-                            }
-                            (int size, int align)[] fieldSizeAndAlignArr = new (int size, int align)[fieldRecs.Count];
-                            //对象头是虚函数表指针  
-                            for(int i = 0; i < fieldRecs.Count; i++)
-                            {
-                                string typeExpress = fieldRecs[i].typeExpression;
-                                var size = MemUtility.GetGizboxTypeSize(typeExpress);
-                                var align = MemUtility.GetGizboxTypeSize(typeExpress);
-                                fieldRecs[i].size = size;
-                                fieldSizeAndAlignArr[i] = (size, align);
-                            }
-                            long classSize = MemUtility.ClassLayout(8, fieldSizeAndAlignArr, out var allocAddrs);
-                            for(int i = 0; i < fieldRecs.Count; i++)
-                            {
-                                fieldRecs[i].addr = allocAddrs[i];
-                            }
+                            //类对象布局（Vptr在对象头占8字节）  
+                            GenClassLayoutInfo(r);
 
-                            r.size = classSize;
+                            //虚函数表布局
+                            GenVTableLayoutInfo(r);
                         }
                         break;
                     default:
@@ -336,7 +325,7 @@ namespace Gizbox.Src.Backend
         /// <summary> 指令选择 </summary>
         private void Pass2()
         {
-            //指令分析  
+            //建立指令附加信息  
             for(int line = 0; line < ir.codes.Count; ++line)
             {
                 var tac = ir.codes[line];
@@ -344,12 +333,6 @@ namespace Gizbox.Src.Backend
                 //建立TAC信息  
                 AddTacInfo(tac, line);
                 var inf = GetTacInfo(tac);
-
-
-                // 读取字符串字面量和浮点数字面量到静态常量数据区  
-                CollectReadOnlyData(tac.arg1, line);
-                CollectReadOnlyData(tac.arg2, line);
-                CollectReadOnlyData(tac.arg3, line);
             }
 
 
@@ -534,8 +517,9 @@ namespace Gizbox.Src.Backend
                             instructions.Add(X64.mov(X64.rcx, x64obj));
 
                             //取Vptr  
-                            var methodRec = QueryVMethod(x64obj, methodName);
+                            var methodRec = QueryVMethod(codeParamObj.oprand1, methodName, tacInf.ownerline);
                             instructions.Add(X64.mov(X64.rax, X64.mem(X64.rcx, displacement: 0)));
+                            //函数地址  
                             instructions.Add(X64.mov(X64.rax, X64.mem(X64.rax, displacement: methodRec.addr)));//addr表示在虚函数表中的偏移(Index*8)
 
 
@@ -719,7 +703,43 @@ namespace Gizbox.Src.Backend
         }
 
 
-        # region PASS1
+        #region PASS0
+        private void GenClassLayoutInfo(SymbolTable.Record classRec)
+        {
+            var classEnv = classRec.envPtr;
+            Console.WriteLine("---------" + classEnv.name + "----------");
+            List<SymbolTable.Record> fieldRecs = new();
+            foreach(var (memberName, memberRec) in classEnv.records)
+            {
+                if(memberRec.category != SymbolTable.RecordCatagory.Variable)
+                    continue;
+                fieldRecs.Add(memberRec);
+            }
+            (int size, int align)[] fieldSizeAndAlignArr = new (int size, int align)[fieldRecs.Count];
+            //对象头是虚函数表指针  
+            for(int i = 0; i < fieldRecs.Count; i++)
+            {
+                string typeExpress = fieldRecs[i].typeExpression;
+                var size = MemUtility.GetGizboxTypeSize(typeExpress);
+                var align = MemUtility.GetGizboxTypeSize(typeExpress);
+                fieldRecs[i].size = size;
+                fieldSizeAndAlignArr[i] = (size, align);
+            }
+            long classSize = MemUtility.ClassLayout(8, fieldSizeAndAlignArr, out var allocAddrs);
+            for(int i = 0; i < fieldRecs.Count; i++)
+            {
+                fieldRecs[i].addr = allocAddrs[i];
+            }
+
+            classRec.size = classSize;
+        }
+        private void GenVTableLayoutInfo(SymbolTable.Record classRec)
+        {
+        }
+
+        #endregion
+
+        #region PASS1
 
         private void AnalyzeUSEDEF(TAC tac, int lineNum, BasicBlock block)
         {
@@ -1230,9 +1250,27 @@ namespace Gizbox.Src.Backend
         #endregion
 
 
-        private SymbolTable.Record QueryVMethod(X64Operand obj, string methodName)
+        private SymbolTable.Record QueryVMethod(IROperand irobj, string methodName, int irline)
         {
-            throw new Exception("Not Implement.");
+            switch(irobj.expr.type)
+            {
+                case IROperandExpr.Type.Var:
+                    {
+
+                    }
+                    break;
+                case IROperandExpr.Type.ClassMemberAccess:
+                    {
+
+                    }
+                    break;
+                case IROperandExpr.Type.ArrayElementAccess:
+                    {
+
+                    }
+                    break;
+            }
+            throw new Exception("");
         }
         private SymbolTable.Record QueryVariable(string varName, int line)
         {
