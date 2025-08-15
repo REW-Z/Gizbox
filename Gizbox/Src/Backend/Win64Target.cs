@@ -47,6 +47,10 @@ namespace Gizbox.Src.Backend
         private HashSet<X64Instruction> callerRestorePlaceHolders = new();//主调函数恢复寄存器占位
         private HashSet<X64Instruction> calleeRestorePlaceHolders = new();//被调函数恢复寄存器占位
 
+        //虚函数索引查询表(DefineClassName, MethodName, addrOffset(idx * 8))  
+        public Dictionary<string, Dictionary<string, int>> vfuncIdxDict = new();
+
+
 
         public Win64CodeGenContext(ILUnit ir)
         {
@@ -735,6 +739,25 @@ namespace Gizbox.Src.Backend
         }
         private void GenVTableLayoutInfo(SymbolTable.Record classRec)
         {
+            var classTable = classRec.envPtr;
+            Dictionary<string, int> classFunctionOffsetDict = new();
+
+            int index = 0;
+            foreach(var (key, rec) in classTable.records)
+            {
+                if(rec.category != SymbolTable.RecordCatagory.Function)
+                    continue;
+
+                //var irVtable = ir.vtables[classRec.name];//不使用已有的Vtable  
+                classFunctionOffsetDict[rec.name] = (index * 8);
+                index++;
+            }
+
+            //填充到缓冲
+            vfuncIdxDict[classRec.name] = classFunctionOffsetDict;
+
+            //填充rodata  
+            //...
         }
 
         #endregion
