@@ -16,11 +16,11 @@ namespace Gizbox.IR
         [DataMember]
         public string op;
         [DataMember]
+        public string arg0;
+        [DataMember]
         public string arg1;
         [DataMember]
         public string arg2;
-        [DataMember]
-        public string arg3;
 
         public string ToExpression(bool showlabel = true)
         {
@@ -39,6 +39,10 @@ namespace Gizbox.IR
             }
             str += op;
 
+            if (string.IsNullOrEmpty(arg0) == false)
+            {
+                str += " " + arg0;
+            }
             if (string.IsNullOrEmpty(arg1) == false)
             {
                 str += " " + arg1;
@@ -46,10 +50,6 @@ namespace Gizbox.IR
             if (string.IsNullOrEmpty(arg2) == false)
             {
                 str += " " + arg2;
-            }
-            if (string.IsNullOrEmpty(arg3) == false)
-            {
-                str += " " + arg3;
             }
             return str;
         }

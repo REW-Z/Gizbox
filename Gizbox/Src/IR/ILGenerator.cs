@@ -638,7 +638,7 @@ namespace Gizbox.IR
 
         public TAC GenerateCode(string op, object arg1 = null, object arg2 = null, object arg3 = null)
         {
-            var newCode = new TAC() { op = op, arg1 = arg1?.ToString(), arg2 = arg2?.ToString(), arg3 = arg3?.ToString() };
+            var newCode = new TAC() { op = op, arg0 = arg1?.ToString(), arg1 = arg2?.ToString(), arg2 = arg3?.ToString() };
 
             ilUnit.codes.Add(newCode);
 

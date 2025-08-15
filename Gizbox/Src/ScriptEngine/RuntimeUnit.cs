@@ -231,9 +231,9 @@ namespace Gizbox.ScriptEngine
 
             this.op = tac.op;
 
-            this.arg1 = Operand.Parse(tac.arg1);
-            this.arg2 = Operand.Parse(tac.arg2);
-            this.arg3 = Operand.Parse(tac.arg3);
+            this.arg1 = Operand.Parse(tac.arg0);
+            this.arg2 = Operand.Parse(tac.arg1);
+            this.arg3 = Operand.Parse(tac.arg2);
         }
 
         public string ToExpression(bool showlabel = true)

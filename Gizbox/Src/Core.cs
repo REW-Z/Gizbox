@@ -108,6 +108,8 @@ namespace Gizbox
             [DataMember]
             public RecordCatagory category;
             [DataMember]
+            public int index;//索引-用于标识参数列表的顺序
+            [DataMember]
             public string typeExpression;
             [DataMember]
             public long size;
@@ -139,6 +141,7 @@ namespace Gizbox
         [DataMember]
         public Dictionary<string, Record> records;
 
+        public Dictionary<RecordCatagory, int> countDict;
 
 
 
@@ -149,7 +152,8 @@ namespace Gizbox
         {
             this.name = name;
             this.tableCatagory = tableCatagory;
-            this.records = new Dictionary<string, Record>();
+            this.records = new ();
+            this.countDict = new();
 
             if(parentTable != null)
             {
@@ -319,7 +323,7 @@ namespace Gizbox
                 typeExpression = typeExpr ,
                 envPtr = envPtr,
             };
-            records[synbolName] = newRec;
+            AddRecord(synbolName, newRec);
 
             return newRec;
         }
@@ -328,6 +332,16 @@ namespace Gizbox
         public void AddRecord(string key, Record rec)
         {
             this.records[key] = rec;
+            if(this.countDict.TryGetValue(rec.category, out var count))
+            {
+                rec.index = count;
+                this.countDict[rec.category] = count + 1;
+            }
+            else
+            {
+                rec.index = 0;
+                this.countDict[rec.category] = 1;
+            }
         }
 
         //获取子表  

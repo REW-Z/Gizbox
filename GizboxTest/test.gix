@@ -44,6 +44,10 @@ class Creature
     {
         Console::Log(this.name + " move...");
     }
+
+    void Foo(string aaa)
+    {
+    }
 }
 namespace Human::Job
 {

@@ -96,8 +96,8 @@ namespace Gizbox.Src.Backend
     public class X64Instruction
     {
         public InstructionType type;
+        public X64Operand operand0;
         public X64Operand operand1;
-        public X64Operand operand2;
         public string comment;//指令注释
     }
 
@@ -193,65 +193,65 @@ namespace Gizbox.Src.Backend
     public static class X64
     {
         // 跳转指令
-        public static X64Instruction jmp(string labelname) => new() { type = InstructionType.jmp, operand1 = new X64Label(labelname) };
-        public static X64Instruction jnz(string labelname) => new() { type = InstructionType.jnz, operand1 = new X64Label(labelname) };
-        public static X64Instruction je(string labelname) => new() { type = InstructionType.je, operand1 = new X64Label(labelname) };
-        public static X64Instruction jne(string labelname) => new() { type = InstructionType.jne, operand1 = new X64Label(labelname) };
-        public static X64Instruction jl(string labelname) => new() { type = InstructionType.jl, operand1 = new X64Label(labelname) };
-        public static X64Instruction jle(string labelname) => new() { type = InstructionType.jle, operand1 = new X64Label(labelname) };
-        public static X64Instruction jg(string labelname) => new() { type = InstructionType.jg, operand1 = new X64Label(labelname) };
-        public static X64Instruction jge(string labelname) => new() { type = InstructionType.jge, operand1 = new X64Label(labelname) };
+        public static X64Instruction jmp(string labelname) => new() { type = InstructionType.jmp, operand0 = new X64Label(labelname) };
+        public static X64Instruction jnz(string labelname) => new() { type = InstructionType.jnz, operand0 = new X64Label(labelname) };
+        public static X64Instruction je(string labelname) => new() { type = InstructionType.je, operand0 = new X64Label(labelname) };
+        public static X64Instruction jne(string labelname) => new() { type = InstructionType.jne, operand0 = new X64Label(labelname) };
+        public static X64Instruction jl(string labelname) => new() { type = InstructionType.jl, operand0 = new X64Label(labelname) };
+        public static X64Instruction jle(string labelname) => new() { type = InstructionType.jle, operand0 = new X64Label(labelname) };
+        public static X64Instruction jg(string labelname) => new() { type = InstructionType.jg, operand0 = new X64Label(labelname) };
+        public static X64Instruction jge(string labelname) => new() { type = InstructionType.jge, operand0 = new X64Label(labelname) };
 
         // 数据移动
-        public static X64Instruction mov(X64Operand dest, X64Operand src) => new() { type = InstructionType.mov, operand1 = dest, operand2 = src };
+        public static X64Instruction mov(X64Operand dest, X64Operand src) => new() { type = InstructionType.mov, operand0 = dest, operand1 = src };
 
         // 栈操作
-        public static X64Instruction push(X64Operand operand) => new() { type = InstructionType.push, operand1 = operand };
-        public static X64Instruction pop(X64Operand operand) => new() { type = InstructionType.pop, operand1 = operand };
+        public static X64Instruction push(X64Operand operand) => new() { type = InstructionType.push, operand0 = operand };
+        public static X64Instruction pop(X64Operand operand) => new() { type = InstructionType.pop, operand0 = operand };
 
         // 算术运算
-        public static X64Instruction add(X64Operand dest, X64Operand src) => new() { type = InstructionType.add, operand1 = dest, operand2 = src };
-        public static X64Instruction sub(X64Operand dest, X64Operand src) => new() { type = InstructionType.sub, operand1 = dest, operand2 = src };
-        public static X64Instruction imul(X64Operand dest, X64Operand src) => new() { type = InstructionType.imul, operand1 = dest, operand2 = src };
-        public static X64Instruction idiv(X64Operand operand) => new() { type = InstructionType.idiv, operand1 = operand };
+        public static X64Instruction add(X64Operand dest, X64Operand src) => new() { type = InstructionType.add, operand0 = dest, operand1 = src };
+        public static X64Instruction sub(X64Operand dest, X64Operand src) => new() { type = InstructionType.sub, operand0 = dest, operand1 = src };
+        public static X64Instruction imul(X64Operand dest, X64Operand src) => new() { type = InstructionType.imul, operand0 = dest, operand1 = src };
+        public static X64Instruction idiv(X64Operand operand) => new() { type = InstructionType.idiv, operand0 = operand };
 
-        public static X64Instruction inc(X64Operand operand) => new() { type = InstructionType.inc, operand1 = operand };
-        public static X64Instruction dec(X64Operand operand) => new() { type = InstructionType.dec, operand1 = operand };
-        public static X64Instruction neg(X64Operand operand) => new() { type = InstructionType.neg, operand1 = operand };
-        public static X64Instruction not(X64Operand operand) => new() { type = InstructionType.not, operand1 = operand };
+        public static X64Instruction inc(X64Operand operand) => new() { type = InstructionType.inc, operand0 = operand };
+        public static X64Instruction dec(X64Operand operand) => new() { type = InstructionType.dec, operand0 = operand };
+        public static X64Instruction neg(X64Operand operand) => new() { type = InstructionType.neg, operand0 = operand };
+        public static X64Instruction not(X64Operand operand) => new() { type = InstructionType.not, operand0 = operand };
 
         // 逻辑运算
-        public static X64Instruction and(X64Operand dest, X64Operand src) => new() { type = InstructionType.and, operand1 = dest, operand2 = src };
-        public static X64Instruction or(X64Operand dest, X64Operand src) => new() { type = InstructionType.or, operand1 = dest, operand2 = src };
-        public static X64Instruction xor(X64Operand dest, X64Operand src) => new() { type = InstructionType.xor, operand1 = dest, operand2 = src };
+        public static X64Instruction and(X64Operand dest, X64Operand src) => new() { type = InstructionType.and, operand0 = dest, operand1 = src };
+        public static X64Instruction or(X64Operand dest, X64Operand src) => new() { type = InstructionType.or, operand0 = dest, operand1 = src };
+        public static X64Instruction xor(X64Operand dest, X64Operand src) => new() { type = InstructionType.xor, operand0 = dest, operand1 = src };
 
         // 比较和测试
-        public static X64Instruction cmp(X64Operand op1, X64Operand op2) => new() { type = InstructionType.cmp, operand1 = op1, operand2 = op2 };
-        public static X64Instruction test(X64Operand op1, X64Operand op2) => new() { type = InstructionType.test, operand1 = op1, operand2 = op2 };
+        public static X64Instruction cmp(X64Operand op1, X64Operand op2) => new() { type = InstructionType.cmp, operand0 = op1, operand1 = op2 };
+        public static X64Instruction test(X64Operand op1, X64Operand op2) => new() { type = InstructionType.test, operand0 = op1, operand1 = op2 };
 
         // 函数调用
-        public static X64Instruction call(string labelname) => new() { type = InstructionType.call, operand1 = new X64Label(labelname) };
-        public static X64Instruction call(X64Operand method) => new() { type = InstructionType.call, operand1 = method };
+        public static X64Instruction call(string labelname) => new() { type = InstructionType.call, operand0 = new X64Label(labelname) };
+        public static X64Instruction call(X64Operand method) => new() { type = InstructionType.call, operand0 = method };
 
         // 其他
         public static X64Instruction leave() => new() { type = InstructionType.leave };
         public static X64Instruction ret() => new() { type = InstructionType.ret };
-        public static X64Instruction lea(X64Operand dest, X64Operand src) => new() { type = InstructionType.lea, operand1 = dest, operand2 = src };
+        public static X64Instruction lea(X64Operand dest, X64Operand src) => new() { type = InstructionType.lea, operand0 = dest, operand1 = src };
 
         // 条件设置
-        public static X64Instruction setl(X64Operand operand) => new() { type = InstructionType.setl, operand1 = operand };
-        public static X64Instruction setle(X64Operand operand) => new() { type = InstructionType.setle, operand1 = operand };
-        public static X64Instruction setg(X64Operand operand) => new() { type = InstructionType.setg, operand1 = operand };
-        public static X64Instruction setge(X64Operand operand) => new() { type = InstructionType.setge, operand1 = operand };
-        public static X64Instruction sete(X64Operand operand) => new() { type = InstructionType.sete, operand1 = operand };
-        public static X64Instruction setne(X64Operand operand) => new() { type = InstructionType.setne, operand1 = operand };
+        public static X64Instruction setl(X64Operand operand) => new() { type = InstructionType.setl, operand0 = operand };
+        public static X64Instruction setle(X64Operand operand) => new() { type = InstructionType.setle, operand0 = operand };
+        public static X64Instruction setg(X64Operand operand) => new() { type = InstructionType.setg, operand0 = operand };
+        public static X64Instruction setge(X64Operand operand) => new() { type = InstructionType.setge, operand0 = operand };
+        public static X64Instruction sete(X64Operand operand) => new() { type = InstructionType.sete, operand0 = operand };
+        public static X64Instruction setne(X64Operand operand) => new() { type = InstructionType.setne, operand0 = operand };
 
         public static X64Instruction cqo() => new() { type = InstructionType.cqo };
 
         // 占位  
         public static X64Instruction placehold(string comment)
         {
-            return new X64Instruction() { type = InstructionType.undefined, operand1 = null, operand2 = null, comment = comment };
+            return new X64Instruction() { type = InstructionType.undefined, operand0 = null, operand1 = null, comment = comment };
         }
 
         //常用属性  
