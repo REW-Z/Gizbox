@@ -1753,9 +1753,10 @@ namespace Gizbox.Src.Backend
         }
 
 
-        public class GizboxType
+        public class TypeExpr
         {
-            public enum Type
+            public static Dictionary<string, TypeExpr> typeExpressionCache = new();
+            public enum Category
             {
                 Int,
                 Long,
@@ -1768,20 +1769,21 @@ namespace Gizbox.Src.Backend
                 Array, //数组类型
                 Function, //函数类型
             }
-            public static Dictionary<string, GizboxType> typeExpressionCache = new();
 
-            public Type type;
-            public GizboxType Object_Class;
-            public GizboxType Array_ElementType;
-            public GizboxType Function_ReturnType;
-            public List<GizboxType> Function_ParamTypes;
+            public Category type;
+            public TypeExpr Object_Class;
+            public TypeExpr Array_ElementType;
+            public TypeExpr Function_ReturnType;
+            public List<TypeExpr> Function_ParamTypes;
 
-            public static GizboxType Get(string typeExpression)
+            private TypeExpr() { }
+
+            public static TypeExpr Parse(string typeExpression)
             {
-                if(typeExpressionCache.ContainsKey(typeExpression))
-                    return typeExpressionCache[typeExpression];
+                typeExpression = typeExpression.Trim();
 
-
+                if(typeExpressionCache.TryGetValue(typeExpression, out var cached))
+                    return cached;
 
                 if(typeExpression.Contains("->"))
                 {
