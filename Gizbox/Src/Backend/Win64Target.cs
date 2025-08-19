@@ -47,11 +47,16 @@ namespace Gizbox.Src.Backend
         private HashSet<X64Instruction> callerRestorePlaceHolders = new();//主调函数恢复寄存器占位
         private HashSet<X64Instruction> calleeRestorePlaceHolders = new();//被调函数恢复寄存器占位
 
-        //类表
+        // 类表
         public Dictionary<string, SymbolTable.Record> classDict = new();
 
-        //类名-虚函数表roKey
+        // 类名-虚函数表roKey
         public Dictionary<string, string> vtableRoKeys = new();
+
+        // 当前函数作用域  
+        private Dictionary<SymbolTable, BiDictionary<SymbolTable.Record, X64Reg>> vRegs = new();
+        private SymbolTable globalEnv = null;
+        private SymbolTable funcEnv = null;
 
 
         //debug  
@@ -78,6 +83,8 @@ namespace Gizbox.Src.Backend
         /// <summary> 静态信息补充 </summary>
         private void Pass0()
         {
+            this.globalEnv = ir.globalScope.env;
+
             //类布局和虚函数表布局
             var globalEnv = ir.globalScope.env;
             foreach(var (k, r) in globalEnv.records)
@@ -419,8 +426,11 @@ namespace Gizbox.Src.Backend
         /// <summary> 指令选择 </summary>
         private void Pass2()
         {
-            // 指令选择  
+            vRegs.Add(globalEnv, new());
+
+            // 参数临时列表
             List<TACInfo> tempParamList = new();
+            // 指令选择  
             for(int i = 0; i < ir.codes.Count; ++i)
             {
                 var tac = ir.codes[i];
@@ -437,6 +447,11 @@ namespace Gizbox.Src.Backend
                         break;
                     case "FUNC_BEGIN":
                         {
+                            //函数作用域开始
+                            funcEnv = ir.GetTopEnvAtLine(i);
+                            vRegs.Add(funcEnv, new());
+
+
                             //函数序言
                             instructions.Add(X64.push(X64.rbp));
                             instructions.Add(X64.mov(X64.rbp, X64.rsp));
@@ -457,6 +472,9 @@ namespace Gizbox.Src.Backend
                             var placeholder = X64.placehold("callee_restore");
                             calleeRestorePlaceHolders.Add(placeholder);
                             instructions.Add(placeholder);
+
+                            //函数作用域结束
+                            funcEnv = null;
                         }
                         break;
                     case "RETURN":
@@ -482,14 +500,9 @@ namespace Gizbox.Src.Backend
                                 }
                             }
 
-                            //函数尾声
-                            instructions.Add(X64.mov(X64.rsp, X64.rbp));
-                            instructions.Add(X64.pop(X64.rbp));
-                            instructions.Add(X64.ret());
-                            //恢复寄存器（非易失性需要由Callee保存） 
-                            var placeholder = X64.placehold("callee_restore");
-                            calleeRestorePlaceHolders.Add(placeholder);
-                            instructions.Add(placeholder);
+                            // 跳转到FUNC_END  
+                            string funcEndLabel = "func_end:" + funcEnv.name;
+                            instructions.Add(X64.jmp(funcEndLabel));
                         }
                         break;
                     case "EXTERN_IMPL"://无需处理
@@ -675,19 +688,48 @@ namespace Gizbox.Src.Backend
                         }
                         break; 
                     case "DEL":
-                        {//todo
+                        {
+                            var objPtr = ParseOperand(tacInf.oprand0);
+                            instructions.Add(X64.mov(X64.rcx, objPtr));
+                            instructions.Add(X64.call("free"));
                         }
                         break;
                     case "ALLOC_ARRAY":
-                        {//todo
+                        {
+                            var target = ParseOperand(tacInf.oprand0);
+                            var lenOp = ParseOperand(tacInf.oprand1);
+                            string arrType = tacInf.oprand0.typeExpression;
+                            string elemType = UtilsW64.SliceArrayElementType(arrType);
+                            int elemSize = UtilsW64.GetTypeSize(elemType);
+
+                            instructions.Add(X64.mov(X64.rax, lenOp));//RAX 作为中间寄存器
+                            instructions.Add(X64.mul(X64.rax, X64.imm(elemSize)));
+                            instructions.Add(X64.mov(X64.rcx, X64.rax));
+
+                            //动态分配  
+                            instructions.Add(X64.call("malloc"));
+                            //返回指针在RAX，写入目标变量  
+                            instructions.Add(X64.mov(target, X64.rax));
                         }
                         break;
                     case "IF_FALSE_JUMP":
-                        {//todo
+                        {
+                            var cond = ParseOperand(tacInf.oprand0);
+                            instructions.Add(X64.test(cond, cond));
+                            instructions.Add(X64.jz(tac.arg1));//jump if zero
                         }
                         break;
                     case "=":
                         {
+                            var dst = ParseOperand(tacInf.oprand0);
+                            var src = ParseOperand(tacInf.oprand1);
+
+                            if(tacInf.oprand0.IsSSEType())
+                            {
+                            }
+                            else
+                            {
+                            }
                         }
                         break;
                     case "+=":
@@ -789,6 +831,7 @@ namespace Gizbox.Src.Backend
 
 
         #region PASS0
+
         private void GenClassLayoutInfo(SymbolTable.Record classRec)
         {
             var classEnv = classRec.envPtr;
@@ -1123,15 +1166,21 @@ namespace Gizbox.Src.Backend
                     {
                         switch(iroperandExpr.segments[0])
                         {
+                            case "LITBOOL":
+                                {
+                                    var value = iroperandExpr.segments[1] == "True" ? 1L : 0L;
+                                    return X64.imm(value);
+                                }
+                                break;
                             case "LITINT":
                                 {
                                     var value = long.Parse(iroperandExpr.segments[1]);
                                     return X64.imm(value);
                                 }
                                 break;
-                            case "LITBOOL":
+                            case "LITLONG":
                                 {
-                                    var value = iroperandExpr.segments[1] == "True" ? 1L : 0L;
+                                    var value = long.Parse(iroperandExpr.segments[1]);
                                     return X64.imm(value);
                                 }
                                 break;
@@ -1179,7 +1228,7 @@ namespace Gizbox.Src.Backend
 
                         if(varRec.category == SymbolTable.RecordCatagory.Variable)
                         {
-                            return X64.vreg(varRec);
+                            return vreg(varRec);
                         }
                         else if(varRec.category == SymbolTable.RecordCatagory.Param)
                         {
@@ -1201,7 +1250,7 @@ namespace Gizbox.Src.Backend
                             throw new GizboxException(ExceptioName.Unknown, $"field not found for member access \"{objName}.{fieldName}\" at line {irOperand.owner.line}");
 
                         // 对象变量是一个指针值，在虚拟寄存器
-                        var baseVreg = X64.vreg(objRec);
+                        var baseVreg = vreg(objRec);
 
                         // 生成内存操作数
                         return X64.mem(baseVreg, displacement: fieldRec.addr);
@@ -1219,13 +1268,13 @@ namespace Gizbox.Src.Backend
                         var elemType = UtilsW64.SliceArrayElementType(arrayRec.typeExpression);
                         int elemSize = UtilsW64.GetTypeSize(elemType);
 
-                        var baseV = X64.vreg(arrayRec);
+                        var baseV = vreg(arrayRec);
 
                         // 所有可能是LITINT或者变量  
                         var idxRec = Query(indexExpr, irOperand.owner.line);
                         if(idxRec != null)
                         {
-                            var idxV = X64.vreg(idxRec);
+                            var idxV = vreg(idxRec);
                             return X64.mem(baseV, idxV, elemSize, 0);
                         }
                         else
@@ -1345,6 +1394,26 @@ namespace Gizbox.Src.Backend
             }
             return null;
         }
+
+
+        public X64Reg vreg(SymbolTable.Record varrec)
+        {
+            var xoperand = new X64Reg(varrec);
+
+            //局部变量  
+            if(funcEnv != null)
+            {
+                vRegs[funcEnv].TryAdd(varrec, xoperand);
+            }
+            //全局变量
+            else
+            {
+                vRegs[globalEnv].TryAdd(varrec, xoperand);
+            }
+
+            return xoperand;
+        }
+
         #endregion
 
         /// <summary>
@@ -1683,6 +1752,91 @@ namespace Gizbox.Src.Backend
             }
         }
 
+
+        public class GizboxType
+        {
+            public enum Type
+            {
+                Int,
+                Long,
+                Float,
+                Double,
+                Bool,
+                Char,
+                String,
+                Object, //引用类型
+                Array, //数组类型
+                Function, //函数类型
+            }
+            public static Dictionary<string, GizboxType> typeExpressionCache = new();
+
+            public Type type;
+            public GizboxType Object_Class;
+            public GizboxType Array_ElementType;
+            public GizboxType Function_ReturnType;
+            public List<GizboxType> Function_ParamTypes;
+
+            public static GizboxType Get(string typeExpression)
+            {
+                if(typeExpressionCache.ContainsKey(typeExpression))
+                    return typeExpressionCache[typeExpression];
+
+
+
+                if(typeExpression.Contains("->"))
+                {
+
+                }
+                else if(typeExpression.EndsWith("[]"))
+                {
+
+                }
+                else if(typeExpression.StartsWith("(") && typeExpression.EndsWith(")"))
+                {
+
+                }
+                else
+                {
+                    switch(typeExpression)
+                    {
+                        case "bool":
+                            {
+                            }
+                            break;
+                        case "char":
+                            {
+                            }
+                            break;
+                        case "int":
+                        {
+                        }
+                            break;
+                        case "long":
+                            {
+                            }
+                            break;
+                        case "float":
+                        {
+                        }
+                            break;
+                        case "double":
+                        {
+                        }
+                            break;
+                        case "string":
+                            {
+                            }
+                            break;
+                        default:
+                            {
+                            }
+                            break;
+
+                    }
+                }
+            }
+
+        }
         private class UtilsW64
         {
             public static bool IsJump(TAC tac)
@@ -1783,6 +1937,8 @@ namespace Gizbox.Src.Backend
                 {
                     case "int":
                         return 4;
+                    case "long":
+                        return 8;
                     case "float":
                         return 4;
                     case "double":

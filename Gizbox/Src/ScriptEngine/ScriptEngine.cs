@@ -370,19 +370,10 @@ namespace Gizbox.ScriptEngine
                             retRegister = GetValue(code.arg1);
                         }
 
-                        //处理返回值后，跳转到exit:functionname前一行  
-                        //（未来考虑加个FUNC_END标号或者给RETURN增加FUNC_END的功能）  
-
-                        var jumpAddr = mainUnit.QueryLabel("exit", QueryEnv(SymbolTable.TableCatagory.FuncScope).name, currUnit);
-                        int exitLine = jumpAddr.Item2;
-                        int endLine = exitLine - 1;    
+                        //处理返回值后，跳转到func_end:function    
+                        var jumpAddr = mainUnit.QueryLabel("func_end", QueryEnv(SymbolTable.TableCatagory.FuncScope).name, currUnit);
                         
-                        //不能使用ir判断
-                        //if(ir.codes[endLine].op != "METHOD_END" && ir.codes[endLine].op != "FUNC_END")
-                        //{
-                        //    throw new Exception("函数或方法的END没有紧接exit标签");  
-                        //}
-                        this.curr = endLine;
+                        this.curr = jumpAddr.Item2;
                         this.currUnit = jumpAddr.Item1;
 
                         return;
@@ -1034,11 +1025,16 @@ namespace Gizbox.ScriptEngine
         {
             switch(typeExpr)
             {
-                case "bool": return true;
-                case "int": return true;
-                case "float": return true;
-                case "string": return true;
-                default: return false;
+                case "bool": 
+                case "int": 
+                case "long":
+                case "float":
+                case "double":
+                case "char":
+                case "string":
+                    return true;
+                default: 
+                    return false;
             }
         }
         private bool IsFuncType(string typeExpr)
@@ -1416,6 +1412,7 @@ namespace Gizbox.ScriptEngine
                         switch (toType)
                         {
                             case "int": return val;
+                            case "long": return (long)val.AsInt;
                             case "float": return ((float)val.AsInt);
                             case "double": return ((double)val.AsInt);
                         }
@@ -1426,6 +1423,7 @@ namespace Gizbox.ScriptEngine
                         switch (toType)
                         {
                             case "int": return ((int)val.AsFloat);
+                            case "long": return ((long)val.AsFloat);
                             case "float": return val;
                             case "double": return ((double)val.AsFloat);
                         }
@@ -1436,6 +1434,7 @@ namespace Gizbox.ScriptEngine
                         switch (toType)
                         {
                             case "int": return ((int)val.AsDouble);
+                            case "long": return ((long)val.AsDouble);
                             case "float": return ((float)val.AsDouble);
                             case "double": return val;
                         }
@@ -1455,7 +1454,8 @@ namespace Gizbox.ScriptEngine
                         {
                             case "void": 
                             case "bool": 
-                            case "int": 
+                            case "int":
+                            case "long":
                             case "float": 
                             case "double": 
                             case "char":
@@ -1475,7 +1475,8 @@ namespace Gizbox.ScriptEngine
                         {
                             case "void": 
                             case "bool": 
-                            case "int": 
+                            case "int":
+                            case "long":
                             case "float": 
                             case "double": 
                             case "char":
@@ -1507,6 +1508,7 @@ namespace Gizbox.ScriptEngine
                 case GizType.Void:
                 case GizType.Bool:
                 case GizType.Int:
+                case GizType.Long:
                 case GizType.Float:
                 case GizType.Double:
                 case GizType.Char:

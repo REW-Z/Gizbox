@@ -47,14 +47,29 @@ namespace Gizbox.Src.Backend
         undefined = -1,//用于占位
 
         mov,
+        movss,
+        movsd,
 
         push,
         pop,
 
         add,
+        addss,
+        addsd,
+
         sub,
+        subss,
+        subsd,
+
+        mul,
         imul,
+        mulss,
+        mulsd,
+
+        div,
         idiv,
+        divss,
+        divsd,
 
         inc,
         dec,
@@ -69,6 +84,7 @@ namespace Gizbox.Src.Backend
         test,
 
         jmp,
+        jz,
         jnz,
         je,
         jne,
@@ -194,6 +210,7 @@ namespace Gizbox.Src.Backend
     {
         // 跳转指令
         public static X64Instruction jmp(string labelname) => new() { type = InstructionType.jmp, operand0 = new X64Label(labelname) };
+        public static X64Instruction jz(string labelname) => new() { type = InstructionType.jz, operand0 = new X64Label(labelname) };
         public static X64Instruction jnz(string labelname) => new() { type = InstructionType.jnz, operand0 = new X64Label(labelname) };
         public static X64Instruction je(string labelname) => new() { type = InstructionType.je, operand0 = new X64Label(labelname) };
         public static X64Instruction jne(string labelname) => new() { type = InstructionType.jne, operand0 = new X64Label(labelname) };
@@ -205,15 +222,28 @@ namespace Gizbox.Src.Backend
         // 数据移动
         public static X64Instruction mov(X64Operand dest, X64Operand src) => new() { type = InstructionType.mov, operand0 = dest, operand1 = src };
 
+
         // 栈操作
         public static X64Instruction push(X64Operand operand) => new() { type = InstructionType.push, operand0 = operand };
         public static X64Instruction pop(X64Operand operand) => new() { type = InstructionType.pop, operand0 = operand };
 
         // 算术运算
-        public static X64Instruction add(X64Operand dest, X64Operand src) => new() { type = InstructionType.add, operand0 = dest, operand1 = src };
-        public static X64Instruction sub(X64Operand dest, X64Operand src) => new() { type = InstructionType.sub, operand0 = dest, operand1 = src };
-        public static X64Instruction imul(X64Operand dest, X64Operand src) => new() { type = InstructionType.imul, operand0 = dest, operand1 = src };
-        public static X64Instruction idiv(X64Operand operand) => new() { type = InstructionType.idiv, operand0 = operand };
+        public static X64Instruction add(X64Operand dest, X64Operand src)
+        {
+            throw new NotImplementedException("Add operation not implemented yet.");
+        }
+        public static X64Instruction sub(X64Operand dest, X64Operand src)
+        {
+            throw new NotImplementedException("Add operation not implemented yet.");
+        }
+        public static X64Instruction mul(X64Operand dest, X64Operand src)
+        {
+            throw new NotImplementedException("Add operation not implemented yet.");
+        }
+        public static X64Instruction div(X64Operand operand)
+        {
+            throw new NotImplementedException("Add operation not implemented yet.");
+        }
 
         public static X64Instruction inc(X64Operand operand) => new() { type = InstructionType.inc, operand0 = operand };
         public static X64Instruction dec(X64Operand operand) => new() { type = InstructionType.dec, operand0 = operand };
@@ -291,12 +321,6 @@ namespace Gizbox.Src.Backend
         public static X64Rel rel(string symbolName, long displacement = 0) => new X64Rel(symbolName, displacement);
 
 
-
-        public static X64Reg vreg(SymbolTable.Record varrec)
-        {
-            var xoperand = new X64Reg(varrec);
-            return xoperand;
-        }
 
         public static X64Mem mem(RegisterEnum baseReg, RegisterEnum indexReg, int scale, long displacement = 0)
         {

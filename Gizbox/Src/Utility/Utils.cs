@@ -21,11 +21,15 @@ namespace Gizbox
         {
             switch (typeExpr)
             {
-                case "bool": return true;
-                case "int": return true;
-                case "float": return true;
-                case "string": return true;
-                default: return false;
+                case "bool": 
+                case "int": 
+                case "long":  
+                case "float":
+                case "double":
+                case "string": 
+                    return true;
+                default: 
+                    return false;
             }
         }
 

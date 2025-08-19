@@ -12,6 +12,7 @@ namespace Gizbox
 
         //ValueType  
         Int,
+        Long,
         Float,
         Double,
         Bool,
@@ -44,6 +45,10 @@ namespace Gizbox
         [DataMember]
         [FieldOffset(4)]
         public int AsInt;
+
+        [DataMember]
+        [FieldOffset(4)]
+        public int AsLong;
 
         [DataMember]
         [FieldOffset(4)]
@@ -83,6 +88,10 @@ namespace Gizbox
         public static implicit operator Value(int v)
         {
             return new Value() { type = GizType.Int, AsInt = v };
+        }
+        public static implicit operator Value(long v)
+        {
+            return new Value() { type = GizType.Long, AsLong = v };
         }
         public static implicit operator Value(float v)
         {
@@ -129,7 +138,9 @@ namespace Gizbox
             {
                 case GizType.Bool: throw new GizboxException(ExceptioName.OperationTypeError);
                 case GizType.Int: return v1.AsInt + v2.AsInt;
+                case GizType.Long: return v1.AsLong + v2.AsLong;
                 case GizType.Float: return v1.AsFloat + v2.AsFloat;
+                case GizType.Double: return v1.AsDouble + v2.AsDouble;
                 //case GizType.String: return (string)v1.AsObject + (string)v2.AsObject;
                 default: throw new GizboxException(ExceptioName.OperationTypeError);
             }
@@ -139,8 +150,10 @@ namespace Gizbox
             if (v1.type != v2.type) throw new GizboxException(ExceptioName.OperationTypeError);
             switch (v1.type)
             {
-                case GizType.Int: return v1.AsInt - v2.AsInt;
+                case GizType.Int:  return v1.AsInt - v2.AsInt;
+                case GizType.Long: return v1.AsLong - v2.AsLong;
                 case GizType.Float: return v1.AsFloat - v2.AsFloat;
+                case GizType.Double:  return v1.AsDouble - v2.AsDouble;
                 default: throw new GizboxException(ExceptioName.OperationTypeError);
             }
         }
@@ -150,7 +163,9 @@ namespace Gizbox
             switch (v1.type)
             {
                 case GizType.Int: return v1.AsInt * v2.AsInt;
+                case GizType.Long: return v1.AsLong * v2.AsLong;
                 case GizType.Float: return v1.AsFloat * v2.AsFloat;
+                case GizType.Double: return v1.AsDouble * v2.AsDouble;
                 default: throw new GizboxException(ExceptioName.OperationTypeError);
             }
         }
@@ -160,7 +175,9 @@ namespace Gizbox
             switch (v1.type)
             {
                 case GizType.Int: return v1.AsInt / v2.AsInt;
+                case GizType.Long: return v1.AsLong / v2.AsLong;
                 case GizType.Float: return v1.AsFloat / v2.AsFloat;
+                case GizType.Double:  return v1.AsDouble / v2.AsDouble;
                 default: throw new GizboxException(ExceptioName.OperationTypeError);
             }
         }
@@ -169,8 +186,10 @@ namespace Gizbox
             if (v1.type != v2.type) throw new GizboxException(ExceptioName.OperationTypeError);
             switch (v1.type)
             {
-                case GizType.Int: return v1.AsInt % v2.AsInt;
+                case GizType.Int:  return v1.AsInt % v2.AsInt;
+                case GizType.Long: return v1.AsLong % v2.AsLong;
                 case GizType.Float: return v1.AsFloat % v2.AsFloat;
+                case GizType.Double: return v1.AsDouble % v2.AsDouble;
                 default: throw new GizboxException(ExceptioName.OperationTypeError);
             }
         }
@@ -179,8 +198,14 @@ namespace Gizbox
             if (v1.type != v2.type) throw new GizboxException(ExceptioName.OperationTypeError);
             switch (v1.type)
             {
-                case GizType.Int: return v1.AsInt > v2.AsInt;
-                case GizType.Float: return v1.AsFloat > v2.AsFloat;
+                case GizType.Int:
+                    return v1.AsInt > v2.AsInt;
+                case GizType.Long:
+                    return v1.AsLong > v2.AsLong;
+                case GizType.Float:
+                    return v1.AsFloat > v2.AsFloat;
+                case GizType.Double:
+                    return v1.AsDouble > v2.AsDouble;
                 default: throw new GizboxException(ExceptioName.OperationTypeError);
             }
         }
@@ -189,8 +214,14 @@ namespace Gizbox
             if (v1.type != v2.type) throw new GizboxException(ExceptioName.OperationTypeError);
             switch (v1.type)
             {
-                case GizType.Int: return v1.AsInt < v2.AsInt;
-                case GizType.Float: return v1.AsFloat < v2.AsFloat;
+                case GizType.Int:
+                    return v1.AsInt < v2.AsInt;
+                case GizType.Long:
+                    return v1.AsLong < v2.AsLong;
+                case GizType.Float:
+                    return v1.AsFloat < v2.AsFloat;
+                case GizType.Double:
+                    return v1.AsDouble < v2.AsDouble;
                 default: throw new GizboxException(ExceptioName.OperationTypeError);
             }
         }
@@ -199,8 +230,14 @@ namespace Gizbox
             if (v1.type != v2.type) throw new GizboxException(ExceptioName.OperationTypeError);
             switch (v1.type)
             {
-                case GizType.Int: return v1.AsInt <= v2.AsInt;
-                case GizType.Float: return v1.AsFloat <= v2.AsFloat;
+                case GizType.Int:
+                    return v1.AsInt <= v2.AsInt;
+                case GizType.Long:
+                    return v1.AsLong <= v2.AsLong;
+                case GizType.Float:
+                    return v1.AsFloat <= v2.AsFloat;
+                case GizType.Double:
+                    return v1.AsDouble <= v2.AsDouble;
                 default: throw new GizboxException(ExceptioName.OperationTypeError);
             }
         }
@@ -209,8 +246,14 @@ namespace Gizbox
             if (v1.type != v2.type) throw new GizboxException(ExceptioName.OperationTypeError);
             switch (v1.type)
             {
-                case GizType.Int: return v1.AsInt >= v2.AsInt;
-                case GizType.Float: return v1.AsFloat >= v2.AsFloat;
+                case GizType.Int:
+                    return v1.AsInt >= v2.AsInt;
+                case GizType.Long:
+                    return v1.AsLong >= v2.AsLong;
+                case GizType.Float:
+                    return v1.AsFloat >= v2.AsFloat;
+                case GizType.Double:
+                    return v1.AsDouble >= v2.AsDouble;
                 default: throw new GizboxException(ExceptioName.OperationTypeError);
             }
         }
@@ -227,7 +270,9 @@ namespace Gizbox
                 case GizType.Void: return v1.type == v2.type;
                 case GizType.Bool: return v1.AsBool == v2.AsBool;
                 case GizType.Int: return v1.AsInt == v2.AsInt;
+                case GizType.Long: return v1.AsLong == v2.AsLong;
                 case GizType.Float: return v1.AsFloat == v2.AsFloat;
+                case GizType.Double: return v1.AsDouble == v2.AsDouble;
                 default: throw new GizboxException(ExceptioName.OperationTypeError);
             }
         }
@@ -243,7 +288,9 @@ namespace Gizbox
             {
                 case GizType.Bool: return v1.AsBool != v2.AsBool;
                 case GizType.Int: return v1.AsInt != v2.AsInt;
+                case GizType.Long: return v1.AsLong != v2.AsLong;
                 case GizType.Float: return v1.AsFloat != v2.AsFloat;
+                case GizType.Double: return v1.AsDouble != v2.AsDouble;
                 default: throw new GizboxException(ExceptioName.OperationTypeError);
             }
         }
@@ -257,8 +304,11 @@ namespace Gizbox
             {
                 case GizType.Void: return "";
                 case GizType.Bool: return AsBool.ToString();
+                case GizType.Char: return AsChar.ToString();
                 case GizType.Int: return AsInt.ToString();
+                case GizType.Long: return AsLong.ToString();
                 case GizType.Float: return AsFloat.ToString();
+                case GizType.Double: return AsDouble.ToString();
                 case GizType.StringRef:
                     {
                         return $"GizString(ptr:{this.AsPtr})";

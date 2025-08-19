@@ -58,6 +58,7 @@ namespace Gizbox
             keywords.Add(new TokenPattern("void", "void\\W", 1));
             keywords.Add(new TokenPattern("bool", "bool\\W", 1));
             keywords.Add(new TokenPattern("int", "int\\W", 1));
+            keywords.Add(new TokenPattern("long", "long\\W", 1));
             keywords.Add(new TokenPattern("float", "float\\W", 1));
             keywords.Add(new TokenPattern("double", "double\\W", 1));
             keywords.Add(new TokenPattern("char", "char\\W", 1));
@@ -123,6 +124,7 @@ namespace Gizbox
 
             literals.Add(new TokenPattern("LITBOOL", "(true|false)[^a-zA-Z]", 1));
             literals.Add(new TokenPattern("LITINT", "[0-9]+[^\\d\\.]", 1));
+            literals.Add(new TokenPattern("LITLONG", "[0-9]+[L|l]\\D", 1));
             literals.Add(new TokenPattern("LITFLOAT", "[0-9]+\\.[0-9]+[F|f]\\D", 1));
             literals.Add(new TokenPattern("LITDOUBLE", "[0-9]+\\.[0-9]+[D|d]\\D", 1));
             literals.Add(new TokenPattern("LITCHAR", "\\\'[^\\\']\\\'[^\\\']", 1));

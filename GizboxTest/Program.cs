@@ -122,28 +122,10 @@ switch(cmdIdx)
     case 4:
         {
             //测试脚本Test  
-            Console.WriteLine("测试新解释引擎");
-            
+            Console.WriteLine("测试");
+
+
             break;  
-            //string source = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\test.gix");
-            //Gizbox.Compiler compiler = new Compiler();
-            //compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
-            //compiler.ConfigParserDataSource(hardcode: true);
-            ////compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
-            //var il = compiler.Compile(source);
-
-            //Compiler.Pause("Compile End");
-
-            //ScriptEngineV2 engineV2 = new ScriptEngineV2();
-            //engineV2.AddLibSearchDirectory(AppDomain.CurrentDomain.BaseDirectory);
-            //engineV2.csharpInteropContext.ConfigExternCallClasses(new Type[] {
-            //    typeof(TestExternCalls),
-            //});
-            //engineV2.Execute(il);
-
-
-
-            //Compiler.Pause("Execute End");
         }
         break;
     case 5:

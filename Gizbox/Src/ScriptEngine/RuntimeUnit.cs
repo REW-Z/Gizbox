@@ -117,6 +117,7 @@ namespace Gizbox.ScriptEngine
                 case "LITNULL": this.val =  Value.NULL; break;
                 case "LITBOOL": this.val = bool.Parse(lex); break;
                 case "LITINT": this.val = int.Parse(lex); break;
+                case "LITLONG": this.val = long.Parse(lex); break;
                 case "LITFLOAT": this.val = float.Parse(lex.Substring(0, lex.Length - 1)); break;//去除F标记  
                 case "LITDOUBLE": this.val = double.Parse(lex.Substring(0, lex.Length - 1)); break;//去除F标记  
                 case "LITCHAR": this.val = lex[1]; break;

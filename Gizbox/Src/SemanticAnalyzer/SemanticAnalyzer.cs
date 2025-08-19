@@ -635,7 +635,7 @@ namespace Gizbox.SemanticRule
                 psr.newElement.attributes["ast_node"] = (SyntaxTree.PrimitiveTypeNode)psr.stack[psr.stack.Top].attributes["ast_node"];
             });
 
-            string[] primiveProductions = new string[] { "void", "bool", "int", "float", "double", "char", "string" };
+            string[] primiveProductions = new string[] { "void", "bool", "int", "long", "float", "double", "char", "string" };
             foreach (var t in primiveProductions)
             {
                 AddActionAtTail("primitive -> " + t, (psr, production) => {
@@ -1037,7 +1037,7 @@ namespace Gizbox.SemanticRule
                 };
             });
 
-            string[] litTypes = new string[] { "null", "LITINT", "LITFLOAT", "LITDOUBLE", "LITCHAR", "LITSTRING", "LITBOOL" };
+            string[] litTypes = new string[] { "null", "LITINT", "LITLONG", "LITFLOAT", "LITDOUBLE", "LITCHAR", "LITSTRING", "LITBOOL" };
             foreach (var litType in litTypes)
             {
 
@@ -2674,6 +2674,8 @@ namespace Gizbox.SemanticRule
                     return "bool";
                 case "LITINT":
                     return "int";
+                case "LITLONG":
+                    return "long";
                 case "LITFLOAT":
                     return "float";
                 case "LITDOUBLE":
@@ -2820,7 +2822,7 @@ namespace Gizbox.SemanticRule
             //库依赖中查找  
             foreach(var lib in this.ilUnit.dependencyLibs)
             {
-                lib.QueryAllTopSymbol(rawname, result, ignoreMangle: true);
+                lib.QueryAllTopSymbolToContainer(rawname, result, ignoreMangle: true);
             }
         }
         private bool TryQueryIgnoreMangle(string name)

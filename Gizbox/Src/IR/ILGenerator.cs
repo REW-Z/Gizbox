@@ -131,7 +131,8 @@ namespace Gizbox.IR
                             //函数开始    
                             GenerateCode(" ").label = "entry:" + funcFullName;
                             EnvBegin(envStack.Peek().GetTableInChildren(classDeclNode.classNameNode.FullName + ".ctor"));
-                            GenerateCode("FUNC_BEGIN", funcFullName);
+                            GenerateCode("FUNC_BEGIN", funcFullName).label = "func_begin:" + funcFullName;
+                            
 
                             //基类构造函数调用  
                             if (classDeclNode.baseClassNameNode != null)
@@ -161,7 +162,7 @@ namespace Gizbox.IR
 
                             GenerateCode("RETURN");
 
-                            GenerateCode("FUNC_END");
+                            GenerateCode("FUNC_END").label = "func_end:" + funcFullName;
                             EnvEnd(envStack.Peek().GetTableInChildren(classDeclNode.classNameNode.FullName + ".ctor"));
                             GenerateCode(" ").label = "exit:" + funcFullName;
                         }

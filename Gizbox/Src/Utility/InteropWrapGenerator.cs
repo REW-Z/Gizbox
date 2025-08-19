@@ -594,8 +594,10 @@ namespace Gizbox
             switch (gizType)
             {
                 case "int": return "0";
+                case "long": return "0L";
                 case "bool": return "false";
                 case "float": return "0.0f";
+                case "double": return "0.0d";
                 case "string": return "";
                 default:
                     {

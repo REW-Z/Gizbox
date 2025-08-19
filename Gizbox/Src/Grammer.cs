@@ -157,6 +157,7 @@ namespace Gizbox
             "primitive -> void",
             "primitive -> bool",
             "primitive -> int",
+            "primitive -> long",
             "primitive -> float",
             "primitive -> double",
             "primitive -> char",
@@ -231,6 +232,7 @@ namespace Gizbox
 
             "lit -> LITBOOL",
             "lit -> LITINT",
+            "lit -> LITLONG",
             "lit -> LITFLOAT",
             "lit -> LITDOUBLE",
             "lit -> LITCHAR",

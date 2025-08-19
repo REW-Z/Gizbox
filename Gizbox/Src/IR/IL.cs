@@ -81,11 +81,11 @@ namespace Gizbox.IR
         [DataMember]
         public List<TAC> codes = new List<TAC>();
 
-        //作用域状态数组  
+        //行数 -> 作用域状态数组  
         [DataMember]
         public int[] scopeStatusArr;
 
-        //作用域列表  
+        //作用域列表(按结束顺序)    
         [DataMember]
         public List<Scope> scopes = new List<Scope>();
 
@@ -101,7 +101,7 @@ namespace Gizbox.IR
         [DataMember]
         public Dictionary<string, int> label2Line = new Dictionary<string, int>();
 
-        //行数 -> 符号表链 查询表
+        //状态 -> 符号表链 查询表
         [DataMember]
         public Dictionary<int, GStack<SymbolTable>> stackDic;
 
@@ -183,6 +183,8 @@ namespace Gizbox.IR
             }
         }
 
+
+
         //缓存符号表栈  
         private void CacheEnvStack()
         {
@@ -212,7 +214,7 @@ namespace Gizbox.IR
             }
         }
 
-        //所在符号表链  
+        /// <summary> 计算所在符号表链 </summary>
         private void EnvHits(int currentLine, List<SymbolTable> envs)
         {
             envs.Clear();
@@ -226,7 +228,7 @@ namespace Gizbox.IR
             }
         }
 
-        //查询顶层符号  
+        /// <summary> 查询一个顶层符号 </summary>
         public SymbolTable.Record QueryTopSymbol(string name, bool ignoreMangle = false)
         {
             //本单元查找  
@@ -257,7 +259,10 @@ namespace Gizbox.IR
 
             return null;
         }
-        public void QueryAllTopSymbol(string name, List<SymbolTable.Record> result, bool ignoreMangle = false)
+
+
+        /// <summary> 查询顶层符号并全部填充到 </summary>
+        public void QueryAllTopSymbolToContainer(string name, List<SymbolTable.Record> result, bool ignoreMangle = false)
         {
             //本单元查找  
             if (ignoreMangle == false)
@@ -277,13 +282,13 @@ namespace Gizbox.IR
             {
                 foreach (var dep in dependencyLibs)
                 {
-                    dep.QueryAllTopSymbol(name, result, ignoreMangle);
+                    dep.QueryAllTopSymbolToContainer(name, result, ignoreMangle);
                 }
             }
         }
 
 
-        //查询虚函数表  
+        /// <summary> 查询虚函数表 </summary>
         public VTable QueryVTable(string name)
         {
             //本单元查找  
@@ -306,13 +311,32 @@ namespace Gizbox.IR
         }
 
 
-        //查询所有全局作用域   
+        /// <summary> 查询所有全局作用域 </summary>
         public List<SymbolTable> GetAllGlobalEnvs()
         {
             List<SymbolTable> envs = new List<SymbolTable>();
             AddGlobalEnvsToList(this, envs);
             return envs;
         }
+
+
+        /// <summary> 行所在符号表栈 </summary>
+        public GStack<SymbolTable> GetEnvStackAtLine(int line)
+        {
+            if(line < scopeStatusArr.Length)
+            {
+                var status = scopeStatusArr[line];
+                return stackDic[status];
+            }
+            return null;
+        }
+
+        /// <summary> 行所在的顶层符号表 </summary>
+        public SymbolTable GetTopEnvAtLine(int line)
+        {
+            return GetEnvStackAtLine(line).Peek();
+        }
+
         private void AddGlobalEnvsToList(ILUnit unit, List<SymbolTable> list)
         {
             if (list.Contains(unit.globalScope.env)) return;
