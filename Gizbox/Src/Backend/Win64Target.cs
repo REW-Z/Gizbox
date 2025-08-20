@@ -183,11 +183,11 @@ namespace Gizbox.Src.Backend
 
                     Console.ForegroundColor = ConsoleColor.DarkGreen;
                     if(tacInf.oprand0 != null) 
-                        Console.WriteLine("    op0：typeExpr:" + (tacInf.oprand0.typeExpression ?? "?") + "  type:  " + tacInf.oprand0.expr.type.ToString());
+                        Console.WriteLine("    op0：typeExpr:" + (tacInf.oprand0.typeExpr.ToString() ?? "?") + "  type:  " + tacInf.oprand0.expr.type.ToString());
                     if(tacInf.oprand1 != null)
-                        Console.WriteLine("    op1：typeExpr:" + (tacInf.oprand1.typeExpression ?? "?") + "  type:  " + tacInf.oprand1.expr.type.ToString());
+                        Console.WriteLine("    op1：typeExpr:" + (tacInf.oprand1.typeExpr.ToString() ?? "?") + "  type:  " + tacInf.oprand1.expr.type.ToString());
                     if(tacInf.oprand2 != null)
-                        Console.WriteLine("    op2：typeExpr:" + (tacInf.oprand2.typeExpression ?? "?") + "  type:  " + tacInf.oprand2.expr.type.ToString());
+                        Console.WriteLine("    op2：typeExpr:" + (tacInf.oprand2.typeExpr.ToString() ?? "?") + "  type:  " + tacInf.oprand2.expr.type.ToString());
 
                     Console.ForegroundColor = ConsoleColor.White;
                 }
@@ -593,7 +593,7 @@ namespace Gizbox.Src.Backend
                             instructions.Add(X64.mov(X64.rcx, x64obj));
 
                             //取Vptr  
-                            var methodRec = QueryMember(codeParamObj.oprand0.typeExpression, methodName);
+                            var methodRec = QueryMember(codeParamObj.oprand0.typeExpr.ToString(), methodName);
                             instructions.Add(X64.mov(X64.rax, X64.mem(X64.rcx, displacement: 0)));
                             //函数地址（addr表示在虚函数表中的偏移(Index*8)）  
                             instructions.Add(X64.mov(X64.rax, X64.mem(X64.rax, displacement: methodRec.addr)));
@@ -698,12 +698,12 @@ namespace Gizbox.Src.Backend
                         {
                             var target = ParseOperand(tacInf.oprand0);
                             var lenOp = ParseOperand(tacInf.oprand1);
-                            string arrType = tacInf.oprand0.typeExpression;
-                            string elemType = UtilsW64.SliceArrayElementType(arrType);
-                            int elemSize = UtilsW64.GetTypeSize(elemType);
+                            var arrType = tacInf.oprand0.typeExpr;
+                            var elemType = arrType.ArrayElementType;
+                            int elemSize = elemType.Size;
 
                             instructions.Add(X64.mov(X64.rax, lenOp));//RAX 作为中间寄存器
-                            instructions.Add(X64.mul(X64.rax, X64.imm(elemSize)));
+                            instructions.Add(X64.mul(X64.imm(elemSize)));
                             instructions.Add(X64.mov(X64.rcx, X64.rax));
 
                             //动态分配  
@@ -726,9 +726,14 @@ namespace Gizbox.Src.Backend
 
                             if(tacInf.oprand0.IsSSEType())
                             {
+                                if(tacInf.oprand0.typeExpr.Size == 4)
+                                    instructions.Add(X64.movss(dst, src));
+                                else if(tacInf.oprand0.typeExpr.Size == 8)
+                                    instructions.Add(X64.movsd(dst, src));
                             }
                             else
                             {
+                                instructions.Add(X64.mov(dst, src));
                             }
                         }
                         break;
@@ -1174,7 +1179,7 @@ namespace Gizbox.Src.Backend
                                 break;
                             case "LITINT":
                                 {
-                                    var value = long.Parse(iroperandExpr.segments[1]);
+                                    var value = int.Parse(iroperandExpr.segments[1]);
                                     return X64.imm(value);
                                 }
                                 break;
@@ -1265,8 +1270,8 @@ namespace Gizbox.Src.Backend
                             throw new GizboxException(ExceptioName.Unknown, $"array not found for element access \"{arrayName}[{indexExpr}]\" at line {irOperand.owner.line}");
 
                         // 元素大小
-                        var elemType = UtilsW64.SliceArrayElementType(arrayRec.typeExpression);
-                        int elemSize = UtilsW64.GetTypeSize(elemType);
+                        var elemType = TypeExpr.Parse(arrayRec.typeExpression);
+                        int elemSize = elemType.Size;
 
                         var baseV = vreg(arrayRec);
 
@@ -1598,6 +1603,7 @@ namespace Gizbox.Src.Backend
                 }
             }
         }
+
         public class IROperand
         {
             ///操作数实例（和tac中的操作数一一对应）
@@ -1607,7 +1613,7 @@ namespace Gizbox.Src.Backend
 
             public string[] segments => expr.segments;//子操作数
 
-            public string typeExpression;//类型  
+            public TypeExpr typeExpr;//类型  
             public SymbolTable.Record[] segmentRecs;//变量的符号表条目（如果子操作数是变量）  
             public SymbolTable.Record RET_functionRec;//返回值的函数符号表条目（如果是RET操作数）
 
@@ -1622,17 +1628,17 @@ namespace Gizbox.Src.Backend
                     SymbolTable.Record rec;
                     if(owner.tac.op == "MCALL" && operandIdx == 0)
                     {
-                        var className = owner.MCALL_methodTargetObject.typeExpression;
-                        rec = context.QueryMember(className, segments[0]);
+                        var objClass = owner.MCALL_methodTargetObject.typeExpr;
+                        rec = context.QueryMember(objClass.ToString(), segments[0]);
                         segmentRecs[0] = rec;
-                        typeExpression = rec.typeExpression;
+                        typeExpr = TypeExpr.Parse(rec.typeExpression);
                     }
                     else
                     {
                         rec = context.Query(segments[0], tacinf.line);
                         if(rec == null) throw new GizboxException(ExceptioName.Unknown, $"cannot find variable {segments[0]} at line {tacinf.line}");
                         segmentRecs[0] = rec;
-                        typeExpression = rec.typeExpression;
+                        typeExpr = TypeExpr.Parse(rec.typeExpression);
                     }
                 }
                 else if(expr.type == IROperandExpr.Type.ClassMemberAccess)
@@ -1646,14 +1652,14 @@ namespace Gizbox.Src.Backend
                         Console.WriteLine("成员类型：" + memberRec.category.ToString());
                         segmentRecs[0] = objRec;
                         segmentRecs[1] = memberRec;
-                        typeExpression = memberRec.typeExpression;
+                        typeExpr = TypeExpr.Parse(memberRec.typeExpression);
                     }
                     else
                     {
                         var objRec = context.Query(segments[0], tacinf.line);
                         segmentRecs[0] = objRec;
                         segmentRecs[1] = null;
-                        typeExpression = objRec.name;
+                        typeExpr = TypeExpr.Parse(objRec.name);
                     }
                 }
                 else if(expr.type == IROperandExpr.Type.ArrayElementAccess)
@@ -1662,7 +1668,7 @@ namespace Gizbox.Src.Backend
                     var indexRec = context.Query(segments[1], tacinf.line);
                     segmentRecs[0] = arrayRec;
                     segmentRecs[1] = indexRec;
-                    typeExpression = UtilsW64.SliceArrayElementType(arrayRec.typeExpression);
+                    typeExpr = TypeExpr.Parse(arrayRec.typeExpression).ArrayElementType;
                 }
                 else if(expr.type == IROperandExpr.Type.RET)
                 {
@@ -1697,148 +1703,27 @@ namespace Gizbox.Src.Backend
                         throw new GizboxException(ExceptioName.Unknown, $"no function record for RET at line {this.owner.line}");
                     }
 
-                    typeExpression = UtilsW64.SliceFunctionRetType(RET_functionRec.typeExpression);
+                    typeExpr = TypeExpr.Parse(RET_functionRec.typeExpression).FunctionReturnType;
 
                 }
                 else if(expr.type == IROperandExpr.Type.LitOrConst)
                 {
-                    typeExpression = UtilsW64.GetLitConstType(segments[0]);
+                    typeExpr = TypeExpr.Parse(UtilsW64.GetLitConstType(segments[0]));
                 }
                 else if(expr.type == IROperandExpr.Type.Label)
                 {
-                    typeExpression = "(label)";
+                    typeExpr = TypeExpr.Parse("(label)");
                 }
             }
 
             public bool IsSSEType()
             {
-                //判断是否是SSE类型的字面量
-                switch(expr.type)
-                {
-                    case IROperandExpr.Type.LitOrConst:
-                        {
-                            switch(expr.segments[0])
-                            {
-                                case "LITFLOAT":
-                                case "LITDOUBLE":
-                                    return true;
-                                default:
-                                    return false;
-                            }
-                        }
-                        break;
-                    case IROperandExpr.Type.RET:
-                        {
-                            return UtilsW64.IsSSETypeExpression(UtilsW64.SliceFunctionRetType(RET_functionRec.typeExpression));
-                        }
-                    case IROperandExpr.Type.Identifier:
-                        {
-                            return UtilsW64.IsSSETypeExpression(segmentRecs[0].typeExpression); 
-                        }
-                        break;
-                    case IROperandExpr.Type.ClassMemberAccess:
-                        {
-                            return UtilsW64.IsSSETypeExpression(segmentRecs[1].typeExpression);
-                        }
-                        break;
-                    case IROperandExpr.Type.ArrayElementAccess:
-                        {
-                            var eleType = UtilsW64.SliceArrayElementType(segmentRecs[0].typeExpression);
-                            return UtilsW64.IsSSETypeExpression(eleType);
-                        }
-                        break;
-                }
-                return false;
+                return typeExpr.IsSSEType;
             }
         }
 
 
-        public class TypeExpr
-        {
-            public static Dictionary<string, TypeExpr> typeExpressionCache = new();
-            public enum Category
-            {
-                Int,
-                Long,
-                Float,
-                Double,
-                Bool,
-                Char,
-                String,
-                Object, //引用类型
-                Array, //数组类型
-                Function, //函数类型
-            }
-
-            public Category type;
-            public TypeExpr Object_Class;
-            public TypeExpr Array_ElementType;
-            public TypeExpr Function_ReturnType;
-            public List<TypeExpr> Function_ParamTypes;
-
-            private TypeExpr() { }
-
-            public static TypeExpr Parse(string typeExpression)
-            {
-                typeExpression = typeExpression.Trim();
-
-                if(typeExpressionCache.TryGetValue(typeExpression, out var cached))
-                    return cached;
-
-                if(typeExpression.Contains("->"))
-                {
-
-                }
-                else if(typeExpression.EndsWith("[]"))
-                {
-
-                }
-                else if(typeExpression.StartsWith("(") && typeExpression.EndsWith(")"))
-                {
-
-                }
-                else
-                {
-                    switch(typeExpression)
-                    {
-                        case "bool":
-                            {
-                            }
-                            break;
-                        case "char":
-                            {
-                            }
-                            break;
-                        case "int":
-                        {
-                        }
-                            break;
-                        case "long":
-                            {
-                            }
-                            break;
-                        case "float":
-                        {
-                        }
-                            break;
-                        case "double":
-                        {
-                        }
-                            break;
-                        case "string":
-                            {
-                            }
-                            break;
-                        default:
-                            {
-                            }
-                            break;
-
-                    }
-                }
-            }
-
-        }
+        
         private class UtilsW64
         {
             public static bool IsJump(TAC tac)
@@ -1852,33 +1737,7 @@ namespace Gizbox.Src.Backend
             {
                 return !string.IsNullOrEmpty(tac.label);
             }
-            public static bool IsSSETypeExpression(string typeExpression)
-            {
-                switch(typeExpression)
-                {
-                    case "float":
-                        return true;
-                    case "double":
-                        return true;
-                    default:
-                        return false;
-                }
-            }
-            public static string SliceFunctionRetType(string funcTypeExpression)
-            {
-                if(funcTypeExpression.Contains("->") == false)
-                    throw new GizboxException(ExceptioName.Unknown, $"not a function type:{funcTypeExpression}");
 
-                Console.WriteLine("funcTypeExpr:" + funcTypeExpression);
-                return "";
-            }
-            public static string SliceArrayElementType(string arrTypeExpress)
-            {
-                if(arrTypeExpress.EndsWith("[]") == false)
-                    throw new GizboxException(ExceptioName.Unknown, $"not a array type:{arrTypeExpress}");
-                var eleType = arrTypeExpress.Substring(0, arrTypeExpress.Length - 2);
-                return eleType;
-            }
             public static string GetLitConstType(string litconstMark)
             {
                 switch(litconstMark)
@@ -1932,31 +1791,6 @@ namespace Gizbox.Src.Backend
 
                 throw new GizboxException(ExceptioName.Unknown, $"param cannot pass by register. idx:{paramIdx}");
             }
-
-            public static int GetTypeSize(string typeExpression)
-            {
-                switch(typeExpression)
-                {
-                    case "int":
-                        return 4;
-                    case "long":
-                        return 8;
-                    case "float":
-                        return 4;
-                    case "double":
-                        return 8;
-                    case "bool":
-                        return 1;
-                    case "char":
-                        return 2;
-                    case "string":
-                        return 8; // 字符串64位指针
-                    default:
-                        // 引用类型64位指针
-                        return 8;
-                }
-            }
-
         }
     }
 }

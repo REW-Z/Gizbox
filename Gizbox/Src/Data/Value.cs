@@ -48,7 +48,7 @@ namespace Gizbox
 
         [DataMember]
         [FieldOffset(4)]
-        public int AsLong;
+        public long AsLong;
 
         [DataMember]
         [FieldOffset(4)]

@@ -387,6 +387,181 @@ namespace Gizbox
         }
     }
 
+    public class TypeExpr
+    {
+        public static Dictionary<string, TypeExpr> typeExpressionCache = new();
+        public enum Category
+        {
+            Other,
+            Void,
+            Int,
+            Long,
+            Float,
+            Double,
+            Bool,
+            Char,
+            String,
+            Object, //引用类型
+            Array, //数组类型
+            Function, //函数类型
+        }
+
+        private string rawTypeExpression;
+        private Category category;
+        private TypeExpr Array_ElementType;
+        private TypeExpr Function_ReturnType;
+        private List<TypeExpr> Function_ParamTypes;
+
+        private TypeExpr() { }
+
+        public static TypeExpr Parse(string typeExpression)
+        {
+            typeExpression = typeExpression.Trim();
+
+            if(typeExpressionCache.TryGetValue(typeExpression, out var cached))
+                return cached;
+
+            TypeExpr type = new TypeExpr();
+
+            if(typeExpression.Contains("->"))
+            {
+                type.category = Category.Function;
+
+                string paramPart = null;
+                string returnPart = null;
+                for(int i = 0; i < typeExpression.Length - 1; ++i)
+                {
+                    if(typeExpression[i] == '-' && typeExpression[i + 1] == '>')
+                    {
+                        type.Function_ParamTypes = new List<TypeExpr>();
+                        paramPart = typeExpression.Substring(0, i).Trim();
+                        returnPart = typeExpression.Substring(i + 2).Trim();
+                        break;
+                    }
+                }
+                if(paramPart == null || returnPart == null)
+                    throw new GizboxException(ExceptioName.Unknown, "param or return type expression invalid.");
+
+                var paramStrArr = paramPart.Split(',');
+                type.Function_ParamTypes = paramStrArr
+                    .Select(p => Parse(p.Trim()))
+                    .ToList();
+                type.Function_ReturnType = Parse(returnPart.Trim());
+            }
+            else if(typeExpression.EndsWith("[]"))
+            {
+                type.category = Category.Array;
+                var typeEle = typeExpression.Substring(0, typeExpression.Length - 2).Trim();
+                type.Array_ElementType = Parse(typeEle);
+            }
+            else if(typeExpression.StartsWith("(") && typeExpression.EndsWith(")"))
+            {
+                type.category = Category.Other;
+            }
+            else
+            {
+                switch(typeExpression)
+                {
+                    case "bool":
+                        type.category = Category.Bool;
+                        break;
+                    case "char":
+                        type.category = Category.Char;
+                        break;
+                    case "int":
+                        type.category = Category.Int;
+                        break;
+                    case "long":
+                        type.category = Category.Long;
+                        break;
+                    case "float":
+                        type.category = Category.Float;
+                        break;
+                    case "double":
+                        type.category = Category.Double;
+                        break;
+                    case "string":
+                        type.category = Category.String;
+                        break;
+                    default:
+                        type.category = Category.Object;
+                        break;
+                }
+            }
+
+            type.rawTypeExpression = typeExpression;
+            typeExpressionCache[typeExpression] = type;
+            return type;
+        }
+
+        public override string ToString()
+        {
+            return rawTypeExpression;
+        }
+        public int Size
+        {
+            get
+            {
+                return category switch
+                {
+                    Category.Void => 0,
+                    Category.Int => 4,
+                    Category.Long => 8,
+                    Category.Float => 4,
+                    Category.Double => 8,
+                    Category.Bool => 1,
+                    Category.Char => 2,
+                    Category.String => 8,
+                    Category.Object => 8,
+                    Category.Array => 8,
+                    Category.Function => 8,
+                    _ => throw new GizboxException(ExceptioName.Unknown, $"unknown type expression category: {category}"),
+                };
+            }
+        }
+
+        public bool IsPrimitive
+        {
+            get
+            {
+                return category switch
+                {
+                    Category.Int => true,
+                    Category.Long => true,
+                    Category.Float => true,
+                    Category.Double => true,
+                    Category.Bool => true,
+                    Category.Char => true,
+                    _ => false,
+                };
+            }
+        }
+
+        public TypeExpr FunctionReturnType => Function_ReturnType;
+
+        public List<TypeExpr> FunctionParamTypes => Function_ParamTypes;
+
+        public bool IsSSEType
+        {
+            get
+            {
+                return category == Category.Float || category == Category.Double;
+            }
+        }
+
+        public TypeExpr ArrayElementType
+        {
+            get
+            {
+                if(category != Category.Array)
+                    throw new GizboxException(ExceptioName.Unknown, $"cannot get element type of non-array type: {category}");
+
+                return Array_ElementType;
+            }
+        }
+    }
+
+
 
     /// <summary>
     /// 虚函数表  

@@ -22,7 +22,7 @@ string[] cmds = {
     "1.生成库文件",
     "2.生成分析器硬编码",
     "3.执行Test脚本",
-    "4.测试新解释器",
+    "4.测试杂项",
     "5.测试x64目标代码生成",
     };
 
@@ -90,7 +90,7 @@ switch(cmdIdx)
             Gizbox.Compiler compilerTest = new Compiler();
             compilerTest.ConfigParserDataSource(hardcode: false);
             compilerTest.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
-            compilerTest.InsertParserHardcodeToSourceFile("F:\\ZQJ\\GizboxAndTools\\Gizbox\\Gizbox\\Src\\Parser\\ParserHardcoder.cs");
+            compilerTest.InsertParserHardcodeToSourceFile("F:\\Legacy\\MyProjects\\Gizbox\\Gizbox\\Src\\Parser\\ParserHardcoder.cs");
             Console.WriteLine("生成硬编码完成");
             return;
         }
@@ -122,7 +122,7 @@ switch(cmdIdx)
     case 4:
         {
             //测试脚本Test  
-            Console.WriteLine("测试");
+            Console.WriteLine("测试杂项");
 
 
             break;  

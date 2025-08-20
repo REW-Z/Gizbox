@@ -124,7 +124,7 @@ namespace Gizbox.Src.Backend
     /// </summary>
     public abstract class X64Operand
     {
-        public enum OperandType
+        public enum OperandKind
         {
             Label,// 标签
             Immediate,// 立即数
@@ -133,11 +133,11 @@ namespace Gizbox.Src.Backend
             Mem,// 内存
             Rel,// RIP相对寻址
         }
-        public abstract OperandType Type { get; }
+        public abstract OperandKind Kind { get; }
     }
     public class X64Label : X64Operand
     {
-        public override OperandType Type => OperandType.Label;
+        public override OperandKind Kind => OperandKind.Label;
         public string name;
         public X64Label(string label)
         {
@@ -146,12 +146,12 @@ namespace Gizbox.Src.Backend
     }
     public class X64Immediate : X64Operand
     {
-        public override OperandType Type => OperandType.Immediate;
+        public override OperandKind Kind => OperandKind.Immediate;
         public long value;
     }
     public class X64Reg : X64Operand
     {
-        public override OperandType Type => isVirtual ? OperandType.VReg : OperandType.Reg;
+        public override OperandKind Kind => isVirtual ? OperandKind.VReg : OperandKind.Reg;
 
         public bool isVirtual;
         public RegisterEnum physReg;
@@ -178,7 +178,7 @@ namespace Gizbox.Src.Backend
     }
     public class X64Mem : X64Operand
     {
-        public override OperandType Type => OperandType.Mem;
+        public override OperandKind Kind => OperandKind.Mem;
         public X64Reg baseReg; // 基址寄存器
         public X64Reg indexReg; // 索引寄存器
         public int scale; // 缩放因子
@@ -194,7 +194,7 @@ namespace Gizbox.Src.Backend
     }
     public class X64Rel : X64Operand
     {
-        public override OperandType Type => OperandType.Rel;
+        public override OperandKind Kind => OperandKind.Rel;
         public string symbolName; // 符号名称
         public long displacement; // 可选的偏移量
 
@@ -221,29 +221,23 @@ namespace Gizbox.Src.Backend
 
         // 数据移动
         public static X64Instruction mov(X64Operand dest, X64Operand src) => new() { type = InstructionType.mov, operand0 = dest, operand1 = src };
-
+        public static X64Instruction movss(X64Operand dest, X64Operand src) => new() { type = InstructionType.movss, operand0 = dest, operand1 = src };
+        public static X64Instruction movsd(X64Operand dest, X64Operand src) => new() { type = InstructionType.movsd, operand0 = dest, operand1 = src };
 
         // 栈操作
         public static X64Instruction push(X64Operand operand) => new() { type = InstructionType.push, operand0 = operand };
         public static X64Instruction pop(X64Operand operand) => new() { type = InstructionType.pop, operand0 = operand };
 
         // 算术运算
-        public static X64Instruction add(X64Operand dest, X64Operand src)
-        {
-            throw new NotImplementedException("Add operation not implemented yet.");
-        }
-        public static X64Instruction sub(X64Operand dest, X64Operand src)
-        {
-            throw new NotImplementedException("Add operation not implemented yet.");
-        }
-        public static X64Instruction mul(X64Operand dest, X64Operand src)
-        {
-            throw new NotImplementedException("Add operation not implemented yet.");
-        }
-        public static X64Instruction div(X64Operand operand)
-        {
-            throw new NotImplementedException("Add operation not implemented yet.");
-        }
+        public static X64Instruction add(X64Operand dest, X64Operand src) => new() { type = InstructionType.add, operand0 = dest, operand1 = src };
+        public static X64Instruction sub(X64Operand dest, X64Operand src) => new() { type = InstructionType.sub, operand0 = dest, operand1 = src };
+        
+        public static X64Instruction mul(X64Operand src) => new() { type = InstructionType.mul, operand0 = src};
+        public static X64Instruction div(X64Operand src) => new() { type = InstructionType.div, operand0 = src };
+
+
+
+
 
         public static X64Instruction inc(X64Operand operand) => new() { type = InstructionType.inc, operand0 = operand };
         public static X64Instruction dec(X64Operand operand) => new() { type = InstructionType.dec, operand0 = operand };
@@ -318,14 +312,9 @@ namespace Gizbox.Src.Backend
         public static X64Immediate imm(long val) => new() { value = val };
         
         public static X64Label label(string name) => new(name);
+
         public static X64Rel rel(string symbolName, long displacement = 0) => new X64Rel(symbolName, displacement);
 
-
-
-        public static X64Mem mem(RegisterEnum baseReg, RegisterEnum indexReg, int scale, long displacement = 0)
-        {
-            return new X64Mem(new X64Reg(baseReg), new X64Reg(indexReg), scale, displacement);
-        }
         public static X64Mem mem(X64Reg baseVReg, X64Reg indexVReg = null, int scale = 1, long displacement = 0)
         {
             return new X64Mem(baseVReg, indexVReg, scale, displacement);
