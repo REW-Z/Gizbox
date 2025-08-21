@@ -894,7 +894,7 @@ namespace Gizbox.ScriptEngine
 
         public Value NewString(string str)
         {
-            Log("创建新的动态字符串：" + str);
+            //Log("创建新的动态字符串：" + str);
 
             long ptr = this.heap.Alloc(str);
             return Value.FromStringPtr(ptr);

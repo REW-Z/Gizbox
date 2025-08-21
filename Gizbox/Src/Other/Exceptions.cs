@@ -152,7 +152,7 @@ namespace Gizbox
         }
         public string LineMessage()
         {
-            return "(line:" + node.StartToken().line + ")";
+            return "(line:" + (node?.StartToken()?.line ?? -1) + ")";
         }
 
         public override string Message => LineMessage() + base.Message;

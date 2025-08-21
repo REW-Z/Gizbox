@@ -231,6 +231,8 @@ namespace Gizbox.Interop.CSharp
         {
             switch (csVal)
             {
+                case Value gval://直接返回不封装
+                    return gval;
                 case bool b:
                 case int i:
                 case float f:
@@ -325,6 +327,31 @@ namespace Gizbox.Interop.CSharp
         public void Core__GC__Disable()
         {
             engineContext.GCEnable(false);
+        }
+
+        public Value Core__Extern__BoolToString(bool v)
+        {
+            return engineContext.NewString(v.ToString());
+        }
+        public Value Core__Extern__CharToString(char v)
+        {
+            return engineContext.NewString(v.ToString());
+        }
+        public Value Core__Extern__IntToString(int v)
+        {
+            return engineContext.NewString(v.ToString());
+        }
+        public Value Core__Extern__FloatToString(float v)
+        {
+            return engineContext.NewString(v.ToString());
+        }
+        public Value Core__Extern__LongToString(long v)
+        {
+            return engineContext.NewString(v.ToString());
+        }
+        public Value Core__Extern__DoubleToString(double v)
+        {
+            return engineContext.NewString(v.ToString());
         }
     }
 

@@ -123,14 +123,14 @@ namespace Gizbox
             literals = new List<TokenPattern>();
 
             literals.Add(new TokenPattern("LITBOOL", "(true|false)[^a-zA-Z]", 1));
-            literals.Add(new TokenPattern("LITINT", "[0-9]+[^\\d\\.]", 1));
+            literals.Add(new TokenPattern("LITINT", "[0-9]+[^\\d\\.Ll]", 1));
             literals.Add(new TokenPattern("LITLONG", "[0-9]+[L|l]\\D", 1));
             literals.Add(new TokenPattern("LITFLOAT", "[0-9]+\\.[0-9]+[F|f]\\D", 1));
             literals.Add(new TokenPattern("LITDOUBLE", "[0-9]+\\.[0-9]+[D|d]\\D", 1));
             literals.Add(new TokenPattern("LITCHAR", "\\\'[^\\\']\\\'[^\\\']", 1));
             literals.Add(new TokenPattern("LITSTRING", "\\\"[^\\\"]*\\\"[^\\\"]", 1));
 
-            identifierPattern = new TokenPattern("ID", "[A-Z|a-z][A-Z|a-z|0-9|_]*(\\:\\:[A-Z|a-z|0-9|_]+)*[^A-Za-z0-9_\\:]", 1);
+            identifierPattern = new TokenPattern("ID", "[A-Za-z_][A-Za-z0-9_]*(\\:\\:[A-Za-z_][A-Za-z0-9_]*)*[^A-Za-z0-9_\\:]", 1);
 
             whitespace = new TokenPattern("space", "[\\n|\\s|\\t]+");
 

@@ -17,6 +17,22 @@ namespace Gizbox
             return result;
         }
 
+        public static string GetBoxType(string typeExpression)
+        {
+            switch(typeExpression)
+            {
+                case "bool": return "Bool";
+                case "int": return "Int";
+                case "long": return "Long";
+                case "float": return "Float";
+                case "double": return "Double";
+                case "string": 
+                    return "string";
+                default:
+                    return typeExpression;
+            }
+        }
+
         public static bool IsPrimitiveType(string typeExpr)
         {
             switch (typeExpr)

@@ -9,24 +9,81 @@ namespace Core
 		}
 	}
 	
-	class Boolean
+	class Bool
 	{
 		bool value = false;
+
+		string ToString()
+		{
+			return Core::Extern::BoolToString(this.value);
+		}
 	}
-	class Integer
+	class Char
+	{
+		char value = ' ';
+
+		string ToString()
+		{
+			return Core::Extern::CharToString(this.value);
+		}
+	}
+	class Int
 	{
 		int value = 0;
+		
+		string ToString()
+		{
+			return Core::Extern::IntToString(this.value);
+		}
+	}
+	class Long
+	{
+		long value = 0L;
+		
+		string ToString()
+		{
+			return Core::Extern::LongToString(this.value);
+		}
 	}
 	class Float
 	{
 		float value = 0.0f;
+		
+		string ToString()
+		{
+			return Core::Extern::FloatToString(this.value);
+		}
 	}
 	class Double
 	{
 		double value = 0.0d;
+		
+		string ToString()
+		{
+			return Core::Extern::DoubleToString(this.value);
+		}
 	}
 
 }
+
+namespace Core::GC
+{
+	extern void Enable();
+	extern void Disable();
+	extern void Collect();
+}
+
+namespace Core::Extern
+{
+	extern string BoolToString(bool v);
+	extern string CharToString(char v);
+	extern string IntToString(int v);
+	extern string LongToString(long v);
+	extern string FloatToString(float v);
+	extern string DoubleToString(double v);
+}
+
+
 
 namespace Core::Boolean
 {
@@ -43,13 +100,6 @@ namespace Core::Float
 namespace Core::Double
 {
 	const int size = 64;
-}
-
-namespace Core::GC
-{
-	extern void Enable();
-	extern void Disable();
-	extern void Collect();
 }
 
 

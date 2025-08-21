@@ -2146,7 +2146,7 @@ namespace Gizbox.SemanticRule
                         if (rec == null)
                             rec = Query_IgnoreMangle(idNode.FullName);
                         if (rec == null)
-                            throw new SemanticException(ExceptioName.IdentifierNotFound, idNode, idNode.FullName);
+                            throw new SemanticException(ExceptioName.IdentifierNotFound, idNode, (idNode?.FullName ?? "???"));
 
                         //常量替换  
                         if (rec.category == SymbolTable.RecordCatagory.Constant)
@@ -2191,16 +2191,21 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.CastNode castNode:
                     {
                         // !!特殊的转换需要重写为函数调用
-                        var typeExpr = TypeExpr.Parse(castNode.typeNode.TypeExpression());
-                        if(typeExpr.Category == TypeExpr.Kind.String)
+                        AnalyzeTypeExpression(castNode.factorNode);
+                        var srcType = TypeExpr.Parse((string)castNode.factorNode.attributes["type"]);
+                        var targetType = TypeExpr.Parse(castNode.typeNode.TypeExpression());
+
+                        string targetClass = Utils.GetBoxType(srcType.ToString());
+
+                        if(targetType.Category == TypeExpr.Kind.String)
                         {
                             castNode.replacement = new SyntaxTree.CallNode()
                             {
                                 isMemberAccessFunction = false,
                                 funcNode = new SyntaxTree.IdentityNode() 
                                 {
-                                    attributes = null,
-                                    token = new Token("ID", PatternType.Id, "ToString", default, default, default),
+                                    attributes = new Dictionary<string, object>(),
+                                    token = new Token("ID", PatternType.Id, $"Core::Extern::{targetClass}ToString", default, default, default),
                                     identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
                                 },
                                 argumantsNode = new SyntaxTree.ArgumentListNode()
@@ -2216,7 +2221,7 @@ namespace Gizbox.SemanticRule
 
                             break;
                         }
-                        else if(typeExpr.Category == TypeExpr.Kind.Array)
+                        else if(targetType.Category == TypeExpr.Kind.Array)
                         {
                             throw new SemanticException(ExceptioName.SemanticAnalysysError, castNode, "cast to array not support.");
                         }
@@ -2248,6 +2253,7 @@ namespace Gizbox.SemanticRule
                         }
 
                         //函数分析(需要先补全名称)  
+                        
                         callNode.funcNode.attributes["not_a_property"] = null;//防止被当作属性替换  
                         Pass3_AnalysisNode(callNode.funcNode);
 
