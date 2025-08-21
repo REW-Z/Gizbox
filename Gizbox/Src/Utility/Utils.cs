@@ -16,60 +16,6 @@ namespace Gizbox
             }
             return result;
         }
-
-        public static string GetBoxType(string typeExpression)
-        {
-            switch(typeExpression)
-            {
-                case "bool": return "Bool";
-                case "int": return "Int";
-                case "long": return "Long";
-                case "float": return "Float";
-                case "double": return "Double";
-                case "string": 
-                    return "string";
-                default:
-                    return typeExpression;
-            }
-        }
-
-        public static bool IsPrimitiveType(string typeExpr)
-        {
-            switch (typeExpr)
-            {
-                case "bool": 
-                case "int": 
-                case "long":  
-                case "float":
-                case "double":
-                case "string": 
-                    return true;
-                default: 
-                    return false;
-            }
-        }
-
-        public static bool IsArrayType(string typeExpr)
-        {
-            return typeExpr.EndsWith("[]");
-        }
-
-        public static bool IsFunType(string typeExpr)
-        {
-            return typeExpr.Contains("->");
-        }
-
-        public static bool IsClassType(string typeExpr)
-        {
-            if(IsPrimitiveType(typeExpr)) 
-                return false;
-            if(IsArrayType(typeExpr))
-                return false;
-            if(IsFunType(typeExpr))
-                return false;
-
-            return true;
-        }
     }
 
 

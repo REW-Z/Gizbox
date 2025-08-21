@@ -57,9 +57,9 @@ namespace Gizbox.IR
 
         public void GenNode(SyntaxTree.Node node)
         {
-            if (node.replacement != null)
+            if (node.overrideNode != null)
             {
-                GenNode(node.replacement);
+                GenNode(node.overrideNode);
                 return;
             }
 
@@ -113,7 +113,7 @@ namespace Gizbox.IR
                 case ClassDeclareNode classDeclNode:
                     {
                         string className = classDeclNode.classNameNode.FullName;
-                        GenerateCode("JUMP", "exit:" + className);
+                        GenerateCode("JUMP", "%LABEL:exit:" + className);
                         GenerateCode(" ").label = className;
                         //GeneratorCode("CLASS_BEGIN", classDeclNode.classNameNode.token.attribute);
                         envStack.Push(classDeclNode.attributes["env"] as SymbolTable);
@@ -126,7 +126,7 @@ namespace Gizbox.IR
                             //string funcFullName = "ctor";
 
                             //跳过声明  
-                            GenerateCode("JUMP", "exit:" + funcFullName);
+                            GenerateCode("JUMP", "%LABEL:exit:" + funcFullName);
 
                             //函数开始    
                             GenerateCode(" ").label = "entry:" + funcFullName;
@@ -141,8 +141,8 @@ namespace Gizbox.IR
                                 var baseRec = Query(baseClassName);
                                 var baseEnv = baseRec.envPtr;
 
-                                GenerateCode("PARAM", "[this]");
-                                GenerateCode("CALL", "[" + baseClassName + ".ctor]", "LITINT:1");
+                                GenerateCode("PARAM", "this");
+                                GenerateCode("CALL", baseClassName + ".ctor", "%LITINT:1");
                             }
 
                             //成员变量初始化
@@ -153,7 +153,7 @@ namespace Gizbox.IR
                                     var fieldDecl = memberDecl as VarDeclareNode;
 
                                     GenNode(fieldDecl.initializerNode);
-                                    GenerateCode("=", "[this." + fieldDecl.identifierNode.FullName + "]", GetRet(fieldDecl.initializerNode));
+                                    GenerateCode("=", "this." + fieldDecl.identifierNode.FullName, GetRet(fieldDecl.initializerNode));
                                 }
                             }
 
@@ -199,7 +199,7 @@ namespace Gizbox.IR
 
 
                         //跳过声明  
-                        GenerateCode("JUMP", "exit:" + funcFinalName);
+                        GenerateCode("JUMP", "%LABEL:exit:" + funcFinalName);
 
 
                         //函数开始    
@@ -214,7 +214,7 @@ namespace Gizbox.IR
                         //else
                         //    GenerateCode("FUNC_BEGIN", funcFinalName);
 
-                        GenerateCode("FUNC_BEGIN", funcFinalName);
+                        GenerateCode("FUNC_BEGIN", funcFinalName).label = "func_begin:" + funcFinalName;
 
                         //语句  
                         foreach (var stmt in funcDeclNode.statementsNode.statements)
@@ -232,7 +232,7 @@ namespace Gizbox.IR
                         //else
                         //    GenerateCode("FUNC_END", funcFinalName);
 
-                        GenerateCode("FUNC_END", funcFinalName);
+                        GenerateCode("FUNC_END", funcFinalName).label = "func_end:" + funcFinalName;
 
                         EnvEnd(funcDeclNode.attributes["env"] as SymbolTable);
                         envStack.Pop();
@@ -248,7 +248,7 @@ namespace Gizbox.IR
 
 
                         //跳过声明  
-                        GenerateCode("JUMP", "exit:" + funcFullName);
+                        GenerateCode("JUMP", "%LABEL:exit:" + funcFullName);
 
                         //函数开始    
                         GenerateCode(" ").label = "entry:" + funcFullName;
@@ -256,13 +256,15 @@ namespace Gizbox.IR
                         envStack.Push(externFuncDeclNode.attributes["env"] as SymbolTable);
                         EnvBegin(externFuncDeclNode.attributes["env"] as SymbolTable);
 
-                        GenerateCode("FUNC_BEGIN", funcFullName);
+                        GenerateCode("FUNC_BEGIN", funcFullName).label = "func_begin:" + funcFullName;
+                        ;
 
 
                         GenerateCode("EXTERN_IMPL", externFuncDeclNode.identifierNode.FullName);
 
 
-                        GenerateCode("FUNC_END", funcFullName);
+                        GenerateCode("FUNC_END", funcFullName).label = "func_end:" + funcFullName;
+                        ;
 
 
                         EnvEnd(externFuncDeclNode.attributes["env"] as SymbolTable);
@@ -345,13 +347,13 @@ namespace Gizbox.IR
                             GenerateCode(" ").label = "IfCondition_" + ifCounter + "_" + i;
 
                             GenNode(clause.conditionNode);
-                            GenerateCode("IF_FALSE_JUMP", GetRet(clause.conditionNode), falseGotoLabel);
+                            GenerateCode("IF_FALSE_JUMP", GetRet(clause.conditionNode), "%LABEL:" + falseGotoLabel);
 
                             GenerateCode(" ").label = "IfStmt_" + ifCounter + "_" + i;
 
                             GenNode(clause.thenNode);
 
-                            GenerateCode("JUMP", "EndIf_" + ifCounter);
+                            GenerateCode("JUMP", "%LABEL:EndIf_" + ifCounter);
                         }
 
                         if (elseClause != null)
@@ -372,7 +374,7 @@ namespace Gizbox.IR
 
                         GenNode(whileNode.conditionNode);
 
-                        GenerateCode("IF_FALSE_JUMP", GetRet(whileNode.conditionNode), "EndWhile_" + whileCounter);
+                        GenerateCode("IF_FALSE_JUMP", GetRet(whileNode.conditionNode), "%LABEL:EndWhile_" + whileCounter);
 
                         loopExitStack.Push("EndWhile_" + whileCounter);
 
@@ -380,7 +382,7 @@ namespace Gizbox.IR
 
                         loopExitStack.Pop();
 
-                        GenerateCode("JUMP", "While_" + whileCounter);
+                        GenerateCode("JUMP", "%LABEL:While_" + whileCounter);
 
                         GenerateCode(" ").label = "EndWhile_" + whileCounter;
                     }
@@ -400,7 +402,7 @@ namespace Gizbox.IR
 
                         //condition  
                         GenNode(forNode.conditionNode);
-                        GenerateCode("IF_FALSE_JUMP", GetRet(forNode.conditionNode), "EndFor_" + forCounter);
+                        GenerateCode("IF_FALSE_JUMP", GetRet(forNode.conditionNode), "%LABEL:EndFor_" + forCounter);
 
                         loopExitStack.Push("EndFor_" + forCounter);
 
@@ -412,7 +414,7 @@ namespace Gizbox.IR
 
                         loopExitStack.Pop();
 
-                        GenerateCode("JUMP", "For_" + forCounter);
+                        GenerateCode("JUMP", "%LABEL:For_" + forCounter);
 
                         GenerateCode(" ").label = "EndFor_" + forCounter;
 
@@ -423,7 +425,7 @@ namespace Gizbox.IR
 
                 case BreakStmtNode breakNode:
                     {
-                        GenerateCode("JUMP", loopExitStack.Peek());
+                        GenerateCode("JUMP", "%LABEL:" + loopExitStack.Peek());
                     }
                     break;
 
@@ -436,12 +438,12 @@ namespace Gizbox.IR
                 case IdentityNode idNode:
                     {
                         //标识符表达式的返回变量（本身）    
-                        SetRet(idNode, "[" + idNode.FullName + "]");
+                        SetRet(idNode, idNode.FullName);
                     }
                     break;
                 case ThisNode thisnode:
                     {
-                        SetRet(thisnode, "[this]");
+                        SetRet(thisnode, "this");
                     }
                     break;
                 case LiteralNode literalNode:
@@ -457,7 +459,7 @@ namespace Gizbox.IR
 
                         //成员表达式的返回变量(X.Y格式)  
                         string obj = TrimName(GetRet(objMemberAccess.objectNode));
-                        SetRet(objMemberAccess, "[" + obj + "." + objMemberAccess.memberNode.FullName + "]");
+                        SetRet(objMemberAccess, obj + "." + objMemberAccess.memberNode.FullName);
                     }
                     break;
                 case CastNode castNode:
@@ -565,7 +567,7 @@ namespace Gizbox.IR
                             }
                             else
                             {
-                                GenerateCode("PARAM", "[this]");
+                                GenerateCode("PARAM", "this");
                             }
                         }
 
@@ -573,24 +575,42 @@ namespace Gizbox.IR
 
                         if (callNode.isMemberAccessFunction == true)
                         {
-                            GenerateCode("MCALL", "[" + mangledName + "]", "LITINT:" + argCount);
-                            GenerateCode("=", GetRet(callNode), "RET");
+                            GenerateCode("MCALL", mangledName, "%LITINT:" + argCount);
+                            GenerateCode("=", GetRet(callNode), "%RET");
                         }
                         else
                         {
-                            GenerateCode("CALL", "[" + mangledName + "]", "LITINT:" + argCount);
-                            GenerateCode("=", GetRet(callNode), "RET");
+                            GenerateCode("CALL", mangledName, "%LITINT:" + argCount);
+                            GenerateCode("=", GetRet(callNode), "%RET");
                         }
                     }
                     break;
                 case ElementAccessNode eleAccessNode:
                     {
                         GenNode(eleAccessNode.indexNode);
-
                         GenNode(eleAccessNode.containerNode);
-                        string rightval = "[" + TrimName(GetRet(eleAccessNode.containerNode)) + "[" + TrimName(GetRet(eleAccessNode.indexNode)) + "]" + "]";
 
-                        SetRet(eleAccessNode, rightval);
+                        string container = TrimName(GetRet(eleAccessNode.containerNode));
+                        string index = TrimName(GetRet(eleAccessNode.indexNode));
+
+                        // 是左值  
+                        bool isLeftValue = (eleAccessNode.Parent is AssignNode assign) && (assign.lvalueNode == eleAccessNode);
+
+                        if(isLeftValue)
+                        {
+                            string accessExpr = container + "[" + index + "]";
+                            // 直接作为左值返回
+                            SetRet(eleAccessNode, accessExpr);
+                        }
+                        else
+                        {
+
+                            string accessExpr = container + "[" + index + "]";
+                            string elemType = (string)eleAccessNode.attributes["type"];
+                            string tmp = NewTemp(elemType);
+                            GenerateCode("=", tmp, accessExpr); // tmp = [container[index]]
+                            SetRet(eleAccessNode, tmp);
+                        }
                     }
                     break;
                 case NewObjectNode newObjNode:
@@ -602,7 +622,7 @@ namespace Gizbox.IR
 
                         GenerateCode("ALLOC", GetRet(newObjNode), className);
                         GenerateCode("PARAM", GetRet(newObjNode));
-                        GenerateCode("CALL", "[" + className + ".ctor]", "LITINT:" + 1);
+                        GenerateCode("CALL", className + ".ctor", "%LITINT:" + 1);
                     }
                     break;
                 case NewArrayNode newArrNode:
@@ -621,19 +641,19 @@ namespace Gizbox.IR
                         string identifierName = incDecNode.identifierNode.FullName;
                         if (incDecNode.isOperatorFront)//++i
                         {
-                            GenerateCode(incDecNode.op, "[" + identifierName + "]");
-                            SetRet(incDecNode, "[" + identifierName + "]");
+                            GenerateCode(incDecNode.op, identifierName);
+                            SetRet(incDecNode, identifierName);
                         }
                         else//i++
                         {
                             SetRet(incDecNode, NewTemp(Query(identifierName).typeExpression));
-                            GenerateCode("=", GetRet(incDecNode), "[" + identifierName + "]");
-                            GenerateCode(incDecNode.op, "[" + identifierName + "]");
+                            GenerateCode("=", GetRet(incDecNode), identifierName);
+                            GenerateCode(incDecNode.op, identifierName);
                         }
                     }
                     break;
                 default:
-                    throw new SemanticException(ExceptioName.Normal, node, "IR generation not implemtented:" + node.GetType().Name);
+                    throw new SemanticException(ExceptioName.Undefine, node, "IR generation not implemtented:" + node.GetType().Name);
             }
         }
 
@@ -648,9 +668,9 @@ namespace Gizbox.IR
 
         private string GetRet(SyntaxTree.Node exprNode)
         {
-            if (exprNode.replacement != null)
+            if (exprNode.overrideNode != null)
             {
-                return GetRet(exprNode.replacement);
+                return GetRet(exprNode.overrideNode);
             }
 
             if (exprNode.attributes.ContainsKey("ret"))
@@ -673,7 +693,7 @@ namespace Gizbox.IR
 
             envStack.Peek().NewRecord(tempVarName, SymbolTable.RecordCatagory.Variable, type);
 
-            return "[" + tempVarName + "]";
+            return tempVarName;
         }
 
         private string GenLitOperandStr(LiteralNode literalNode)
@@ -697,16 +717,16 @@ namespace Gizbox.IR
                         if (Compiler.enableLogILGenerator)
                             Log("新的字符串常量：" + lex + " 指针：" + ptr);
 
-                        operandStr = "CONSTSTRING:" + ptr;
+                        operandStr = "%CONSTSTRING:" + ptr;
                     }
                     else
                     {
-                        operandStr = "LIT" + typeName.ToUpper() + ":" + literalNode.token.attribute;
+                        operandStr = "%LIT" + typeName.ToUpper() + ":" + literalNode.token.attribute;
                     }
                 }
                 else
                 {
-                    operandStr = "LITNULL:";
+                    operandStr = "%LITNULL:";
                 }
             }
             else

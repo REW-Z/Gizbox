@@ -337,7 +337,7 @@ namespace Gizbox.ScriptEngine
                 case "": break;
                 case "JUMP":
                     {
-                        var jaddr = mainUnit.QueryLabel(((OperandString)code.arg1).str, "", currUnit);
+                        var jaddr = mainUnit.QueryLabel(((OperandLabel)code.arg0).label, "", currUnit);
                         this.currUnit = jaddr.Item1;
                         this.curr = jaddr.Item2;
                         return;
@@ -364,10 +364,10 @@ namespace Gizbox.ScriptEngine
                     }
                 case "RETURN":
                     {
-                        var retValue = code.arg1;
+                        var retValue = code.arg0;
                         if(retValue != null)
                         {
-                            retRegister = GetValue(code.arg1);
+                            retRegister = GetValue(code.arg0);
                         }
 
                         //处理返回值后，跳转到func_end:function    
@@ -383,7 +383,7 @@ namespace Gizbox.ScriptEngine
                         List<Value> arguments = callStack[callStack.Top].args.AsList();
                         arguments.Reverse();
 
-                        Value result = csharpInteropContext.ExternCall(OperandString.GetString(code.arg1), arguments);
+                        Value result = csharpInteropContext.ExternCall((code.arg0 as OperandSingleIdentifier).name, arguments);
 
                         retRegister = result;
 
@@ -402,7 +402,7 @@ namespace Gizbox.ScriptEngine
                     }
                 case "PARAM":
                     {
-                        Value arg = GetValue(code.arg1); 
+                        Value arg = GetValue(code.arg0); 
                         
                         if (arg.Type == GizType.Void)
                             throw new RuntimeException(ExceptioName.ScriptRuntimeError, GetCurrentCode(), "null argument");
@@ -412,10 +412,10 @@ namespace Gizbox.ScriptEngine
                     break;
                 case "CALL":
                     {
-                        string funcMangledName = code.arg1.str;
+                        string funcMangledName = code.arg0.str;
 
-                        if (GetValue(code.arg2).Type != GizType.Int) throw new GizboxException(ExceptioName.Normal, "arg count not integer");
-                        int argCount = GetValue(code.arg2).AsInt;
+                        if (GetValue(code.arg1).Type != GizType.Int) throw new GizboxException(ExceptioName.Undefine, "arg count not integer");
+                        int argCount = GetValue(code.arg1).AsInt;
 
                         this.callStack[this.callStack.Top + 1].returnPtr = new Tuple<int, int>(this.currUnit, (this.curr + 1));
 
@@ -431,10 +431,10 @@ namespace Gizbox.ScriptEngine
                     }
                 case "MCALL":
                     {
-                        string funcMangledName = code.arg1.str;
+                        string funcMangledName = code.arg0.str;
 
-                        if (GetValue(code.arg2).Type != GizType.Int) throw new GizboxException(ExceptioName.Normal, "arg count not integer");
-                        int argCount = GetValue(code.arg2).AsInt;
+                        if (GetValue(code.arg1).Type != GizType.Int) throw new GizboxException(ExceptioName.Undefine, "arg count not integer");
+                        int argCount = GetValue(code.arg1).AsInt;
 
                         this.callStack[this.callStack.Top + 1].returnPtr = new Tuple<int, int>(this.currUnit, (this.curr + 1));
 
@@ -462,17 +462,17 @@ namespace Gizbox.ScriptEngine
                     }
                 case "ALLOC":
                     {
-                        string className = OperandString.GetString(code.arg2);
+                        string className = (code.arg1 as OperandSingleIdentifier).name;
                         SymbolTable tableFound;
                         var rec = Query(className, out tableFound);
                         GizObject newfanObj = new GizObject(className, rec.envPtr, mainUnit.QueryVTable(className));
                         var ptr = heap.Alloc(newfanObj);
-                        SetValue(code.arg1, Value.FromGizObjectPtr(ptr));
+                        SetValue(code.arg0, Value.FromGizObjectPtr(ptr));
                     }
                     break;
                 case "DEL":
                     {
-                        var objPtr = GetValue(code.arg1);
+                        var objPtr = GetValue(code.arg0);
                         if(objPtr.IsRefType && objPtr.AsPtr >= 0)
                         {
                             this.heap.Write(objPtr.AsPtr, null);
@@ -485,17 +485,30 @@ namespace Gizbox.ScriptEngine
                     break;
                 case "ALLOC_ARRAY":
                     {
-                        Value[] arr = new Value[GetValue(code.arg2).AsInt];
+                        var len = GetValue(code.arg1).AsInt;
+                        Value[] arr = new Value[len];
+
+                        //数组元素类型
+                        var arrayRec = (code.arg0 as OperandSingleIdentifier).record;
+                        if(arrayRec == null)
+                            throw new GizboxException(ExceptioName.ScriptRuntimeError, "array rec not found.");
+
+                        var arrTypeExpr = TypeExpr.Parse(arrayRec.typeExpression);
+                        
+                        for(int i = 0; i < len; ++i)
+                        {
+                            arr[i] = Value.DefaultOf(arrTypeExpr.ArrayElementType);
+                        }
                         var ptr = heap.Alloc(arr);
-                        SetValue(code.arg1, Value.FromArrayPtr(ptr));
+                        SetValue(code.arg0, Value.FromArrayPtr(ptr));
                     }
                     break;
                 case "IF_FALSE_JUMP":
                     {
-                        bool conditionTrue = GetValue(code.arg1).AsBool;
+                        bool conditionTrue = GetValue(code.arg0).AsBool;
                         if(conditionTrue == false)
                         {
-                            var jumpAddr = mainUnit.QueryLabel(OperandString.GetString(code.arg2), "", currUnit);
+                            var jumpAddr = mainUnit.QueryLabel((code.arg1 as OperandLabel).label, "", currUnit);
 
                             this.curr = jumpAddr.Item2;
                             this.currUnit = jumpAddr.Item1;
@@ -508,76 +521,77 @@ namespace Gizbox.ScriptEngine
                     }
                 case "=":
                     {
-                        SetValue(code.arg1, GetValue(code.arg2)); 
+                        SetValue(code.arg0, GetValue(code.arg1)); 
                     }
                     break;
                 case "+=":
-                        SetValue(code.arg1, caculator.CalBinary("+", GetValue(code.arg1), GetValue(code.arg2)));
+                        SetValue(code.arg0, caculator.CalBinary("+", GetValue(code.arg0), GetValue(code.arg1)));
                     break;
                 case "-=":
-                        SetValue(code.arg1, caculator.CalBinary("-", GetValue(code.arg1), GetValue(code.arg2)));
+                        SetValue(code.arg0, caculator.CalBinary("-", GetValue(code.arg0), GetValue(code.arg1)));
                     break;
                 case "*=":
-                        SetValue(code.arg1, caculator.CalBinary("*", GetValue(code.arg1), GetValue(code.arg2)));
+                        SetValue(code.arg0, caculator.CalBinary("*", GetValue(code.arg0), GetValue(code.arg1)));
                     break;
                 case "/=":
-                        SetValue(code.arg1, caculator.CalBinary("/", GetValue(code.arg1), GetValue(code.arg2)));
+                        SetValue(code.arg0, caculator.CalBinary("/", GetValue(code.arg0), GetValue(code.arg1)));
                     break;
                 case "%=":
-                        SetValue(code.arg1, caculator.CalBinary("%", GetValue(code.arg1), GetValue(code.arg2)));
+                        SetValue(code.arg0, caculator.CalBinary("%", GetValue(code.arg0), GetValue(code.arg1)));
                     break;
                 case "+":
-                        SetValue(code.arg1, caculator.CalBinary("+", GetValue(code.arg2), GetValue(code.arg3)));
+                        SetValue(code.arg0, caculator.CalBinary("+", GetValue(code.arg1), GetValue(code.arg2)));
                     break;
                 case "-":
-                        SetValue(code.arg1, caculator.CalBinary("-", GetValue(code.arg2), GetValue(code.arg3)));
+                        SetValue(code.arg0, caculator.CalBinary("-", GetValue(code.arg1), GetValue(code.arg2)));
                     break;
                 case "*":
-                        SetValue(code.arg1, caculator.CalBinary("*", GetValue(code.arg2), GetValue(code.arg3)));
+                        SetValue(code.arg0, caculator.CalBinary("*", GetValue(code.arg1), GetValue(code.arg2)));
                     break;
                 case "/":
-                        SetValue(code.arg1, caculator.CalBinary("/", GetValue(code.arg2), GetValue(code.arg3)));
+                        SetValue(code.arg0, caculator.CalBinary("/", GetValue(code.arg1), GetValue(code.arg2)));
                     break;
                 case "%":
-                        SetValue(code.arg1, caculator.CalBinary("%", GetValue(code.arg2), GetValue(code.arg3)));
+                        SetValue(code.arg0, caculator.CalBinary("%", GetValue(code.arg1), GetValue(code.arg2)));
                     break;
                 case "NEG":
-                        SetValue(code.arg1, caculator.CalNegtive(GetValue(code.arg2)));
+                        SetValue(code.arg0, caculator.CalNegtive(GetValue(code.arg1)));
                     break;
                 case "!":
-                        SetValue(code.arg1, caculator.CalNot(GetValue(code.arg2)));
+                        SetValue(code.arg0, caculator.CalNot(GetValue(code.arg1)));
                     break;
                 case "<":
-                        SetValue(code.arg1, caculator.CalBinary("<", GetValue(code.arg2), GetValue(code.arg3)));
+                        SetValue(code.arg0, caculator.CalBinary("<", GetValue(code.arg1), GetValue(code.arg2)));
                     break;
                 case "<=":
-                        SetValue(code.arg1, caculator.CalBinary("<=", GetValue(code.arg2), GetValue(code.arg3)));
+                        SetValue(code.arg0, caculator.CalBinary("<=", GetValue(code.arg1), GetValue(code.arg2)));
                     break;
                 case ">":
-                        SetValue(code.arg1, caculator.CalBinary(">", GetValue(code.arg2), GetValue(code.arg3)));
+                        SetValue(code.arg0, caculator.CalBinary(">", GetValue(code.arg1), GetValue(code.arg2)));
                     break;
                 case ">=":
-                        SetValue(code.arg1, caculator.CalBinary(">=", GetValue(code.arg2), GetValue(code.arg3)));
+                        SetValue(code.arg0, caculator.CalBinary(">=", GetValue(code.arg1), GetValue(code.arg2)));
                     break;
                 case "==":
-                        SetValue(code.arg1, caculator.CalBinary("==", GetValue(code.arg2), GetValue(code.arg3)));
+                        SetValue(code.arg0, caculator.CalBinary("==", GetValue(code.arg1), GetValue(code.arg2)));
                     break;
                 case "!=":
-                        SetValue(code.arg1, caculator.CalBinary("!=", GetValue(code.arg2), GetValue(code.arg3)));
+                        SetValue(code.arg0, caculator.CalBinary("!=", GetValue(code.arg1), GetValue(code.arg2)));
                     break;
                 case "++":
                     {
-                        SetValue(code.arg1, GetValue(code.arg1) + 1);
+                        SetValue(code.arg0, GetValue(code.arg0) + 1);
                     }
                     break;
                 case "--":
                     {
-                        SetValue(code.arg1, GetValue(code.arg1) - 1);
+                        SetValue(code.arg0, GetValue(code.arg0) - 1);
                     }
                     break;
                 case "CAST":
                     {
-                        SetValue(code.arg1, caculator.Cast(OperandString.GetString(code.arg2), GetValue(code.arg3), this));
+                        string typeName = (code.arg1 as OperandSingleIdentifier).name;
+                        SetValue(code.arg0, caculator.Cast(typeName, GetValue(code.arg2), this));
                     }
                     break;
             }
@@ -709,7 +723,7 @@ namespace Gizbox.ScriptEngine
                         switch(r.registerName)
                         {
                             case "RET": return retRegister;
-                            default: throw new GizboxException(ExceptioName.Normal, "unknown register:" + r.registerName);
+                            default: throw new GizboxException(ExceptioName.Undefine, "unknown register:" + r.registerName);
                         }
                     }
                 case OperandConst c:
@@ -724,14 +738,13 @@ namespace Gizbox.ScriptEngine
                         throw new RuntimeException(ExceptioName.UnknownConstant, GetCurrentCode(), "");
                     }
                 case OperandLiteralValue l: return l.val;
-                case OperandVariable varible:
+                case OperandSingleIdentifier varible:
                     {
                         return AccessVariable(varible.name, write:false);
                     }
                 case OperandElementAccess ele:
                     {
                         int idx = GetValue(ele.index).AsInt;
-
                         var arr = (Value[])(this.DeReference(GetValue(ele.array).AsPtr));
                         return arr[idx];
                     }
@@ -743,11 +756,18 @@ namespace Gizbox.ScriptEngine
                         if ((objptr.IsVoid)) throw new RuntimeException(ExceptioName.AccessedObjectNotFound, GetCurrentCode(), "when access member \"" + fieldName +  "\"");
                         if (objptr.Type != GizType.ObjectRef) throw new RuntimeException(ExceptioName.ObjectTypeError, GetCurrentCode(), "not gizbox object");
 
-                        var fields = (this.DeReference(objptr.AsPtr) as GizObject).fields;
+                        var obj = this.DeReference(objptr.AsPtr);
+                        var gobj = (obj as GizObject);
+                        var fields = gobj.fields;
                         if (fields.ContainsKey(fieldName) == false) throw new RuntimeException(ExceptioName.ObjectFieldNotInitialized,GetCurrentCode(), fieldName);
                         return (this.DeReference(objptr.AsPtr) as GizObject).fields[fieldName];
 
                     }
+                case OperandLabel strOperand:
+                    {
+                        throw new GizboxException(ExceptioName.AccessError, "error:OperandString: " + operand.str + " ");
+                    }
+                    break;
                 default:
                     throw new GizboxException(ExceptioName.AccessError, operand.GetType().Name);
             }
@@ -777,7 +797,7 @@ namespace Gizbox.ScriptEngine
                         throw new RuntimeException(ExceptioName.CannotAssignToLiteral, null, "");
                     }
                     break;
-                case OperandVariable varible:
+                case OperandSingleIdentifier varible:
                     {
                         AccessVariable(varible.name, write: true, value:val);
                     }

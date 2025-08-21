@@ -228,6 +228,65 @@ namespace Gizbox.IR
             }
         }
 
+        /// <summary> 查询(当前表栈、全局作用域、库) </summary>
+        public SymbolTable.Record Query(string name, int line = -1)
+        {
+            if(line > -1)
+            {
+                var stack = GetEnvStackAtLine(line);
+
+                //符号表链查找  
+                foreach(SymbolTable env in stack)
+                {
+                    if(env.ContainRecordName(name))
+                    {
+                        return env.GetRecord(name);
+                    }
+                }
+            }
+            //库依赖中查找  
+            if(dependencyLibs != null)
+            {
+                foreach(var lib in this.dependencyLibs)
+                {
+                    var result = lib.Query(name);
+                    if(result != null)
+                        return result;
+                }
+            }
+
+            return null;
+        }
+        /// <summary> 查询(当前表栈、全局作用域、库) </summary>
+        public SymbolTable.Record QueryRaw(string name, int line = -1)
+        {
+            if(line > -1)
+            {
+                var stack = GetEnvStackAtLine(line);
+
+                //符号表链查找  
+                foreach(SymbolTable env in stack)
+                {
+                    if(env.ContainRecordRawName(name))
+                    {
+                        return env.GetRecordByRawname(name);
+                    }
+                }
+            }
+            //库依赖中查找  
+            if(dependencyLibs != null)
+            {
+                foreach(var lib in this.dependencyLibs)
+                {
+                    var result = lib.QueryRaw(name);
+                    if(result != null)
+                        return result;
+                }
+            }
+
+            return null;
+        }
+
         /// <summary> 查询一个顶层符号 </summary>
         public SymbolTable.Record QueryTopSymbol(string name, bool ignoreMangle = false)
         {
@@ -262,7 +321,7 @@ namespace Gizbox.IR
 
 
         /// <summary> 查询顶层符号并全部填充到 </summary>
-        public void QueryAllTopSymbolToContainer(string name, List<SymbolTable.Record> result, bool ignoreMangle = false)
+        public void QueryAndFillTopSymbolsToContainer(string name, List<SymbolTable.Record> result, bool ignoreMangle = false)
         {
             //本单元查找  
             if (ignoreMangle == false)
@@ -282,7 +341,7 @@ namespace Gizbox.IR
             {
                 foreach (var dep in dependencyLibs)
                 {
-                    dep.QueryAllTopSymbolToContainer(name, result, ignoreMangle);
+                    dep.QueryAndFillTopSymbolsToContainer(name, result, ignoreMangle);
                 }
             }
         }

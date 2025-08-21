@@ -211,6 +211,14 @@ namespace Gizbox
                     result.Add(kv.Value);
             }
         }
+        public void GetAllRecordByName(string symbolName, List<SymbolTable.Record> result)
+        {
+            foreach(var kv in records)
+            {
+                if(kv.Value.name == symbolName)
+                    result.Add(kv.Value);
+            }
+        }
 
         //（仅为类符号表时）是子类
         public bool Class_IsSubClassOf(string baseClassName)
@@ -433,7 +441,7 @@ namespace Gizbox
                     }
                 }
                 if(paramPart == null || returnPart == null)
-                    throw new GizboxException(ExceptioName.Normal, "param or return type expression invalid.");
+                    throw new GizboxException(ExceptioName.Undefine, "param or return type expression invalid.");
 
                 var paramStrArr = paramPart.Split(',');
                 type._Function_ParamTypes = paramStrArr
@@ -519,7 +527,7 @@ namespace Gizbox
                     Kind.Object => 8,
                     Kind.Array => 8,
                     Kind.Function => 8,
-                    _ => throw new GizboxException(ExceptioName.Normal, $"unknown type expression category: {_Kind}"),
+                    _ => throw new GizboxException(ExceptioName.Undefine, $"unknown type expression category: {_Kind}"),
                 };
             }
         }
@@ -545,7 +553,23 @@ namespace Gizbox
         {
             get
             {
-                return _Kind == Kind.Object || _Kind == Kind.Array || _Kind == Kind.Function;
+                return _Kind == Kind.String ||
+                    _Kind == Kind.Object || 
+                    _Kind == Kind.Array || 
+                    _Kind == Kind.Function;
+            }
+        }
+
+        public bool IsArray
+        {
+            get => _Kind == Kind.Array;
+        }
+
+        public bool IsClassType
+        {
+            get
+            {
+                return _Kind == Kind.Object;
             }
         }
 
@@ -562,6 +586,54 @@ namespace Gizbox
             get
             {
                 return _Kind == Kind.Int || _Kind == Kind.Long || _Kind == Kind.Float || _Kind == Kind.Double;
+            }
+        }
+
+        public TypeExpr BoxType
+        {
+            get
+            {
+                switch(_Kind)
+                {
+                    case Kind.Bool:
+                        return Parse("Core::Bool");
+                    case Kind.Char:
+                        return Parse("Core::Char");
+                    case Kind.Int:
+                        return Parse("Core::Int");
+                    case Kind.Long:
+                        return Parse("Core::Long");
+                    case Kind.Float:
+                        return Parse("Core::Float");
+                    case Kind.Double:
+                        return Parse("Core::Double");
+                    default:
+                        return this;
+                }
+            }
+        }
+
+        public string ExternConvertStringFunction
+        {
+            get
+            {
+                switch(_Kind)
+                {
+                    case Kind.Bool:
+                        return $"Core::Extern::BoolToString";
+                    case Kind.Char:
+                        return $"Core::Extern::CharToString";
+                    case Kind.Int:
+                        return $"Core::Extern::IntToString";
+                    case Kind.Long:
+                        return $"Core::Extern::LongToString";
+                    case Kind.Float:
+                        return $"Core::Extern::FloatToString";
+                    case Kind.Double:
+                        return $"Core::Extern::DoubleToString";
+                    default:
+                        throw new GizboxException(ExceptioName.Undefine, $"No convert function:{this._RawTypeExpression}");
+                }
             }
         }
 
@@ -582,7 +654,7 @@ namespace Gizbox
             get
             {
                 if(_Kind != Kind.Array)
-                    throw new GizboxException(ExceptioName.Normal, $"cannot get element type of non-array type: {_Kind}");
+                    throw new GizboxException(ExceptioName.Undefine, $"cannot get element type of non-array type: {_Kind}");
 
                 return _Array_ElementType;
             }

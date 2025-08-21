@@ -8,7 +8,7 @@ namespace Gizbox
 {
     [Serializable]
     [DataContract]
-    public class GStack<T>
+    public class GStack<T> : IEnumerable<T>
     {
         [DataMember]
         private List<T> data = new List<T>();
@@ -47,6 +47,23 @@ namespace Gizbox
         public List<T> AsList()
         {
             return data;
+        }
+
+        //从栈顶到栈底
+        IEnumerator<T> IEnumerable<T>.GetEnumerator()
+        {
+            for(int i = Top; i >= 0; i--)
+            {
+                yield return data[i];
+            }
+        }
+
+        public IEnumerator GetEnumerator()
+        {
+            for(int i = Top; i >= 0; i--)
+            {
+                yield return data[i];
+            }
         }
     }
 

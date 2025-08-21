@@ -2121,7 +2121,7 @@ namespace Gizbox.SemanticRule
                         Pass3_AnalysisNode(delNode.objToDelete);
                         string objTypeExpr = (string)delNode.objToDelete.attributes["type"];
 
-                        if (Utils.IsArrayType(objTypeExpr) == false)
+                        if (TypeExpr.Parse(objTypeExpr).Category != TypeExpr.Kind.Array)
                         {
                             if (Query(objTypeExpr) == null)
                             {
@@ -2151,14 +2151,14 @@ namespace Gizbox.SemanticRule
                         //常量替换  
                         if (rec.category == SymbolTable.RecordCatagory.Constant)
                         {
-                            idNode.replacement = new SyntaxTree.LiteralNode
+                            idNode.overrideNode = new SyntaxTree.LiteralNode
                             {
                                 token = new Token(null, PatternType.Literal, rec.initValue, -1, -1, -1),
 
                                 attributes = new Dictionary<string, object>()
                             };
 
-                            idNode.replacement.attributes["type"] = rec.typeExpression;
+                            idNode.overrideNode.attributes["type"] = rec.typeExpression;
                             break;
                         }
 
@@ -2195,17 +2195,15 @@ namespace Gizbox.SemanticRule
                         var srcType = TypeExpr.Parse((string)castNode.factorNode.attributes["type"]);
                         var targetType = TypeExpr.Parse(castNode.typeNode.TypeExpression());
 
-                        string targetClass = Utils.GetBoxType(srcType.ToString());
-
                         if(targetType.Category == TypeExpr.Kind.String)
                         {
-                            castNode.replacement = new SyntaxTree.CallNode()
+                            castNode.overrideNode = new SyntaxTree.CallNode()
                             {
                                 isMemberAccessFunction = false,
                                 funcNode = new SyntaxTree.IdentityNode() 
                                 {
                                     attributes = new Dictionary<string, object>(),
-                                    token = new Token("ID", PatternType.Id, $"Core::Extern::{targetClass}ToString", default, default, default),
+                                    token = new Token("ID", PatternType.Id, srcType.ExternConvertStringFunction, default, default, default),
                                     identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
                                 },
                                 argumantsNode = new SyntaxTree.ArgumentListNode()
@@ -2217,7 +2215,7 @@ namespace Gizbox.SemanticRule
                                 attributes = castNode.attributes,
                             };
 
-                            Pass3_AnalysisNode(castNode.replacement);
+                            Pass3_AnalysisNode(castNode.overrideNode);
 
                             break;
                         }
@@ -2291,7 +2289,7 @@ namespace Gizbox.SemanticRule
                                 if (setterMethod != null)//存在setter函数  
                                 {
                                     //替换节点  
-                                    assignNode.replacement = new SyntaxTree.CallNode()
+                                    assignNode.overrideNode = new SyntaxTree.CallNode()
                                     {
 
                                         isMemberAccessFunction = true,
@@ -2306,7 +2304,7 @@ namespace Gizbox.SemanticRule
                                         attributes = assignNode.attributes,
                                     };
 
-                                    Pass3_AnalysisNode(assignNode.replacement);
+                                    Pass3_AnalysisNode(assignNode.overrideNode);
 
                                     break;
                                 }
@@ -2346,7 +2344,7 @@ namespace Gizbox.SemanticRule
                                 {
 
                                     //替换节点  
-                                    objMemberAccessNode.replacement = new SyntaxTree.CallNode()
+                                    objMemberAccessNode.overrideNode = new SyntaxTree.CallNode()
                                     {
 
                                         isMemberAccessFunction = true,
@@ -2361,7 +2359,7 @@ namespace Gizbox.SemanticRule
                                         attributes = objMemberAccessNode.attributes,
                                     };
 
-                                    Pass3_AnalysisNode(objMemberAccessNode.replacement);
+                                    Pass3_AnalysisNode(objMemberAccessNode.overrideNode);
 
                                     break;
                                 }
@@ -2496,7 +2494,7 @@ namespace Gizbox.SemanticRule
                         string containerTypeExpr = AnalyzeTypeExpression(eleAccessNode.containerNode);
 
                         if (containerTypeExpr.EndsWith("[]") == false)
-                            throw new SemanticException(ExceptioName.Normal, eleAccessNode, "only array can use [] operator");
+                            throw new SemanticException(ExceptioName.Undefine, eleAccessNode, "only array can use [] operator");
 
                         nodeTypeExprssion = containerTypeExpr.Substring(0, containerTypeExpr.Length - 2);
                     }
@@ -2653,11 +2651,11 @@ namespace Gizbox.SemanticRule
         }
         private bool CheckType_Equal(string typeExpr1, string typeExpr2)
         {
-            if (typeExpr1 == "null" && Utils.IsPrimitiveType(typeExpr2) == false)
+            if (typeExpr1 == "null" && TypeExpr.Parse(typeExpr2).IsPointerType)
             {
                 return true;
             }
-            else if (typeExpr2 == "null" && Utils.IsPrimitiveType(typeExpr1) == false)
+            else if (typeExpr2 == "null" && TypeExpr.Parse(typeExpr1).IsPointerType)
             {
                 return true;
             }
@@ -2669,7 +2667,7 @@ namespace Gizbox.SemanticRule
             if(typeExpr1 == typeExpr2) return true;
 
             //有至少一个是基元类型  
-            if(Utils.IsPrimitiveType(typeExpr1) || Utils.IsPrimitiveType(typeExpr2))
+            if(TypeExpr.Parse(typeExpr1).IsPrimitive || TypeExpr.Parse(typeExpr2).IsPrimitive)
             {
                 return typeExpr1 == typeExpr2;
             }
@@ -2682,7 +2680,7 @@ namespace Gizbox.SemanticRule
                     return true;
                 }
                 //两个都是类类型
-                else if(Utils.IsClassType(typeExpr1) && Utils.IsClassType(typeExpr2))
+                else if(TypeExpr.Parse(typeExpr1).IsClassType && TypeExpr.Parse(typeExpr2).IsClassType)
                 {
                     var typeRec1 = Query(typeExpr1);
                     if(typeRec1.envPtr.Class_IsSubClassOf(typeExpr2))
@@ -2691,7 +2689,7 @@ namespace Gizbox.SemanticRule
                     }
                 }
                 //两个都是数组类型  
-                else if(Utils.IsArrayType(typeExpr1) && Utils.IsArrayType(typeExpr2))
+                else if(TypeExpr.Parse(typeExpr1).IsArray && TypeExpr.Parse(typeExpr2).IsArray)
                 {
                     //不支持逆变和协变  
                 }
@@ -2859,7 +2857,7 @@ namespace Gizbox.SemanticRule
             //库依赖中查找  
             foreach(var lib in this.ilUnit.dependencyLibs)
             {
-                lib.QueryAllTopSymbolToContainer(rawname, result, ignoreMangle: true);
+                lib.QueryAndFillTopSymbolsToContainer(rawname, result, ignoreMangle: true);
             }
         }
         private bool TryQueryIgnoreMangle(string name)

@@ -108,7 +108,7 @@ namespace Gizbox
 
             private Node parent;
 
-            public Node replacement = null;
+            public Node overrideNode = null;
 
             public int depth = -1;
 

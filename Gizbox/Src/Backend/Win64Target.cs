@@ -584,7 +584,7 @@ namespace Gizbox.Src.Backend
                     case "MCALL":
                         {
                             // 第一参数是 方法名（未混淆），第二个参数是参数个数
-                            string methodName = tac.arg0.Substring(1, tac.arg0.Length - 2);
+                            string methodName = tac.arg0;
 
 
                             //this参数载入寄存器  
@@ -1425,19 +1425,19 @@ namespace Gizbox.Src.Backend
                     {
                         switch(iroperandExpr.segments[0])
                         {
-                            case "LITBOOL":
+                            case "%LITBOOL":
                                 {
                                     var value = iroperandExpr.segments[1] == "True" ? 1L : 0L;
                                     return X64.imm(value);
                                 }
                                 break;
-                            case "LITINT":
+                            case "%LITINT":
                                 {
                                     var value = int.Parse(iroperandExpr.segments[1]);
                                     return X64.imm(value);
                                 }
                                 break;
-                            case "LITLONG":
+                            case "%LITLONG":
                                 {
                                     var value = long.Parse(iroperandExpr.segments[1]);
                                     return X64.imm(value);
@@ -1449,18 +1449,18 @@ namespace Gizbox.Src.Backend
                                     return X64.imm((long)charValue[0]);
                                 }
                                 break;
-                            case "LITNULL":
+                            case "%LITNULL":
                                 {
                                     return X64.imm(0);
                                 }
                                 break;
-                            case "LITFLOAT":
-                            case "LITDOUBLE":
+                            case "%LITFLOAT":
+                            case "%LITDOUBLE":
                                 {
                                     return X64.rel(iroperandExpr.roDataKey);
                                 }
                                 break;
-                            case "CONSTSTRING":
+                            case "%CONSTSTRING":
                                 {
                                     return X64.rel(iroperandExpr.roDataKey);
                                 }
@@ -1539,9 +1539,9 @@ namespace Gizbox.Src.Backend
                         else
                         {
                             long immIndex = 0;
-                            if(indexExpr != null && indexExpr.StartsWith("LITINT:"))
+                            if(indexExpr != null && indexExpr.StartsWith("%LITINT:"))
                             {
-                                var lit = indexExpr.Substring("LITINT:".Length);
+                                var lit = indexExpr.Substring("%LITINT:".Length);
                                 immIndex = long.Parse(lit);
                                 long disp = checked(immIndex * elemSize);
                                 return X64.mem(baseV, displacement: disp);
@@ -1559,14 +1559,6 @@ namespace Gizbox.Src.Backend
 
         public IROperandExpr GetIROperandInfo(string rawoperand)
         {
-            //可能的格式示例：
-            //  数组访问：[arr[x]]
-            //  成员访问：[obj.x]
-            //  局部变量访问：[var1]
-            //  全局变量访问：[globalvar1]
-            //  字面量:LITINT:123
-            //  常量：CONSTSTRING:123  //第123个字符串常量
-
             if(operandCache.TryGetValue(rawoperand, out var result))
             {
                 return result;
@@ -1575,57 +1567,50 @@ namespace Gizbox.Src.Backend
             {
                 IROperandExpr irOperand = new();
 
-                // 移除方括号
-                if(rawoperand.StartsWith("[") && rawoperand.EndsWith("]"))
+                //返回值虚拟寄存器
+                if(rawoperand == "%RET")
                 {
-                    string operand = rawoperand.Substring(1, rawoperand.Length - 2);
-
-                    if(operand.Contains('.'))
-                    {
-                        //成员访问：[obj.x]
-                        var parts = operand.Split('.');
-                        irOperand.type = IROperandExpr.Type.ClassMemberAccess;
-                        irOperand.segments = parts;
-                    }
-                    else if(operand.Contains('['))
-                    {
-                        //数组访问：[arr[x]]
-                        var parts = operand.Split('[');
-                        var arrName = parts[0];
-                        var indexExpr = parts[1].Substring(0, parts[1].Length - 1);//去掉']'
-                        irOperand.type = IROperandExpr.Type.ArrayElementAccess;
-                        irOperand.segments = new[] { arrName, indexExpr };
-                    }
-                    else
-                    {
-                        //局部变量或全局变量访问
-                        irOperand.type = IROperandExpr.Type.Identifier;
-                        irOperand.segments = new[] { operand };
-                    }
+                    irOperand.type = IROperandExpr.Type.RET;
+                    irOperand.segments = new[] { "%RET" };
                 }
                 //字面量或者常量  
-                else if(rawoperand.Contains(':'))
+                else if(rawoperand.StartsWith("%CONST") || rawoperand.StartsWith("%LIT"))
                 {
                     var parts = rawoperand.Split(':');
                     irOperand.type = IROperandExpr.Type.LitOrConst;
                     irOperand.segments = parts;
                 }
-                //其他
+                //标签  
+                else if(rawoperand.StartsWith("%LABEL:"))
+                {
+                    irOperand.type = IROperandExpr.Type.Label;
+                    irOperand.segments = new[] { rawoperand.Substring(7) };
+                }
+                //成员访问
+                else if(rawoperand.Contains('.'))
+                {
+                    //成员访问：obj.x
+                    var parts = rawoperand.Split('.');
+                    irOperand.type = IROperandExpr.Type.ClassMemberAccess;
+                    irOperand.segments = parts;
+                }
+                //数组元素访问  
+                else if(rawoperand.Contains('[') && rawoperand.EndsWith("]"))
+                {
+                    //数组访问：arr[x]
+                    var parts = rawoperand.Split('[');
+                    var arrName = parts[0];
+                    var indexExpr = parts[1].Substring(0, parts[1].Length - 1);//去掉']'
+                    irOperand.type = IROperandExpr.Type.ArrayElementAccess;
+                    irOperand.segments = new[] { arrName, indexExpr };
+                }
+                //标识符（变量名、函数名、类型名）
                 else
                 {
-                    //返回值
-                    if(rawoperand == "RET")
-                    {
-                        irOperand.type = IROperandExpr.Type.RET;
-                        irOperand.segments = new[] { "RET" };
-                    }
-                    //标签  
-                    else
-                    {
-                        irOperand.type = IROperandExpr.Type.Label;
-                        irOperand.segments = new[] { rawoperand };
-                    }
+                    irOperand.type = IROperandExpr.Type.Identifier;
+                    irOperand.segments = new[] { rawoperand };
                 }
+
 
                 //缓存
                 operandCache.Add(rawoperand, irOperand);
@@ -1892,10 +1877,17 @@ namespace Gizbox.Src.Backend
                     if(segments[1] != "ctor")
                     {
                         var objRec = context.Query(segments[0], tacinf.line);
-                        string className = objRec.typeExpression;
+                        string className;
+                        if(objRec.category == SymbolTable.RecordCatagory.Class)//静态函数
+                        {
+                            className = objRec.name;
+                        }
+                        else
+                        {
+                            className = objRec.typeExpression;
+                        }
                         var classRec = context.classDict[className];
                         var memberRec = context.QueryMember(className, segments[1]);
-                        Console.WriteLine("成员类型：" + memberRec.category.ToString());
                         segmentRecs[0] = objRec;
                         segmentRecs[1] = memberRec;
                         typeExpr = TypeExpr.Parse(memberRec.typeExpression);

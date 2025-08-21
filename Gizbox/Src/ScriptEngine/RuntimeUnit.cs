@@ -17,49 +17,40 @@ namespace Gizbox.ScriptEngine
             this.str = argStr;
         }
 
-        public static string GetString(Operand operand)
-        {
-            if ((operand is OperandString) == false) throw new RuntimeException(ExceptioName.ScriptRuntimeError, null, "not StringOperand type !");
-            return ((OperandString)operand).str;
-        }
 
-        public static Operand Parse(string argStr)
+        public static Operand Parse(string argStr, ILUnit unit, int line)
         {
             if(string.IsNullOrEmpty(argStr))
             {
                 return null;
             }
-            else if(argStr == "RET")
+            else if(argStr == "%RET")
             {
                 return new OperandRegister(argStr);
             }
-            else if(argStr.StartsWith("CONST"))
+            else if(argStr.StartsWith("%CONST"))
             {
                 return new OperandConst(argStr);
             }
-            else if(argStr.StartsWith("LIT"))
+            else if(argStr.StartsWith("%LIT"))
             {
                 return new OperandLiteralValue(argStr);
             }
-            else if(argStr[0] == '[' && argStr[argStr.Length - 1] == ']')
+            else if(argStr.StartsWith("%LABEL:"))
             {
-                string expr = argStr.Substring(1, argStr.Length - 2);
-                if(expr[expr.Length - 1] == ']')
-                {
-                    return new OperandElementAccess(expr);
-                }
-                else if(expr.Contains("."))
-                {
-                    return new OperandMemberAccess (expr);
-                }
-                else
-                {
-                    return new OperandVariable(expr);
-                }
+                return new OperandLabel(argStr);
             }
-            else
+            else if(argStr.Contains("."))
             {
-                return new OperandString(argStr);
+                return new OperandMemberAccess(argStr, unit, line);
+            }
+            else if(argStr.EndsWith("]"))
+            {
+                return new OperandElementAccess(argStr, unit, line);
+            }
+            else 
+            {
+                return new OperandSingleIdentifier(argStr, unit, line);
             }
 
             throw new GizboxException(ExceptioName.TacError);
@@ -70,13 +61,18 @@ namespace Gizbox.ScriptEngine
         public string registerName;
         public OperandRegister(string str) : base(str)
         {
-            this.registerName = str;
+            this.registerName = str.Substring(1);
         }
     }
-    public class OperandString : Operand
+    public class OperandLabel : Operand
     {
-        public OperandString(string s) : base(s)
+        public string label;
+        public OperandLabel(string s) : base(s)
         {
+            if(s.StartsWith("%LABEL:") == false)
+                throw new GizboxException(ExceptioName.TacError, "OperandLabel must start with 'LABEL:'");
+
+            label = s.Substring(7);
         }
     }
     public class OperandConst : Operand
@@ -93,7 +89,7 @@ namespace Gizbox.ScriptEngine
             string lex = str.Substring(splitIndex + 1);
             switch (baseType)
             {
-                case "CONSTSTRING":
+                case "%CONSTSTRING":
                     {
                         this.oldPtr = long.Parse(lex);
                         this.giztype = "string";
@@ -114,13 +110,13 @@ namespace Gizbox.ScriptEngine
             string lex = str.Substring(splitIndex + 1);
             switch (baseType)
             {
-                case "LITNULL": this.val =  Value.NULL; break;
-                case "LITBOOL": this.val = bool.Parse(lex); break;
-                case "LITINT": this.val = int.Parse(lex); break;
-                case "LITLONG": this.val = long.Parse(lex); break;
-                case "LITFLOAT": this.val = float.Parse(lex.Substring(0, lex.Length - 1)); break;//去除F标记  
-                case "LITDOUBLE": this.val = double.Parse(lex.Substring(0, lex.Length - 1)); break;//去除F标记  
-                case "LITCHAR": this.val = lex[1]; break;
+                case "%LITNULL": this.val =  Value.NULL; break;
+                case "%LITBOOL": this.val = bool.Parse(lex); break;
+                case "%LITINT": this.val = int.Parse(lex); break;
+                case "%LITLONG": this.val = long.Parse(lex.Substring(0, lex.Length - 1)); break;
+                case "%LITFLOAT": this.val = float.Parse(lex.Substring(0, lex.Length - 1)); break;//去除F标记  
+                case "%LITDOUBLE": this.val = double.Parse(lex.Substring(0, lex.Length - 1)); break;//去除F标记  
+                case "%LITCHAR": this.val = lex[1]; break;
                 //case "LITSTRING": return Value.Void;//字符串字面量已经移除
                 default: throw new GizboxException(ExceptioName.UnknownLiteral,  str);
             }
@@ -131,7 +127,7 @@ namespace Gizbox.ScriptEngine
         public Operand array;
         public Operand index;
 
-        public OperandElementAccess(string expr) : base(expr)
+        public OperandElementAccess(string expr, ILUnit unit, int line) : base(expr)
         {
             int lbracket = expr.IndexOf('[');
             int rbracket = expr.IndexOf(']');
@@ -142,18 +138,18 @@ namespace Gizbox.ScriptEngine
 
             if (arrVarExpr[arrVarExpr.Length - 1] == ']')
             {
-                this.array = new OperandElementAccess(arrVarExpr);
+                this.array = new OperandElementAccess(arrVarExpr, unit, line);
             }
             else if (arrVarExpr.Contains("."))
             {
-                this.array = new OperandMemberAccess(arrVarExpr);
+                this.array = new OperandMemberAccess(arrVarExpr, unit, line);
             }
             else
             {
-                this.array = new OperandVariable(arrVarExpr);
+                this.array = new OperandSingleIdentifier(arrVarExpr, unit, line);
             }
 
-            this.index = Operand.Parse(idxExpr);
+            this.index = Operand.Parse(idxExpr, unit, line);
         }
     }
     public class OperandMemberAccess :Operand
@@ -161,7 +157,7 @@ namespace Gizbox.ScriptEngine
         public Operand obj;
         public string fieldname;
 
-        public OperandMemberAccess (string expr) : base(expr)
+        public OperandMemberAccess (string expr, ILUnit unit, int line) : base(expr)
         {
             int lastDot = expr.LastIndexOf('.');
             var variableExpr = expr.Substring(0, lastDot);
@@ -170,26 +166,30 @@ namespace Gizbox.ScriptEngine
 
             if (variableExpr[variableExpr.Length - 1] == ']')
             {
-                this.obj = new OperandElementAccess(variableExpr);
+                this.obj = new OperandElementAccess(variableExpr, unit, line);
             }
             else if(variableExpr.Contains("."))
             {
-                this.obj = new OperandMemberAccess(variableExpr);
+                this.obj = new OperandMemberAccess(variableExpr, unit, line);
             }
             else
             {
-                this.obj = new OperandVariable(variableExpr);
+                this.obj = new OperandSingleIdentifier(variableExpr, unit, line);
             }
             
             this.fieldname = fieldName;
         }
     }
-    public class OperandVariable : Operand
+    public class OperandSingleIdentifier : Operand
     {
         public string name;
-        public OperandVariable(string str) : base(str)
+
+        public SymbolTable.Record record;
+
+        public OperandSingleIdentifier(string str, ILUnit unit, int line) : base(str)
         {
             this.name = str;
+            this.record = unit.Query(this.name, line);
         }
     }
 
@@ -204,11 +204,11 @@ namespace Gizbox.ScriptEngine
 
         public string op;
 
+        public Operand arg0;
         public Operand arg1;
         public Operand arg2;
-        public Operand arg3;
 
-        public RuntimeCode(TAC tac)
+        public RuntimeCode(TAC tac, ILUnit unit, int line)
         {
             if(string.IsNullOrEmpty(tac.label))
             {
@@ -232,9 +232,9 @@ namespace Gizbox.ScriptEngine
 
             this.op = tac.op;
 
-            this.arg1 = Operand.Parse(tac.arg0);
-            this.arg2 = Operand.Parse(tac.arg1);
-            this.arg3 = Operand.Parse(tac.arg2);
+            this.arg0 = Operand.Parse(tac.arg0, unit, line);
+            this.arg1 = Operand.Parse(tac.arg1, unit, line);
+            this.arg2 = Operand.Parse(tac.arg2, unit, line);
         }
 
         public string ToExpression(bool showlabel = true)
@@ -255,6 +255,11 @@ namespace Gizbox.ScriptEngine
             str += "\t";
             str += op;
 
+            if (arg0 != null)
+            {
+                str += "\t";
+                str += arg0.str;
+            }
             if (arg1 != null)
             {
                 str += "\t";
@@ -264,11 +269,6 @@ namespace Gizbox.ScriptEngine
             {
                 str += "\t";
                 str += arg2.str;
-            }
-            if (arg3 != null)
-            {
-                str += "\t";
-                str += arg3.str;
             }
             return str;
         }
@@ -290,8 +290,8 @@ namespace Gizbox.ScriptEngine
         public List<object> constData = new List<object>();
 
 
-        private Dictionary<string, int> entryLabels = new Dictionary<string, int>();
-        private Dictionary<string, int> exitLabels = new Dictionary<string, int>();
+        private Dictionary<string, Dictionary<string, int>> specialLabels = new ();
+
 
 
 
@@ -312,9 +312,10 @@ namespace Gizbox.ScriptEngine
                 this.directlyDependencies.Add(new RuntimeUnit(engineContext, libIr));
             }
 
-            foreach(var tac in ilunit.codes)
+            for(int i = 0; i < ilunit.codes.Count; ++i)
             {
-                var newCode = new RuntimeCode(tac);
+                var tac = ilunit.codes[i];
+                var newCode = new RuntimeCode(tac, ilunit, i);
                 this.codes.Add(newCode);
             }
 
@@ -329,15 +330,35 @@ namespace Gizbox.ScriptEngine
 
             foreach(var kv in ilunit.label2Line)
             {
+                string firstKey = null;
+                string secondKey = null;
                 if(kv.Key.StartsWith("entry:"))
                 {
-                    var entryKey = kv.Key.Substring(6);
-                    entryLabels[entryKey] = kv.Value;
+                    firstKey = "entry";
+                    secondKey = kv.Key.Substring(6);
+                }
+                else if(kv.Key.StartsWith("func_begin:"))
+                {
+                    firstKey = "func_begin";
+                    secondKey = kv.Key.Substring(11);
+                }
+                else if(kv.Key.StartsWith("func_end:"))
+                {
+                    firstKey = "func_end";
+                    secondKey = kv.Key.Substring(9);
                 }
                 else if(kv.Key.StartsWith("exit:"))
                 {
-                    var exitKey = kv.Key.Substring(5);
-                    exitLabels[exitKey] = kv.Value;
+                    firstKey = "exit";
+                    secondKey = kv.Key.Substring(5);
+                }
+
+
+                if(firstKey != null && secondKey != null)
+                {
+                    if(specialLabels.ContainsKey(firstKey) == false)
+                        specialLabels[firstKey] = new Dictionary<string, int>();
+                    specialLabels[firstKey][secondKey] = kv.Value;
                 }
             }
         }
@@ -352,9 +373,9 @@ namespace Gizbox.ScriptEngine
             //常量指针偏移  
             foreach (var code in this.codes)
             {
+                SetPtrOffset(code.arg0, this.id);
                 SetPtrOffset(code.arg1, this.id);
                 SetPtrOffset(code.arg2, this.id);
-                SetPtrOffset(code.arg3, this.id);
             }
 
             //依赖链接    
@@ -376,9 +397,9 @@ namespace Gizbox.ScriptEngine
             //常量指针  
             foreach(var code in this.codes)
             {
+                SetPtrOffset(code.arg0, this.id);
                 SetPtrOffset(code.arg1, this.id);
                 SetPtrOffset(code.arg2, this.id);
-                SetPtrOffset(code.arg3, this.id);
             }
 
             //依赖  
@@ -514,56 +535,32 @@ namespace Gizbox.ScriptEngine
         //查询标号  
         public Tuple<int, int> QueryLabel(string labelp0, string labelp1, int priorityUnit)
         {
-            //入口标签
-            if(labelp0 == "entry")
+            if(labelp0 == "entry" ||
+                labelp0 == "func_begin" ||
+                labelp0 == "func_end" ||
+                labelp0 == "exit"
+                )
             {
                 //优先查找的库  
-                if (priorityUnit != -1)
+                if(priorityUnit != -1)
                 {
-                    if (allUnits[priorityUnit].entryLabels.ContainsKey(labelp1))
+                    if(allUnits[priorityUnit].specialLabels[labelp0].ContainsKey(labelp1))
                     {
-                        return new Tuple<int, int>(priorityUnit, allUnits[priorityUnit].entryLabels[labelp1]);
+                        return new Tuple<int, int>(priorityUnit, allUnits[priorityUnit].specialLabels[labelp0][labelp1]);
                     }
                 }
                 //正常查找顺序  
-                if (entryLabels.ContainsKey(labelp1) == true)
+                if(specialLabels[labelp0].ContainsKey(labelp1) == true)
                 {
-                    return new Tuple<int, int>(-1, entryLabels[labelp1]);
+                    return new Tuple<int, int>(-1, specialLabels[labelp0][labelp1]);
                 }
                 else
                 {
-                    for (int i = 0; i < allUnits.Count; ++i)
+                    for(int i = 0; i < allUnits.Count; ++i)
                     {
-                        if (allUnits[i].entryLabels.ContainsKey(labelp1))
+                        if(allUnits[i].specialLabels[labelp0].ContainsKey(labelp1))
                         {
-                            return new Tuple<int, int>(i, allUnits[i].entryLabels[labelp1]);
-                        }
-                    }
-                }
-            }
-            //出口标签  
-            else if(labelp0 == "exit")
-            {
-                //优先查找的库  
-                if (priorityUnit != -1)
-                {
-                    if (allUnits[priorityUnit].exitLabels.ContainsKey(labelp1))
-                    {
-                        return new Tuple<int, int>(priorityUnit, allUnits[priorityUnit].exitLabels[labelp1]);
-                    }
-                }
-                //正常查找顺序  
-                if (exitLabels.ContainsKey(labelp1) == true)
-                {
-                    return new Tuple<int, int>(-1, exitLabels[labelp1]);
-                }
-                else
-                {
-                    for (int i = 0; i < allUnits.Count; ++i)
-                    {
-                        if (allUnits[i].exitLabels.ContainsKey(labelp1))
-                        {
-                            return new Tuple<int, int>(i, allUnits[i].exitLabels[labelp1]);
+                            return new Tuple<int, int>(i, allUnits[i].specialLabels[labelp0][labelp1]);
                         }
                     }
                 }
@@ -573,24 +570,24 @@ namespace Gizbox.ScriptEngine
             {
                 string label = labelp0;
                 //优先查找的库  
-                if (priorityUnit != -1)
+                if(priorityUnit != -1)
                 {
-                    if (allUnits[priorityUnit].label2Line.ContainsKey(label))
+                    if(allUnits[priorityUnit].label2Line.ContainsKey(label))
                     {
                         return new Tuple<int, int>(priorityUnit, allUnits[priorityUnit].label2Line[label]);
                     }
                 }
 
                 //正常查找顺序  
-                if (label2Line.ContainsKey(label) == true)
+                if(label2Line.ContainsKey(label) == true)
                 {
                     return new Tuple<int, int>(-1, label2Line[label]);
                 }
                 else
                 {
-                    for (int i = 0; i < allUnits.Count; ++i)
+                    for(int i = 0; i < allUnits.Count; ++i)
                     {
-                        if (allUnits[i].label2Line.ContainsKey(label))
+                        if(allUnits[i].label2Line.ContainsKey(label))
                         {
                             return new Tuple<int, int>(i, allUnits[i].label2Line[label]);
                         }
@@ -598,7 +595,7 @@ namespace Gizbox.ScriptEngine
                 }
             }
 
-            throw new GizboxException(ExceptioName.LabelNotFound, labelp0);
+            throw new GizboxException(ExceptioName.LabelNotFound, labelp0 + (labelp1 != null ? (":" + labelp1) : string.Empty));
         }
 
         // 查询库  

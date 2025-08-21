@@ -6,7 +6,7 @@ namespace Gizbox
 {
     public enum ExceptioName
     {
-        Normal,
+        Undefine,
 
         //0.
         LibraryLoadPathNotSet,
@@ -98,7 +98,7 @@ namespace Gizbox
     {
         public ExceptioName exType;
         public string appendMsg;
-        public GizboxException(ExceptioName extype = ExceptioName.Normal, string appendMsg = "") : base(appendMsg) 
+        public GizboxException(ExceptioName extype = ExceptioName.Undefine, string appendMsg = "") : base(appendMsg) 
         { 
             this.exType = extype;
             this.appendMsg = appendMsg;

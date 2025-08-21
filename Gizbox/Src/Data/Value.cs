@@ -129,6 +129,31 @@ namespace Gizbox
             return new Value() { type = GizType.ArrayRef, AsPtr = arrayPtr };
         }
 
+        public static Value DefaultOf(TypeExpr type)
+        {
+            switch(type.Category)
+            {
+                case TypeExpr.Kind.Int:
+                    return (int)0;
+                case TypeExpr.Kind.Long:
+                    return 0L;
+                case TypeExpr.Kind.Float:
+                    return 0f;
+                case TypeExpr.Kind.Double:
+                    return 0d;
+                case TypeExpr.Kind.Bool:
+                    return false;
+                case TypeExpr.Kind.Char:
+                    return '\0';
+                case TypeExpr.Kind.String:
+                    return FromStringPtr(0);
+                default:
+                    return NULL;
+
+
+            }
+            
+        }
 
         // ---------- OPERATOR --------------
         public static Value operator +(Value v1, Value v2)
