@@ -395,7 +395,7 @@ namespace Gizbox.Src.Backend
             }
             if(iterationCount >= maxIterations)
             {
-                throw new GizboxException(ExceptioName.Unknown,
+                throw new GizboxException(ExceptioName.CodeGen,
                     $"活跃变量分析未收敛，迭代次数超过 {maxIterations}");
             }
 
@@ -668,7 +668,7 @@ namespace Gizbox.Src.Backend
                             // 获取类型记录
                             if(!classDict.TryGetValue(typeName, out var classRec))
                             {
-                                throw new GizboxException(ExceptioName.Unknown, $"未找到类型定义: {typeName}");
+                                throw new GizboxException(ExceptioName.CodeGen, $"未找到类型定义: {typeName}");
                             }
 
                             // 获取类的大小
@@ -739,86 +739,340 @@ namespace Gizbox.Src.Backend
                         break;
                     case "+=":
                         {
+                            var dst = ParseOperand(tacInf.oprand0);
+                            var src = ParseOperand(tacInf.oprand1);
+                            if(tacInf.oprand0.IsSSEType())
+                            {
+                                if(tacInf.oprand0.typeExpr.Size == 4) 
+                                    instructions.Add(X64.addss(dst, src)); 
+                                else
+                                    instructions.Add(X64.addsd(dst, src));
+                            }
+                            else
+                            {
+                                instructions.Add(X64.add(dst, src));
+                            }
                         }
                         break;
                     case "-=":
                         {
+                            var dst = ParseOperand(tacInf.oprand0);
+                            var src = ParseOperand(tacInf.oprand1);
+                            if(tacInf.oprand0.IsSSEType())
+                            {
+                                if(tacInf.oprand0.typeExpr.Size == 4) 
+                                    instructions.Add(X64.subss(dst, src));
+                                else
+                                    instructions.Add(X64.subsd(dst, src));
+                            }
+                            else
+                            {
+                                instructions.Add(X64.sub(dst, src));
+                            }
                         }
                         break;
                     case "*=":
                         {
+                            var dst = ParseOperand(tacInf.oprand0);
+                            var src = ParseOperand(tacInf.oprand1);
+                            if(tacInf.oprand0.IsSSEType())
+                            {
+                                if(tacInf.oprand0.typeExpr.Size == 4) 
+                                    instructions.Add(X64.mulss(dst, src)); 
+                                else
+                                    instructions.Add(X64.mulsd(dst, src));
+                            }
+                            else
+                            {
+                                instructions.Add(X64.imul(dst, src));
+                            }
                         }
                         break;
                     case "/=":
                         {
+                            var dst = ParseOperand(tacInf.oprand0);
+                            var src = ParseOperand(tacInf.oprand1);
+                            if(tacInf.oprand0.IsSSEType())
+                            {
+                                if(tacInf.oprand0.typeExpr.Size == 4) 
+                                    instructions.Add(X64.divss(dst, src)); 
+                                else 
+                                    instructions.Add(X64.divsd(dst, src));
+                            }
+                            else
+                            {
+                                instructions.Add(X64.mov(X64.rax, dst));
+                                instructions.Add(X64.cqo());
+                                instructions.Add(X64.idiv(src));
+                                instructions.Add(X64.mov(dst, X64.rax));
+                            }
                         }
                         break;
                     case "%=":
                         {
+                            var dst = ParseOperand(tacInf.oprand0);
+                            var src = ParseOperand(tacInf.oprand1);
+                            instructions.Add(X64.mov(X64.rax, dst));
+                            instructions.Add(X64.cqo());
+                            instructions.Add(X64.idiv(src));
+                            instructions.Add(X64.mov(dst, X64.rdx));
                         }
                         break;
                     case "+":
                         {
+                            var dst = ParseOperand(tacInf.oprand0);
+                            var a = ParseOperand(tacInf.oprand1);
+                            var b = ParseOperand(tacInf.oprand2);
+                            if(tacInf.oprand0.IsSSEType())
+                            {
+                                if(tacInf.oprand0.typeExpr.Size == 4) 
+                                    instructions.Add(X64.movss(dst, a)); 
+                                else 
+                                    instructions.Add(X64.movsd(dst, a));
+
+                                if(tacInf.oprand0.typeExpr.Size == 4) 
+                                    instructions.Add(X64.addss(dst, b)); 
+                                else 
+                                    instructions.Add(X64.addsd(dst, b));
+                            }
+                            else
+                            {
+                                instructions.Add(X64.mov(dst, a));
+                                instructions.Add(X64.add(dst, b));
+                            }
                         }
                         break;
                     case "-":
                         {
+                            var dst = ParseOperand(tacInf.oprand0);
+                            var a = ParseOperand(tacInf.oprand1);
+                            var b = ParseOperand(tacInf.oprand2);
+                            if(tacInf.oprand0.IsSSEType())
+                            {
+                                if(tacInf.oprand0.typeExpr.Size == 4) 
+                                    instructions.Add(X64.movss(dst, a)); 
+                                else 
+                                    instructions.Add(X64.movsd(dst, a));
+
+                                if(tacInf.oprand0.typeExpr.Size == 4) 
+                                    instructions.Add(X64.subss(dst, b)); 
+                                else 
+                                    instructions.Add(X64.subsd(dst, b));
+                            }
+                            else
+                            {
+                                instructions.Add(X64.mov(dst, a));
+                                instructions.Add(X64.sub(dst, b));
+                            }
                         }
                         break;
                     case "*":
                         {
+                            var dst = ParseOperand(tacInf.oprand0);
+                            var a = ParseOperand(tacInf.oprand1);
+                            var b = ParseOperand(tacInf.oprand2);
+                            if(tacInf.oprand0.IsSSEType())
+                            {
+                                if(tacInf.oprand0.typeExpr.Size == 4) 
+                                    instructions.Add(X64.movss(dst, a));
+                                else 
+                                    instructions.Add(X64.movsd(dst, a));
+
+                                if(tacInf.oprand0.typeExpr.Size == 4) 
+                                    instructions.Add(X64.mulss(dst, b)); 
+                                else 
+                                    instructions.Add(X64.mulsd(dst, b));
+                            }
+                            else
+                            {
+                                instructions.Add(X64.mov(dst, a));
+                                instructions.Add(X64.imul(dst, b));
+                            }
                         }
                         break;
                     case "/":
                         {
+                            var dst = ParseOperand(tacInf.oprand0);
+                            var a = ParseOperand(tacInf.oprand1);
+                            var b = ParseOperand(tacInf.oprand2);
+                            if(tacInf.oprand0.IsSSEType())
+                            {
+                                if(tacInf.oprand0.typeExpr.Size == 4)
+                                { 
+                                    instructions.Add(X64.movss(dst, a));
+                                    instructions.Add(X64.divss(dst, b));
+                                } 
+                                else
+                                { 
+                                    instructions.Add(X64.movsd(dst, a)); 
+                                    instructions.Add(X64.divsd(dst, b)); 
+                                }
+                            }
+                            else
+                            {
+                                instructions.Add(X64.mov(X64.rax, a));
+                                instructions.Add(X64.cqo());
+                                instructions.Add(X64.idiv(b));
+                                instructions.Add(X64.mov(dst, X64.rax));
+                            }
                         }
                         break;
                     case "%":
                         {
+                            var dst = ParseOperand(tacInf.oprand0);
+                            var a = ParseOperand(tacInf.oprand1);
+                            var b = ParseOperand(tacInf.oprand2);
+                            instructions.Add(X64.mov(X64.rax, a));
+                            instructions.Add(X64.cqo());
+                            instructions.Add(X64.idiv(b));
+                            instructions.Add(X64.mov(dst, X64.rdx));
                         }
                         break;
                     case "NEG":
                         {
+                            var dst = ParseOperand(tacInf.oprand0);
+                            var src = ParseOperand(tacInf.oprand1);
+                            if(!tacInf.oprand0.IsSSEType())
+                            {
+                                instructions.Add(X64.mov(dst, src));
+                                instructions.Add(X64.neg(dst));
+                            }
                         }
                         break;
                     case "!":
                         {
+                            var dst = ParseOperand(tacInf.oprand0);
+                            var src = ParseOperand(tacInf.oprand1);
+                            instructions.Add(X64.mov(dst, src));
+                            instructions.Add(X64.test(dst, dst));
+                            instructions.Add(X64.sete(dst));
                         }
                         break;
                     case "<":
-                        {
-                        }
-                        break;
                     case "<=":
-                        {
-                        }
-                        break;
                     case ">":
-                        {
-                        }
-                        break;
                     case ">=":
-                        {
-                        }
-                        break;
                     case "==":
-                        {
-                        }
-                        break;
                     case "!=":
                         {
+                            var dst = ParseOperand(tacInf.oprand0);
+                            var a = ParseOperand(tacInf.oprand1);
+                            var b = ParseOperand(tacInf.oprand2);
+                            instructions.Add(X64.mov(dst, a));
+                            instructions.Add(X64.cmp(dst, b));
+                            switch(tac.op)
+                            {
+                                case "<": instructions.Add(X64.setl(dst)); break;
+                                case "<=": instructions.Add(X64.setle(dst)); break;
+                                case ">": instructions.Add(X64.setg(dst)); break;
+                                case ">=": instructions.Add(X64.setge(dst)); break;
+                                case "==": instructions.Add(X64.sete(dst)); break;
+                                case "!=": instructions.Add(X64.setne(dst)); break;
+                            }
                         }
                         break;
                     case "++":
                         {
+                            var dst = ParseOperand(tacInf.oprand0);
+                            if(!tacInf.oprand0.IsSSEType()) instructions.Add(X64.inc(dst));
                         }
                         break;
                     case "--":
                         {
+                            var dst = ParseOperand(tacInf.oprand0);
+                            if(!tacInf.oprand0.IsSSEType()) instructions.Add(X64.dec(dst));
                         }
                         break;
-                    case "CAST":
+                    case "CAST"://CAST [tmp15] Human [tmp14]   tmp15 = (Human)tmp14
                         {
+                            var dst = ParseOperand(tacInf.oprand0);
+                            var src = ParseOperand(tacInf.oprand2);
+
+                            var targetType = TypeExpr.Parse(tacInf.tac.arg1);
+                            var srcType = tacInf.oprand2.typeExpr;
+
+                            //相同类型
+                            if(srcType.ToString() == targetType.ToString())
+                            {
+                                if(dst != src)
+                                    instructions.Add(X64.mov(dst, src));
+                                break;
+                            }
+
+                            //指针类型转换 -> 指针直接赋值  
+                            if(srcType.IsPointerType && targetType.IsPointerType)
+                            {
+                                instructions.Add(X64.mov(dst, src));
+                                break;
+                            }
+
+                            //浮点数 -> 浮点数
+                            if(srcType.IsSSEType && targetType.IsSSEType)
+                            {
+                                if(srcType.Size == 4 && targetType.Size == 8)
+                                    instructions.Add(X64.cvtss2sd(dst, src));
+                                else if(srcType.Size == 8 && targetType.Size == 4)
+                                    instructions.Add(X64.cvtsd2ss(dst, src));
+
+                                break;
+                            }
+
+                            //整数->整数  
+                            if(srcType.IsInteger && targetType.IsInteger)
+                            {
+                                if(srcType.Size == targetType.Size)
+                                {
+                                    instructions.Add(X64.mov(dst, src));
+                                }
+                                else if(srcType.Size < targetType.Size)//扩展
+                                {
+                                    
+                                    if(srcType.IsSigned)
+                                        instructions.Add(X64.movsx(dst, src));
+                                    else
+                                        instructions.Add(X64.movzx(dst, src));
+                                }
+                                else //截断
+                                {
+                                    instructions.Add(X64.mov(dst, src));
+                                }
+                                break;
+                            }
+
+                            //整数->浮点数
+                            if(srcType.IsInteger && targetType.IsSSEType)
+                            {
+                                if(targetType.Size == 4)
+                                    instructions.Add(X64.cvtsi2ss(dst, src));
+                                else 
+                                    instructions.Add(X64.cvtsi2sd(dst, src));
+                                break;
+                            }
+                            // 浮点 -> 整数 (截断)
+                            if(srcType.IsSSEType && targetType.IsInteger)
+                            {
+                                if(srcType.Size == 4) 
+                                {
+                                    if(targetType.Size == 8)
+                                        instructions.Add(X64.cvttss2siq(dst, src));
+                                    else
+                                        instructions.Add(X64.cvttss2si(dst, src));
+                                }
+                                else
+                                {
+                                    if(targetType.Size == 8)
+                                        instructions.Add(X64.cvttsd2siq(dst, src));
+                                    else
+                                        instructions.Add(X64.cvttsd2si(dst, src));
+                                }
+                                break;
+                            }
+
+                            //整数 -> 字符串  
+                            //浮点数 -< 字符串
+
+
+                            throw new GizboxException(ExceptioName.CodeGen, $"cast not support:{srcType.ToString()}->{targetType.ToString()}");
                         }
                         break;
                     default:
@@ -932,7 +1186,7 @@ namespace Gizbox.Src.Backend
             
             if(envStack == null)
             {
-                throw new GizboxException(ExceptioName.Unknown, $"null env stack at line:{lineNum}!");
+                throw new GizboxException(ExceptioName.CodeGen, $"null env stack at line:{lineNum}!");
             }
                 
 
@@ -1250,9 +1504,9 @@ namespace Gizbox.Src.Backend
                         var fieldRec = irOperand.segmentRecs[1];
 
                         if(objRec == null)
-                            throw new GizboxException(ExceptioName.Unknown, $"object not found for member access \"{objName}.{fieldName}\" at line {irOperand.owner.line}");
+                            throw new GizboxException(ExceptioName.CodeGen, $"object not found for member access \"{objName}.{fieldName}\" at line {irOperand.owner.line}");
                         if(fieldRec == null)
-                            throw new GizboxException(ExceptioName.Unknown, $"field not found for member access \"{objName}.{fieldName}\" at line {irOperand.owner.line}");
+                            throw new GizboxException(ExceptioName.CodeGen, $"field not found for member access \"{objName}.{fieldName}\" at line {irOperand.owner.line}");
 
                         // 对象变量是一个指针值，在虚拟寄存器
                         var baseVreg = vreg(objRec);
@@ -1267,7 +1521,7 @@ namespace Gizbox.Src.Backend
                         var indexExpr = iroperandExpr.segments[1];
                         var arrayRec = irOperand.segmentRecs[0];
                         if(arrayRec == null)
-                            throw new GizboxException(ExceptioName.Unknown, $"array not found for element access \"{arrayName}[{indexExpr}]\" at line {irOperand.owner.line}");
+                            throw new GizboxException(ExceptioName.CodeGen, $"array not found for element access \"{arrayName}[{indexExpr}]\" at line {irOperand.owner.line}");
 
                         // 元素大小
                         var elemType = TypeExpr.Parse(arrayRec.typeExpression);
@@ -1293,7 +1547,7 @@ namespace Gizbox.Src.Backend
                                 return X64.mem(baseV, displacement: disp);
                             }
 
-                            throw new GizboxException(ExceptioName.Unknown, $"unsupported array index expression \"{indexExpr}\" at line {irOperand.owner.line}");
+                            throw new GizboxException(ExceptioName.CodeGen, $"unsupported array index expression \"{indexExpr}\" at line {irOperand.owner.line}");
                         }
                     }
                     break;
@@ -1498,7 +1752,7 @@ namespace Gizbox.Src.Backend
             if(name == null)
                 return null;
             if(envStack == null)
-                throw new GizboxException(ExceptioName.Unknown, "envStack is null!");
+                throw new GizboxException(ExceptioName.CodeGen, "envStack is null!");
             
             for(int i = envStack.Count - 1; i >= 0; i--)
             {
@@ -1593,14 +1847,6 @@ namespace Gizbox.Src.Backend
                     oprand2 = new IROperand(context, this, 2, tac.arg2);
                     allOprands.Add(oprand2);
                 }
-
-                foreach(var operand in allOprands)
-                {
-                    if(operand.expr.type == IROperandExpr.Type.RET)
-                    {
-                        
-                    }
-                }
             }
         }
 
@@ -1636,7 +1882,7 @@ namespace Gizbox.Src.Backend
                     else
                     {
                         rec = context.Query(segments[0], tacinf.line);
-                        if(rec == null) throw new GizboxException(ExceptioName.Unknown, $"cannot find variable {segments[0]} at line {tacinf.line}");
+                        if(rec == null) throw new GizboxException(ExceptioName.CodeGen, $"cannot find variable {segments[0]} at line {tacinf.line}");
                         segmentRecs[0] = rec;
                         typeExpr = TypeExpr.Parse(rec.typeExpression);
                     }
@@ -1673,7 +1919,7 @@ namespace Gizbox.Src.Backend
                 else if(expr.type == IROperandExpr.Type.RET)
                 {
                     var call = context.Lookback(this.owner.line, "CALL");
-                    var mcall = context.Lookback(this.owner.line, "CALL");
+                    var mcall = context.Lookback(this.owner.line, "MCALL");
 
                     TACInfo lastCall = null;
                     if(call != null && mcall != null)
@@ -1693,14 +1939,14 @@ namespace Gizbox.Src.Backend
                     }
                     else
                     {
-                        throw new GizboxException(ExceptioName.Unknown, $"no CALL or MCALL before RET at line {this.owner.line}");
+                        throw new GizboxException(ExceptioName.CodeGen, $"no CALL or MCALL before RET at line {this.owner.line}");
                     }
 
                     this.RET_functionRec = lastCall.oprand0.segmentRecs[0];
 
                     if(this.RET_functionRec == null)
                     {
-                        throw new GizboxException(ExceptioName.Unknown, $"no function record for RET at line {this.owner.line}");
+                        throw new GizboxException(ExceptioName.CodeGen, $"no function record for RET at line {this.owner.line}");
                     }
 
                     typeExpr = TypeExpr.Parse(RET_functionRec.typeExpression).FunctionReturnType;
@@ -1789,7 +2035,7 @@ namespace Gizbox.Src.Backend
                     }
                 }
 
-                throw new GizboxException(ExceptioName.Unknown, $"param cannot pass by register. idx:{paramIdx}");
+                throw new GizboxException(ExceptioName.CodeGen, $"param cannot pass by register. idx:{paramIdx}");
             }
         }
     }

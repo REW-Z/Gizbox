@@ -50,6 +50,9 @@ namespace Gizbox.Src.Backend
         movss,
         movsd,
 
+        movzx,//带符号扩展
+        movsx,//填零扩展
+
         push,
         pop,
 
@@ -106,7 +109,16 @@ namespace Gizbox.Src.Backend
         sete,
         setne,
 
-        cqo, // 符号扩展用于idiv
+        cqo,
+
+        cvtsi2ss,
+        cvtsi2sd,
+        cvttss2si,
+        cvttss2siq,  
+        cvttsd2si,
+        cvttsd2siq,  
+        cvtss2sd,
+        cvtsd2ss,
     }
 
     public class X64Instruction
@@ -224,20 +236,32 @@ namespace Gizbox.Src.Backend
         public static X64Instruction movss(X64Operand dest, X64Operand src) => new() { type = InstructionType.movss, operand0 = dest, operand1 = src };
         public static X64Instruction movsd(X64Operand dest, X64Operand src) => new() { type = InstructionType.movsd, operand0 = dest, operand1 = src };
 
+        public static X64Instruction movzx(X64Operand dest, X64Operand src) => new() { type = InstructionType.movzx, operand0 = dest, operand1 = src };
+        public static X64Instruction movsx(X64Operand dest, X64Operand src) => new() { type = InstructionType.movsx, operand0 = dest, operand1 = src };
+
         // 栈操作
         public static X64Instruction push(X64Operand operand) => new() { type = InstructionType.push, operand0 = operand };
         public static X64Instruction pop(X64Operand operand) => new() { type = InstructionType.pop, operand0 = operand };
 
-        // 算术运算
+        // 算术运算 - 标量整数/指针
         public static X64Instruction add(X64Operand dest, X64Operand src) => new() { type = InstructionType.add, operand0 = dest, operand1 = src };
         public static X64Instruction sub(X64Operand dest, X64Operand src) => new() { type = InstructionType.sub, operand0 = dest, operand1 = src };
-        
-        public static X64Instruction mul(X64Operand src) => new() { type = InstructionType.mul, operand0 = src};
+
+        // 乘除（使用显式两操作数形式/一操作数形式）
+        public static X64Instruction imul(X64Operand dest, X64Operand src) => new() { type = InstructionType.imul, operand0 = dest, operand1 = src };
+        public static X64Instruction mul(X64Operand src) => new() { type = InstructionType.mul, operand0 = src };
+        public static X64Instruction idiv(X64Operand src) => new() { type = InstructionType.idiv, operand0 = src };
         public static X64Instruction div(X64Operand src) => new() { type = InstructionType.div, operand0 = src };
 
-
-
-
+        // SSE 标量浮点算术
+        public static X64Instruction addss(X64Operand dest, X64Operand src) => new() { type = InstructionType.addss, operand0 = dest, operand1 = src };
+        public static X64Instruction addsd(X64Operand dest, X64Operand src) => new() { type = InstructionType.addsd, operand0 = dest, operand1 = src };
+        public static X64Instruction subss(X64Operand dest, X64Operand src) => new() { type = InstructionType.subss, operand0 = dest, operand1 = src };
+        public static X64Instruction subsd(X64Operand dest, X64Operand src) => new() { type = InstructionType.subsd, operand0 = dest, operand1 = src };
+        public static X64Instruction mulss(X64Operand dest, X64Operand src) => new() { type = InstructionType.mulss, operand0 = dest, operand1 = src };
+        public static X64Instruction mulsd(X64Operand dest, X64Operand src) => new() { type = InstructionType.mulsd, operand0 = dest, operand1 = src };
+        public static X64Instruction divss(X64Operand dest, X64Operand src) => new() { type = InstructionType.divss, operand0 = dest, operand1 = src };
+        public static X64Instruction divsd(X64Operand dest, X64Operand src) => new() { type = InstructionType.divsd, operand0 = dest, operand1 = src };
 
         public static X64Instruction inc(X64Operand operand) => new() { type = InstructionType.inc, operand0 = operand };
         public static X64Instruction dec(X64Operand operand) => new() { type = InstructionType.dec, operand0 = operand };
@@ -271,6 +295,19 @@ namespace Gizbox.Src.Backend
         public static X64Instruction setne(X64Operand operand) => new() { type = InstructionType.setne, operand0 = operand };
 
         public static X64Instruction cqo() => new() { type = InstructionType.cqo };
+
+        // 整数 -> 浮点
+        public static X64Instruction cvtsi2ss(X64Operand dest, X64Operand src) => new() { type = InstructionType.cvtsi2ss, operand0 = dest, operand1 = src };
+        public static X64Instruction cvtsi2sd(X64Operand dest, X64Operand src) => new() { type = InstructionType.cvtsi2sd, operand0 = dest, operand1 = src };
+        // 浮点 -> 整数  
+        public static X64Instruction cvttss2si(X64Operand dest, X64Operand src) => new() { type = InstructionType.cvttss2si, operand0 = dest, operand1 = src };
+        public static X64Instruction cvttss2siq(X64Operand dest, X64Operand src) => new() { type = InstructionType.cvttss2siq, operand0 = dest, operand1 = src };
+        public static X64Instruction cvttsd2si(X64Operand dest, X64Operand src) => new() { type = InstructionType.cvttsd2si, operand0 = dest, operand1 = src };
+        public static X64Instruction cvttsd2siq(X64Operand dest, X64Operand src) => new() { type = InstructionType.cvttsd2siq, operand0 = dest, operand1 = src };
+        // float <-> double
+        public static X64Instruction cvtss2sd(X64Operand dest, X64Operand src) => new() { type = InstructionType.cvtss2sd, operand0 = dest, operand1 = src };
+        public static X64Instruction cvtsd2ss(X64Operand dest, X64Operand src) => new() { type = InstructionType.cvtsd2ss, operand0 = dest, operand1 = src };
+
 
         // 占位  
         public static X64Instruction placehold(string comment)

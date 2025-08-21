@@ -1896,7 +1896,7 @@ namespace Gizbox.SemanticRule
         }
 
         /// <summary>
-        /// PASS3:语义分析（类型检查等）      
+        /// PASS3:语义分析（类型检查、树节点重写等）      
         /// </summary>
         private void Pass3_AnalysisNode(SyntaxTree.Node node)
         {
@@ -2190,6 +2190,37 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.CastNode castNode:
                     {
+                        // !!特殊的转换需要重写为函数调用
+                        var typeExpr = TypeExpr.Parse(castNode.typeNode.TypeExpression());
+                        if(typeExpr.Category == TypeExpr.Kind.String)
+                        {
+                            castNode.replacement = new SyntaxTree.CallNode()
+                            {
+                                isMemberAccessFunction = false,
+                                funcNode = new SyntaxTree.IdentityNode() 
+                                {
+                                    attributes = null,
+                                    token = new Token("ID", PatternType.Id, "ToString", default, default, default),
+                                    identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
+                                },
+                                argumantsNode = new SyntaxTree.ArgumentListNode()
+                                {
+                                    arguments = new List<SyntaxTree.ExprNode>() {
+                                                castNode.factorNode
+                                            },
+                                },
+                                attributes = castNode.attributes,
+                            };
+
+                            Pass3_AnalysisNode(castNode.replacement);
+
+                            break;
+                        }
+                        else if(typeExpr.Category == TypeExpr.Kind.Array)
+                        {
+                            throw new SemanticException(ExceptioName.SemanticAnalysysError, castNode, "cast to array not support.");
+                        }
+
                         TryCompleteType(castNode.typeNode);
                         Pass3_AnalysisNode(castNode.factorNode);
                         AnalyzeTypeExpression(castNode);
@@ -2459,7 +2490,7 @@ namespace Gizbox.SemanticRule
                         string containerTypeExpr = AnalyzeTypeExpression(eleAccessNode.containerNode);
 
                         if (containerTypeExpr.EndsWith("[]") == false)
-                            throw new SemanticException(ExceptioName.Unknown, eleAccessNode, "only array can use [] operator");
+                            throw new SemanticException(ExceptioName.Normal, eleAccessNode, "only array can use [] operator");
 
                         nodeTypeExprssion = containerTypeExpr.Substring(0, containerTypeExpr.Length - 2);
                     }

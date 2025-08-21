@@ -6,8 +6,9 @@ namespace Gizbox
 {
     public enum ExceptioName
     {
+        Normal,
+
         //0.
-        Unknown,
         LibraryLoadPathNotSet,
         LibraryFileNotFound,
         LibraryDependencyCannotBeEmpty,
@@ -87,6 +88,9 @@ namespace Gizbox
         StackFrameAndGlobalSymbolTableNameNotFound,
         OnlyBooleanValuesCanBeNegated,
         TypeCannotBeNegative,
+
+        //5.
+        CodeGen,
     }
 
 
@@ -94,7 +98,7 @@ namespace Gizbox
     {
         public ExceptioName exType;
         public string appendMsg;
-        public GizboxException(ExceptioName extype = ExceptioName.Unknown, string appendMsg = "") : base(appendMsg) 
+        public GizboxException(ExceptioName extype = ExceptioName.Normal, string appendMsg = "") : base(appendMsg) 
         { 
             this.exType = extype;
             this.appendMsg = appendMsg;

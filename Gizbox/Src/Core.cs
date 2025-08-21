@@ -390,7 +390,7 @@ namespace Gizbox
     public class TypeExpr
     {
         public static Dictionary<string, TypeExpr> typeExpressionCache = new();
-        public enum Category
+        public enum Kind
         {
             Other,
             Void,
@@ -406,13 +406,6 @@ namespace Gizbox
             Function, //函数类型
         }
 
-        private string rawTypeExpression;
-        private Category category;
-        private TypeExpr Array_ElementType;
-        private TypeExpr Function_ReturnType;
-        private List<TypeExpr> Function_ParamTypes;
-
-        private TypeExpr() { }
 
         public static TypeExpr Parse(string typeExpression)
         {
@@ -425,7 +418,7 @@ namespace Gizbox
 
             if(typeExpression.Contains("->"))
             {
-                type.category = Category.Function;
+                type._Kind = Kind.Function;
 
                 string paramPart = null;
                 string returnPart = null;
@@ -433,89 +426,100 @@ namespace Gizbox
                 {
                     if(typeExpression[i] == '-' && typeExpression[i + 1] == '>')
                     {
-                        type.Function_ParamTypes = new List<TypeExpr>();
+                        type._Function_ParamTypes = new List<TypeExpr>();
                         paramPart = typeExpression.Substring(0, i).Trim();
                         returnPart = typeExpression.Substring(i + 2).Trim();
                         break;
                     }
                 }
                 if(paramPart == null || returnPart == null)
-                    throw new GizboxException(ExceptioName.Unknown, "param or return type expression invalid.");
+                    throw new GizboxException(ExceptioName.Normal, "param or return type expression invalid.");
 
                 var paramStrArr = paramPart.Split(',');
-                type.Function_ParamTypes = paramStrArr
+                type._Function_ParamTypes = paramStrArr
                     .Select(p => Parse(p.Trim()))
                     .ToList();
-                type.Function_ReturnType = Parse(returnPart.Trim());
+                type._Function_ReturnType = Parse(returnPart.Trim());
             }
             else if(typeExpression.EndsWith("[]"))
             {
-                type.category = Category.Array;
+                type._Kind = Kind.Array;
                 var typeEle = typeExpression.Substring(0, typeExpression.Length - 2).Trim();
-                type.Array_ElementType = Parse(typeEle);
+                type._Array_ElementType = Parse(typeEle);
             }
             else if(typeExpression.StartsWith("(") && typeExpression.EndsWith(")"))
             {
-                type.category = Category.Other;
+                type._Kind = Kind.Other;
             }
             else
             {
                 switch(typeExpression)
                 {
                     case "bool":
-                        type.category = Category.Bool;
+                        type._Kind = Kind.Bool;
                         break;
                     case "char":
-                        type.category = Category.Char;
+                        type._Kind = Kind.Char;
                         break;
                     case "int":
-                        type.category = Category.Int;
+                        type._Kind = Kind.Int;
                         break;
                     case "long":
-                        type.category = Category.Long;
+                        type._Kind = Kind.Long;
                         break;
                     case "float":
-                        type.category = Category.Float;
+                        type._Kind = Kind.Float;
                         break;
                     case "double":
-                        type.category = Category.Double;
+                        type._Kind = Kind.Double;
                         break;
                     case "string":
-                        type.category = Category.String;
+                        type._Kind = Kind.String;
                         break;
                     default:
-                        type.category = Category.Object;
+                        type._Kind = Kind.Object;
                         break;
                 }
             }
 
-            type.rawTypeExpression = typeExpression;
+            type._RawTypeExpression = typeExpression;
             typeExpressionCache[typeExpression] = type;
             return type;
         }
 
+        private string _RawTypeExpression;
+        private Kind _Kind;
+        private TypeExpr _Array_ElementType;
+        private TypeExpr _Function_ReturnType;
+        private List<TypeExpr> _Function_ParamTypes;
+
+        private TypeExpr() { }
+
         public override string ToString()
         {
-            return rawTypeExpression;
+            return _RawTypeExpression;
         }
+
+        public Kind Category => _Kind;
+
         public int Size
         {
             get
             {
-                return category switch
+                return _Kind switch
                 {
-                    Category.Void => 0,
-                    Category.Int => 4,
-                    Category.Long => 8,
-                    Category.Float => 4,
-                    Category.Double => 8,
-                    Category.Bool => 1,
-                    Category.Char => 2,
-                    Category.String => 8,
-                    Category.Object => 8,
-                    Category.Array => 8,
-                    Category.Function => 8,
-                    _ => throw new GizboxException(ExceptioName.Unknown, $"unknown type expression category: {category}"),
+                    Kind.Void => 0,
+                    Kind.Int => 4,
+                    Kind.Long => 8,
+                    Kind.Float => 4,
+                    Kind.Double => 8,
+                    Kind.Bool => 1,
+                    Kind.Char => 2,
+                    Kind.String => 8,
+                    Kind.Object => 8,
+                    Kind.Array => 8,
+                    Kind.Function => 8,
+                    _ => throw new GizboxException(ExceptioName.Normal, $"unknown type expression category: {_Kind}"),
                 };
             }
         }
@@ -524,28 +528,52 @@ namespace Gizbox
         {
             get
             {
-                return category switch
+                return _Kind switch
                 {
-                    Category.Int => true,
-                    Category.Long => true,
-                    Category.Float => true,
-                    Category.Double => true,
-                    Category.Bool => true,
-                    Category.Char => true,
+                    Kind.Int => true,
+                    Kind.Long => true,
+                    Kind.Float => true,
+                    Kind.Double => true,
+                    Kind.Bool => true,
+                    Kind.Char => true,
                     _ => false,
                 };
             }
         }
 
-        public TypeExpr FunctionReturnType => Function_ReturnType;
+        public bool IsPointerType
+        {
+            get
+            {
+                return _Kind == Kind.Object || _Kind == Kind.Array || _Kind == Kind.Function;
+            }
+        }
 
-        public List<TypeExpr> FunctionParamTypes => Function_ParamTypes;
+        public bool IsInteger
+        {
+            get
+            {
+                return _Kind == Kind.Int || _Kind == Kind.Long;
+            }
+        }
+
+        public bool IsSigned
+        {
+            get
+            {
+                return _Kind == Kind.Int || _Kind == Kind.Long || _Kind == Kind.Float || _Kind == Kind.Double;
+            }
+        }
+
+        public TypeExpr FunctionReturnType => _Function_ReturnType;
+
+        public List<TypeExpr> FunctionParamTypes => _Function_ParamTypes;
 
         public bool IsSSEType
         {
             get
             {
-                return category == Category.Float || category == Category.Double;
+                return _Kind == Kind.Float || _Kind == Kind.Double;
             }
         }
 
@@ -553,10 +581,10 @@ namespace Gizbox
         {
             get
             {
-                if(category != Category.Array)
-                    throw new GizboxException(ExceptioName.Unknown, $"cannot get element type of non-array type: {category}");
+                if(_Kind != Kind.Array)
+                    throw new GizboxException(ExceptioName.Normal, $"cannot get element type of non-array type: {_Kind}");
 
-                return Array_ElementType;
+                return _Array_ElementType;
             }
         }
     }

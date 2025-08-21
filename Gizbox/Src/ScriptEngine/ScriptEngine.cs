@@ -414,7 +414,7 @@ namespace Gizbox.ScriptEngine
                     {
                         string funcMangledName = code.arg1.str;
 
-                        if (GetValue(code.arg2).Type != GizType.Int) throw new GizboxException(ExceptioName.Unknown, "arg count not integer");
+                        if (GetValue(code.arg2).Type != GizType.Int) throw new GizboxException(ExceptioName.Normal, "arg count not integer");
                         int argCount = GetValue(code.arg2).AsInt;
 
                         this.callStack[this.callStack.Top + 1].returnPtr = new Tuple<int, int>(this.currUnit, (this.curr + 1));
@@ -433,7 +433,7 @@ namespace Gizbox.ScriptEngine
                     {
                         string funcMangledName = code.arg1.str;
 
-                        if (GetValue(code.arg2).Type != GizType.Int) throw new GizboxException(ExceptioName.Unknown, "arg count not integer");
+                        if (GetValue(code.arg2).Type != GizType.Int) throw new GizboxException(ExceptioName.Normal, "arg count not integer");
                         int argCount = GetValue(code.arg2).AsInt;
 
                         this.callStack[this.callStack.Top + 1].returnPtr = new Tuple<int, int>(this.currUnit, (this.curr + 1));
@@ -709,7 +709,7 @@ namespace Gizbox.ScriptEngine
                         switch(r.registerName)
                         {
                             case "RET": return retRegister;
-                            default: throw new GizboxException(ExceptioName.Unknown, "unknown register:" + r.registerName);
+                            default: throw new GizboxException(ExceptioName.Normal, "unknown register:" + r.registerName);
                         }
                     }
                 case OperandConst c:

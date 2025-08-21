@@ -633,7 +633,7 @@ namespace Gizbox.IR
                     }
                     break;
                 default:
-                    throw new SemanticException(ExceptioName.Unknown, node, "IR generation not implemtented:" + node.GetType().Name);
+                    throw new SemanticException(ExceptioName.Normal, node, "IR generation not implemtented:" + node.GetType().Name);
             }
         }
 
