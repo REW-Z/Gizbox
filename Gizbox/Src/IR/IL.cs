@@ -11,6 +11,8 @@ namespace Gizbox.IR
     public class TAC
     {
         [DataMember]
+        public int line;
+        [DataMember]
         public string label;
 
         [DataMember]

@@ -18,7 +18,7 @@ namespace Gizbox.IR
 
 
         //temp info  
-        private GStack<SymbolTable> envStack = new GStack<SymbolTable>();
+        private GStack<SymbolTable> envStackTemp = new GStack<SymbolTable>();
 
         //status  
         private int tmpCounter = 0;//临时变量自增    
@@ -35,7 +35,7 @@ namespace Gizbox.IR
         {
             tmpCounter = 0;
 
-            envStack.Push(ilUnit.globalScope.env);
+            envStackTemp.Push(ilUnit.globalScope.env);
 
 
             //从根节点生成   
@@ -44,6 +44,10 @@ namespace Gizbox.IR
             //生成一个空指令  
             GenerateCode("");
 
+            //指令重整
+            ResortCodes();
+
+            //完成指令构建
             ilUnit.Complete();
 
 
@@ -92,7 +96,7 @@ namespace Gizbox.IR
                         {
                             Log("KEY:" + key);
                         }
-                        envStack.Push(blockNode.attributes["env"] as SymbolTable);
+                        envStackTemp.Push(blockNode.attributes["env"] as SymbolTable);
                         EnvBegin(blockNode.attributes["env"] as SymbolTable);
 
 
@@ -101,7 +105,7 @@ namespace Gizbox.IR
                             GenNode(stmt);
                         }
 
-                        envStack.Pop();
+                        envStackTemp.Pop();
                         EnvEnd(blockNode.attributes["env"] as SymbolTable);
                     }
                     break;
@@ -113,10 +117,10 @@ namespace Gizbox.IR
                 case ClassDeclareNode classDeclNode:
                     {
                         string className = classDeclNode.classNameNode.FullName;
-                        GenerateCode("JUMP", "%LABEL:class_end:" + className);
+                        //GenerateCode("JUMP", "%LABEL:class_end:" + className);//顶级语句重排之后不再需要跳过
                         GenerateCode(" ").label = "class_begin:" + className;
                         //GeneratorCode("CLASS_BEGIN", classDeclNode.classNameNode.token.attribute);
-                        envStack.Push(classDeclNode.attributes["env"] as SymbolTable);
+                        envStackTemp.Push(classDeclNode.attributes["env"] as SymbolTable);
                         EnvBegin(classDeclNode.attributes["env"] as SymbolTable);
 
                         //构造函数（默认）  
@@ -130,7 +134,7 @@ namespace Gizbox.IR
 
                             //函数开始    
                             GenerateCode(" ").label = "entry:" + funcFullName;
-                            EnvBegin(envStack.Peek().GetTableInChildren(classDeclNode.classNameNode.FullName + ".ctor"));
+                            EnvBegin(envStackTemp.Peek().GetTableInChildren(classDeclNode.classNameNode.FullName + ".ctor"));
                             GenerateCode("FUNC_BEGIN", funcFullName).label = "func_begin:" + funcFullName;
                             
 
@@ -163,7 +167,7 @@ namespace Gizbox.IR
                             GenerateCode("RETURN");
 
                             GenerateCode("FUNC_END").label = "func_end:" + funcFullName;
-                            EnvEnd(envStack.Peek().GetTableInChildren(classDeclNode.classNameNode.FullName + ".ctor"));
+                            EnvEnd(envStackTemp.Peek().GetTableInChildren(classDeclNode.classNameNode.FullName + ".ctor"));
                             GenerateCode(" ").label = "exit:" + funcFullName;
                         }
 
@@ -178,7 +182,7 @@ namespace Gizbox.IR
 
 
                         EnvEnd(classDeclNode.attributes["env"] as SymbolTable);
-                        envStack.Pop();
+                        envStackTemp.Pop();
                         //GeneratorCode("CLASS_END");
                         GenerateCode(" ").label = "class_end:" + className;
                     }
@@ -187,25 +191,25 @@ namespace Gizbox.IR
                 case FuncDeclareNode funcDeclNode:
                     {
                         //是否是实例成员函数  
-                        bool isMethod = envStack.Peek().tableCatagory == SymbolTable.TableCatagory.ClassScope;
+                        bool isMethod = envStackTemp.Peek().tableCatagory == SymbolTable.TableCatagory.ClassScope;
 
                         //函数全名(修饰)    
                         string funcFinalName;
                         if (isMethod)
-                            funcFinalName = envStack.Peek().name + "." + (string)funcDeclNode.attributes["mangled_name"];
+                            funcFinalName = envStackTemp.Peek().name + "." + (string)funcDeclNode.attributes["mangled_name"];
                         else
                             funcFinalName = (string)funcDeclNode.attributes["mangled_name"];
 
 
 
-                        //跳过声明  
-                        GenerateCode("JUMP", "%LABEL:exit:" + funcFinalName);
+                        ////跳过声明//顶级语句重排之后不再需要跳过  
+                        //GenerateCode("JUMP", "%LABEL:exit:" + funcFinalName);
 
 
                         //函数开始    
                         GenerateCode(" ").label = "entry:" + funcFinalName;
 
-                        envStack.Push(funcDeclNode.attributes["env"] as SymbolTable);
+                        envStackTemp.Push(funcDeclNode.attributes["env"] as SymbolTable);
                         EnvBegin(funcDeclNode.attributes["env"] as SymbolTable);
 
                         //不再使用METHOD_BEGIN
@@ -235,7 +239,7 @@ namespace Gizbox.IR
                         GenerateCode("FUNC_END", funcFinalName).label = "func_end:" + funcFinalName;
 
                         EnvEnd(funcDeclNode.attributes["env"] as SymbolTable);
-                        envStack.Pop();
+                        envStackTemp.Pop();
 
                         GenerateCode(" ").label = "exit:" + funcFinalName;
                     }
@@ -247,13 +251,13 @@ namespace Gizbox.IR
                         string funcFullName = (string)externFuncDeclNode.attributes["mangled_name"];
 
 
-                        //跳过声明  
-                        GenerateCode("JUMP", "%LABEL:exit:" + funcFullName);
+                        ////跳过声明  //顶级语句重排之后不再需要跳过
+                        //GenerateCode("JUMP", "%LABEL:exit:" + funcFullName);
 
                         //函数开始    
                         GenerateCode(" ").label = "entry:" + funcFullName;
 
-                        envStack.Push(externFuncDeclNode.attributes["env"] as SymbolTable);
+                        envStackTemp.Push(externFuncDeclNode.attributes["env"] as SymbolTable);
                         EnvBegin(externFuncDeclNode.attributes["env"] as SymbolTable);
 
                         GenerateCode("FUNC_BEGIN", funcFullName).label = "func_begin:" + funcFullName;
@@ -268,7 +272,7 @@ namespace Gizbox.IR
 
 
                         EnvEnd(externFuncDeclNode.attributes["env"] as SymbolTable);
-                        envStack.Pop();
+                        envStackTemp.Pop();
 
                         GenerateCode(" ").label = "exit:" + funcFullName;
                     }
@@ -391,7 +395,7 @@ namespace Gizbox.IR
                     {
                         int forCounter = (int)forNode.attributes["uid"];
 
-                        envStack.Push(forNode.attributes["env"] as SymbolTable);
+                        envStackTemp.Push(forNode.attributes["env"] as SymbolTable);
                         EnvBegin(forNode.attributes["env"] as SymbolTable);
 
                         //initializer  
@@ -419,7 +423,7 @@ namespace Gizbox.IR
                         GenerateCode(" ").label = "EndFor_" + forCounter;
 
                         EnvEnd(forNode.attributes["env"] as SymbolTable);
-                        envStack.Pop();
+                        envStackTemp.Pop();
                     }
                     break;
 
@@ -691,6 +695,76 @@ namespace Gizbox.IR
             return newCode;
         }
 
+
+        private void ResortCodes()
+        {
+            //ScopeDesc补全  
+            foreach(var desc in scopeDescsAdded)
+            {
+                desc.tacFrom = ilUnit.codes[desc.tmpLineFrom];
+                desc.tacTo = ilUnit.codes[desc.tmpLineTo];
+            }
+
+            //重排指令、并修改Scopes的起止行  
+
+            Stack<TAC> temp1 = new();
+            Stack<TAC> temp2 = new();
+            void TakeLast(int fromIndex, Stack<TAC> to)
+            {
+                if(fromIndex > ilUnit.codes.Count - 1)
+                    return;
+                for(int i = ilUnit.codes.Count - 1; i >= fromIndex; i--)
+                {
+                    to.Push(ilUnit.codes[i]);
+                    ilUnit.codes.RemoveAt(i);
+                }
+            }
+            void AppendLast(int count, Stack<TAC> from)
+            {
+                for(int i = 0; i < count; ++i)
+                {
+                    var tac = from.Pop();
+                    ilUnit.codes.Add(tac);
+                }
+            }
+
+
+            var globalEnv = ilUnit.globalScope.env;
+            List<ScopeDesc> scopesToMove = new ();
+            //仅移动第二层scope  
+            foreach(var scopeDesc in scopeDescsTemp)
+            {
+                if(scopeDesc.env.parent == globalEnv)
+                {
+                    scopesToMove.Add(scopeDesc);
+                }
+            }
+            //scope排序  
+            scopesToMove.Sort((s1, s2) => s1.tmpLineTo - s2.tmpLineTo);
+            Console.WriteLine("sortScopes:" + string.Join(", ", scopesToMove.Select(s => s.tmpLineTo)));
+            //开始移动  
+            foreach(var scope in scopesToMove)
+            {
+                if(scope.tmpLineFrom == 0)//无需移动  
+                    continue;
+
+                TakeLast(scope.tmpLineTo + 1, temp1);
+                TakeLast(scope.tmpLineFrom, temp2);
+            }
+            TakeLast(0, temp1);
+
+            //函数和类定义部分  
+            AppendLast(temp2.Count, temp2);
+            //顶级语句部分  
+            AppendLast(temp1.Count, temp1);
+
+            //tac下标  
+            for(int i = 0; i < ilUnit.codes.Count; ++i)
+            {
+                ilUnit.codes[i].line = i;
+            }
+        }
+
         private string GetRet(SyntaxTree.Node exprNode)
         {
             if (exprNode.overrideNode != null)
@@ -716,7 +790,7 @@ namespace Gizbox.IR
         {
             string tempVarName = "tmp@" + tmpCounter++;
 
-            envStack.Peek().NewRecord(tempVarName, SymbolTable.RecordCatagory.Variable, type);
+            envStackTemp.Peek().NewRecord(tempVarName, SymbolTable.RecordCatagory.Variable, type);
 
             return tempVarName;
         }
@@ -764,18 +838,24 @@ namespace Gizbox.IR
         }
 
 
-        public List<Scope> scopesTemp = new List<Scope>();
+        public List<ScopeDesc> scopeDescsTemp = new ();
+        public List<ScopeDesc> scopeDescsAdded = new();
 
         public void EnvBegin(SymbolTable env)
         {
-            Scope newScope = new Scope() { env = env, lineFrom = ilUnit.codes.Count - 1 + 1 };
-            scopesTemp.Add(newScope);
+            ScopeDesc newScope = new ScopeDesc() { env = env, tmpLineFrom = (ilUnit.codes.Count - 1 + 1) };
+            scopeDescsTemp.Add(newScope);
         }
         public void EnvEnd(SymbolTable env)
         {
-            var scope = scopesTemp.FirstOrDefault(s => s.env == env);
-            scope.lineTo = ilUnit.codes.Count - 1;
-            scopesTemp.Remove(scope);
+            var scopeTmp = scopeDescsTemp.FirstOrDefault(s => s.env == env);
+            scopeTmp.tmpLineTo = ilUnit.codes.Count - 1;
+            scopeDescsTemp.Remove(scopeTmp);
+
+            var scope = new Scope() { env = env };
+            scopeTmp.finalScope = scope;
+
+            scopeDescsAdded.Add(scopeTmp);
             ilUnit.scopes.Add(scope);
         }
 
@@ -783,12 +863,12 @@ namespace Gizbox.IR
         public SymbolTable.Record Query(string id)
         {
             //本编译单元查找  
-            for (int i = envStack.Count - 1; i >= 0; --i)
+            for (int i = envStackTemp.Count - 1; i >= 0; --i)
             {
-                if (envStack[i].ContainRecordName(id))
+                if (envStackTemp[i].ContainRecordName(id))
                 {
                     //Log("在" + envStack[i].name + "中查询：" + id + "成功");
-                    var rec = envStack[i].GetRecord(id);
+                    var rec = envStackTemp[i].GetRecord(id);
                     return rec;
                 }
                 //Log("在" + envStack[i].name + "中查询：" + id + "失败");
@@ -869,5 +949,16 @@ namespace Gizbox.IR
             GixConsole.LogLine("ILGen >>>" + content);
         }
 
+    }
+
+    public class ScopeDesc
+    {
+        public int tmpLineFrom;
+        public int tmpLineTo;
+        public TAC tacFrom;
+        public TAC tacTo;
+        public SymbolTable env;
+
+        public Scope finalScope;
     }
 }
