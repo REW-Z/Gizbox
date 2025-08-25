@@ -44,7 +44,8 @@ namespace Gizbox.Src.Backend
     }
     public enum InstructionType
     {
-        undefined = -1,//用于占位
+        placeholder = -1,//用于占位
+        emptyline,//空行
 
         mov,
         movss,
@@ -124,11 +125,87 @@ namespace Gizbox.Src.Backend
     public class X64Instruction
     {
         public InstructionType type;
+        public string label;//标签
         public X64Operand operand0;
         public X64Operand operand1;
-        public string comment;//指令注释
+        public string mark;//占位标记  
+        public string comment = string.Empty;//指令注释
     }
 
+
+    public class UtilityX64
+    {
+        public static string SerializeInstruction(X64Instruction instr)
+        {
+            StringBuilder strb = new();
+            if(string.IsNullOrEmpty(instr.label) == false)
+            {
+                strb.AppendLine(instr.label);
+            }
+
+            if(instr.type == InstructionType.placeholder)
+            {
+                strb.Append($"\t\t <{instr.mark}>");
+                if(string.IsNullOrEmpty(instr.comment) == false)
+                {
+                    strb.Append($" ; {instr.comment}");
+                }
+                    
+                strb.Append('\n');
+            }
+            else if(instr.type != InstructionType.emptyline)
+            {
+                strb.Append("\t\t");
+                strb.Append(instr.type.ToString());
+                strb.Append("  ");
+
+                if(instr.operand0 != null)
+                {
+                    strb.Append(SerializeOprand(instr.operand0));
+                }
+                if(instr.operand1 != null)
+                {
+                    strb.Append(",  ");
+                    strb.Append(SerializeOprand(instr.operand1));
+                }
+
+                if(string.IsNullOrEmpty(instr.mark) == false)
+                {
+                    strb.Append($" <{instr.mark}> ");
+                }
+                if(string.IsNullOrEmpty(instr.comment) == false)
+                {
+                    strb.Append($" ; {instr.comment}");
+                }
+
+                strb.Append('\n');
+            }
+
+            return strb.ToString();
+        }
+        public static string SerializeOprand(X64Operand operand)
+        {
+            switch(operand)
+            {
+                case X64Reg reg:
+                    return reg.isVirtual ? ("vreg%" + reg.vRegVar.name) : reg.physReg.ToString();
+                case X64Rel rel:
+                    return rel.symbolName + (rel.displacement != 0 ? ("+" + rel.displacement.ToString()) : "");
+                case X64Immediate im:
+                    return (im).value.ToString();
+                case X64Label lb:
+                    return (lb).name;
+                case X64Mem mem:
+                    return "[" +
+                        (mem.baseReg != null ? SerializeOprand(mem.baseReg) : "") +
+                        (mem.indexReg != null ? (" + " + SerializeOprand(mem.indexReg) + (mem.scale != 1 ? (" * " + mem.scale.ToString()) : "")) : "") +
+                        (mem.displacement != 0 ? (" + " + mem.displacement.ToString()) : "")
+                        + "]";
+                default:
+                    return operand.Kind.ToString();
+            }
+        }
+    }
 
 
     /// <summary>
@@ -179,7 +256,7 @@ namespace Gizbox.Src.Backend
         {
             this.vRegVar = varRec;
             this.isVirtual = true;
-            this.physReg = default;
+            this.physReg = RegisterEnum.Undefined;
         }
         public void AllocPhysReg(RegisterEnum reg)
         {
@@ -220,6 +297,9 @@ namespace Gizbox.Src.Backend
 
     public static class X64
     {
+        // 带标签的空行  
+        public static X64Instruction emptyLine(string labelname) => new() { type = InstructionType.emptyline, label = labelname };
+
         // 跳转指令
         public static X64Instruction jmp(string labelname) => new() { type = InstructionType.jmp, operand0 = new X64Label(labelname) };
         public static X64Instruction jz(string labelname) => new() { type = InstructionType.jz, operand0 = new X64Label(labelname) };
@@ -310,9 +390,9 @@ namespace Gizbox.Src.Backend
 
 
         // 占位  
-        public static X64Instruction placehold(string comment)
+        public static X64Instruction placehold(string mark)
         {
-            return new X64Instruction() { type = InstructionType.undefined, operand0 = null, operand1 = null, comment = comment };
+            return new X64Instruction() { type = InstructionType.placeholder, operand0 = null, operand1 = null, mark = mark };
         }
 
         //常用属性  

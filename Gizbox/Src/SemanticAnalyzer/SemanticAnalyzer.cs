@@ -1410,7 +1410,7 @@ namespace Gizbox.SemanticRule
                                 var paramNode = funcDeclNode.parametersNode.parameterNodes[i];
                                 typeExpr += (paramNode.typeNode.TypeExpression());
                             }
-                            typeExpr += (" -> " + funcDeclNode.returnTypeNode.TypeExpression());
+                            typeExpr += (" => " + funcDeclNode.returnTypeNode.TypeExpression());
 
 
                             //函数修饰名称  
@@ -1462,7 +1462,7 @@ namespace Gizbox.SemanticRule
                                 var paramNode = externFuncDeclNode.parametersNode.parameterNodes[i];
                                 typeExpr += (paramNode.typeNode.TypeExpression());
                             }
-                            typeExpr += (" -> " + externFuncDeclNode.returnTypeNode.TypeExpression());
+                            typeExpr += (" => " + externFuncDeclNode.returnTypeNode.TypeExpression());
 
                             //函数修饰名称  
                             var paramTypeArr = externFuncDeclNode.parametersNode.parameterNodes.Select(n => n.typeNode.TypeExpression()).ToArray();
@@ -1660,7 +1660,7 @@ namespace Gizbox.SemanticRule
                                 if (i != 0) typeExpr += ",";
                                 typeExpr += (paramTypeArr[i]);
                             }
-                            typeExpr += (" -> " + funcDeclNode.returnTypeNode.TypeExpression());
+                            typeExpr += (" => " + funcDeclNode.returnTypeNode.TypeExpression());
 
                             //函数修饰名称（成员函数）(要加上this基类型)  
                             var funcMangledName = Utils.Mangle(funcDeclNode.identifierNode.FullName, paramTypeArr);
@@ -2121,7 +2121,7 @@ namespace Gizbox.SemanticRule
                         Pass3_AnalysisNode(delNode.objToDelete);
                         string objTypeExpr = (string)delNode.objToDelete.attributes["type"];
 
-                        if (TypeExpr.Parse(objTypeExpr).Category != TypeExpr.Kind.Array)
+                        if (GType.Parse(objTypeExpr).Category != GType.Kind.Array)
                         {
                             if (Query(objTypeExpr) == null)
                             {
@@ -2192,10 +2192,10 @@ namespace Gizbox.SemanticRule
                     {
                         // !!特殊的转换需要重写为函数调用
                         AnalyzeTypeExpression(castNode.factorNode);
-                        var srcType = TypeExpr.Parse((string)castNode.factorNode.attributes["type"]);
-                        var targetType = TypeExpr.Parse(castNode.typeNode.TypeExpression());
+                        var srcType = GType.Parse((string)castNode.factorNode.attributes["type"]);
+                        var targetType = GType.Parse(castNode.typeNode.TypeExpression());
 
-                        if(targetType.Category == TypeExpr.Kind.String)
+                        if(targetType.Category == GType.Kind.String)
                         {
                             castNode.overrideNode = new SyntaxTree.CallNode()
                             {
@@ -2219,7 +2219,7 @@ namespace Gizbox.SemanticRule
 
                             break;
                         }
-                        else if(targetType.Category == TypeExpr.Kind.Array)
+                        else if(targetType.Category == GType.Kind.Array)
                         {
                             throw new SemanticException(ExceptioName.SemanticAnalysysError, castNode, "cast to array not support.");
                         }
@@ -2538,7 +2538,7 @@ namespace Gizbox.SemanticRule
 
                             var typeExpr = memberRec.typeExpression;
 
-                            if (typeExpr.Contains("->") == false) throw new SemanticException(ExceptioName.ObjectMemberNotFunction, callNode, typeExpr);
+                            if (typeExpr.Contains("=>") == false) throw new SemanticException(ExceptioName.ObjectMemberNotFunction, callNode, typeExpr);
                             nodeTypeExprssion = typeExpr.Split(' ').LastOrDefault();
                         }
                         else
@@ -2651,11 +2651,11 @@ namespace Gizbox.SemanticRule
         }
         private bool CheckType_Equal(string typeExpr1, string typeExpr2)
         {
-            if (typeExpr1 == "null" && TypeExpr.Parse(typeExpr2).IsPointerType)
+            if (typeExpr1 == "null" && GType.Parse(typeExpr2).IsPointerType)
             {
                 return true;
             }
-            else if (typeExpr2 == "null" && TypeExpr.Parse(typeExpr1).IsPointerType)
+            else if (typeExpr2 == "null" && GType.Parse(typeExpr1).IsPointerType)
             {
                 return true;
             }
@@ -2667,7 +2667,7 @@ namespace Gizbox.SemanticRule
             if(typeExpr1 == typeExpr2) return true;
 
             //有至少一个是基元类型  
-            if(TypeExpr.Parse(typeExpr1).IsPrimitive || TypeExpr.Parse(typeExpr2).IsPrimitive)
+            if(GType.Parse(typeExpr1).IsPrimitive || GType.Parse(typeExpr2).IsPrimitive)
             {
                 return typeExpr1 == typeExpr2;
             }
@@ -2680,7 +2680,7 @@ namespace Gizbox.SemanticRule
                     return true;
                 }
                 //两个都是类类型
-                else if(TypeExpr.Parse(typeExpr1).IsClassType && TypeExpr.Parse(typeExpr2).IsClassType)
+                else if(GType.Parse(typeExpr1).IsClassType && GType.Parse(typeExpr2).IsClassType)
                 {
                     var typeRec1 = Query(typeExpr1);
                     if(typeRec1.envPtr.Class_IsSubClassOf(typeExpr2))
@@ -2689,7 +2689,7 @@ namespace Gizbox.SemanticRule
                     }
                 }
                 //两个都是数组类型  
-                else if(TypeExpr.Parse(typeExpr1).IsArray && TypeExpr.Parse(typeExpr2).IsArray)
+                else if(GType.Parse(typeExpr1).IsArray && GType.Parse(typeExpr2).IsArray)
                 {
                     //不支持逆变和协变  
                 }

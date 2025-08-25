@@ -40,7 +40,7 @@ namespace Gizbox.ScriptEngine
             {
                 return new OperandLabel(argStr);
             }
-            else if(argStr.Contains("."))
+            else if(argStr.Contains("->"))
             {
                 return new OperandMemberAccess(argStr, unit, line);
             }
@@ -140,7 +140,7 @@ namespace Gizbox.ScriptEngine
             {
                 this.array = new OperandElementAccess(arrVarExpr, unit, line);
             }
-            else if (arrVarExpr.Contains("."))
+            else if (arrVarExpr.Contains("->"))
             {
                 this.array = new OperandMemberAccess(arrVarExpr, unit, line);
             }
@@ -159,16 +159,16 @@ namespace Gizbox.ScriptEngine
 
         public OperandMemberAccess (string expr, ILUnit unit, int line) : base(expr)
         {
-            int lastDot = expr.LastIndexOf('.');
-            var variableExpr = expr.Substring(0, lastDot);
-            string fieldName = expr.Substring(lastDot + 1);
+            var (start, end) = expr.GetSubStringIndex("->");
+            var variableExpr = expr.Substring(0, start);
+            string fieldName = expr.Substring(end + 1);
 
 
             if (variableExpr[variableExpr.Length - 1] == ']')
             {
                 this.obj = new OperandElementAccess(variableExpr, unit, line);
             }
-            else if(variableExpr.Contains("."))
+            else if(variableExpr.Contains("->"))
             {
                 this.obj = new OperandMemberAccess(variableExpr, unit, line);
             }

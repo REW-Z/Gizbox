@@ -129,23 +129,23 @@ namespace Gizbox
             return new Value() { type = GizType.ArrayRef, AsPtr = arrayPtr };
         }
 
-        public static Value DefaultOf(TypeExpr type)
+        public static Value DefaultOf(GType type)
         {
             switch(type.Category)
             {
-                case TypeExpr.Kind.Int:
+                case GType.Kind.Int:
                     return (int)0;
-                case TypeExpr.Kind.Long:
+                case GType.Kind.Long:
                     return 0L;
-                case TypeExpr.Kind.Float:
+                case GType.Kind.Float:
                     return 0f;
-                case TypeExpr.Kind.Double:
+                case GType.Kind.Double:
                     return 0d;
-                case TypeExpr.Kind.Bool:
+                case GType.Kind.Bool:
                     return false;
-                case TypeExpr.Kind.Char:
+                case GType.Kind.Char:
                     return '\0';
-                case TypeExpr.Kind.String:
+                case GType.Kind.String:
                     return FromStringPtr(0);
                 default:
                     return NULL;

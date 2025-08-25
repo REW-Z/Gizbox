@@ -14,6 +14,11 @@ using Gizbox.IR;
 
 namespace Gizbox.Src.Backend
 {
+    public enum BuildMode
+    {
+        Debug,
+        Release,
+    }
     public static class Win64Target
     {
         public static void CodeGen(ILUnit ir)
@@ -22,12 +27,25 @@ namespace Gizbox.Src.Backend
 
             context.StartCodeGen();
         }
-    }
+        public static void Log(string content)
+        {
+            if(!Compiler.enableLogCodeGen)
+                return;
+            GixConsole.LogLine("Win64 >>>" + content);
+        }
 
+        public static AdditionInfo GetAdditionInf(this SymbolTable.Record rec)
+        {
+            rec.runtimeAdditionalInfo ??= new AdditionInfo();
+            return (rec.runtimeAdditionalInfo as AdditionInfo);
+        }
+    }
 
     public class Win64CodeGenContext
     {
         private ILUnit ir;
+
+        public static BuildMode buildMode = BuildMode.Debug;
 
         private ControlFlowGraph cfg;
         private List<BasicBlock> blocks;
@@ -39,7 +57,7 @@ namespace Gizbox.Src.Backend
         private Dictionary<TAC, TACInfo> tacInfoCache = new(); 
 
 
-        private List<X64Instruction> instructions = new();//1-n  1-1  n-1
+        private LList<X64Instruction> instructions = new();//1-n  1-1  n-1
 
         // 占位指令  
         private HashSet<X64Instruction> callerSavePlaceHolders = new();//主调函数保存寄存器指令占位
@@ -49,6 +67,16 @@ namespace Gizbox.Src.Backend
 
         // 类表
         public Dictionary<string, SymbolTable.Record> classDict = new();
+
+        // 函数表  
+        public Dictionary<string, SymbolTable.Record> funcDict = new();
+
+        // 全局变量表  
+        public Dictionary<string, SymbolTable.Record > globalVarInfos = new();
+        // 外部变量表  
+        public Dictionary<string, SymbolTable.Record> externVars = new();
+        // 外部函数表  
+        public Dictionary<string, SymbolTable.Record> externFuncs = new();
 
         // 类名-虚函数表roKey
         public Dictionary<string, string> vtableRoKeys = new();
@@ -63,7 +91,8 @@ namespace Gizbox.Src.Backend
         private const bool debugLogSymbolTable = true;
         private const bool debugLogTacInfos = true;
         private const bool debugLogBlockInfos = false;
-        
+        private const bool debugLogAsmInfos = true;
+
 
 
 
@@ -74,16 +103,75 @@ namespace Gizbox.Src.Backend
 
         public void StartCodeGen()
         {
-            Pass0();//静态信息补充
-            Pass1();//基本块和控制流图
-            Pass2();//指令选择
-            Pass3();//寄存器分配
+            Pass0();
+            Pass1();
+            Pass2();
+            Pass3();
+            Pass4();
+        }
+
+        /// <summary> IR指令重排序 </summary>
+        private void Pass0()
+        {
+            /*
+            顶级语句（全局作用域）显式定义的变量视为全局静态变量，临时变量依然视为普通局部变量。  
+            顶级临时变量不会被其他函数引用
+            */
+            //代码整理：
+            //把所有函数定义挪到.text前面，这样顶级语句就处在最后。
+            //然后在顶级语句的指令前加上一个@main标签。
+
+
+
         }
 
         /// <summary> 静态信息补充 </summary>
-        private void Pass0()
+        private void Pass1()
         {
             this.globalEnv = ir.globalScope.env;
+
+            //收集全局和外部信息    
+            var envs = ir.GetAllGlobalEnvs();
+            foreach(var env in envs)
+            {
+                //本编译单元  
+                if(env == ir.globalScope.env)
+                {
+                    foreach(var (_, rec) in env.records)
+                    {
+                        if(rec.category != SymbolTable.RecordCatagory.Variable)
+                            continue;
+
+                        //全局变量  
+                        if(rec.name.StartsWith("tmp@") == false)
+                        {
+                            rec.GetAdditionInf().isGlobalVar = true;
+                            string key = rec.name;
+                            object value = GetStaticInitValue(rec);
+                            dataSeg.Add(key, value);
+                            globalVarInfos.Add(rec.name, rec);
+                        }
+                    }
+                }
+                //依赖单元  
+                else
+                {
+                    foreach(var (_, rec) in env.records)
+                    {
+                        if(rec.category == SymbolTable.RecordCatagory.Variable)
+                        {
+                            //外部变量  
+                            externVars.Add(rec.name, rec);
+                        }
+                        else if(rec.category == SymbolTable.RecordCatagory.Function)
+                        {
+                            //外部函数  
+                            externFuncs.Add(rec.name, rec);
+                        }
+
+                    }
+                }
+            }
 
             //类布局和虚函数表布局
             var globalEnv = ir.globalScope.env;
@@ -105,7 +193,7 @@ namespace Gizbox.Src.Backend
                     case SymbolTable.RecordCatagory.Function:
                         {
                             //函数信息
-                            GenFuncInfo(r.envPtr);
+                            GenFuncInfo(r);
                         }
                         break;
                     default:
@@ -179,23 +267,23 @@ namespace Gizbox.Src.Backend
                     var tacInf = GetTacInfo(ir.codes[line]);
 
                     Console.ForegroundColor = ConsoleColor.White;
-                    Console.WriteLine("原指令：" + tacInf.tac.ToExpression());
+                    Win64Target.Log("原指令：" + tacInf.tac.ToExpression());
 
                     Console.ForegroundColor = ConsoleColor.DarkGreen;
                     if(tacInf.oprand0 != null) 
-                        Console.WriteLine("    op0：typeExpr:" + (tacInf.oprand0.typeExpr.ToString() ?? "?") + "  type:  " + tacInf.oprand0.expr.type.ToString());
+                        Win64Target.Log("    op0：typeExpr:" + (tacInf.oprand0.typeExpr.ToString() ?? "?") + "  type:  " + tacInf.oprand0.expr.type.ToString());
                     if(tacInf.oprand1 != null)
-                        Console.WriteLine("    op1：typeExpr:" + (tacInf.oprand1.typeExpr.ToString() ?? "?") + "  type:  " + tacInf.oprand1.expr.type.ToString());
+                        Win64Target.Log("    op1：typeExpr:" + (tacInf.oprand1.typeExpr.ToString() ?? "?") + "  type:  " + tacInf.oprand1.expr.type.ToString());
                     if(tacInf.oprand2 != null)
-                        Console.WriteLine("    op2：typeExpr:" + (tacInf.oprand2.typeExpr.ToString() ?? "?") + "  type:  " + tacInf.oprand2.expr.type.ToString());
+                        Win64Target.Log("    op2：typeExpr:" + (tacInf.oprand2.typeExpr.ToString() ?? "?") + "  type:  " + tacInf.oprand2.expr.type.ToString());
 
                     Console.ForegroundColor = ConsoleColor.White;
                 }
             }
         }
 
-        /// <summary> 划分基本块 </summary>
-        private void Pass1()
+        /// <summary> 划分基本块和活跃性分析 </summary>
+        private void Pass2()
         {
             //基本块划分
             blocks = new List<BasicBlock>();
@@ -399,42 +487,97 @@ namespace Gizbox.Src.Backend
                     $"活跃变量分析未收敛，迭代次数超过 {maxIterations}");
             }
 
+            // 计算活跃区间  
+            foreach(var b in blocks)
+            {
+                b.CaculateLiveRanges();
+            }
+            cfg.CaculateLiveInfos();
+
+            // 初步确定局部变量的栈帧布局  
+            if(buildMode == BuildMode.Debug)
+            {
+                //Debug:局部变量内存不重叠  
+                foreach(var (funcName, funcRec) in funcDict)
+                {
+                    var table = funcRec.envPtr;
+
+                    List<SymbolTable.Record> localVars = new();
+                    foreach(var (memberName, memberRec) in table.records)
+                    {
+                        if(memberRec.category != SymbolTable.RecordCatagory.Variable)
+                            continue;
+                        localVars.Add(memberRec);
+                    }
+
+                    (int size, int align)[] localvarinfo = new (int size, int align)[localVars.Count];
+                    for(int i = 0; i < localVars.Count; ++i)
+                    {
+                        var type = GType.Parse(localVars[i].typeExpression);
+                        localvarinfo[i] = (type.Size, type.Align);
+                    }
+                    long[] result;
+                    var frameSize = MemUtility.LocalVarLayout(localvarinfo, out result);
+                    for(int i = 0; i < localVars.Count; ++i)
+                    {
+                        localVars[i].addr = result[i];
+                    }
+                    funcRec.size = frameSize;
+                }
+            }
+            else
+            {
+                //Release:根据变量活跃区间确定内存重用
+                throw new NotImplementedException();
+            }
+
             // 输出活跃变量分析结果
             if(debugLogBlockInfos)
             {
                 foreach(var b in blocks)
                 {
-                    Console.WriteLine("\n\n---------block len" + (b.endIdx - b.startIdx) + "------------");
+                    Win64Target.Log("\n\n---------block len" + (b.endIdx - b.startIdx) + "------------");
                     for(int i = b.startIdx; i <= b.endIdx; ++i)
                     {
-                        Console.WriteLine(ir.codes[i].ToExpression());
+                        Win64Target.Log(ir.codes[i].ToExpression());
                     }
 
-                    Console.WriteLine("  USE: " + string.Join(", ", b.USE.Keys.Select(v => v.name)));
-                    Console.WriteLine("  DEF: " + string.Join(", ", b.DEF.Keys.Select(v => v.name)));
-                    Console.WriteLine("  IN:  " + string.Join(", ", b.IN.Select(v => v.name)));
-                    Console.WriteLine("  OUT: " + string.Join(", ", b.OUT.Select(v => v.name)));
+                    Win64Target.Log("  USE: " + string.Join(", ", b.USE.Keys.Select(v => v.name)));
+                    Win64Target.Log("  DEF: " + string.Join(", ", b.DEF.Keys.Select(v => v.name)));
+                    Win64Target.Log("  IN:  " + string.Join(", ", b.IN.Select(v => v.name)));
+                    Win64Target.Log("  OUT: " + string.Join(", ", b.OUT.Select(v => v.name)));
                 }
-            }
-
-            for(int i = 0; i < blocks.Count; i++)
-            {
-                var b = blocks[i];
             }
         }
 
         /// <summary> 指令选择 </summary>
-        private void Pass2()
+        private void Pass3()
         {
             vRegs.Add(globalEnv, new());
 
             // 参数临时列表
             List<TACInfo> tempParamList = new();
+            // 上一个IR生成的X64指令  
+            LList<X64Instruction>.Node lastInstruction = null;
+
             // 指令选择  
             for(int i = 0; i < ir.codes.Count; ++i)
             {
                 var tac = ir.codes[i];
                 var tacInf = GetTacInfo(tac);
+
+                //空行  
+                if(string.IsNullOrWhiteSpace(tac.op))
+                {
+                    if(string.IsNullOrEmpty(tac.label) == false)
+                    {
+                        instructions.AddLast(X64.emptyLine(tac.label));
+                        //记录
+                        lastInstruction = instructions.Last;
+                    }
+                    continue;
+                }
+
 
                 switch(tac.op)
                 {
@@ -442,36 +585,36 @@ namespace Gizbox.Src.Backend
                         break;
                     case "JUMP":
                         {
-                            instructions.Add(X64.jmp(tac.arg0));
+                            instructions.AddLast(X64.jmp(tacInf.oprand0.segments[0]));
                         }
                         break;
                     case "FUNC_BEGIN":
                         {
                             //函数作用域开始
-                            funcEnv = ir.GetTopEnvAtLine(i);
+                            funcEnv = ir.GetOutermostEnvAtLine(i);
                             vRegs.Add(funcEnv, new());
 
 
                             //函数序言
-                            instructions.Add(X64.push(X64.rbp));
-                            instructions.Add(X64.mov(X64.rbp, X64.rsp));
+                            instructions.AddLast(X64.push(X64.rbp));
+                            instructions.AddLast(X64.mov(X64.rbp, X64.rsp));
 
                             //保存寄存器（非易失性需要由Callee保存）  
                             var placeholder = X64.placehold("callee_save");
                             calleeSavePlaceHolders.Add(placeholder);
-                            instructions.Add(placeholder);
+                            instructions.AddLast(placeholder);
                         }
                         break;
                     case "FUNC_END":
                         {
                             //函数尾声
-                            instructions.Add(X64.mov(X64.rsp, X64.rbp));
-                            instructions.Add(X64.pop(X64.rbp));
-                            instructions.Add(X64.ret());
+                            instructions.AddLast(X64.mov(X64.rsp, X64.rbp));
+                            instructions.AddLast(X64.pop(X64.rbp));
+                            instructions.AddLast(X64.ret());
                             //恢复寄存器（非易失性需要由Callee保存） 
                             var placeholder = X64.placehold("callee_restore");
                             calleeRestorePlaceHolders.Add(placeholder);
-                            instructions.Add(placeholder);
+                            instructions.AddLast(placeholder);
 
                             //函数作用域结束
                             funcEnv = null;
@@ -491,18 +634,18 @@ namespace Gizbox.Src.Backend
                                 if(tacinfo.oprand0.IsSSEType())
                                 {
                                     // 浮点数返回值 -> xmm0
-                                    instructions.Add(X64.mov(X64.xmm0, returnValue));
+                                    instructions.AddLast(X64.mov(X64.xmm0, returnValue));
                                 }
                                 else
                                 {
                                     // 整数/指针返回值 -> rax
-                                    instructions.Add(X64.mov(X64.rax, returnValue));
+                                    instructions.AddLast(X64.mov(X64.rax, returnValue));
                                 }
                             }
 
                             // 跳转到FUNC_END  
                             string funcEndLabel = "func_end:" + funcEnv.name;
-                            instructions.Add(X64.jmp(funcEndLabel));
+                            instructions.AddLast(X64.jmp(funcEndLabel));
                         }
                         break;
                     case "EXTERN_IMPL"://无需处理
@@ -516,33 +659,33 @@ namespace Gizbox.Src.Backend
                     case "CALL":
                         {
                             // 第一参数是 函数名，第二个参数是 参数个数
-                            string funcName = tac.arg0.Substring(1, tac.arg0.Length - 2);
+                            string funcName = tac.arg0;
 
 
                             //调用前准备  
                             {
                                 // 调用者保存寄存器（易失性寄存器需Caller保存） (选择性保存)
                                 var placeholderSave = X64.placehold("caller_save");
-                                instructions.Add(placeholderSave);
+                                instructions.AddLast(placeholderSave);
                                 callerSavePlaceHolders.Add(placeholderSave);
 
 
                                 // 栈帧16字节对齐
-                                instructions.Add(X64.and(X64.rsp, X64.imm(-16)));
+                                instructions.AddLast(X64.and(X64.rsp, X64.imm(-16)));
                                 // 如果是奇数个参数 -> 需要8字节对齐栈指针
                                 if(tacInf.CALL_paramCount % 2 != 0)
                                 {
                                     // 如果是奇数个参数，先将rsp对齐到16字节
-                                    instructions.Add(X64.sub(X64.rsp, X64.imm(8)));
+                                    instructions.AddLast(X64.sub(X64.rsp, X64.imm(8)));
                                 }
                                 // 其他栈参数空间
                                 if(tacInf.CALL_paramCount > 4)
                                 {
                                     int len = (tacInf.CALL_paramCount - 4) * 8;
-                                    instructions.Add(X64.sub(X64.rsp, X64.imm(len)));
+                                    instructions.AddLast(X64.sub(X64.rsp, X64.imm(len)));
                                 }
                                 // 影子空间(32字节)
-                                instructions.Add(X64.sub(X64.rsp, X64.imm(32)));
+                                instructions.AddLast(X64.sub(X64.rsp, X64.imm(32)));
 
 
                                 // 参数赋值(IR中PARAM指令已经是倒序)  
@@ -554,7 +697,7 @@ namespace Gizbox.Src.Backend
 
                                     //栈帧传参[rsp + 8]开始
                                     int offset = (8 * (paraminfo.PARAM_paramidx + 1));
-                                    instructions.Add(X64.mov(X64.mem(X64.rsp, displacement: offset), ParseOperand(paraminfo.oprand0)));
+                                    instructions.AddLast(X64.mov(X64.mem(X64.rsp, displacement: offset), ParseOperand(paraminfo.oprand0)));
                                 }
                                 tempParamList.Clear();
                             }
@@ -562,7 +705,7 @@ namespace Gizbox.Src.Backend
 
                             // 实际的函数调用
                             // （CALL 指令会自动把返回地址（下一条指令的 RIP）压入栈顶）  
-                            instructions.Add(X64.call(funcName));
+                            instructions.AddLast(X64.call(funcName));
 
                             //调用后处理
                             {
@@ -571,12 +714,12 @@ namespace Gizbox.Src.Backend
                                 {
                                     int stackParamCount = tacInf.CALL_paramCount - 4;
                                     long stackCleanupBytes = stackParamCount * 8; // 每个参数8字节
-                                    instructions.Add(X64.add(X64.rsp, X64.imm(stackCleanupBytes)));
+                                    instructions.AddLast(X64.add(X64.rsp, X64.imm(stackCleanupBytes)));
                                 }
 
                                 //还原保存的寄存器(占位)  
                                 var placeholderRestore = X64.placehold("caller_restore");
-                                instructions.Add(placeholderRestore);
+                                instructions.AddLast(placeholderRestore);
                                 callerRestorePlaceHolders.Add(placeholderRestore);
                             }
                         }
@@ -590,39 +733,39 @@ namespace Gizbox.Src.Backend
                             //this参数载入寄存器  
                             var codeParamObj = tempParamList.FirstOrDefault(c => c.PARAM_paramidx == 0);
                             var x64obj = ParseOperand(codeParamObj.oprand0);
-                            instructions.Add(X64.mov(X64.rcx, x64obj));
+                            instructions.AddLast(X64.mov(X64.rcx, x64obj));
 
                             //取Vptr  
                             var methodRec = QueryMember(codeParamObj.oprand0.typeExpr.ToString(), methodName);
-                            instructions.Add(X64.mov(X64.rax, X64.mem(X64.rcx, displacement: 0)));
+                            instructions.AddLast(X64.mov(X64.rax, X64.mem(X64.rcx, displacement: 0)));
                             //函数地址（addr表示在虚函数表中的偏移(Index*8)）  
-                            instructions.Add(X64.mov(X64.rax, X64.mem(X64.rax, displacement: methodRec.addr)));
+                            instructions.AddLast(X64.mov(X64.rax, X64.mem(X64.rax, displacement: methodRec.addr)));
 
 
                             //调用前准备(和CALL指令一致)  
                             {
                                 // 调用者保存寄存器（易失性寄存器需Caller保存） (选择性保存)
                                 var placeholderSave = X64.placehold("caller_save");
-                                instructions.Add(placeholderSave);
+                                instructions.AddLast(placeholderSave);
                                 callerSavePlaceHolders.Add(placeholderSave);
 
 
                                 // 栈帧16字节对齐
-                                instructions.Add(X64.and(X64.rsp, X64.imm(-16)));
+                                instructions.AddLast(X64.and(X64.rsp, X64.imm(-16)));
                                 // 如果是奇数个参数 -> 需要8字节对齐栈指针
                                 if(tacInf.CALL_paramCount % 2 != 0)
                                 {
                                     // 如果是奇数个参数，先将rsp对齐到16字节
-                                    instructions.Add(X64.sub(X64.rsp, X64.imm(8)));
+                                    instructions.AddLast(X64.sub(X64.rsp, X64.imm(8)));
                                 }
                                 // 其他栈参数空间
                                 if(tacInf.CALL_paramCount > 4)
                                 {
                                     int len = (tacInf.CALL_paramCount - 4) * 8;
-                                    instructions.Add(X64.sub(X64.rsp, X64.imm(len)));
+                                    instructions.AddLast(X64.sub(X64.rsp, X64.imm(len)));
                                 }
                                 // 影子空间(32字节)
-                                instructions.Add(X64.sub(X64.rsp, X64.imm(32)));
+                                instructions.AddLast(X64.sub(X64.rsp, X64.imm(32)));
 
 
                                 // 参数赋值(IR中PARAM指令已经是倒序)  
@@ -634,7 +777,7 @@ namespace Gizbox.Src.Backend
 
                                     //栈帧传参[rsp + 8]开始
                                     int offset = (8 * (paraminfo.PARAM_paramidx + 1));
-                                    instructions.Add(X64.mov(X64.mem(X64.rsp, displacement: offset), ParseOperand(paraminfo.oprand0)));
+                                    instructions.AddLast(X64.mov(X64.mem(X64.rsp, displacement: offset), ParseOperand(paraminfo.oprand0)));
                                 }
                                 tempParamList.Clear();
                             }
@@ -651,12 +794,12 @@ namespace Gizbox.Src.Backend
                                 {
                                     int stackParamCount = tacInf.CALL_paramCount - 4;
                                     long stackCleanupBytes = stackParamCount * 8; // 每个参数8字节
-                                    instructions.Add(X64.add(X64.rsp, X64.imm(stackCleanupBytes)));
+                                    instructions.AddLast(X64.add(X64.rsp, X64.imm(stackCleanupBytes)));
                                 }
 
                                 //还原保存的寄存器(占位)  
                                 var placeholderRestore = X64.placehold("caller_restore");
-                                instructions.Add(placeholderRestore);
+                                instructions.AddLast(placeholderRestore);
                                 callerRestorePlaceHolders.Add(placeholderRestore);
                             }
                         }
@@ -675,23 +818,23 @@ namespace Gizbox.Src.Backend
                             long objectSize = classRec.size;
 
                             // 调用malloc分配堆内存（参数是字节数）
-                            instructions.Add(X64.mov(X64.rcx, X64.imm(objectSize)));
-                            instructions.Add(X64.call("malloc"));
+                            instructions.AddLast(X64.mov(X64.rcx, X64.imm(objectSize)));
+                            instructions.AddLast(X64.call("malloc"));
 
                             // 分配的内存地址存储到目标变量  
                             var targetVar = ParseOperand(tacInf.oprand0);
-                            instructions.Add(X64.mov(targetVar, X64.rax));
+                            instructions.AddLast(X64.mov(targetVar, X64.rax));
 
                             // 将虚函数表地址写入对象的前8字节
-                            instructions.Add(X64.mov(X64.rdx, X64.rel(vtableRoKeys[typeName])));
-                            instructions.Add(X64.mov(X64.mem(X64.rax, displacement: 0), X64.rdx));
+                            instructions.AddLast(X64.mov(X64.rdx, X64.rel(vtableRoKeys[typeName])));
+                            instructions.AddLast(X64.mov(X64.mem(X64.rax, displacement: 0), X64.rdx));
                         }
                         break; 
                     case "DEL":
                         {
                             var objPtr = ParseOperand(tacInf.oprand0);
-                            instructions.Add(X64.mov(X64.rcx, objPtr));
-                            instructions.Add(X64.call("free"));
+                            instructions.AddLast(X64.mov(X64.rcx, objPtr));
+                            instructions.AddLast(X64.call("free"));
                         }
                         break;
                     case "ALLOC_ARRAY":
@@ -702,21 +845,21 @@ namespace Gizbox.Src.Backend
                             var elemType = arrType.ArrayElementType;
                             int elemSize = elemType.Size;
 
-                            instructions.Add(X64.mov(X64.rax, lenOp));//RAX 作为中间寄存器
-                            instructions.Add(X64.mul(X64.imm(elemSize)));
-                            instructions.Add(X64.mov(X64.rcx, X64.rax));
+                            instructions.AddLast(X64.mov(X64.rax, lenOp));//RAX 作为中间寄存器
+                            instructions.AddLast(X64.mul(X64.imm(elemSize)));
+                            instructions.AddLast(X64.mov(X64.rcx, X64.rax));
 
                             //动态分配  
-                            instructions.Add(X64.call("malloc"));
+                            instructions.AddLast(X64.call("malloc"));
                             //返回指针在RAX，写入目标变量  
-                            instructions.Add(X64.mov(target, X64.rax));
+                            instructions.AddLast(X64.mov(target, X64.rax));
                         }
                         break;
                     case "IF_FALSE_JUMP":
                         {
                             var cond = ParseOperand(tacInf.oprand0);
-                            instructions.Add(X64.test(cond, cond));
-                            instructions.Add(X64.jz(tac.arg1));//jump if zero
+                            instructions.AddLast(X64.test(cond, cond));
+                            instructions.AddLast(X64.jz(tacInf.oprand1.segments[0]));//jump if zero
                         }
                         break;
                     case "=":
@@ -727,13 +870,13 @@ namespace Gizbox.Src.Backend
                             if(tacInf.oprand0.IsSSEType())
                             {
                                 if(tacInf.oprand0.typeExpr.Size == 4)
-                                    instructions.Add(X64.movss(dst, src));
+                                    instructions.AddLast(X64.movss(dst, src));
                                 else if(tacInf.oprand0.typeExpr.Size == 8)
-                                    instructions.Add(X64.movsd(dst, src));
+                                    instructions.AddLast(X64.movsd(dst, src));
                             }
                             else
                             {
-                                instructions.Add(X64.mov(dst, src));
+                                instructions.AddLast(X64.mov(dst, src));
                             }
                         }
                         break;
@@ -744,13 +887,13 @@ namespace Gizbox.Src.Backend
                             if(tacInf.oprand0.IsSSEType())
                             {
                                 if(tacInf.oprand0.typeExpr.Size == 4) 
-                                    instructions.Add(X64.addss(dst, src)); 
+                                    instructions.AddLast(X64.addss(dst, src)); 
                                 else
-                                    instructions.Add(X64.addsd(dst, src));
+                                    instructions.AddLast(X64.addsd(dst, src));
                             }
                             else
                             {
-                                instructions.Add(X64.add(dst, src));
+                                instructions.AddLast(X64.add(dst, src));
                             }
                         }
                         break;
@@ -761,13 +904,13 @@ namespace Gizbox.Src.Backend
                             if(tacInf.oprand0.IsSSEType())
                             {
                                 if(tacInf.oprand0.typeExpr.Size == 4) 
-                                    instructions.Add(X64.subss(dst, src));
+                                    instructions.AddLast(X64.subss(dst, src));
                                 else
-                                    instructions.Add(X64.subsd(dst, src));
+                                    instructions.AddLast(X64.subsd(dst, src));
                             }
                             else
                             {
-                                instructions.Add(X64.sub(dst, src));
+                                instructions.AddLast(X64.sub(dst, src));
                             }
                         }
                         break;
@@ -778,13 +921,13 @@ namespace Gizbox.Src.Backend
                             if(tacInf.oprand0.IsSSEType())
                             {
                                 if(tacInf.oprand0.typeExpr.Size == 4) 
-                                    instructions.Add(X64.mulss(dst, src)); 
+                                    instructions.AddLast(X64.mulss(dst, src)); 
                                 else
-                                    instructions.Add(X64.mulsd(dst, src));
+                                    instructions.AddLast(X64.mulsd(dst, src));
                             }
                             else
                             {
-                                instructions.Add(X64.imul(dst, src));
+                                instructions.AddLast(X64.imul(dst, src));
                             }
                         }
                         break;
@@ -795,16 +938,16 @@ namespace Gizbox.Src.Backend
                             if(tacInf.oprand0.IsSSEType())
                             {
                                 if(tacInf.oprand0.typeExpr.Size == 4) 
-                                    instructions.Add(X64.divss(dst, src)); 
+                                    instructions.AddLast(X64.divss(dst, src)); 
                                 else 
-                                    instructions.Add(X64.divsd(dst, src));
+                                    instructions.AddLast(X64.divsd(dst, src));
                             }
                             else
                             {
-                                instructions.Add(X64.mov(X64.rax, dst));
-                                instructions.Add(X64.cqo());
-                                instructions.Add(X64.idiv(src));
-                                instructions.Add(X64.mov(dst, X64.rax));
+                                instructions.AddLast(X64.mov(X64.rax, dst));
+                                instructions.AddLast(X64.cqo());
+                                instructions.AddLast(X64.idiv(src));
+                                instructions.AddLast(X64.mov(dst, X64.rax));
                             }
                         }
                         break;
@@ -812,10 +955,10 @@ namespace Gizbox.Src.Backend
                         {
                             var dst = ParseOperand(tacInf.oprand0);
                             var src = ParseOperand(tacInf.oprand1);
-                            instructions.Add(X64.mov(X64.rax, dst));
-                            instructions.Add(X64.cqo());
-                            instructions.Add(X64.idiv(src));
-                            instructions.Add(X64.mov(dst, X64.rdx));
+                            instructions.AddLast(X64.mov(X64.rax, dst));
+                            instructions.AddLast(X64.cqo());
+                            instructions.AddLast(X64.idiv(src));
+                            instructions.AddLast(X64.mov(dst, X64.rdx));
                         }
                         break;
                     case "+":
@@ -826,19 +969,19 @@ namespace Gizbox.Src.Backend
                             if(tacInf.oprand0.IsSSEType())
                             {
                                 if(tacInf.oprand0.typeExpr.Size == 4) 
-                                    instructions.Add(X64.movss(dst, a)); 
+                                    instructions.AddLast(X64.movss(dst, a)); 
                                 else 
-                                    instructions.Add(X64.movsd(dst, a));
+                                    instructions.AddLast(X64.movsd(dst, a));
 
                                 if(tacInf.oprand0.typeExpr.Size == 4) 
-                                    instructions.Add(X64.addss(dst, b)); 
+                                    instructions.AddLast(X64.addss(dst, b)); 
                                 else 
-                                    instructions.Add(X64.addsd(dst, b));
+                                    instructions.AddLast(X64.addsd(dst, b));
                             }
                             else
                             {
-                                instructions.Add(X64.mov(dst, a));
-                                instructions.Add(X64.add(dst, b));
+                                instructions.AddLast(X64.mov(dst, a));
+                                instructions.AddLast(X64.add(dst, b));
                             }
                         }
                         break;
@@ -850,19 +993,19 @@ namespace Gizbox.Src.Backend
                             if(tacInf.oprand0.IsSSEType())
                             {
                                 if(tacInf.oprand0.typeExpr.Size == 4) 
-                                    instructions.Add(X64.movss(dst, a)); 
+                                    instructions.AddLast(X64.movss(dst, a)); 
                                 else 
-                                    instructions.Add(X64.movsd(dst, a));
+                                    instructions.AddLast(X64.movsd(dst, a));
 
                                 if(tacInf.oprand0.typeExpr.Size == 4) 
-                                    instructions.Add(X64.subss(dst, b)); 
+                                    instructions.AddLast(X64.subss(dst, b)); 
                                 else 
-                                    instructions.Add(X64.subsd(dst, b));
+                                    instructions.AddLast(X64.subsd(dst, b));
                             }
                             else
                             {
-                                instructions.Add(X64.mov(dst, a));
-                                instructions.Add(X64.sub(dst, b));
+                                instructions.AddLast(X64.mov(dst, a));
+                                instructions.AddLast(X64.sub(dst, b));
                             }
                         }
                         break;
@@ -874,19 +1017,19 @@ namespace Gizbox.Src.Backend
                             if(tacInf.oprand0.IsSSEType())
                             {
                                 if(tacInf.oprand0.typeExpr.Size == 4) 
-                                    instructions.Add(X64.movss(dst, a));
+                                    instructions.AddLast(X64.movss(dst, a));
                                 else 
-                                    instructions.Add(X64.movsd(dst, a));
+                                    instructions.AddLast(X64.movsd(dst, a));
 
                                 if(tacInf.oprand0.typeExpr.Size == 4) 
-                                    instructions.Add(X64.mulss(dst, b)); 
+                                    instructions.AddLast(X64.mulss(dst, b)); 
                                 else 
-                                    instructions.Add(X64.mulsd(dst, b));
+                                    instructions.AddLast(X64.mulsd(dst, b));
                             }
                             else
                             {
-                                instructions.Add(X64.mov(dst, a));
-                                instructions.Add(X64.imul(dst, b));
+                                instructions.AddLast(X64.mov(dst, a));
+                                instructions.AddLast(X64.imul(dst, b));
                             }
                         }
                         break;
@@ -899,21 +1042,21 @@ namespace Gizbox.Src.Backend
                             {
                                 if(tacInf.oprand0.typeExpr.Size == 4)
                                 { 
-                                    instructions.Add(X64.movss(dst, a));
-                                    instructions.Add(X64.divss(dst, b));
+                                    instructions.AddLast(X64.movss(dst, a));
+                                    instructions.AddLast(X64.divss(dst, b));
                                 } 
                                 else
                                 { 
-                                    instructions.Add(X64.movsd(dst, a)); 
-                                    instructions.Add(X64.divsd(dst, b)); 
+                                    instructions.AddLast(X64.movsd(dst, a)); 
+                                    instructions.AddLast(X64.divsd(dst, b)); 
                                 }
                             }
                             else
                             {
-                                instructions.Add(X64.mov(X64.rax, a));
-                                instructions.Add(X64.cqo());
-                                instructions.Add(X64.idiv(b));
-                                instructions.Add(X64.mov(dst, X64.rax));
+                                instructions.AddLast(X64.mov(X64.rax, a));
+                                instructions.AddLast(X64.cqo());
+                                instructions.AddLast(X64.idiv(b));
+                                instructions.AddLast(X64.mov(dst, X64.rax));
                             }
                         }
                         break;
@@ -922,10 +1065,10 @@ namespace Gizbox.Src.Backend
                             var dst = ParseOperand(tacInf.oprand0);
                             var a = ParseOperand(tacInf.oprand1);
                             var b = ParseOperand(tacInf.oprand2);
-                            instructions.Add(X64.mov(X64.rax, a));
-                            instructions.Add(X64.cqo());
-                            instructions.Add(X64.idiv(b));
-                            instructions.Add(X64.mov(dst, X64.rdx));
+                            instructions.AddLast(X64.mov(X64.rax, a));
+                            instructions.AddLast(X64.cqo());
+                            instructions.AddLast(X64.idiv(b));
+                            instructions.AddLast(X64.mov(dst, X64.rdx));
                         }
                         break;
                     case "NEG":
@@ -934,8 +1077,8 @@ namespace Gizbox.Src.Backend
                             var src = ParseOperand(tacInf.oprand1);
                             if(!tacInf.oprand0.IsSSEType())
                             {
-                                instructions.Add(X64.mov(dst, src));
-                                instructions.Add(X64.neg(dst));
+                                instructions.AddLast(X64.mov(dst, src));
+                                instructions.AddLast(X64.neg(dst));
                             }
                         }
                         break;
@@ -943,9 +1086,9 @@ namespace Gizbox.Src.Backend
                         {
                             var dst = ParseOperand(tacInf.oprand0);
                             var src = ParseOperand(tacInf.oprand1);
-                            instructions.Add(X64.mov(dst, src));
-                            instructions.Add(X64.test(dst, dst));
-                            instructions.Add(X64.sete(dst));
+                            instructions.AddLast(X64.mov(dst, src));
+                            instructions.AddLast(X64.test(dst, dst));
+                            instructions.AddLast(X64.sete(dst));
                         }
                         break;
                     case "<":
@@ -958,29 +1101,29 @@ namespace Gizbox.Src.Backend
                             var dst = ParseOperand(tacInf.oprand0);
                             var a = ParseOperand(tacInf.oprand1);
                             var b = ParseOperand(tacInf.oprand2);
-                            instructions.Add(X64.mov(dst, a));
-                            instructions.Add(X64.cmp(dst, b));
+                            instructions.AddLast(X64.mov(dst, a));
+                            instructions.AddLast(X64.cmp(dst, b));
                             switch(tac.op)
                             {
-                                case "<": instructions.Add(X64.setl(dst)); break;
-                                case "<=": instructions.Add(X64.setle(dst)); break;
-                                case ">": instructions.Add(X64.setg(dst)); break;
-                                case ">=": instructions.Add(X64.setge(dst)); break;
-                                case "==": instructions.Add(X64.sete(dst)); break;
-                                case "!=": instructions.Add(X64.setne(dst)); break;
+                                case "<": instructions.AddLast(X64.setl(dst)); break;
+                                case "<=": instructions.AddLast(X64.setle(dst)); break;
+                                case ">": instructions.AddLast(X64.setg(dst)); break;
+                                case ">=": instructions.AddLast(X64.setge(dst)); break;
+                                case "==": instructions.AddLast(X64.sete(dst)); break;
+                                case "!=": instructions.AddLast(X64.setne(dst)); break;
                             }
                         }
                         break;
                     case "++":
                         {
                             var dst = ParseOperand(tacInf.oprand0);
-                            if(!tacInf.oprand0.IsSSEType()) instructions.Add(X64.inc(dst));
+                            if(!tacInf.oprand0.IsSSEType()) instructions.AddLast(X64.inc(dst));
                         }
                         break;
                     case "--":
                         {
                             var dst = ParseOperand(tacInf.oprand0);
-                            if(!tacInf.oprand0.IsSSEType()) instructions.Add(X64.dec(dst));
+                            if(!tacInf.oprand0.IsSSEType()) instructions.AddLast(X64.dec(dst));
                         }
                         break;
                     case "CAST"://CAST [tmp15] Human [tmp14]   tmp15 = (Human)tmp14
@@ -988,21 +1131,21 @@ namespace Gizbox.Src.Backend
                             var dst = ParseOperand(tacInf.oprand0);
                             var src = ParseOperand(tacInf.oprand2);
 
-                            var targetType = TypeExpr.Parse(tacInf.tac.arg1);
+                            var targetType = GType.Parse(tacInf.tac.arg1);
                             var srcType = tacInf.oprand2.typeExpr;
 
                             //相同类型
                             if(srcType.ToString() == targetType.ToString())
                             {
                                 if(dst != src)
-                                    instructions.Add(X64.mov(dst, src));
+                                    instructions.AddLast(X64.mov(dst, src));
                                 break;
                             }
 
                             //指针类型转换 -> 指针直接赋值  
                             if(srcType.IsPointerType && targetType.IsPointerType)
                             {
-                                instructions.Add(X64.mov(dst, src));
+                                instructions.AddLast(X64.mov(dst, src));
                                 break;
                             }
 
@@ -1010,9 +1153,9 @@ namespace Gizbox.Src.Backend
                             if(srcType.IsSSEType && targetType.IsSSEType)
                             {
                                 if(srcType.Size == 4 && targetType.Size == 8)
-                                    instructions.Add(X64.cvtss2sd(dst, src));
+                                    instructions.AddLast(X64.cvtss2sd(dst, src));
                                 else if(srcType.Size == 8 && targetType.Size == 4)
-                                    instructions.Add(X64.cvtsd2ss(dst, src));
+                                    instructions.AddLast(X64.cvtsd2ss(dst, src));
 
                                 break;
                             }
@@ -1022,19 +1165,19 @@ namespace Gizbox.Src.Backend
                             {
                                 if(srcType.Size == targetType.Size)
                                 {
-                                    instructions.Add(X64.mov(dst, src));
+                                    instructions.AddLast(X64.mov(dst, src));
                                 }
                                 else if(srcType.Size < targetType.Size)//扩展
                                 {
                                     
                                     if(srcType.IsSigned)
-                                        instructions.Add(X64.movsx(dst, src));
+                                        instructions.AddLast(X64.movsx(dst, src));
                                     else
-                                        instructions.Add(X64.movzx(dst, src));
+                                        instructions.AddLast(X64.movzx(dst, src));
                                 }
                                 else //截断
                                 {
-                                    instructions.Add(X64.mov(dst, src));
+                                    instructions.AddLast(X64.mov(dst, src));
                                 }
                                 break;
                             }
@@ -1043,9 +1186,9 @@ namespace Gizbox.Src.Backend
                             if(srcType.IsInteger && targetType.IsSSEType)
                             {
                                 if(targetType.Size == 4)
-                                    instructions.Add(X64.cvtsi2ss(dst, src));
+                                    instructions.AddLast(X64.cvtsi2ss(dst, src));
                                 else 
-                                    instructions.Add(X64.cvtsi2sd(dst, src));
+                                    instructions.AddLast(X64.cvtsi2sd(dst, src));
                                 break;
                             }
                             // 浮点 -> 整数 (截断)
@@ -1054,16 +1197,16 @@ namespace Gizbox.Src.Backend
                                 if(srcType.Size == 4) 
                                 {
                                     if(targetType.Size == 8)
-                                        instructions.Add(X64.cvttss2siq(dst, src));
+                                        instructions.AddLast(X64.cvttss2siq(dst, src));
                                     else
-                                        instructions.Add(X64.cvttss2si(dst, src));
+                                        instructions.AddLast(X64.cvttss2si(dst, src));
                                 }
                                 else
                                 {
                                     if(targetType.Size == 8)
-                                        instructions.Add(X64.cvttsd2siq(dst, src));
+                                        instructions.AddLast(X64.cvttsd2siq(dst, src));
                                     else
-                                        instructions.Add(X64.cvttsd2si(dst, src));
+                                        instructions.AddLast(X64.cvttsd2si(dst, src));
                                 }
                                 break;
                             }
@@ -1078,14 +1221,49 @@ namespace Gizbox.Src.Backend
                     default:
                         break;
                 }
+
+
+                //当前IR有标签
+                if(string.IsNullOrEmpty(tac.label) == false)
+                {
+                    if(lastInstruction.Next == null)
+                        throw new GizboxException(ExceptioName.CodeGen, "Internal error: no instruction for label!");
+
+                    lastInstruction.Next.value.label = tac.label;
+                }
+
+                //添加注释
+                if(lastInstruction != null)
+                {
+                    if(lastInstruction.Next != null)
+                    {
+                        lastInstruction.Next.value.comment += $"// {tacInf.line} : {tac.ToExpression(showlabel: false, indent: false)}";
+                    }
+                    else
+                    {
+                        lastInstruction.value.comment += $"//  none: {tacInf.line} : {tac.ToExpression(showlabel: false, indent: false)}";
+                    }
+                }
+                    
+
+                //记录
+                lastInstruction = instructions.Last;
             }
         }
 
         // <summary> 寄存器分配 </summary>
-        private void Pass3()
+        private void Pass4()
         {
-            //寄存器分配
-            //todo
+            if(debugLogAsmInfos)
+            {
+                StringBuilder strb = new StringBuilder();
+                strb.AppendLine();
+                foreach(var instruction in instructions)
+                {
+                    strb.Append(UtilityX64.SerializeInstruction(instruction));
+                }
+                Win64Target.Log(strb.ToString());
+            }
         }
 
 
@@ -1094,7 +1272,7 @@ namespace Gizbox.Src.Backend
         private void GenClassLayoutInfo(SymbolTable.Record classRec)
         {
             var classEnv = classRec.envPtr;
-            Console.WriteLine("---------" + classEnv.name + "----------");
+            Win64Target.Log("---------" + classEnv.name + "----------");
             List<SymbolTable.Record> fieldRecs = new();
             foreach(var (memberName, memberRec) in classEnv.records)
             {
@@ -1126,12 +1304,12 @@ namespace Gizbox.Src.Backend
             var classTable = classRec.envPtr;
 
             //方法信息(包含构造函数)  
-            foreach(var funcTable in classTable.children)
+            foreach(var (memName, memRec) in classTable.records)
             {
-                if(funcTable.tableCatagory != SymbolTable.TableCatagory.FuncScope)
+                if(memRec.category != SymbolTable.RecordCatagory.Function)
                     continue;
 
-                GenFuncInfo(funcTable);
+                GenFuncInfo(memRec);
             }
 
             //虚函数表和函数指针索引  
@@ -1162,8 +1340,17 @@ namespace Gizbox.Src.Backend
             }
         }
 
-        private void GenFuncInfo(SymbolTable funcTable)
+        private void GenFuncInfo(SymbolTable.Record funcRec)
         {
+            var funcTable = funcRec.envPtr;
+
+            Console.WriteLine("func：" + funcTable.name);
+
+            if(funcTable == null)
+                throw new GizboxException(ExceptioName.CodeGen, $"null func table of {(funcRec?.name ?? "?")}.");
+
+            //添加进函数表    
+            funcDict.Add(funcTable.name, funcRec);
             //参数偏移  
             {
                 foreach(var (key, rec) in funcTable.records)
@@ -1173,6 +1360,56 @@ namespace Gizbox.Src.Backend
                     rec.addr = rec.index * 8;
                 }
             }
+            //（局部变量内存偏移，需要等活跃变量分析之后）
+        }
+
+        private object GetStaticInitValue(SymbolTable.Record rec)
+        {
+            if(rec.category == SymbolTable.RecordCatagory.Function)
+            {
+                var type = GType.Parse(rec.typeExpression);
+                if(string.IsNullOrEmpty(rec.initValue))
+                {
+                    switch(type.Category)
+                    {
+                        case GType.Kind.Bool:
+                            return false;
+                        case GType.Kind.Char:
+                            return '\0';
+                        case GType.Kind.Int:
+                            return 0;
+                        case GType.Kind.Long:
+                            return 0L;
+                        case GType.Kind.Float:
+                            return 0f;
+                        case GType.Kind.Double:
+                            return 0d;
+                        default:
+                            return null;
+                    }
+                }
+                else
+                {
+                    switch(type.Category)
+                    {
+                        case GType.Kind.Bool:
+                            return bool.Parse(rec.initValue);
+                        case GType.Kind.Char:
+                            return char.Parse(rec.initValue);;
+                        case GType.Kind.Int:
+                            return int.Parse(rec.initValue);
+                        case GType.Kind.Long:
+                            return long.Parse(rec.initValue);
+                        case GType.Kind.Float:
+                            return float.Parse(rec.initValue);
+                        case GType.Kind.Double:
+                            return double.Parse(rec.initValue);
+                        default:
+                            return null;
+                    }
+                }
+            }
+            return null;
         }
 
         #endregion
@@ -1295,7 +1532,7 @@ namespace Gizbox.Src.Backend
         /// <returns></returns>
         private string AnalyzeOprand(string operand)
         {
-            var irOperand = GetIROperandInfo(operand);
+            var irOperand = ParseIRExpr(operand);
 
             switch(irOperand.type)
             {
@@ -1368,7 +1605,7 @@ namespace Gizbox.Src.Backend
             if(string.IsNullOrEmpty(operand))
                 return;
 
-            var iroperand = GetIROperandInfo(operand);
+            var iroperand = ParseIRExpr(operand);
             switch(iroperand.type)
             {
                 case IROperandExpr.Type.LitOrConst:
@@ -1524,7 +1761,7 @@ namespace Gizbox.Src.Backend
                             throw new GizboxException(ExceptioName.CodeGen, $"array not found for element access \"{arrayName}[{indexExpr}]\" at line {irOperand.owner.line}");
 
                         // 元素大小
-                        var elemType = TypeExpr.Parse(arrayRec.typeExpression);
+                        var elemType = GType.Parse(arrayRec.typeExpression);
                         int elemSize = elemType.Size;
 
                         var baseV = vreg(arrayRec);
@@ -1556,8 +1793,7 @@ namespace Gizbox.Src.Backend
             return null;
         }
 
-
-        public IROperandExpr GetIROperandInfo(string rawoperand)
+        public IROperandExpr ParseIRExpr(string rawoperand)
         {
             if(operandCache.TryGetValue(rawoperand, out var result))
             {
@@ -1587,10 +1823,11 @@ namespace Gizbox.Src.Backend
                     irOperand.segments = new[] { rawoperand.Substring(7) };
                 }
                 //成员访问
-                else if(rawoperand.Contains('.'))
+                else if(rawoperand.Contains("->"))
                 {
                     //成员访问：obj.x
-                    var parts = rawoperand.Split('.');
+                    var parts = rawoperand.SplitViaStr("->");
+
                     irOperand.type = IROperandExpr.Type.ClassMemberAccess;
                     irOperand.segments = parts;
                 }
@@ -1707,7 +1944,14 @@ namespace Gizbox.Src.Backend
         }
 
 
-        private SymbolTable.Record QueryMember(string objDefineType, string memberName)
+        public (SymbolTable.Record, SymbolTable.Record) QueryClassAndMember(string objDefineType, string memberName)
+        {
+            if(classDict.Count == 0 || classDict.ContainsKey(objDefineType) == false)
+                return (null, null);
+            return (classDict[objDefineType], QueryMember(classDict[objDefineType], memberName));
+
+        }
+        public SymbolTable.Record QueryMember(string objDefineType, string memberName)
         {
             if(classDict.Count == 0)
                 return null;
@@ -1718,7 +1962,7 @@ namespace Gizbox.Src.Backend
             return classRec.envPtr.GetRecord(memberName);
         }
 
-        private SymbolTable.Record Query(string name, int line)
+        public SymbolTable.Record Query(string name, int line)
         {
             var status = ir.scopeStatusArr[line];
             ir.stackDic.TryGetValue(status, out var envStack);
@@ -1768,267 +2012,315 @@ namespace Gizbox.Src.Backend
             }
             return null;
         }
+    }
 
-        public class IROperandExpr
+
+    public class IROperandExpr
+    {
+        ///操作数表达式（和变量和值并不是一一对应，值可能重复，变量在不同作用域可能重名）
+
+        public enum Type
         {
-            ///操作数表达式（和变量和值并不是一一对应，值可能重复，变量在不同作用域可能重名）
-            
-            public enum Type
-            {
-                Label,//xxx    //Label, ClassName
-                RET, //RET     //Return value
-                LitOrConst,//LIT:xxx   //Literal, Const value
-                Identifier,//[xxx]     //Variale, Function
+            Label,//xxx    //Label, ClassName
+            RET, //RET     //Return value
+            LitOrConst,//LIT:xxx   //Literal, Const value
+            Identifier,//[xxx]     //Variale, Function
 
-                ClassMemberAccess,//[aaa.bbb]     //MemberAccess
-                ArrayElementAccess, //[aaa[bbb]]  //ElementAccess
-            }
-
-            public Type type;
-            public string[] segments;
-
-            public string roDataKey;//rodata的name，用于字面量
+            ClassMemberAccess,//[aaa.bbb]     //MemberAccess
+            ArrayElementAccess, //[aaa[bbb]]  //ElementAccess
         }
 
-        public class TACInfo
+        public Type type;
+        public string[] segments;
+
+        public string roDataKey;//rodata的name，用于字面量
+    }
+
+    public class TACInfo
+    {
+        /// TAC附加信息  
+        public Win64CodeGenContext context;
+
+        public TAC tac;
+        public int line;
+
+        public IROperand oprand0;
+        public IROperand oprand1;
+        public IROperand oprand2;
+
+        public List<IROperand> allOprands = new();
+
+
+        public int PARAM_paramidx;//参数索引（如果是PARAM指令）
+        public int CALL_paramCount;//参数个数（如果是CALL指令）
+        public IROperand MCALL_methodTargetObject;//this参数（如果是MCALL指令）
+
+        public TACInfo(Win64CodeGenContext context, TAC tac, int line)
         {
-            /// TAC附加信息  
-            public Win64CodeGenContext context;
-
-            public TAC tac;
-            public int line;
-
-            public IROperand oprand0;
-            public IROperand oprand1;
-            public IROperand oprand2;
-
-            public List<IROperand> allOprands = new();
-
-
-            public int PARAM_paramidx;//参数索引（如果是PARAM指令）
-            public int CALL_paramCount;//参数个数（如果是CALL指令）
-            public IROperand MCALL_methodTargetObject;//this参数（如果是MCALL指令）
-
-            public TACInfo(Win64CodeGenContext context, TAC tac, int line)
+            this.context = context;
+            this.tac = tac;
+            this.line = line;
+        }
+        public void FinishInfo()
+        {
+            if(string.IsNullOrEmpty(tac.arg0) == false)
             {
-                this.context = context;
-                this.tac = tac;
-                this.line = line;
+                oprand0 = new IROperand(context, this, 0, tac.arg0);
+                allOprands.Add(oprand0);
             }
-            public void FinishInfo()
+            if(string.IsNullOrEmpty(tac.arg1) == false)
             {
-                if(string.IsNullOrEmpty(tac.arg0) == false)
-                {
-                    oprand0 = new IROperand(context, this, 0, tac.arg0);
-                    allOprands.Add(oprand0);
-                }
-                if(string.IsNullOrEmpty(tac.arg1) == false)
-                {
-                    oprand1 = new IROperand(context, this, 1, tac.arg1);
-                    allOprands.Add(oprand1);
-                }
-                if(string.IsNullOrEmpty(tac.arg2) == false)
-                {
-                    oprand2 = new IROperand(context, this, 2, tac.arg2);
-                    allOprands.Add(oprand2);
-                }
+                oprand1 = new IROperand(context, this, 1, tac.arg1);
+                allOprands.Add(oprand1);
+            }
+            if(string.IsNullOrEmpty(tac.arg2) == false)
+            {
+                oprand2 = new IROperand(context, this, 2, tac.arg2);
+                allOprands.Add(oprand2);
             }
         }
+    }
 
-        public class IROperand
+    public class IROperand
+    {
+        ///操作数实例（和tac中的操作数一一对应）
+        public TACInfo owner;
+        public int operandIdx;
+        public IROperandExpr expr;
+
+        public string[] segments => expr.segments;//子操作数
+
+        public GType typeExpr;//类型  
+        public SymbolTable.Record[] segmentRecs;//变量的符号表条目（如果子操作数是变量）  
+        public SymbolTable.Record RET_functionRec;//返回值的函数符号表条目（如果是RET操作数）
+
+        public IROperand(Win64CodeGenContext context, TACInfo tacinf, int operandIdx, string rawoperand)
         {
-            ///操作数实例（和tac中的操作数一一对应）
-            public TACInfo owner;
-            public int operandIdx;
-            public IROperandExpr expr;
-
-            public string[] segments => expr.segments;//子操作数
-
-            public TypeExpr typeExpr;//类型  
-            public SymbolTable.Record[] segmentRecs;//变量的符号表条目（如果子操作数是变量）  
-            public SymbolTable.Record RET_functionRec;//返回值的函数符号表条目（如果是RET操作数）
-
-            public IROperand(Win64CodeGenContext context, TACInfo tacinf, int operandIdx, string rawoperand)
+            this.owner = tacinf;
+            this.expr = context.ParseIRExpr(rawoperand);
+            this.operandIdx = operandIdx;
+            this.segmentRecs = new SymbolTable.Record[segments.Length];
+            if(expr.type == IROperandExpr.Type.Identifier)//Function Or Variable
             {
-                this.owner = tacinf;
-                this.expr = context.GetIROperandInfo(rawoperand);
-                this.operandIdx = operandIdx;
-                this.segmentRecs = new SymbolTable.Record[segments.Length];
-                if(expr.type == IROperandExpr.Type.Identifier)//Function Or Variable
+                SymbolTable.Record rec;
+
+                if(segments[0].Contains("."))
                 {
-                    SymbolTable.Record rec;
+                    if(segments[0].EndsWith(".ctor"))
+                    {
+                        string className = segments[0].Substring(0, segments[0].Length - 5);
+                        var classRec = context.Query(className, owner.line);
+                        segmentRecs[0] = null;
+                        typeExpr = Utils.CtorType(classRec);
+                    }
+                    else
+                    {
+                        string[] parts = segments[0].Split('.');
+                        string className = parts[0];
+                        string memberName = parts[1];
+                        var (classRec, memberRec) = context.QueryClassAndMember(className, memberName);
+                        segmentRecs[0] = memberRec;
+                        typeExpr = GType.Parse(memberRec.typeExpression);
+                        Win64Target.Log("------- " + typeExpr.ToString());
+                    }
+                }
+                else
+                {
+
                     if(owner.tac.op == "MCALL" && operandIdx == 0)
                     {
                         var objClass = owner.MCALL_methodTargetObject.typeExpr;
                         rec = context.QueryMember(objClass.ToString(), segments[0]);
                         segmentRecs[0] = rec;
-                        typeExpr = TypeExpr.Parse(rec.typeExpression);
+                        typeExpr = GType.Parse(rec.typeExpression);
+                    }
+                    else if(owner.tac.op == "CALL" && operandIdx == 0)
+                    {
+                        rec = context.Query(segments[0], owner.line);
+                        segmentRecs[0] = rec;
+                        typeExpr = GType.Parse(rec.typeExpression);
                     }
                     else
                     {
                         rec = context.Query(segments[0], tacinf.line);
-                        if(rec == null) throw new GizboxException(ExceptioName.CodeGen, $"cannot find variable {segments[0]} at line {tacinf.line}");
+                        if(rec == null)
+                            throw new GizboxException(ExceptioName.CodeGen, $"cannot find variable {segments[0]} at line {tacinf.line}");
                         segmentRecs[0] = rec;
-                        typeExpr = TypeExpr.Parse(rec.typeExpression);
+                        typeExpr = GType.Parse(rec.typeExpression);
                     }
                 }
-                else if(expr.type == IROperandExpr.Type.ClassMemberAccess)
+            }
+            else if(expr.type == IROperandExpr.Type.ClassMemberAccess)
+            {
+                if(segments[1] != "ctor")
                 {
-                    if(segments[1] != "ctor")
+                    var objRec = context.Query(segments[0], tacinf.line);
+                    string className;
+                    if(objRec.category == SymbolTable.RecordCatagory.Class)//静态函数
                     {
-                        var objRec = context.Query(segments[0], tacinf.line);
-                        string className;
-                        if(objRec.category == SymbolTable.RecordCatagory.Class)//静态函数
-                        {
-                            className = objRec.name;
-                        }
-                        else
-                        {
-                            className = objRec.typeExpression;
-                        }
-                        var classRec = context.classDict[className];
-                        var memberRec = context.QueryMember(className, segments[1]);
-                        segmentRecs[0] = objRec;
-                        segmentRecs[1] = memberRec;
-                        typeExpr = TypeExpr.Parse(memberRec.typeExpression);
+                        className = objRec.name;
                     }
                     else
                     {
-                        var objRec = context.Query(segments[0], tacinf.line);
-                        segmentRecs[0] = objRec;
-                        segmentRecs[1] = null;
-                        typeExpr = TypeExpr.Parse(objRec.name);
+                        className = objRec.typeExpression;
                     }
-                }
-                else if(expr.type == IROperandExpr.Type.ArrayElementAccess)
-                {
-                    var arrayRec = context.Query(segments[0], tacinf.line);
-                    var indexRec = context.Query(segments[1], tacinf.line);
-                    segmentRecs[0] = arrayRec;
-                    segmentRecs[1] = indexRec;
-                    typeExpr = TypeExpr.Parse(arrayRec.typeExpression).ArrayElementType;
-                }
-                else if(expr.type == IROperandExpr.Type.RET)
-                {
-                    var call = context.Lookback(this.owner.line, "CALL");
-                    var mcall = context.Lookback(this.owner.line, "MCALL");
-
-                    TACInfo lastCall = null;
-                    if(call != null && mcall != null)
-                    {
-                        if(call.line > mcall.line)
-                            lastCall = call;
-                        else
-                            lastCall = mcall;
-                    }
-                    else if(call != null)
-                    {
-                        lastCall = call;
-                    }
-                    else if(mcall != null)
-                    {
-                        lastCall = mcall;
-                    }
-                    else
-                    {
-                        throw new GizboxException(ExceptioName.CodeGen, $"no CALL or MCALL before RET at line {this.owner.line}");
-                    }
-
-                    this.RET_functionRec = lastCall.oprand0.segmentRecs[0];
-
-                    if(this.RET_functionRec == null)
-                    {
-                        throw new GizboxException(ExceptioName.CodeGen, $"no function record for RET at line {this.owner.line}");
-                    }
-
-                    typeExpr = TypeExpr.Parse(RET_functionRec.typeExpression).FunctionReturnType;
-
-                }
-                else if(expr.type == IROperandExpr.Type.LitOrConst)
-                {
-                    typeExpr = TypeExpr.Parse(UtilsW64.GetLitConstType(segments[0]));
-                }
-                else if(expr.type == IROperandExpr.Type.Label)
-                {
-                    typeExpr = TypeExpr.Parse("(label)");
-                }
-            }
-
-            public bool IsSSEType()
-            {
-                return typeExpr.IsSSEType;
-            }
-        }
-
-
-        
-        private class UtilsW64
-        {
-            public static bool IsJump(TAC tac)
-            {
-                return tac.op == "IF_FALSE_JUMP" ||
-                    tac.op == "JUMP" ||
-                    tac.op == "RETURN";
-                //过程调用一般不会中断基本块，因为过程内的控制流是隐藏的  
-            }
-            public static bool HasLabel(TAC tac)
-            {
-                return !string.IsNullOrEmpty(tac.label);
-            }
-
-            public static string GetLitConstType(string litconstMark)
-            {
-                switch(litconstMark)
-                {
-                    case "LITINT": 
-                        return "int";
-                    case "LITLONG":
-                        return "long";
-                    case "LITFLOAT":
-                        return "float";
-                    case "LITDOUBLE":
-                        return "double";
-                    case "LITBOOL":
-                        return "bool";
-                    case "LITCHAR":
-                        return "char";
-                    case "CONSTSTRING":
-                        return "string";
-                    default:
-                        return litconstMark;
-                }
-
-            }
-
-            public static X64Reg GetParamReg(int paramIdx, bool isSSE)
-            {
-                if(isSSE == false)
-                {
-                    switch(paramIdx)
-                    {
-                        case 0: return X64.rcx;
-                        case 1: return X64.rdx;
-                        case 2: return X64.r8;
-                        case 3: return X64.r9;
-                    }
+                    var classRec = context.classDict[className];
+                    var memberRec = context.QueryMember(className, segments[1]);
+                    segmentRecs[0] = objRec;
+                    segmentRecs[1] = memberRec;
+                    typeExpr = GType.Parse(memberRec.typeExpression);
                 }
                 else
                 {
-                    switch(paramIdx)
-                    {
-                        case 0:
-                            return X64.xmm0;
-                        case 1:
-                            return X64.xmm1;
-                        case 2:
-                            return X64.xmm2;
-                        case 3:
-                            return X64.xmm3;
-                    }
+                    var objRec = context.Query(segments[0], tacinf.line);
+                    segmentRecs[0] = objRec;
+                    segmentRecs[1] = null;
+                    typeExpr = GType.Parse(objRec.name);
+                }
+            }
+            else if(expr.type == IROperandExpr.Type.ArrayElementAccess)
+            {
+                var arrayRec = context.Query(segments[0], tacinf.line);
+                var indexRec = context.Query(segments[1], tacinf.line);
+                segmentRecs[0] = arrayRec;
+                segmentRecs[1] = indexRec;
+                typeExpr = GType.Parse(arrayRec.typeExpression).ArrayElementType;
+            }
+            else if(expr.type == IROperandExpr.Type.RET)
+            {
+                var call = context.Lookback(this.owner.line, "CALL");
+                var mcall = context.Lookback(this.owner.line, "MCALL");
+
+                TACInfo lastCall = null;
+                if(call != null && mcall != null)
+                {
+                    if(call.line > mcall.line)
+                        lastCall = call;
+                    else
+                        lastCall = mcall;
+                }
+                else if(call != null)
+                {
+                    lastCall = call;
+                }
+                else if(mcall != null)
+                {
+                    lastCall = mcall;
+                }
+                else
+                {
+                    throw new GizboxException(ExceptioName.CodeGen, $"no CALL or MCALL before RET at line {this.owner.line}");
                 }
 
-                throw new GizboxException(ExceptioName.CodeGen, $"param cannot pass by register. idx:{paramIdx}");
+                this.RET_functionRec = lastCall.oprand0.segmentRecs[0];
+
+                if(this.RET_functionRec == null)
+                {
+                    throw new GizboxException(ExceptioName.CodeGen, $"no function record for RET at line {this.owner.line}");
+                }
+
+                typeExpr = GType.Parse(RET_functionRec.typeExpression).FunctionReturnType;
             }
+            else if(expr.type == IROperandExpr.Type.LitOrConst)
+            {
+                typeExpr = GType.Parse(UtilsW64.GetLitConstType(segments[0]));
+            }
+            else if(expr.type == IROperandExpr.Type.Label)
+            {
+                typeExpr = GType.Parse("(label)");
+            }
+        }
+
+        public bool IsSSEType()
+        {
+            return typeExpr.IsSSEType;
+        }
+    }
+
+
+    public class AdditionInfo
+    {
+        public SymbolTable.Record target;
+
+        public bool isGlobalVar = false;
+    }
+
+    public class X64FunctionDesc
+    {
+        public string name;
+        public LList<X64Instruction>.Node start;
+        public LList<X64Instruction>.Node end;
+    }
+    public class UtilsW64
+    {
+        public static bool IsJump(TAC tac)
+        {
+            return tac.op == "IF_FALSE_JUMP" ||
+                tac.op == "JUMP" ||
+                tac.op == "RETURN";
+            //过程调用一般不会中断基本块，因为过程内的控制流是隐藏的  
+        }
+        public static bool HasLabel(TAC tac)
+        {
+            return !string.IsNullOrEmpty(tac.label);
+        }
+
+        public static string GetLitConstType(string litconstMark)
+        {
+            switch(litconstMark)
+            {
+                case "%LITINT":
+                    return "int";
+                case "%LITLONG":
+                    return "long";
+                case "%LITFLOAT":
+                    return "float";
+                case "%LITDOUBLE":
+                    return "double";
+                case "%LITBOOL":
+                    return "bool";
+                case "%LITCHAR":
+                    return "char";
+                case "%CONSTSTRING":
+                    return "string";
+                default:
+                    return litconstMark;
+            }
+
+        }
+
+        public static X64Reg GetParamReg(int paramIdx, bool isSSE)
+        {
+            if(isSSE == false)
+            {
+                switch(paramIdx)
+                {
+                    case 0:
+                        return X64.rcx;
+                    case 1:
+                        return X64.rdx;
+                    case 2:
+                        return X64.r8;
+                    case 3:
+                        return X64.r9;
+                }
+            }
+            else
+            {
+                switch(paramIdx)
+                {
+                    case 0:
+                        return X64.xmm0;
+                    case 1:
+                        return X64.xmm1;
+                    case 2:
+                        return X64.xmm2;
+                    case 3:
+                        return X64.xmm3;
+                }
+            }
+
+            throw new GizboxException(ExceptioName.CodeGen, $"param cannot pass by register. idx:{paramIdx}");
         }
     }
 }

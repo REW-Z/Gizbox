@@ -16,13 +16,60 @@ namespace Gizbox
             }
             return result;
         }
+
+        public static GType CtorType(SymbolTable.Record classRec)
+        {
+            return GType.Parse($"{classRec.name} => void");
+        }
+    }
+
+    public static class StringExtensions
+    {
+        /// <summary>
+        /// 字符串中字符串的起止idx
+        /// </summary>
+        public static (int, int) GetSubStringIndex(this string _this, string subStr)
+        {
+            if(_this.Contains(subStr) == false)
+                throw new ArgumentException("Input string does not contain the specified substring.");
+
+            for(int i = 0; i <= _this.Length - subStr.Length; i++)
+            {
+                for(int j = 0; j < subStr.Length; j++)
+                {
+                    if(_this[i + j] != subStr[j])
+                        break;
+                    if(j == subStr.Length - 1)
+                        return (i, i + subStr.Length - 1);
+                }
+            }
+
+            throw new Exception("Unexpected error: substring not found after initial check.");
+        }
+
+        /// <summary>
+        /// 通过字符串分割字符串
+        /// </summary>
+        public static string[] SplitViaStr(this string _this, string splitStr)
+        {
+            List<string> parts = new List<string>();
+            int start = 0;
+            int index;
+            while((index = _this.IndexOf(splitStr, start)) != -1)
+            {
+                parts.Add(_this.Substring(start, index - start));
+                start = index + splitStr.Length;
+            }
+            parts.Add(_this.Substring(start));
+            return parts.ToArray();
+        }
     }
 
 
 
     public class MemUtility
     {
-        //参数对齐
+        //类成员布局  
         public static long ClassLayout(int headerSize, (int size, int align)[] fields, out long[] allocAddrs)
         {
             //headerSize是对象头信息，一般是虚函数表指针等信息  
@@ -53,7 +100,40 @@ namespace Gizbox
             return classSize;
         }
 
-        public static long AlignUp(long value, int alignment)
+        //局部变量布局（栈帧向低地址增长）(不负责对齐)  
+        public static long LocalVarLayout((int size, int align)[] fields, out long[] allocAddrs)
+        {
+            if(fields == null || fields.Length == 0)
+            {
+                allocAddrs = new long[0];
+                return 0;
+            }
+
+            allocAddrs = new long[fields.Length];
+
+            long cursor = 0;
+            for(int i = 0; i < fields.Length; i++)
+            {
+                int fsize = fields[i].size;
+                int falign = fields[i].align <= 0 ? 1 : fields[i].align;
+
+                if((falign & (falign - 1)) != 0)
+                    throw new ArgumentException("Alignment must be power of two");
+
+                // 预留空间后按对齐向下取整，得到变量起始地址（相对 RBP 的负偏移）
+                long next = cursor - fsize;
+                long addr = AlignDown(next, falign);
+
+                allocAddrs[i] = addr;
+                cursor = addr;
+            }
+
+            // 返回 RBP 以下总大小（包含 header）
+            long frameSize = -cursor;
+            return frameSize;
+        }
+
+        private static long AlignUp(long value, int alignment)
         {
             if(alignment <= 0 || (alignment & (alignment - 1)) != 0)
                 throw new ArgumentException("Alignment must be power of two");
@@ -62,7 +142,7 @@ namespace Gizbox
             return (value + mask) & ~mask;
         }
         // 内存向下对齐计算函数
-        public static long AlignDown(long value, int alignment)
+        private static long AlignDown(long value, int alignment)
         {
             if(alignment <= 0 || (alignment & (alignment - 1)) != 0)
                 throw new ArgumentException("Alignment must be power of two");

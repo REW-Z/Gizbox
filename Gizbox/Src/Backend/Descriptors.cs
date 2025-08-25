@@ -34,7 +34,52 @@ namespace Gizbox.Src.Backend
         public List<VariableDescriptor> variables = new();
     }
 
+    /// <summary>
+    /// 变量活跃信息  
+    /// </summary>
+    public class LiveInfo
+    {
+        public SymbolTable.Record variable;
+        public List<(int def, int die)> liveRanges;
 
+        public LiveInfo(SymbolTable.Record variable)
+        {
+            this.variable = variable;
+            this.liveRanges = new();
+        }
+
+        public void AddRange(IEnumerable<(int def, int die)> ranges)
+        {
+            this.liveRanges.AddRange(ranges);
+        }
+
+        public void MergeRanges()
+        {
+            liveRanges.Sort((a, b) => a.def - b.def);
+            List<(int def, int die)> merged = new();
+            foreach(var r in liveRanges)
+            {
+                if(merged.Count == 0)
+                {
+                    merged.Add(r);
+                    continue;
+                }
+
+                var last = merged[merged.Count - 1];
+                //有交集  
+                if(Math.Max(r.def, last.def) <= Math.Min(r.die, last.die))
+                {
+                    var newStart = Math.Min(r.def, last.def);
+                    var newEnd = Math.Max(r.die, last.die);
+                    merged[merged.Count - 1] = (newStart, newEnd);
+                }
+                else
+                {
+                    merged.Add(r);
+                }
+            }
+        }
+    }
 
     /// <summary>
     /// 控制流图  
@@ -47,11 +92,29 @@ namespace Gizbox.Src.Backend
 
         public List<(BasicBlock src, BasicBlock dst)> edges = new();
 
+        public Dictionary<SymbolTable.Record, LiveInfo> varialbeLiveInfos = new(); 
+
         public void AddEdge(BasicBlock src, BasicBlock dst)
         {
             edges.Add((src, dst));
             src.successors.Add(dst);
             dst.predecessors.Add(src);
+        }
+        public void CaculateLiveInfos()
+        {
+            foreach(var b in blocks)
+            {
+                foreach(var (rec, ranges) in b.variableLiveRanges)
+                {
+                    if(varialbeLiveInfos.ContainsKey(rec) == false)
+                        varialbeLiveInfos[rec] = new(rec);
+                    varialbeLiveInfos[rec].AddRange(ranges);
+                }
+            }
+            foreach(var (rec, info) in varialbeLiveInfos)
+            {
+                info.MergeRanges();
+            }
         }
     }
     /// <summary>
@@ -81,7 +144,109 @@ namespace Gizbox.Src.Backend
         public List<SymbolTable.Record> IN = new();
         //出口处活跃变量
         public List<SymbolTable.Record> OUT = new();
+
+        //变量活跃区间
+        public Dictionary<SymbolTable.Record, List<(int start, int end)>> variableLiveRanges = new();
+
+        //计算活跃区间  
+        public void CaculateLiveRanges()
+        {
+            HashSet<SymbolTable.Record> variables = new();
+            foreach(var use in USE)
+                variables.Add(use.Key);
+            foreach(var def in DEF)
+                variables.Add(def.Key);
+            foreach(var _in in IN)
+                variables.Add(_in);
+            foreach(var _out in OUT)
+                variables.Add(_out);
+
+
+            List<(int def, int dead)> ranges = new();
+
+            List<int> useLines = new();
+            List<int> defLines = new();
+
+            foreach(var va in variables)
+            {
+                ranges.Clear();
+                useLines.Clear();
+                defLines.Clear();
+
+                if(this.USE.TryGetValue(va, out var tuse))
+                    useLines.AddRange(tuse);
+                if(this.DEF.TryGetValue(va, out var tdef))
+                    defLines.AddRange(tdef);
+                useLines.Sort();
+                defLines.Sort();
+
+
+                bool isLive = OUT.Contains(va);
+                int deadPos = isLive ? (this.endIdx + 1) : -1;//最后一个use的后一行
+
+                int useidx = useLines.Count - 1;
+                int defidx = defLines.Count - 1;
+                while(useidx >= 0 || defidx >= 0)
+                {
+                    int line = -1;
+                    bool isDef = false;
+                    bool isUse = false;
+                    if(useidx >= 0)
+                    {
+                        line = useLines[useidx];
+                        isUse = true;
+                    }
+                    if(defidx >= 0 && defLines[defidx] > line)
+                    {
+                        line = defLines[defidx];
+                        isDef = true;
+                    }
+                    
+                    //是DEF行（1行只能有一个DEF）  
+                    if(isDef)
+                    {
+                        if(isLive)
+                        {
+                            ranges.Add((line, deadPos));
+                            isLive = false;
+                        }
+
+                        //一行可能有多个def  
+                        while(defidx >= 0 && defLines[defidx] == line)
+                            defidx--;
+                    }
+
+                    //是USE行
+                    if(isUse)
+                    {
+                        if(isLive == false)//是区间内最后一个use  
+                        {
+                            isLive = true;
+                            deadPos = line + 1;
+                        }
+                        //一行可能有多个use   
+                        while(useidx >= 0 && useLines[useidx] == line)
+                            useidx--;
+                    }
+                }
+                //依然活跃  
+                if(isLive)
+                {
+                    ranges.Add((this.startIdx, deadPos));
+                }
+
+                //写入基本块  
+                if(this.variableLiveRanges.TryGetValue(va, out var list) == false)
+                {
+                    var newlist = new List<(int start, int end)>();
+                    this.variableLiveRanges.Add(va, newlist);
+                    list = newlist;
+                }
+                list.AddRange(ranges);
+            }
+        }
     }
+
 
 
 

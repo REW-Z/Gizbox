@@ -16,6 +16,7 @@ namespace Gizbox
         public static bool enableLogSemanticAnalyzer = false;
         public static bool enableLogILGenerator = false;
         public static bool enableLogScriptEngine = false;
+        public static bool enableLogCodeGen = true;
 
         //parser data  
         private bool parserDataHardcode = true;

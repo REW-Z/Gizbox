@@ -2,6 +2,8 @@
 
 namespace Math
 {
+	const float Pi = 3.14159265358979323846f;
+
 	float Abs(float number)
 	{
 		float result = number;

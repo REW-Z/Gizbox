@@ -493,7 +493,7 @@ namespace Gizbox.ScriptEngine
                         if(arrayRec == null)
                             throw new GizboxException(ExceptioName.ScriptRuntimeError, "array rec not found.");
 
-                        var arrTypeExpr = TypeExpr.Parse(arrayRec.typeExpression);
+                        var arrTypeExpr = GType.Parse(arrayRec.typeExpression);
                         
                         for(int i = 0; i < len; ++i)
                         {
@@ -1039,34 +1039,6 @@ namespace Gizbox.ScriptEngine
                 }
             }
             return null;
-        }
-
-        private bool IsBaseType(string typeExpr)
-        {
-            switch(typeExpr)
-            {
-                case "bool": 
-                case "int": 
-                case "long":
-                case "float":
-                case "double":
-                case "char":
-                case "string":
-                    return true;
-                default: 
-                    return false;
-            }
-        }
-        private bool IsFuncType(string typeExpr)
-        {
-            if(typeExpr.Contains("->"))
-            {
-                return true;
-            }
-            else
-            {
-                return false;
-            }
         }
 
 

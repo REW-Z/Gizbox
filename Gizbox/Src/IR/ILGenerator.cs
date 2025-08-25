@@ -113,8 +113,8 @@ namespace Gizbox.IR
                 case ClassDeclareNode classDeclNode:
                     {
                         string className = classDeclNode.classNameNode.FullName;
-                        GenerateCode("JUMP", "%LABEL:exit:" + className);
-                        GenerateCode(" ").label = className;
+                        GenerateCode("JUMP", "%LABEL:class_end:" + className);
+                        GenerateCode(" ").label = "class_begin:" + className;
                         //GeneratorCode("CLASS_BEGIN", classDeclNode.classNameNode.token.attribute);
                         envStack.Push(classDeclNode.attributes["env"] as SymbolTable);
                         EnvBegin(classDeclNode.attributes["env"] as SymbolTable);
@@ -153,7 +153,7 @@ namespace Gizbox.IR
                                     var fieldDecl = memberDecl as VarDeclareNode;
 
                                     GenNode(fieldDecl.initializerNode);
-                                    GenerateCode("=", "this." + fieldDecl.identifierNode.FullName, GetRet(fieldDecl.initializerNode));
+                                    GenerateCode("=", "this->" + fieldDecl.identifierNode.FullName, GetRet(fieldDecl.initializerNode));
                                 }
                             }
 
@@ -180,7 +180,7 @@ namespace Gizbox.IR
                         EnvEnd(classDeclNode.attributes["env"] as SymbolTable);
                         envStack.Pop();
                         //GeneratorCode("CLASS_END");
-                        GenerateCode(" ").label = "exit:" + className;
+                        GenerateCode(" ").label = "class_end:" + className;
                     }
                     break;
                 //函数声明
@@ -457,9 +457,34 @@ namespace Gizbox.IR
                     {
                         GenNode(objMemberAccess.objectNode);
 
-                        //成员表达式的返回变量(X.Y格式)  
-                        string obj = TrimName(GetRet(objMemberAccess.objectNode));
-                        SetRet(objMemberAccess, obj + "." + objMemberAccess.memberNode.FullName);
+                        // 取出objec的返回表达式
+                        string objExpr = TrimName(GetRet(objMemberAccess.objectNode));
+
+                        bool IsAccess(ExprNode node)
+                        {
+                            if(node is ElementAccessNode)
+                                return true;
+                            if(node is ObjectMemberAccessNode)
+                                return true;
+                            return false;
+                        }
+
+                        // 作为左值使用
+                        bool isLeftValue = (objMemberAccess.Parent is AssignNode assign) && (assign.lvalueNode == objMemberAccess);
+                        if(isLeftValue)
+                        {
+                            SetRet(objMemberAccess, objExpr + "->" + objMemberAccess.memberNode.FullName);
+                        }
+                        else
+                        {
+                            // 右值：读一次到临时变量，返回该临时
+                            string valueType = (string)objMemberAccess.attributes["type"];
+                            string tmp = NewTemp(valueType);
+                            GenerateCode("=", tmp, objExpr + "->" + objMemberAccess.memberNode.FullName);
+                            SetRet(objMemberAccess, tmp);
+                        }
+
+
                     }
                     break;
                 case CastNode castNode:

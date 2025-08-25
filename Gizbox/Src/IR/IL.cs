@@ -22,7 +22,7 @@ namespace Gizbox.IR
         [DataMember]
         public string arg2;
 
-        public string ToExpression(bool showlabel = true)
+        public string ToExpression(bool showlabel = true, bool indent = true)
         {
             string str = "";
 
@@ -30,11 +30,16 @@ namespace Gizbox.IR
             {
                 if (string.IsNullOrEmpty(label))
                 {
-                    str += new string(' ', 20);
+                    if(indent)
+                        str += new string(' ', 20);
+                    
                 }
                 else
                 {
-                    str += (label + ":").PadRight(20);
+                    if(indent)
+                        str += (label + ":").PadRight(20);
+                    else
+                        str += (label + ":");
                 }
             }
             str += op;
@@ -390,8 +395,8 @@ namespace Gizbox.IR
             return null;
         }
 
-        /// <summary> 行所在的顶层符号表 </summary>
-        public SymbolTable GetTopEnvAtLine(int line)
+        /// <summary> 行所在的最外层符号表 </summary>
+        public SymbolTable GetOutermostEnvAtLine(int line)
         {
             return GetEnvStackAtLine(line).Peek();
         }
@@ -401,6 +406,9 @@ namespace Gizbox.IR
             if (list.Contains(unit.globalScope.env)) return;
 
             list.Add(unit.globalScope.env);
+
+            if(dependencyLibs.Count == 0 && dependencies.Count > 0)
+                throw new GizboxException(ExceptioName.Undefine, "dependencies is not loaded.");
             foreach (var dep in dependencyLibs)
             {
                 AddGlobalEnvsToList(dep, list);

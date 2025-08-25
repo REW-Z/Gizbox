@@ -119,6 +119,8 @@ namespace Gizbox
             public string initValue;
             [DataMember]
             public SymbolTable envPtr;
+
+            public object runtimeAdditionalInfo;
         }
 
         //符号表名称  
@@ -380,7 +382,7 @@ namespace Gizbox
             foreach (var key in records.Keys)
             {
                 var rec = records[key];
-                GixConsole.LogLine($"|{rec.name.PadRight(pad)}|{rec.rawname.PadRight(pad)}|{rec.category.ToString().PadRight(pad)}|{rec.typeExpression.PadRight(pad)}|{rec.addr.ToString().PadRight(pad)}|{(rec.envPtr != null ? "hasSubTable" : "").PadRight(pad)}|");
+                GixConsole.LogLine($"|{rec.name.PadRight(pad)}|{rec.rawname.PadRight(pad)}|{rec.category.ToString().PadRight(pad)}|{rec.typeExpression.PadRight(pad)}|{rec.addr.ToString().PadRight(pad)}|{(rec.envPtr != null ? rec.envPtr.name : "").PadRight(pad)}|");
             }
             GixConsole.LogLine($"|{new string('-', pad * 6 + 4)}|");
             GixConsole.LogLine();
@@ -395,9 +397,9 @@ namespace Gizbox
         }
     }
 
-    public class TypeExpr
+    public class GType
     {
-        public static Dictionary<string, TypeExpr> typeExpressionCache = new();
+        public static Dictionary<string, GType> typeExpressionCache = new();
         public enum Kind
         {
             Other,
@@ -415,16 +417,16 @@ namespace Gizbox
         }
 
 
-        public static TypeExpr Parse(string typeExpression)
+        public static GType Parse(string typeExpression)
         {
             typeExpression = typeExpression.Trim();
 
             if(typeExpressionCache.TryGetValue(typeExpression, out var cached))
                 return cached;
 
-            TypeExpr type = new TypeExpr();
+            GType type = new GType();
 
-            if(typeExpression.Contains("->"))
+            if(typeExpression.Contains("=>"))
             {
                 type._Kind = Kind.Function;
 
@@ -432,9 +434,9 @@ namespace Gizbox
                 string returnPart = null;
                 for(int i = 0; i < typeExpression.Length - 1; ++i)
                 {
-                    if(typeExpression[i] == '-' && typeExpression[i + 1] == '>')
+                    if(typeExpression[i] == '=' && typeExpression[i + 1] == '>')
                     {
-                        type._Function_ParamTypes = new List<TypeExpr>();
+                        type._Function_ParamTypes = new List<GType>();
                         paramPart = typeExpression.Substring(0, i).Trim();
                         returnPart = typeExpression.Substring(i + 2).Trim();
                         break;
@@ -497,11 +499,11 @@ namespace Gizbox
 
         private string _RawTypeExpression;
         private Kind _Kind;
-        private TypeExpr _Array_ElementType;
-        private TypeExpr _Function_ReturnType;
-        private List<TypeExpr> _Function_ParamTypes;
+        private GType _Array_ElementType;
+        private GType _Function_ReturnType;
+        private List<GType> _Function_ParamTypes;
 
-        private TypeExpr() { }
+        private GType() { }
 
         public override string ToString()
         {
@@ -511,6 +513,28 @@ namespace Gizbox
         public Kind Category => _Kind;
 
         public int Size
+        {
+            get
+            {
+                return _Kind switch
+                {
+                    Kind.Void => 0,
+                    Kind.Int => 4,
+                    Kind.Long => 8,
+                    Kind.Float => 4,
+                    Kind.Double => 8,
+                    Kind.Bool => 1,
+                    Kind.Char => 2,
+                    Kind.String => 8,
+                    Kind.Object => 8,
+                    Kind.Array => 8,
+                    Kind.Function => 8,
+                    _ => throw new GizboxException(ExceptioName.Undefine, $"unknown type expression category: {_Kind}"),
+                };
+            }
+        }
+
+        public int Align
         {
             get
             {
@@ -589,7 +613,7 @@ namespace Gizbox
             }
         }
 
-        public TypeExpr BoxType
+        public GType BoxType
         {
             get
             {
@@ -637,9 +661,17 @@ namespace Gizbox
             }
         }
 
-        public TypeExpr FunctionReturnType => _Function_ReturnType;
+        public GType FunctionReturnType
+        {
+            get
+            {
+                if(this.Category != Kind.Function) 
+                    throw new GizboxException(ExceptioName.Undefine, $"cannot get return type of non-function type: {_Kind}");
+                return _Function_ReturnType;
+            }
+        }
 
-        public List<TypeExpr> FunctionParamTypes => _Function_ParamTypes;
+        public List<GType> FunctionParamTypes => _Function_ParamTypes;
 
         public bool IsSSEType
         {
@@ -649,7 +681,7 @@ namespace Gizbox
             }
         }
 
-        public TypeExpr ArrayElementType
+        public GType ArrayElementType
         {
             get
             {
