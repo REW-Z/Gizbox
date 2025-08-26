@@ -808,11 +808,15 @@ namespace Gizbox.IR
 
             //global作用域中的临时变量复制到Main作用域  
             List<SymbolTable.Record> tempVars = new();
-            foreach(var rec in globalEnv.GetByCategory(SymbolTable.RecordCatagory.Variable))
+            var globalVarRecs = globalEnv.GetByCategory(SymbolTable.RecordCatagory.Variable);
+            if(globalVarRecs != null)
             {
-                if(rec.name.StartsWith("tmp@"))
+                foreach(var rec in globalVarRecs)
                 {
-                    tempVars.Add(rec);
+                    if(rec.name.StartsWith("tmp@"))
+                    {
+                        tempVars.Add(rec);
+                    }
                 }
             }
             foreach(var rec in tempVars)

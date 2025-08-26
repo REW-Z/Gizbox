@@ -1372,11 +1372,20 @@ namespace Gizbox.SemanticRule
                             if (isTopLevelAtNamespace)
                                 varDeclNode.identifierNode.SetPrefix(currentNamespace);
 
+                            //是否初始值是常量
+                            string initVal = null;
+                            if(varDeclNode.initializerNode is LiteralNode lit)
+                            {
+                                initVal = lit.token.attribute;
+                            }
+
                             //新建符号表条目  
                             var newRec = envStack.Peek().NewRecord(
                                 varDeclNode.identifierNode.FullName,
                                 SymbolTable.RecordCatagory.Variable,
-                                varDeclNode.typeNode.TypeExpression()
+                                varDeclNode.typeNode.TypeExpression(),
+
+                                initValue:initVal
                                 );
                         }
                     }

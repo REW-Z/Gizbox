@@ -145,7 +145,7 @@ namespace Gizbox.Src.Backend
 
             if(instr.type == InstructionType.placeholder)
             {
-                strb.Append($"\t\t <{instr.mark}>");
+                strb.Append($"\t <{instr.mark}>".PadRight(50));
                 if(string.IsNullOrEmpty(instr.comment) == false)
                 {
                     strb.Append($" ; {instr.comment}");
@@ -155,24 +155,28 @@ namespace Gizbox.Src.Backend
             }
             else if(instr.type != InstructionType.emptyline)
             {
-                strb.Append("\t\t");
-                strb.Append(instr.type.ToString());
-                strb.Append("  ");
+                StringBuilder strbTemp = new();
+
+                strbTemp.Append("\t");
+                strbTemp.Append(instr.type.ToString());
+                strbTemp.Append("  ");
 
                 if(instr.operand0 != null)
                 {
-                    strb.Append(SerializeOprand(instr.operand0));
+                    strbTemp.Append(SerializeOprand(instr.operand0));
                 }
                 if(instr.operand1 != null)
                 {
-                    strb.Append(",  ");
-                    strb.Append(SerializeOprand(instr.operand1));
+                    strbTemp.Append(",  ");
+                    strbTemp.Append(SerializeOprand(instr.operand1));
                 }
 
                 if(string.IsNullOrEmpty(instr.mark) == false)
                 {
-                    strb.Append($" <{instr.mark}> ");
+                    strbTemp.Append($" <{instr.mark}> ");
                 }
+
+                strb.Append(strbTemp.ToString().PadRight(50));
                 if(string.IsNullOrEmpty(instr.comment) == false)
                 {
                     strb.Append($" ; {instr.comment}");
@@ -190,7 +194,7 @@ namespace Gizbox.Src.Backend
                 case X64Reg reg:
                     return reg.isVirtual ? ("vreg%" + reg.vRegVar.name) : reg.physReg.ToString();
                 case X64Rel rel:
-                    return rel.symbolName + (rel.displacement != 0 ? ("+" + rel.displacement.ToString()) : "");
+                    return "[rel " + rel.symbolName + (rel.displacement != 0 ? ("+" + rel.displacement.ToString()) : "") + "]";
                 case X64Immediate im:
                     return (im).value.ToString();
                 case X64Label lb:
@@ -198,8 +202,8 @@ namespace Gizbox.Src.Backend
                 case X64Mem mem:
                     return "[" +
                         (mem.baseReg != null ? SerializeOprand(mem.baseReg) : "") +
-                        (mem.indexReg != null ? (" + " + SerializeOprand(mem.indexReg) + (mem.scale != 1 ? (" * " + mem.scale.ToString()) : "")) : "") +
-                        (mem.displacement != 0 ? (" + " + mem.displacement.ToString()) : "")
+                        (mem.indexReg != null ? ("+" + SerializeOprand(mem.indexReg) + (mem.scale != 1 ? ("*" + mem.scale.ToString()) : "")) : "") +
+                        (mem.displacement != 0 ? ("+" + mem.displacement.ToString()) : "")
                         + "]";
                 default:
                     return operand.Kind.ToString();

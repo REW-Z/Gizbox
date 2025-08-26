@@ -44,6 +44,10 @@ class Creature
     {
         Console::Log(this.name + " move...");
     }
+
+    void Foo(string aaa)
+    {
+    }
 }
 namespace Human::Job
 {
@@ -88,4 +92,298 @@ for(int i = 0; i < 99; i++)
 }
 
 
-Console::Log("Test Finish...");
+var inferNum1 = 111;
+var inferNum2 = inferNum1;
+
+Console::Log("sum:" + (string)(inferNum1 + inferNum2));
+
+Console::Log("Test1 Finish...");
+
+int[] indexList = new int[10];
+int[] valueList = new int[10];
+indexList[0] = 1;
+valueList[1] = 333;
+int a = valueList[indexList[0]];
+
+class AAA
+{
+    BBB bbb = null;
+}
+class BBB
+{
+    CCC ccc = null;
+}
+class CCC
+{
+    int x = 0;
+    void Do()
+    {
+        Console::Log("CCC.DO");
+    }
+}
+
+AAA aaa = new AAA();
+aaa.bbb = new BBB();
+aaa.bbb.ccc = new CCC();
+aaa.bbb.ccc.x = a;
+aaa.bbb.ccc.Do();
+
+Console::Log("aaa.bbb.ccc.x:" + (string)(aaa.bbb.ccc.x));
+Console::Log("Test2 Finish...");
+
+void TestGlobal()
+{
+    Console::Log((string)a);
+}
+
+
+// --------------------------------------------------
+// 0   |status 2  |entry:Creature::Born@_string:
+// 1   |status 2  |func_begin:Creature::Born@_string:FUNC_BEGIN Creature::Born@_string
+// 2   |status 2  |If_0:
+// 3   |status 2  |IfCondition_0_0:
+// 4   |status 2  |                    == tmp@1 type %CONSTSTRING:0
+// 5   |status 2  |                    IF_FALSE_JUMP tmp@1 %LABEL:ElseStmt_0
+// 6   |status 2  |IfStmt_0_0:
+// 7   |status 23 |                    PARAM %CONSTSTRING:1
+// 8   |status 23 |                    CALL Console::Log@_string %LITINT:1
+// 9   |status 23 |                    = tmp@2 %RET
+// 10  |status 23 |                    ALLOC tmp@3 Human
+// 11  |status 23 |                    PARAM tmp@3
+// 12  |status 23 |                    CALL Human.ctor %LITINT:1
+// 13  |status 23 |                    = inst tmp@3
+// 14  |status 23 |                    = tmp@4 Creature::totalCount
+// 15  |status 23 |                    ++ Creature::totalCount
+// 16  |status 23 |                    CAST tmp@5 Creature inst
+// 17  |status 23 |                    RETURN tmp@5
+// 18  |status 2  |                    JUMP %LABEL:EndIf_0
+// 19  |status 2  |ElseStmt_0:
+// 20  |status 21 |                    RETURN %LITNULL:
+// 21  |status 2  |EndIf_0:
+// 22  |status 2  |                    RETURN
+// 23  |status 2  |func_end:Creature::Born@_string:FUNC_END Creature::Born@_string
+// 24  |status 2  |exit:Creature::Born@_string:
+// 25  |status 4  |entry:Creature::Die@_Creature:
+// 26  |status 4  |func_begin:Creature::Die@_Creature:FUNC_BEGIN Creature::Die@_Creature
+// 27  |status 4  |If_1:
+// 28  |status 4  |IfCondition_1_0:
+// 29  |status 4  |                    != tmp@6 c %LITNULL:
+// 30  |status 4  |                    IF_FALSE_JUMP tmp@6 %LABEL:EndIf_1
+// 31  |status 4  |IfStmt_1_0:
+// 32  |status 20 |                    = tmp@8 c->name
+// 33  |status 20 |                    + tmp@9 %CONSTSTRING:2 tmp@8
+// 34  |status 20 |                    PARAM tmp@9
+// 35  |status 20 |                    CALL Console::Log@_string %LITINT:1
+// 36  |status 20 |                    = tmp@7 %RET
+// 37  |status 20 |                    DEL c
+// 38  |status 20 |                    = tmp@10 Creature::totalCount
+// 39  |status 20 |                    -- Creature::totalCount
+// 40  |status 4  |                    JUMP %LABEL:EndIf_1
+// 41  |status 4  |EndIf_1:
+// 42  |status 4  |                    RETURN
+// 43  |status 4  |func_end:Creature::Die@_Creature:FUNC_END Creature::Die@_Creature
+// 44  |status 4  |exit:Creature::Die@_Creature:
+// 45  |status 6  |class_begin:Creature:
+// 46  |status 19 |entry:Creature.ctor:
+// 47  |status 19 |func_begin:Creature.ctor:FUNC_BEGIN Creature.ctor
+// 48  |status 19 |                    = this->name %CONSTSTRING:3
+// 49  |status 19 |                    = this->age %LITINT:0
+// 50  |status 19 |                    RETURN
+// 51  |status 19 |func_end:Creature.ctor:FUNC_END
+// 52  |status 19 |exit:Creature.ctor:
+// 53  |status 18 |entry:Creature.Move@:
+// 54  |status 18 |func_begin:Creature.Move@:FUNC_BEGIN Creature.Move@
+// 55  |status 18 |                    = tmp@12 this->name
+// 56  |status 18 |                    + tmp@13 tmp@12 %CONSTSTRING:4
+// 57  |status 18 |                    PARAM tmp@13
+// 58  |status 18 |                    CALL Console::Log@_string %LITINT:1
+// 59  |status 18 |                    = tmp@11 %RET
+// 60  |status 18 |                    RETURN
+// 61  |status 18 |func_end:Creature.Move@:FUNC_END Creature.Move@
+// 62  |status 18 |exit:Creature.Move@:
+// 63  |status 17 |entry:Creature.Foo@_string:
+// 64  |status 17 |func_begin:Creature.Foo@_string:FUNC_BEGIN Creature.Foo@_string
+// 65  |status 17 |                    RETURN
+// 66  |status 17 |func_end:Creature.Foo@_string:FUNC_END Creature.Foo@_string
+// 67  |status 17 |exit:Creature.Foo@_string:
+// 68  |status 6  |class_end:Creature:
+// 69  |status 8  |class_begin:Human:
+// 70  |status 16 |entry:Human.ctor:
+// 71  |status 16 |func_begin:Human.ctor:FUNC_BEGIN Human.ctor
+// 72  |status 16 |                    PARAM this
+// 73  |status 16 |                    CALL Creature.ctor %LITINT:1
+// 74  |status 16 |                    = this->job %LITINT:0
+// 75  |status 16 |                    RETURN
+// 76  |status 16 |func_end:Human.ctor:FUNC_END
+// 77  |status 16 |exit:Human.ctor:
+// 78  |status 22 |entry:Human.Move@:
+// 79  |status 22 |func_begin:Human.Move@:FUNC_BEGIN Human.Move@
+// 80  |status 22 |                    = tmp@15 this->name
+// 81  |status 22 |                    + tmp@16 tmp@15 %CONSTSTRING:5
+// 82  |status 22 |                    PARAM tmp@16
+// 83  |status 22 |                    CALL Console::Log@_string %LITINT:1
+// 84  |status 22 |                    = tmp@14 %RET
+// 85  |status 22 |                    RETURN
+// 86  |status 22 |func_end:Human.Move@:FUNC_END Human.Move@
+// 87  |status 22 |exit:Human.Move@:
+// 88  |status 8  |class_end:Human:
+// 89  |status 10 |class_begin:AAA:
+// 90  |status 15 |entry:AAA.ctor:
+// 91  |status 15 |func_begin:AAA.ctor:FUNC_BEGIN AAA.ctor
+// 92  |status 15 |                    = this->bbb %LITNULL:
+// 93  |status 15 |                    RETURN
+// 94  |status 15 |func_end:AAA.ctor:  FUNC_END
+// 95  |status 15 |exit:AAA.ctor:
+// 96  |status 10 |class_end:AAA:
+// 97  |status 7  |class_begin:BBB:
+// 98  |status 14 |entry:BBB.ctor:
+// 99  |status 14 |func_begin:BBB.ctor:FUNC_BEGIN BBB.ctor
+// 100 |status 14 |                    = this->ccc %LITNULL:
+// 101 |status 14 |                    RETURN
+// 102 |status 14 |func_end:BBB.ctor:  FUNC_END
+// 103 |status 14 |exit:BBB.ctor:
+// 104 |status 7  |class_end:BBB:
+// 105 |status 5  |class_begin:CCC:
+// 106 |status 13 |entry:CCC.ctor:
+// 107 |status 13 |func_begin:CCC.ctor:FUNC_BEGIN CCC.ctor
+// 108 |status 13 |                    = this->x %LITINT:0
+// 109 |status 13 |                    RETURN
+// 110 |status 13 |func_end:CCC.ctor:  FUNC_END
+// 111 |status 13 |exit:CCC.ctor:
+// 112 |status 12 |entry:CCC.Do@:
+// 113 |status 12 |func_begin:CCC.Do@: FUNC_BEGIN CCC.Do@
+// 114 |status 12 |                    PARAM %CONSTSTRING:12
+// 115 |status 12 |                    CALL Console::Log@_string %LITINT:1
+// 116 |status 12 |                    = tmp@44 %RET
+// 117 |status 12 |                    RETURN
+// 118 |status 12 |func_end:CCC.Do@:   FUNC_END CCC.Do@
+// 119 |status 12 |exit:CCC.Do@:
+// 120 |status 5  |class_end:CCC:
+// 121 |status 3  |entry:TestGlobal@:
+// 122 |status 3  |func_begin:TestGlobal@:FUNC_BEGIN TestGlobal@
+// 123 |status 3  |                    PARAM a
+// 124 |status 3  |                    CALL Core::Extern::IntToString@_int %LITINT:1
+// 125 |status 3  |                    = tmp@62 %RET
+// 126 |status 3  |                    PARAM tmp@62
+// 127 |status 3  |                    CALL Console::Log@_string %LITINT:1
+// 128 |status 3  |                    = tmp@61 %RET
+// 129 |status 3  |                    RETURN
+// 130 |status 3  |func_end:TestGlobal@:FUNC_END TestGlobal@
+// 131 |status 3  |exit:TestGlobal@:
+// 132 |status 9  |entry:Main:
+// 133 |status 9  |func_begin:Main:    FUNC_BEGIN Main
+// 134 |status 9  |                    CALL Core::GC::Disable@ %LITINT:0
+// 135 |status 9  |                    = tmp@0 %RET
+// 136 |status 9  |                    = Creature::totalCount %LITINT:0
+// 137 |status 9  |                    PARAM %CONSTSTRING:6
+// 138 |status 9  |                    CALL Creature::Born@_string %LITINT:1
+// 139 |status 9  |                    = tmp@17 %RET
+// 140 |status 9  |                    CAST tmp@18 Human tmp@17
+// 141 |status 9  |                    = sam tmp@18
+// 142 |status 9  |                    = sam->name %CONSTSTRING:7
+// 143 |status 9  |                    = sam->age %LITINT:20
+// 144 |status 9  |                    = sam->job %LITINT:2
+// 145 |status 9  |                    PARAM sam
+// 146 |status 9  |                    MCALL Move@ %LITINT:1
+// 147 |status 9  |                    = tmp@19 %RET
+// 148 |status 11 |                    = i %LITINT:0
+// 149 |status 11 |For_0:
+// 150 |status 11 |                    < tmp@20 i %LITINT:99
+// 151 |status 11 |                    IF_FALSE_JUMP tmp@20 %LABEL:EndFor_0
+// 152 |status 24 |                    += sam->age %LITINT:1
+// 153 |status 24 |If_2:
+// 154 |status 24 |IfCondition_2_0:
+// 155 |status 24 |                    = tmp@21 sam->age
+// 156 |status 24 |                    % tmp@22 tmp@21 %LITINT:10
+// 157 |status 24 |                    == tmp@23 tmp@22 %LITINT:0
+// 158 |status 24 |                    IF_FALSE_JUMP tmp@23 %LABEL:EndIf_2
+// 159 |status 24 |IfStmt_2_0:
+// 160 |status 25 |                    = tmp@25 sam->name
+// 161 |status 25 |                    + tmp@26 tmp@25 %CONSTSTRING:8
+// 162 |status 25 |                    = tmp@28 sam->age
+// 163 |status 25 |                    PARAM tmp@28
+// 164 |status 25 |                    CALL Core::Extern::IntToString@_int %LITINT:1
+// 165 |status 25 |                    = tmp@27 %RET
+// 166 |status 25 |                    + tmp@29 tmp@26 tmp@27
+// 167 |status 25 |                    + tmp@30 tmp@29 %CONSTSTRING:9
+// 168 |status 25 |                    PARAM tmp@30
+// 169 |status 25 |                    CALL Console::Log@_string %LITINT:1
+// 170 |status 25 |                    = tmp@24 %RET
+// 171 |status 24 |                    JUMP %LABEL:EndIf_2
+// 172 |status 24 |EndIf_2:
+// 173 |status 24 |If_3:
+// 174 |status 24 |IfCondition_3_0:
+// 175 |status 24 |                    = tmp@31 sam->age
+// 176 |status 24 |                    > tmp@32 tmp@31 %LITINT:90
+// 177 |status 24 |                    IF_FALSE_JUMP tmp@32 %LABEL:EndIf_3
+// 178 |status 24 |IfStmt_3_0:
+// 179 |status 26 |                    PARAM sam
+// 180 |status 26 |                    CALL Creature::Die@_Creature %LITINT:1
+// 181 |status 26 |                    = tmp@33 %RET
+// 182 |status 26 |                    JUMP %LABEL:EndFor_0
+// 183 |status 24 |                    JUMP %LABEL:EndIf_3
+// 184 |status 24 |EndIf_3:
+// 185 |status 11 |                    = tmp@34 i
+// 186 |status 11 |                    ++ i
+// 187 |status 11 |                    JUMP %LABEL:For_0
+// 188 |status 11 |EndFor_0:
+// 189 |status 9  |                    = inferNum1 %LITINT:111
+// 190 |status 9  |                    = inferNum2 inferNum1
+// 191 |status 9  |                    + tmp@37 inferNum1 inferNum2
+// 192 |status 9  |                    PARAM tmp@37
+// 193 |status 9  |                    CALL Core::Extern::IntToString@_int %LITINT:1
+// 194 |status 9  |                    = tmp@36 %RET
+// 195 |status 9  |                    + tmp@38 %CONSTSTRING:10 tmp@36
+// 196 |status 9  |                    PARAM tmp@38
+// 197 |status 9  |                    CALL Console::Log@_string %LITINT:1
+// 198 |status 9  |                    = tmp@35 %RET
+// 199 |status 9  |                    PARAM %CONSTSTRING:11
+// 200 |status 9  |                    CALL Console::Log@_string %LITINT:1
+// 201 |status 9  |                    = tmp@39 %RET
+// 202 |status 9  |                    ALLOC_ARRAY tmp@40 %LITINT:10
+// 203 |status 9  |                    = indexList tmp@40
+// 204 |status 9  |                    ALLOC_ARRAY tmp@41 %LITINT:10
+// 205 |status 9  |                    = valueList tmp@41
+// 206 |status 9  |                    = indexList[%LITINT:0] %LITINT:1
+// 207 |status 9  |                    = valueList[%LITINT:1] %LITINT:333
+// 208 |status 9  |                    = tmp@42 indexList[%LITINT:0]
+// 209 |status 9  |                    = tmp@43 valueList[tmp@42]
+// 210 |status 9  |                    = a tmp@43
+// 211 |status 9  |                    ALLOC tmp@45 AAA
+// 212 |status 9  |                    PARAM tmp@45
+// 213 |status 9  |                    CALL AAA.ctor %LITINT:1
+// 214 |status 9  |                    = aaa tmp@45
+// 215 |status 9  |                    ALLOC tmp@46 BBB
+// 216 |status 9  |                    PARAM tmp@46
+// 217 |status 9  |                    CALL BBB.ctor %LITINT:1
+// 218 |status 9  |                    = aaa->bbb tmp@46
+// 219 |status 9  |                    = tmp@47 aaa->bbb
+// 220 |status 9  |                    ALLOC tmp@48 CCC
+// 221 |status 9  |                    PARAM tmp@48
+// 222 |status 9  |                    CALL CCC.ctor %LITINT:1
+// 223 |status 9  |                    = tmp@47->ccc tmp@48
+// 224 |status 9  |                    = tmp@49 aaa->bbb
+// 225 |status 9  |                    = tmp@50 tmp@49->ccc
+// 226 |status 9  |                    = tmp@50->x a
+// 227 |status 9  |                    = tmp@52 aaa->bbb
+// 228 |status 9  |                    = tmp@53 tmp@52->ccc
+// 229 |status 9  |                    PARAM tmp@53
+// 230 |status 9  |                    MCALL Do@ %LITINT:1
+// 231 |status 9  |                    = tmp@51 %RET
+// 232 |status 9  |                    = tmp@56 aaa->bbb
+// 233 |status 9  |                    = tmp@57 tmp@56->ccc
+// 234 |status 9  |                    = tmp@58 tmp@57->x
+// 235 |status 9  |                    PARAM tmp@58
+// 236 |status 9  |                    CALL Core::Extern::IntToString@_int %LITINT:1
+// 237 |status 9  |                    = tmp@55 %RET
+// 238 |status 9  |                    + tmp@59 %CONSTSTRING:13 tmp@55
+// 239 |status 9  |                    PARAM tmp@59
+// 240 |status 9  |                    CALL Console::Log@_string %LITINT:1
+// 241 |status 9  |                    = tmp@54 %RET
+// 242 |status 9  |                    PARAM %CONSTSTRING:14
+// 243 |status 9  |                    CALL Console::Log@_string %LITINT:1
+// 244 |status 9  |                    = tmp@60 %RET
+// 245 |status 9  |
+// 246 |status 9  |func_end:Main:      FUNC_END Main
+// 247 |status 9  |exit:Main:
+// --------------------------------------------------

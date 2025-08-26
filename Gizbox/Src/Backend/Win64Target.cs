@@ -12,6 +12,8 @@ using Gizbox.IR;
 //      (RAX, RCX, RDX, R8, R9, R10, R11、 XMM0-XMM5 是调用者保存的寄存器)
 //      (RBX、RBP、RDI、RSI、RSP、R12、R13、R14、R15 和 XMM6 - XMM15 由使用它们的函数保存和还原，视为非易失性。)
 
+//   内存-内存形式  :  dst/src 同为内存时，必须插入中转寄存器（整数用 R11，SSE 用 XMM0）两步搬运。
+
 namespace Gizbox.Src.Backend
 {
     public enum BuildMode
@@ -148,7 +150,10 @@ namespace Gizbox.Src.Backend
                         else if(rec.category == SymbolTable.RecordCatagory.Function)
                         {
                             //外部函数  
-                            externFuncs.Add(rec.name, rec);
+                            if(rec.name != "Main")
+                            {
+                                externFuncs.Add(rec.name, rec);
+                            }
                         }
 
                     }
@@ -253,11 +258,11 @@ namespace Gizbox.Src.Backend
 
                     Console.ForegroundColor = ConsoleColor.DarkGreen;
                     if(tacInf.oprand0 != null) 
-                        Win64Target.Log("    op0：typeExpr:" + (tacInf.oprand0.typeExpr.ToString() ?? "?") + "  type:  " + tacInf.oprand0.expr.type.ToString());
+                        Win64Target.Log("    op0：typeExpr:" + (tacInf.oprand0.typeExpr?.ToString() ?? "?") + "  type:  " + tacInf.oprand0.expr?.type.ToString() ?? "");
                     if(tacInf.oprand1 != null)
-                        Win64Target.Log("    op1：typeExpr:" + (tacInf.oprand1.typeExpr.ToString() ?? "?") + "  type:  " + tacInf.oprand1.expr.type.ToString());
+                        Win64Target.Log("    op1：typeExpr:" + (tacInf.oprand1.typeExpr?.ToString() ?? "?") + "  type:  " + tacInf.oprand1.expr?.type.ToString() ?? "");
                     if(tacInf.oprand2 != null)
-                        Win64Target.Log("    op2：typeExpr:" + (tacInf.oprand2.typeExpr.ToString() ?? "?") + "  type:  " + tacInf.oprand2.expr.type.ToString());
+                        Win64Target.Log("    op2：typeExpr:" + (tacInf.oprand2.typeExpr?.ToString() ?? "?") + "  type:  " + tacInf.oprand2.expr?.type.ToString() ?? "");
 
                     Console.ForegroundColor = ConsoleColor.White;
                 }
@@ -673,11 +678,32 @@ namespace Gizbox.Src.Backend
                                 // 参数赋值(IR中PARAM指令已经是倒序)  
                                 foreach(var paraminfo in tempParamList)
                                 {
+                                    var srcOp = ParseOperand(paraminfo.oprand0);
                                     //寄存器传参  
                                     if(paraminfo.PARAM_paramidx < 4)
-                                        UtilsW64.GetParamReg(paraminfo.PARAM_paramidx, paraminfo.oprand0.IsSSEType());
+                                    {
+                                        var isSse = paraminfo.oprand0.IsSSEType();
+                                        var ssereg = UtilsW64.GetParamReg(paraminfo.PARAM_paramidx, true);
+                                        var intreg = UtilsW64.GetParamReg(paraminfo.PARAM_paramidx, false);
+                                        //浮点参数  
+                                        if(isSse)
+                                        {
+                                            if(paraminfo.oprand0.typeExpr.Size == 4)
+                                                instructions.AddLast(X64.movss(ssereg, srcOp));
+                                            else
+                                                instructions.AddLast(X64.movsd(ssereg, srcOp));
 
-                                    //栈帧传参[rsp + 8]开始
+                                            //浮点参数也需要在整数寄存器rcx,rdx,r8,r9中，以支持可变参数  
+                                            instructions.AddLast(X64.mov(intreg, srcOp));
+                                        }
+                                        //整型参数  
+                                        else
+                                        {
+                                            instructions.AddLast(X64.mov(intreg, srcOp));
+                                        }
+                                    }
+
+                                    //栈帧传参[rsp + 8]开始    （影子空间也需要赋值）
                                     int offset = (8 * (paraminfo.PARAM_paramidx + 1));
                                     instructions.AddLast(X64.mov(X64.mem(X64.rsp, displacement: offset), ParseOperand(paraminfo.oprand0)));
                                 }
@@ -753,11 +779,32 @@ namespace Gizbox.Src.Backend
                                 // 参数赋值(IR中PARAM指令已经是倒序)  
                                 foreach(var paraminfo in tempParamList)
                                 {
+                                    var srcOp = ParseOperand(paraminfo.oprand0);
                                     //寄存器传参  
                                     if(paraminfo.PARAM_paramidx < 4)
-                                        UtilsW64.GetParamReg(paraminfo.PARAM_paramidx, paraminfo.oprand0.IsSSEType());
+                                    {
+                                        var isSse = paraminfo.oprand0.IsSSEType();
+                                        var ssereg = UtilsW64.GetParamReg(paraminfo.PARAM_paramidx, true);
+                                        var intreg = UtilsW64.GetParamReg(paraminfo.PARAM_paramidx, false);
+                                        //浮点参数  
+                                        if(isSse)
+                                        {
+                                            if(paraminfo.oprand0.typeExpr.Size == 4)
+                                                instructions.AddLast(X64.movss(ssereg, srcOp));
+                                            else
+                                                instructions.AddLast(X64.movsd(ssereg, srcOp));
 
-                                    //栈帧传参[rsp + 8]开始
+                                            //浮点参数也需要在整数寄存器rcx,rdx,r8,r9中，以支持可变参数  
+                                            instructions.AddLast(X64.mov(intreg, srcOp));
+                                        }
+                                        //整型参数  
+                                        else
+                                        {
+                                            instructions.AddLast(X64.mov(intreg, srcOp));
+                                        }
+                                    }
+
+                                    //栈帧传参[rsp + 8]开始    （影子空间也需要赋值）
                                     int offset = (8 * (paraminfo.PARAM_paramidx + 1));
                                     instructions.AddLast(X64.mov(X64.mem(X64.rsp, displacement: offset), ParseOperand(paraminfo.oprand0)));
                                 }
@@ -766,7 +813,7 @@ namespace Gizbox.Src.Backend
 
 
                             //调用
-                            X64.call(X64.rax);
+                            instructions.AddLast(X64.call(X64.rax));
 
 
                             //调用后处理
@@ -1239,6 +1286,22 @@ namespace Gizbox.Src.Backend
             if(debugLogAsmInfos)
             {
                 StringBuilder strb = new StringBuilder();
+
+                //.data
+                strb.AppendLine("\n");
+                strb.AppendLine("section .data");
+                foreach(var rodata in roDataSeg)
+                {
+                    strb.AppendLine($"\t{rodata.Key}  {rodata.Value}");
+                }
+                foreach(var rodata in dataSeg)
+                {
+                    strb.AppendLine($"\t{rodata.Key}  {rodata.Value}");
+                }
+
+                //.text  
+                strb.AppendLine();
+                strb.AppendLine("section .text");
                 strb.AppendLine();
                 foreach(var instruction in instructions)
                 {
@@ -1346,7 +1409,7 @@ namespace Gizbox.Src.Backend
 
         private object GetStaticInitValue(SymbolTable.Record rec)
         {
-            if(rec.category == SymbolTable.RecordCatagory.Function)
+            if(rec.category == SymbolTable.RecordCatagory.Variable)
             {
                 var type = GType.Parse(rec.typeExpression);
                 if(string.IsNullOrEmpty(rec.initValue))
@@ -1593,8 +1656,8 @@ namespace Gizbox.Src.Backend
                     {
                         switch(iroperand.segments[0])
                         {
-                            case "LITFLOAT":
-                            case "LITDOUBLE":
+                            case "%LITFLOAT":
+                            case "%LITDOUBLE":
                                 {
                                     var key = GetConstSymbol(iroperand.segments[0], iroperand.segments[1]);
                                     iroperand.roDataKey = key;
@@ -1604,7 +1667,7 @@ namespace Gizbox.Src.Backend
                                     }
                                 }
                                 break;
-                            case "CONSTSTRING":
+                            case "%CONSTSTRING":
                                 {
                                     var key = GetConstSymbol(iroperand.segments[0], iroperand.segments[1]);
                                     iroperand.roDataKey = key;
@@ -1703,9 +1766,23 @@ namespace Gizbox.Src.Backend
                         string varName = iroperandExpr.segments[0];
                         var varRec = irOperand.segmentRecs[0];
 
+                        if(varRec == null)
+                        {
+                            throw new GizboxException(ExceptioName.Undefine, $"null var rec in segment recs:{varName}");
+                        }
                         if(varRec.category == SymbolTable.RecordCatagory.Variable)
                         {
-                            return vreg(varRec);
+                            //全局变量
+                            if(varRec.GetAdditionInf().isGlobalVar)
+                            {
+                                return X64.rel(varRec.name);
+                            }
+                            //局部变量  
+                            else
+                            {
+                                return vreg(varRec);
+                            }
+                            
                         }
                         else if(varRec.category == SymbolTable.RecordCatagory.Param)
                         {
@@ -1839,7 +1916,7 @@ namespace Gizbox.Src.Backend
 
         private string GetConstSymbol(string littype, string litvalue)
         {
-            return $"{littype}_{litvalue.Replace('.', '_')}";
+            return $"{littype.Substring(1)}_{litvalue.Replace('.', '_')}";
         }
 
         private void AddTacInfo(TAC tac, int line)
@@ -2107,7 +2184,7 @@ namespace Gizbox.Src.Backend
                 }
                 else
                 {
-
+                    //Call指令中标识符作为函数名  
                     if(owner.tac.op == "MCALL" && operandIdx == 0)
                     {
                         var objClass = owner.MCALL_methodTargetObject.typeExpr;
@@ -2120,6 +2197,11 @@ namespace Gizbox.Src.Backend
                         rec = context.Query(segments[0], owner.line);
                         segmentRecs[0] = rec;
                         typeExpr = GType.Parse(rec.typeExpression);
+                    }
+                    //CAST指令中标识符作为类型名
+                    else if(owner.tac.op == "CAST" && this.operandIdx == 1)
+                    {
+                        typeExpr = GType.Parse("(type)");
                     }
                     else
                     {
@@ -2241,6 +2323,7 @@ namespace Gizbox.Src.Backend
                 tac.op == "RETURN";
             //过程调用一般不会中断基本块，因为过程内的控制流是隐藏的  
         }
+
         public static bool HasLabel(TAC tac)
         {
             return !string.IsNullOrEmpty(tac.label);

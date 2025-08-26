@@ -433,13 +433,6 @@ namespace Gizbox.IR
                 GixConsole.LogLine($"{i.ToString().PadRight(4)}|status {scopeStatusArr[i].ToString().PadRight(3)}|{codes[i].ToExpression()}");
             }
             GixConsole.LogLine(new string('-', 50));
-
-
-            GixConsole.LogLine("作用域：");
-            foreach (var scope in scopes)
-            {
-                GixConsole.LogLine("scope:" + scope.env.name + ":  " + scope.lineFrom + " ~ " + scope.lineTo);
-            }
         }
     }
 

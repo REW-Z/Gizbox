@@ -144,11 +144,6 @@ switch(cmdIdx)
             Compiler.Pause("Compile End");
 
             il.Print();
-            Console.WriteLine("stack----------------" + il.stackDic.Count);
-            foreach(var (k, v) in il.stackDic)
-            {
-                Console.WriteLine($"line {k} stackdepth:{v.Count}");
-            }
 
             Win64Target.CodeGen(il);
         }
