@@ -103,27 +103,12 @@ namespace Gizbox.Src.Backend
 
         public void StartCodeGen()
         {
-            Pass0();
             Pass1();
             Pass2();
             Pass3();
             Pass4();
         }
 
-        /// <summary> IR指令重排序 </summary>
-        private void Pass0()
-        {
-            /*
-            顶级语句（全局作用域）显式定义的变量视为全局静态变量，临时变量依然视为普通局部变量。  
-            顶级临时变量不会被其他函数引用
-            */
-            //代码整理：
-            //把所有函数定义挪到.text前面，这样顶级语句就处在最后。
-            //然后在顶级语句的指令前加上一个@main标签。
-
-
-
-        }
 
         /// <summary> 静态信息补充 </summary>
         private void Pass1()
@@ -143,14 +128,11 @@ namespace Gizbox.Src.Backend
                             continue;
 
                         //全局变量  
-                        if(rec.name.StartsWith("tmp@") == false)
-                        {
-                            rec.GetAdditionInf().isGlobalVar = true;
-                            string key = rec.name;
-                            object value = GetStaticInitValue(rec);
-                            dataSeg.Add(key, value);
-                            globalVarInfos.Add(rec.name, rec);
-                        }
+                        rec.GetAdditionInf().isGlobalVar = true;
+                        string key = rec.name;
+                        object value = GetStaticInitValue(rec);
+                        dataSeg.Add(key, value);
+                        globalVarInfos.Add(rec.name, rec);
                     }
                 }
                 //依赖单元  
@@ -1344,7 +1326,6 @@ namespace Gizbox.Src.Backend
         {
             var funcTable = funcRec.envPtr;
 
-            Console.WriteLine("func：" + funcTable.name);
 
             if(funcTable == null)
                 throw new GizboxException(ExceptioName.CodeGen, $"null func table of {(funcRec?.name ?? "?")}.");

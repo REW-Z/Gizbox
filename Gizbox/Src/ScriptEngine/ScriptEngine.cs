@@ -260,7 +260,15 @@ namespace Gizbox.ScriptEngine
 
             analysisWatch.Start();
 
-            while ((this.currUnit == -1 && this.curr >= mainUnit.codes.Count) == false)
+
+            //entry  
+            var entryAddr = mainUnit.QueryLabel("entry", "Main", currUnit);
+            var exitAddr = mainUnit.QueryLabel("exit", "Main", currUnit);
+            this.curr = entryAddr.Item2;
+            this.callStack[this.callStack.Top + 1].returnPtr = new Tuple<int, int>(-1, mainUnit.codes.Count - 1);//返回到最后  
+
+
+            while((this.currUnit == -1 && this.curr >= mainUnit.codes.Count) == false)
             {
                 if (this.currUnit == -1)
                 {

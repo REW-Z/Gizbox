@@ -416,4 +416,102 @@ namespace Gizbox
             }
         }
     }
+
+
+    public class GTree<T>
+    {
+        public class Node
+        {
+            public T value;
+            public List<Node> children = new();
+            public Node parent;
+            public int depth = 0;
+
+            public Node Add(T val)
+            {
+                Node c = new();
+                c.value = val;
+
+                Add(c);
+
+                return c;
+            }
+            public void Add(Node c)
+            {
+                c.parent = this;
+                this.children.Add(c);
+                c.depth = this.depth + 1;
+            }
+
+            public void Remove(Node n)
+            {
+                if(children.Contains(n) == false)
+                    return;
+
+                children.Remove(n);
+                n.parent = null;
+                n.depth = 0;
+            }
+
+            public IEnumerable<Node> TraverseNode()
+            {
+                yield return this;
+                foreach(var child in children)
+                {
+                    foreach(var v in child.TraverseNode())
+                    {
+                        yield return v;
+                    }
+                }
+            }
+            public IEnumerable<T> TraverseDepthFirst()
+            {
+                foreach(var child in children)
+                {
+                    foreach(var v in child.TraverseDepthFirst())
+                    {
+                        yield return v;
+                    }
+                }
+                yield return value;
+            }
+        }
+
+        public Node root = new();
+
+
+        public IEnumerable<T> TraverseDepthFirst()
+        {
+            if(root != null)
+                return root.TraverseDepthFirst();
+
+            throw new GizboxException(ExceptioName.Undefine, "root node null.");
+        }
+
+        public IEnumerable<Node> TraverseNode()
+        {
+            if(root != null)
+                return root.TraverseNode();
+
+            throw new GizboxException(ExceptioName.Undefine, "root node null.");
+        }
+
+        public void Print()
+        {
+            System.Text.StringBuilder strb = new System.Text.StringBuilder();
+
+            foreach(var node in TraverseNode())
+            {
+                string brace = "";
+                string lineChar = "┖   ";
+                for(int i = 0; i < node.depth; ++i)
+                {
+                    brace += "    ";
+                }
+                strb.AppendLine(brace + lineChar + node.value);
+            }
+
+            Gizbox.GixConsole.LogLine(strb.ToString());
+        }
+    }
 }

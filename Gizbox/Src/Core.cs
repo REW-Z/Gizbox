@@ -130,7 +130,6 @@ namespace Gizbox
         //符号表类型  
         [DataMember]
         public TableCatagory tableCatagory;
-
         //符号表关系    
         [DataMember]
         public int depth;
@@ -341,6 +340,9 @@ namespace Gizbox
         //添加已有的条目  
         public void AddRecord(string key, Record rec)
         {
+            if(key != rec.name)
+                throw new GizboxException(ExceptioName.Undefine, $"add record invalid key:{key}.");
+
             this.records[key] = rec;
             if(this.countDict.TryGetValue(rec.category, out var count))
             {
@@ -352,6 +354,20 @@ namespace Gizbox
                 rec.index = 0;
                 this.countDict[rec.category] = 1;
             }
+        }
+
+        public Record RemoveRecord(string key)
+        {
+            if(this.records.ContainsKey(key) == false)
+                throw new GizboxException(ExceptioName.Undefine, $"key not exist:{key}.");
+
+            var rec = records[key];
+            this.records.Remove(key);
+
+            this.countDict[rec.category] -= 1;
+
+            return rec;
+
         }
 
         //获取子表  
@@ -371,6 +387,31 @@ namespace Gizbox
         {
             return System.Guid.NewGuid().ToString();
         }
+
+        public void RefreshDepth()
+        {
+            if(parent == null)
+                depth = 0;
+
+            foreach(var child in children)
+            {
+                child.depth = this.depth + 1;
+                child.RefreshDepth();
+            }
+        }
+
+        public void RemoveFromParent()
+        {
+            this.parent.children.Remove(this);
+            this.parent = null;
+        }
+        public void AddChildren(SymbolTable env)
+        {
+            this.children.Add(env);
+            env.parent = this;
+            env.depth = this.depth + 1;
+        }
+
 
         public void Print()
         {

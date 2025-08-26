@@ -368,7 +368,7 @@ namespace Gizbox.ScriptEngine
         {
             //编号所有引用的库  &&  重定向指向常量数据的指针    
             this.allUnits.Add(this);
-            this.id = 0;
+            this.id = -1;
 
             //常量指针偏移  
             foreach (var code in this.codes)

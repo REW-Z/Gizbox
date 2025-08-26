@@ -213,8 +213,6 @@ namespace Gizbox
         {
             if (string.IsNullOrEmpty(this.parserDataPath) && parserDataHardcode == false) throw new Exception("语法分析器数据源没有设置");
 
-            ILUnit ilUnit = new IR.ILUnit();
-
             //词法分析  
             Scanner scanner = new Scanner();
             List<Token> tokens = scanner.Scan(source);
@@ -241,13 +239,13 @@ namespace Gizbox
 
 
             //语义分析  
-            SemanticRule.SemanticAnalyzer semanticAnalyzer = new SemanticRule.SemanticAnalyzer(syntaxTree, ilUnit, this);
+            ILUnit ir = new ILUnit();
+            SemanticRule.SemanticAnalyzer semanticAnalyzer = new SemanticRule.SemanticAnalyzer(syntaxTree, ir, this);
             semanticAnalyzer.Analysis();
 
-
             //中间代码生成    
-            ILGenerator ilGenerator = new IR.ILGenerator(syntaxTree, ilUnit);
-            ilGenerator.Generate();
+            ILGenerator ilGenerator = new IR.ILGenerator(syntaxTree, ir);
+            var ilUnit = ilGenerator.Generate();
 
 
             return ilUnit;

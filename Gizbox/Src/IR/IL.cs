@@ -70,6 +70,12 @@ namespace Gizbox.IR
         public int lineTo;
         [DataMember]
         public SymbolTable env;
+
+
+        public override string ToString()
+        {
+            return $"{(env?.name ?? "scope")}  ({lineFrom} ~ {lineTo})";
+        }
     }
 
     [Serializable]
@@ -129,7 +135,7 @@ namespace Gizbox.IR
         public ILUnit()
         {
             var globalSymbolTable = new SymbolTable("global", SymbolTable.TableCatagory.GlobalScope);
-            globalScope = new Scope() { env = globalSymbolTable };
+            this.globalScope = new Scope() { env = globalSymbolTable };
         }
 
 
@@ -225,7 +231,6 @@ namespace Gizbox.IR
         private void EnvHits(int currentLine, List<SymbolTable> envs)
         {
             envs.Clear();
-            envs.Add(globalScope.env);
             foreach (var scope in scopes)
             {
                 if (scope.lineFrom <= currentLine && currentLine <= scope.lineTo)
