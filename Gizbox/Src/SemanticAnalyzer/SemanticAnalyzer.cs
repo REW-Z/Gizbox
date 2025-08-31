@@ -1373,7 +1373,7 @@ namespace Gizbox.SemanticRule
                                 varDeclNode.identifierNode.SetPrefix(currentNamespace);
 
                             //是否初始值是常量
-                            string initVal = null;
+                            string initVal = string.Empty;
                             if(varDeclNode.initializerNode is LiteralNode lit)
                             {
                                 initVal = lit.token.attribute;
@@ -1384,7 +1384,6 @@ namespace Gizbox.SemanticRule
                                 varDeclNode.identifierNode.FullName,
                                 SymbolTable.RecordCatagory.Variable,
                                 varDeclNode.typeNode.TypeExpression(),
-
                                 initValue:initVal
                                 );
                         }
@@ -1547,15 +1546,19 @@ namespace Gizbox.SemanticRule
         private void Pass2_CollectOtherSymbols(SyntaxTree.Node node)
         {
             bool isTopLevelAtNamespace = false;
-            if (node.Parent != null && node.Parent.Parent != null)
+            if(node.Parent != null && node.Parent.Parent != null)
             {
-                if (node.Parent is SyntaxTree.StatementsNode && node.Parent.Parent is SyntaxTree.NamespaceNode)
+                if(node.Parent is SyntaxTree.StatementsNode && node.Parent.Parent is SyntaxTree.NamespaceNode)
                 {
                     isTopLevelAtNamespace = true;
                 }
             }
+            bool isGlobal = envStack.Peek().tableCatagory == SymbolTable.TableCatagory.GlobalScope;
+            bool isGlobalOrTopAtNamespace = isTopLevelAtNamespace || isGlobal;
 
-            switch (node)
+
+
+            switch(node)
             {
                 case SyntaxTree.ProgramNode programNode:
                     {
@@ -1602,7 +1605,7 @@ namespace Gizbox.SemanticRule
                         constDeclNode.identifierNode.attributes["def_at_env"] = envStack.Peek();
 
                         //（非全局）不支持成员常量  
-                        if (isTopLevelAtNamespace == false)
+                        if (isGlobalOrTopAtNamespace == false)
                         {
                             throw new SemanticException(ExceptioName.ConstantGlobalOrNamespaceOnly, constDeclNode, "");
                         }
@@ -1615,7 +1618,7 @@ namespace Gizbox.SemanticRule
 
 
                         //（非全局变量）成员字段或者局部变量  
-                        if (isTopLevelAtNamespace == false)
+                        if (isGlobalOrTopAtNamespace == false)
                         {
                             varDeclNode.identifierNode.SetPrefix(null);
 
@@ -1642,11 +1645,11 @@ namespace Gizbox.SemanticRule
                         bool isMethod = envStack.Peek().tableCatagory == SymbolTable.TableCatagory.ClassScope;
                         string className = null;
                         if (isMethod) className = envStack.Peek().name;
-                        if (isMethod && isTopLevelAtNamespace) throw new SemanticException(ExceptioName.NamespaceTopLevelNonMemberFunctionOnly, funcDeclNode, "");
+                        if (isMethod && isGlobalOrTopAtNamespace) throw new SemanticException(ExceptioName.NamespaceTopLevelNonMemberFunctionOnly, funcDeclNode, "");
 
 
                         //如果是成员函数 - 加入符号表  
-                        if (isTopLevelAtNamespace == false && isMethod == true)
+                        if (isGlobalOrTopAtNamespace == false && isMethod == true)
                         {
                             //使用原名（成员函数）  
                             funcDeclNode.identifierNode.SetPrefix(null);

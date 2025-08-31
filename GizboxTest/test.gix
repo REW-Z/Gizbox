@@ -13,8 +13,10 @@ void test()
 	GC::Disable();
 
 	int result = globalVar1 + (int)globalVar2;
-	Console::Log((string)result);
+	Console::Log("result:" + (string)result);
 }
+
+test();
 
 // 中间代码  
 // --------------------------------------------------

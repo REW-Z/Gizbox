@@ -340,10 +340,14 @@ namespace Gizbox
         //添加已有的条目  
         public void AddRecord(string key, Record rec)
         {
+            if(records.ContainsKey(key))
+                throw new GizboxException(ExceptioName.Undefine, $"exist key:{key}");
+
             if(key != rec.name)
                 throw new GizboxException(ExceptioName.Undefine, $"add record invalid key:{key}.");
 
             this.records[key] = rec;
+
             if(this.countDict.TryGetValue(rec.category, out var count))
             {
                 rec.index = count;
@@ -417,15 +421,22 @@ namespace Gizbox
         {
             int pad = 16;
             GixConsole.LogLine();
-            GixConsole.LogLine($"|{new string('-', pad)}-{new string('-', pad)}-{ this.name.PadRight(pad) + (this.parent != null ? ("(parent:" + this.parent.name + ")") : "") }-{new string('-', pad)}-{new string('-', pad)}|");
-            GixConsole.LogLine($"|{"NAME".PadRight(pad)}|{"RAW".PadRight(pad)}|{"CATAGORY".PadRight(pad)}|{"TYPE".PadRight(pad)}|{"ADDR".PadRight(pad)}|{"SubTable".PadRight(pad)}|");
-            GixConsole.LogLine($"|{new string('-', pad * 6 + 4)}|");
+            GixConsole.LogLine($"|-{new string('-', pad)}-{new string('-', pad)}-{ this.name.PadRight(pad) + (this.parent != null ? ("(parent:" + this.parent.name + ")") : "").PadRight(pad) }-{new string('-', pad)}-{new string('-', pad)}-{new string('-', pad)}|");
+            GixConsole.LogLine($"|{"NAME".PadRight(pad)}|{"RAW".PadRight(pad)}|{"CATAGORY".PadRight(pad)}|{"TYPE".PadRight(pad)}|{"ADDR".PadRight(pad)}|{"Other".PadRight(pad)}|{"SubTable".PadRight(pad)}|");
+            GixConsole.LogLine($"|{new string('-', pad * 7 + 6)}|");
             foreach (var key in records.Keys)
             {
                 var rec = records[key];
-                GixConsole.LogLine($"|{rec.name.PadRight(pad)}|{rec.rawname.PadRight(pad)}|{rec.category.ToString().PadRight(pad)}|{rec.typeExpression.PadRight(pad)}|{rec.addr.ToString().PadRight(pad)}|{(rec.envPtr != null ? rec.envPtr.name : "").PadRight(pad)}|");
+
+                string otherinfo = string.Empty;
+                if(string.IsNullOrEmpty(rec.initValue) == false)
+                {
+                    otherinfo = rec.initValue.Trim();
+                }
+
+                GixConsole.LogLine($"|{rec.name.PadRight(pad)}|{rec.rawname.PadRight(pad)}|{rec.category.ToString().PadRight(pad)}|{rec.typeExpression.PadRight(pad)}|{rec.addr.ToString().PadRight(pad)}|{otherinfo.PadRight(pad)}|{(rec.envPtr != null ? rec.envPtr.name : "").PadRight(pad)}|");
             }
-            GixConsole.LogLine($"|{new string('-', pad * 6 + 4)}|");
+            GixConsole.LogLine($"|{new string('-', pad * 7 + 6)}|");
             GixConsole.LogLine();
 
             if(this.children .Count > 0)
@@ -1070,7 +1081,7 @@ namespace Gizbox
         {
             if (GixConsole.enableSystemConsole)
             {
-                Console.WriteLine(msg);
+                Console.Write(msg + "\n");
             }
         }
         public static void Pause()

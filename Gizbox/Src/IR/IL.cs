@@ -61,6 +61,8 @@ namespace Gizbox.IR
             return str;
         }
     }
+
+
     [DataContract(IsReference = true)]
     public class Scope
     {
@@ -120,7 +122,7 @@ namespace Gizbox.IR
 
         //静态数据区 - 常量  
         [DataMember]
-        public List<object> constData = new List<object>();
+        public List<(string typeExpress, string valueExpr)> constData = new ();
 
 
         //(不序列化) 临时载入的依赖      
@@ -421,7 +423,6 @@ namespace Gizbox.IR
                 AddGlobalEnvsToList(dep, list);
             }
         }
-
 
         //打印  
         public void Print()

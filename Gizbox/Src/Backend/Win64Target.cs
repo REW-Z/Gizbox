@@ -14,6 +14,31 @@ using Gizbox.IR;
 
 //   内存-内存形式  :  dst/src 同为内存时，必须插入中转寄存器（整数用 R11，SSE 用 XMM0）两步搬运。
 
+
+
+/*
+ 虚函数表定义：
+ section .data
+align 8
+vtable_example:
+    dq FuncA         ; 虚函数1的地址
+    dq FuncB         ; 虚函数2的地址
+
+section .text
+global FuncA
+global FuncB
+
+FuncA:
+    ; 函数实现
+    ret
+
+FuncB:
+    ; 函数实现
+    ret
+ */
+
+
+
 namespace Gizbox.Src.Backend
 {
     public enum BuildMode
@@ -45,15 +70,15 @@ namespace Gizbox.Src.Backend
 
     public class Win64CodeGenContext
     {
-        private ILUnit ir;
+        public ILUnit ir;
 
         public static BuildMode buildMode = BuildMode.Debug;
 
         private ControlFlowGraph cfg;
         private List<BasicBlock> blocks;
 
-        private Dictionary<string, object> dataSeg = new();
-        private Dictionary<string, object> roDataSeg = new();
+
+
 
         private Dictionary<string, IROperandExpr> operandCache = new();
         private Dictionary<TAC, TACInfo> tacInfoCache = new(); 
@@ -67,22 +92,32 @@ namespace Gizbox.Src.Backend
         private HashSet<X64Instruction> callerRestorePlaceHolders = new();//主调函数恢复寄存器占位
         private HashSet<X64Instruction> calleeRestorePlaceHolders = new();//被调函数恢复寄存器占位
 
-        // 类表
-        public Dictionary<string, SymbolTable.Record> classDict = new();
 
-        // 函数表  
-        public Dictionary<string, SymbolTable.Record> funcDict = new();
 
-        // 全局变量表  
-        public Dictionary<string, SymbolTable.Record > globalVarInfos = new();
+        // 数据段  
+        private Dictionary<string, List<(GType typeExpr, string valExpr)>> section_data = new();
+        private Dictionary<string, List<(GType typeExpr, string valExpr)>> section_rdata = new();
+        private Dictionary<string, List<GType>> section_bss = new();
+
+
+        // 本单元全局变量表  
+        public Dictionary<string, SymbolTable.Record> globalVarInfos = new();
+        // 本单元全局函数表  
+        public Dictionary<string, SymbolTable.Record> globalFuncsInfos = new();
         // 外部变量表  
         public Dictionary<string, SymbolTable.Record> externVars = new();
         // 外部函数表  
         public Dictionary<string, SymbolTable.Record> externFuncs = new();
 
+
+
+        // 类表
+        public Dictionary<string, SymbolTable.Record> classDict = new();
+        // 函数表  
+        public Dictionary<string, SymbolTable.Record> funcDict = new();
+
         // 类名-虚函数表roKey
         public Dictionary<string, string> vtableRoKeys = new();
-
         // 当前函数作用域  
         private Dictionary<SymbolTable, BiDictionary<SymbolTable.Record, X64Reg>> vRegs = new();
         private SymbolTable globalEnv = null;
@@ -101,6 +136,22 @@ namespace Gizbox.Src.Backend
         public Win64CodeGenContext(ILUnit ir)
         {
             this.ir = ir;
+
+            //加载依赖单元，附加符号表信息   
+            foreach(var depName in ir.dependencies)
+            {
+                //Load Lib  
+            }
+            foreach(var dep in ir.dependencyLibs)
+            {
+                var gEnv = dep.globalScope.env;
+                //...
+                foreach(var scope in dep.scopes)
+                {
+                    var lEnv = scope.env;
+                    //...
+                }
+            }
         }
 
         public void StartCodeGen()
@@ -126,15 +177,21 @@ namespace Gizbox.Src.Backend
                 {
                     foreach(var (_, rec) in env.records)
                     {
-                        if(rec.category != SymbolTable.RecordCatagory.Variable)
-                            continue;
-
                         //全局变量  
-                        rec.GetAdditionInf().isGlobalVar = true;
-                        string key = rec.name;
-                        object value = GetStaticInitValue(rec);
-                        dataSeg.Add(key, value);
-                        globalVarInfos.Add(rec.name, rec);
+                        if(rec.category == SymbolTable.RecordCatagory.Variable)
+                        {
+                            rec.GetAdditionInf().isGlobal = true;
+                            string key = rec.name;
+                            string initval = rec.initValue;
+                            section_data.Add(key, new() { GetStaticInitValue(rec) });
+                            globalVarInfos.Add(rec.name, rec);
+                        }    
+                        //全局函数  
+                        else if(rec.category == SymbolTable.RecordCatagory.Function)
+                        {
+                            rec.GetAdditionInf().isGlobal = true;
+                            globalFuncsInfos.Add(rec.name, rec);
+                        }
                     }
                 }
                 //依赖单元  
@@ -144,16 +201,16 @@ namespace Gizbox.Src.Backend
                     {
                         if(rec.category == SymbolTable.RecordCatagory.Variable)
                         {
-                            //外部变量  
-                            externVars.Add(rec.name, rec);
+                            ////外部变量  (只需要导入必须的外部变量)
+                            //externVars.Add(rec.name, rec);
                         }
                         else if(rec.category == SymbolTable.RecordCatagory.Function)
                         {
-                            //外部函数  
-                            if(rec.name != "Main")
-                            {
-                                externFuncs.Add(rec.name, rec);
-                            }
+                            ////外部函数  （只需要导入必须的外部函数）
+                            //if(rec.name != "Main")
+                            //{
+                            //    externFuncs.Add(rec.name, rec);
+                            //}
                         }
 
                     }
@@ -1287,16 +1344,84 @@ namespace Gizbox.Src.Backend
             {
                 StringBuilder strb = new StringBuilder();
 
+                //global and extern  
+                strb.AppendLine("\n");
+                foreach(var g in globalVarInfos)
+                {
+                    strb.AppendLine($"global  {g.Key}");
+                }
+                foreach(var g in globalFuncsInfos)
+                {
+                    if(g.Key == "Main")
+                        continue;
+                    strb.AppendLine($"global  {g.Key}");
+                }
+                foreach(var g in externVars)
+                {
+                    strb.AppendLine($"extern  {g.Key}");
+                }
+                foreach(var g in externFuncs)
+                {
+                    if(g.Key == "Main")
+                        continue;
+                    strb.AppendLine($"extern  {g.Key}");
+                }
+
+
                 //.data
                 strb.AppendLine("\n");
-                strb.AppendLine("section .data");
-                foreach(var rodata in roDataSeg)
+                strb.AppendLine("section .rdata");
+                foreach(var rodata in section_rdata)
                 {
-                    strb.AppendLine($"\t{rodata.Key}  {rodata.Value}");
+                    if(rodata.Value.Count == 1)
+                    {
+                        var (typeExpr, valExpr) = rodata.Value[0];
+                        strb.AppendLine($"\t{rodata.Key}  {UtilsW64.GetX64DefineType(typeExpr, valExpr)}");
+                    }
+                    else
+                    {
+                        strb.AppendLine($"\t{rodata.Key}:");
+                        foreach(var (typeExpr, valExpr) in rodata.Value)
+                        {
+                            strb.AppendLine($"\t\t  {UtilsW64.GetX64DefineType(typeExpr, valExpr)}");
+                        }
+                    }
                 }
-                foreach(var rodata in dataSeg)
+                strb.AppendLine("\n");
+                strb.AppendLine("section .data");
+                foreach(var data in section_data)
                 {
-                    strb.AppendLine($"\t{rodata.Key}  {rodata.Value}");
+                    if(data.Value.Count == 1)
+                    {
+                        var (typeExpr, valExpr) = data.Value[0];
+                        strb.AppendLine($"\t{data.Key}  {UtilsW64.GetX64DefineType(typeExpr, valExpr)}");
+                    }
+                    else
+                    {
+                        strb.AppendLine($"\t{data.Key}:");
+                        foreach(var (typeExpr, valExpr) in data.Value)
+                        {
+                            strb.AppendLine($"\t\t  {UtilsW64.GetX64DefineType(typeExpr, valExpr)}");
+                        }
+                    }
+                }
+                strb.AppendLine("\n");
+                strb.AppendLine("section .bss");
+                foreach(var bss in section_bss)
+                {
+                    if(bss.Value.Count == 1)
+                    {
+                        var typeExpr = bss.Value[0];
+                        strb.AppendLine($"\t{bss.Key}  {UtilsW64.GetX64ReserveDefineType(typeExpr)}");
+                    }
+                    else
+                    {
+                        strb.AppendLine($"\t{bss.Key}:");
+                        foreach(var typeExpr in bss.Value)
+                        {
+                            strb.AppendLine($"\t\t  {UtilsW64.GetX64ReserveDefineType(typeExpr)}");
+                        }
+                    }
                 }
 
                 //.text  
@@ -1380,7 +1505,7 @@ namespace Gizbox.Src.Backend
 
                 //填充rodata  
                 string rokey = $"vtable_{classRec.name}";
-                roDataSeg.Add(rokey, vtableData);
+                section_rdata.Add(rokey, vtableData.Select(v => (GType.Parse("FuncPtr"), v.name)).ToList());
                 vtableRoKeys.Add(classRec.name, rokey);
             }
         }
@@ -1407,7 +1532,7 @@ namespace Gizbox.Src.Backend
             //（局部变量内存偏移，需要等活跃变量分析之后）
         }
 
-        private object GetStaticInitValue(SymbolTable.Record rec)
+        private (GType type, string valExpr) GetStaticInitValue(SymbolTable.Record rec)
         {
             if(rec.category == SymbolTable.RecordCatagory.Variable)
             {
@@ -1417,43 +1542,25 @@ namespace Gizbox.Src.Backend
                     switch(type.Category)
                     {
                         case GType.Kind.Bool:
-                            return false;
+                            return (GType.Parse("bool"), "false");
                         case GType.Kind.Char:
-                            return '\0';
+                            return (GType.Parse("char"), "\0");
                         case GType.Kind.Int:
-                            return 0;
+                            return (GType.Parse("int"), "0");
                         case GType.Kind.Long:
-                            return 0L;
+                            return (GType.Parse("long"), "0");
                         case GType.Kind.Float:
-                            return 0f;
+                            return (GType.Parse("int"), "0.0");
                         case GType.Kind.Double:
-                            return 0d;
-                        default:
-                            return null;
+                            return (GType.Parse("int"), "0.0");
                     }
                 }
                 else
                 {
-                    switch(type.Category)
-                    {
-                        case GType.Kind.Bool:
-                            return bool.Parse(rec.initValue);
-                        case GType.Kind.Char:
-                            return char.Parse(rec.initValue);;
-                        case GType.Kind.Int:
-                            return int.Parse(rec.initValue);
-                        case GType.Kind.Long:
-                            return long.Parse(rec.initValue);
-                        case GType.Kind.Float:
-                            return float.Parse(rec.initValue);
-                        case GType.Kind.Double:
-                            return double.Parse(rec.initValue);
-                        default:
-                            return null;
-                    }
+                    return (GType.Parse(rec.typeExpression), UtilsW64.GLitToW64Lit(GType.Parse(rec.typeExpression), rec.initValue));
                 }
             }
-            return null;
+            return default;
         }
 
         #endregion
@@ -1657,13 +1764,22 @@ namespace Gizbox.Src.Backend
                         switch(iroperand.segments[0])
                         {
                             case "%LITFLOAT":
+                                {
+                                    var key = GetConstSymbol(iroperand.segments[0], iroperand.segments[1]);
+                                    iroperand.roDataKey = key;
+                                    if(section_rdata.ContainsKey(key) == false)
+                                    {
+                                        section_rdata[key] = new() { (GType.Parse("float"), iroperand.segments[1]) };
+                                    }
+                                }
+                                break;
                             case "%LITDOUBLE":
                                 {
                                     var key = GetConstSymbol(iroperand.segments[0], iroperand.segments[1]);
                                     iroperand.roDataKey = key;
-                                    if(roDataSeg.ContainsKey(key) == false)
+                                    if(section_rdata.ContainsKey(key) == false)
                                     {
-                                        roDataSeg[key] = iroperand;
+                                        section_rdata[key] = new() { (GType.Parse("double"), iroperand.segments[1]) };
                                     }
                                 }
                                 break;
@@ -1671,10 +1787,10 @@ namespace Gizbox.Src.Backend
                                 {
                                     var key = GetConstSymbol(iroperand.segments[0], iroperand.segments[1]);
                                     iroperand.roDataKey = key;
-                                    if(roDataSeg.ContainsKey(key) == false)
+                                    if(section_rdata.ContainsKey(key) == false)
                                     {
                                         int cstIdx = int.Parse(iroperand.segments[1]);
-                                        roDataSeg[key] = ir.constData[cstIdx];
+                                        section_rdata[key] = new() { (GType.Parse(ir.constData[cstIdx].typeExpress), ir.constData[cstIdx].valueExpr) };
                                     }
                                 }
                                 break;
@@ -1773,7 +1889,7 @@ namespace Gizbox.Src.Backend
                         if(varRec.category == SymbolTable.RecordCatagory.Variable)
                         {
                             //全局变量
-                            if(varRec.GetAdditionInf().isGlobalVar)
+                            if(varRec.GetAdditionInf().isGlobal)
                             {
                                 return X64.rel(varRec.name);
                             }
@@ -2136,6 +2252,31 @@ namespace Gizbox.Src.Backend
                 oprand2 = new IROperand(context, this, 2, tac.arg2);
                 allOprands.Add(oprand2);
             }
+
+
+            //是否有外部函数  
+            if(tac.op == "CALL" ) //todo：MCALL通过虚函数表中函数指针调用，是否不需要导入成员函数？  
+            {
+                var externFuncRec = oprand0.segmentRecs[0];
+                if(externFuncRec.category != SymbolTable.RecordCatagory.Function)
+                    throw new GizboxException(ExceptioName.Undefine, "func rec invalid.");
+                context.externFuncs.Add(externFuncRec.name, externFuncRec);
+            }
+            //是否有外部变量  
+            foreach(var operand in allOprands)
+            {
+                foreach(var rec in operand.segmentRecs)
+                {
+                    if(rec == null)
+                        continue;
+                    if(rec.GetAdditionInf().isGlobal 
+                        && rec.category == SymbolTable.RecordCatagory.Variable 
+                        && rec.GetAdditionInf().table != context.ir.globalScope.env)
+                    {
+                        context.externVars.Add(rec.name, rec);
+                    }
+                }
+            }
         }
     }
 
@@ -2305,7 +2446,9 @@ namespace Gizbox.Src.Backend
     {
         public SymbolTable.Record target;
 
-        public bool isGlobalVar = false;
+        public SymbolTable table;
+
+        public bool isGlobal = false;
     }
 
     public class X64FunctionDesc
@@ -2351,6 +2494,104 @@ namespace Gizbox.Src.Backend
                     return litconstMark;
             }
 
+        }
+
+        public static string GLitToW64Lit(GType gType, string gLiterial)
+        {
+            switch(gType.Category)
+            {
+                case GType.Kind.Bool:
+                    return bool.Parse(gLiterial) ? "1" : "0";
+                case GType.Kind.Char:
+                    return gLiterial;
+                case GType.Kind.Int:
+                    {
+                        return gLiterial;
+                    }
+                case GType.Kind.Long:
+                    {
+                        if(gLiterial.EndsWith("L") || gLiterial.EndsWith("l"))
+                            gLiterial = gLiterial.Substring(0, gLiterial.Length - 1);
+                        return gLiterial;
+                    }
+                case GType.Kind.Float:
+                    {
+                        if(gLiterial.EndsWith("F") || gLiterial.EndsWith("f"))
+                            gLiterial = gLiterial.Substring(0, gLiterial.Length - 1);
+                        return gLiterial;
+                    }
+                case GType.Kind.Double:
+                    {
+                        if(gLiterial.EndsWith("D") || gLiterial.EndsWith("d"))
+                            gLiterial = gLiterial.Substring(0, gLiterial.Length - 1);
+                        return gLiterial;
+                    }
+                case GType.Kind.String:
+                    {
+                        return $"\"{gLiterial}\"";
+                    }
+                default:
+                    throw new GizboxException(ExceptioName.Undefine, $"not support lit type:{gType.ToString()}");
+                    
+            }
+            return "";
+        }
+
+        public static string GetX64DefineType(GType gtype, string val)
+        {
+            string x64DefineType = string.Empty;
+            switch(gtype.Category)
+            {
+                case GType.Kind.Void:
+                case GType.Kind.Bool:
+                case GType.Kind.String://字符串常量  
+                    x64DefineType = "db";
+                    break;
+                case GType.Kind.Char://字符串常量  
+                    x64DefineType = "dw";
+                    break;
+                case GType.Kind.Int:
+                case GType.Kind.Float:
+                    x64DefineType = "dd";
+                    break;
+                case GType.Kind.Long:
+                case GType.Kind.Double:
+                    x64DefineType = "dq";
+                    break;
+                case GType.Kind.Array:
+                default:
+                    x64DefineType = "dq";//引用类型指针  
+                    break;
+            }
+
+            string x64ValExpr = GLitToW64Lit(gtype, val);
+
+            return $"{x64DefineType}  {x64ValExpr}";
+        }
+
+        public static string GetX64ReserveDefineType(GType gtype)
+        {
+            switch(gtype.Category)
+            {
+                case GType.Kind.Void:
+                case GType.Kind.Bool:
+                    return "resb  1";
+                case GType.Kind.Char://字符串常量  
+                    return "resw 1";
+                case GType.Kind.Int:
+                case GType.Kind.Float:
+                    return "resd 1";
+                case GType.Kind.Long:
+                case GType.Kind.Double:
+                    return "resq 1";
+                case GType.Kind.Array://引用类型
+                case GType.Kind.Object://引用类型
+                case GType.Kind.String://非常量字符串
+                    return "resq 1";//指针
+                default:
+                    throw new GizboxException(ExceptioName.Undefine, $"not support .bss type:{gtype.ToString()}");
+                    break;
+            }
         }
 
         public static X64Reg GetParamReg(int paramIdx, bool isSSE)

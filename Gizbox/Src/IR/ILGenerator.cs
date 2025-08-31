@@ -896,7 +896,7 @@ namespace Gizbox.IR
                     {
                         string lex = literalNode.token.attribute;
                         string conststr = lex.Substring(1, lex.Length - 2);
-                        ilUnit.constData.Add(conststr);
+                        ilUnit.constData.Add(("string", conststr));
                         int ptr = ilUnit.constData.Count - 1;
 
                         if (Compiler.enableLogILGenerator)

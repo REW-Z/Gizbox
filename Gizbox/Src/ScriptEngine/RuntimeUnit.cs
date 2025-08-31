@@ -325,7 +325,38 @@ namespace Gizbox.ScriptEngine
             this.vtables = ilunit.vtables;
             this.label2Line = ilunit.label2Line;
             this.stackDic = ilunit.stackDic;
-            this.constData = ilunit.constData;
+            this.constData = ilunit.constData.Select(cdata => BoxConst(cdata)).ToList();
+
+            int ci = 0;
+            foreach(var d in this.constData)
+            {
+                ci++;
+            }
+
+            object BoxConst((string typeExpr, string valExpr) cdata)
+            {
+                var type = GType.Parse(cdata.typeExpr);
+                switch(type.Category)
+                {
+                    case GType.Kind.Void:
+                        return null;
+                    case GType.Kind.Bool:
+                        return bool.Parse(cdata.valExpr);
+                    case GType.Kind.Char:
+                        return char.Parse(cdata.valExpr);
+                    case GType.Kind.Int:
+                        return int.Parse(cdata.valExpr);
+                    case GType.Kind.Long:
+                        return long.Parse(cdata.valExpr);
+                    case GType.Kind.Float:
+                        return float.Parse(cdata.valExpr);
+                    case GType.Kind.Double:
+                        return double.Parse(cdata.valExpr);
+                    case GType.Kind.String:
+                        return cdata.valExpr;
+                }
+                return null;
+            }
 
 
             foreach(var kv in ilunit.label2Line)
@@ -414,7 +445,7 @@ namespace Gizbox.ScriptEngine
             switch(operand)
             {
                 case OperandConst cnst:
-                    cnst.linkedPtr = (__constdataOffset * unitId) + (cnst.oldPtr % __constdataOffset);
+                    cnst.linkedPtr = GetLinkedPtr(unitId, cnst.oldPtr);
                     break;
 
 
@@ -427,7 +458,24 @@ namespace Gizbox.ScriptEngine
                     break;
             }
         }
+        private long GetLinkedPtr(int unitID, long oldPtr)
+        {
+            long unitoffset = 0;
+            if(unitID == -1)
+            {
+                unitoffset = 0L;
+            }
+            else if(unitID >= 0)
+            {
+                unitoffset = unitID * __constdataOffset;
+            }
+            else
+            {
+                throw new GizboxException(ExceptioName.Undefine, "invalid unitid.");
+            }
 
+            return unitoffset + (oldPtr % __constdataOffset);
+        }
 
 
         //读取常量值    

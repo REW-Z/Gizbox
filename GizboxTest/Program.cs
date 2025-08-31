@@ -26,6 +26,9 @@ string[] cmds = {
     "5.测试x64目标代码生成",
     };
 
+Console.WindowWidth = 150;
+Console.WindowHeight = 30;
+
 Console.ForegroundColor = ConsoleColor.Gray;
 Console.WriteLine($"******************************************************");
 Console.WriteLine($"******************* Gizbox测试程序 *******************");
