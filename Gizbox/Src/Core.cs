@@ -98,7 +98,14 @@ namespace Gizbox
             LoopScope,
             FuncScope,
         }
-    [DataContract(IsReference = true)]
+        public enum RecordFlag
+        {
+            None = 0,
+            OperatorOverloadFunc = 1,
+            ExternFunc = 2,
+        }
+
+        [DataContract(IsReference = true)]
         public class Record
         {
             [DataMember]
@@ -119,6 +126,8 @@ namespace Gizbox
             public string initValue;
             [DataMember]
             public SymbolTable envPtr;
+            [DataMember]
+            public RecordFlag flags;
 
             public object runtimeAdditionalInfo;
         }
@@ -217,6 +226,14 @@ namespace Gizbox
             foreach(var kv in records)
             {
                 if(kv.Value.name == symbolName)
+                    result.Add(kv.Value);
+            }
+        }
+        public void GetAllRecordByFlag(RecordFlag flag, List<SymbolTable.Record> result)
+        {
+            foreach(var kv in records)
+            {
+                if((kv.Value.flags & flag) != 0)
                     result.Add(kv.Value);
             }
         }
@@ -624,6 +641,21 @@ namespace Gizbox
                 };
             }
         }
+        public bool IsNumberType
+        {
+            get
+            {
+                return _Kind switch
+                {
+                    Kind.Int => true,
+                    Kind.Long => true,
+                    Kind.Float => true,
+                    Kind.Double => true,
+                    _ => false,
+                };
+            }
+        }
+
 
         public bool IsPointerType
         {

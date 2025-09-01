@@ -285,6 +285,13 @@ namespace Gizbox
         }
         public class FuncDeclareNode : DeclareNode
         {
+            public enum Type
+            {
+                Normal,
+                OperatorOverload,
+            }
+
+            public Type funcType;
             public TypeNode returnTypeNode;
             public IdentityNode identifierNode;
             public ParameterListNode parametersNode;
@@ -435,6 +442,18 @@ namespace Gizbox
             public ExprNode leftNode;
             public ExprNode rightNode;
 
+            public string GetOpName()
+            {
+                switch(op)
+                {
+                    case "+": return "add";
+                    case "-": return "sub";
+                    case "*": return "mul";
+                    case "/": return "div";
+                    case "%": return "mod";
+                }
+                return null;
+            }
             public override string ToString()
             {
                 return this.GetType().Name + "(" + op + ")";

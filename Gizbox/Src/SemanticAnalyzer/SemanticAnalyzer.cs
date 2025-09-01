@@ -439,7 +439,28 @@ namespace Gizbox.SemanticRule
             AddActionAtTail("declstmt -> type ID ( params ) { statements }", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.FuncDeclareNode()
                 {
+                    funcType = FuncDeclareNode.Type.Normal,
+
                     returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 7].attributes["ast_node"],
+                    identifierNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = psr.stack[psr.stack.Top - 6].attributes,
+                        token = psr.stack[psr.stack.Top - 6].attributes["token"] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
+                    },
+                    parametersNode = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes["ast_node"],
+                    statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"],
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
+
+            AddActionAtTail("declstmt -> type operator ID ( params ) { statements }", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.FuncDeclareNode()
+                {
+                    funcType = FuncDeclareNode.Type.OperatorOverload,
+
+                    returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 8].attributes["ast_node"],
                     identifierNode = new SyntaxTree.IdentityNode()
                     {
                         attributes = psr.stack[psr.stack.Top - 6].attributes,
@@ -1397,7 +1418,7 @@ namespace Gizbox.SemanticRule
                         {
 
                             bool isMethod = envStack.Peek().tableCatagory == SymbolTable.TableCatagory.ClassScope;
-                            if (isMethod) throw new Exception();
+                            if (isMethod) throw new Exception();//顶层函数不可能是方法
 
                             //附加命名空间名  
                             if (isTopLevelAtNamespace)
@@ -1442,6 +1463,11 @@ namespace Gizbox.SemanticRule
                                 );
                             newRec.rawname = funcDeclNode.identifierNode.FullName;
 
+                            //重载函数  
+                            if(funcDeclNode.funcType == FuncDeclareNode.Type.OperatorOverload)
+                            {
+                                newRec.flags |= SymbolTable.RecordFlag.OperatorOverloadFunc;
+                            }
                         }
                     }
                     break;
@@ -1492,6 +1518,7 @@ namespace Gizbox.SemanticRule
                                 newEnv
                                 );
                             newRec.rawname = externFuncDeclNode.identifierNode.FullName;
+                            newRec.flags |= SymbolTable.RecordFlag.ExternFunc;
                         }
                         else
                         {
@@ -1912,6 +1939,12 @@ namespace Gizbox.SemanticRule
         /// </summary>
         private void Pass3_AnalysisNode(SyntaxTree.Node node)
         {
+            if(node.overrideNode != null)
+            {
+                Pass3_AnalysisNode(node.overrideNode);
+                return;
+            }
+
             switch (node)
             {
                 case SyntaxTree.ProgramNode programNode:
@@ -2190,9 +2223,47 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.BinaryOpNode binaryNode:
                     {
-                        Pass3_AnalysisNode(binaryNode.leftNode);
-                        Pass3_AnalysisNode(binaryNode.rightNode);
-                        AnalyzeTypeExpression(binaryNode);
+                        string typeExprL = AnalyzeTypeExpression(binaryNode.leftNode);
+                        string typeExprR = AnalyzeTypeExpression(binaryNode.rightNode);
+                        var typeL = GType.Parse(typeExprL);
+                        var typeR = GType.Parse(typeExprR);
+
+                        // !! 操作符重载
+                        if(typeL.IsNumberType == false || typeR.IsNumberType == false)
+                        {
+                            var operatorRec = Query_OperatorOverload(binaryNode.GetOpName(), typeExprL, typeExprR);
+                            if(operatorRec == null)
+                                throw new SemanticException(ExceptioName.SemanticAnalysysError, binaryNode, $"operator overload not exist:{Utils.Mangle(binaryNode.GetOpName(), typeExprL, typeExprR)}");
+
+                            binaryNode.overrideNode = new SyntaxTree.CallNode()
+                            {
+                                isMemberAccessFunction = false,
+                                funcNode = new SyntaxTree.IdentityNode()
+                                {
+                                    attributes = new Dictionary<string, object>(),
+                                    token = new Token("ID", PatternType.Id, operatorRec.rawname, default, default, default),
+                                    identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
+                                },
+                                argumantsNode = new SyntaxTree.ArgumentListNode()
+                                {
+                                    arguments = new List<SyntaxTree.ExprNode>() {
+                                                binaryNode.leftNode,
+                                                binaryNode.rightNode,
+                                            },
+                                },
+                                attributes = new(),
+                            };
+
+                            Pass3_AnalysisNode(binaryNode.overrideNode);
+                            Console.WriteLine(binaryNode.overrideNode.attributes.Count);
+                        }
+                        else
+                        {
+                            Pass3_AnalysisNode(binaryNode.leftNode);
+                            Pass3_AnalysisNode(binaryNode.rightNode);
+
+                            AnalyzeTypeExpression(binaryNode);
+                        }
                     }
                     break;
                 case SyntaxTree.IncDecNode incDecNode:
@@ -2224,7 +2295,7 @@ namespace Gizbox.SemanticRule
                                                 castNode.factorNode
                                             },
                                 },
-                                attributes = castNode.attributes,
+                                attributes = new(),
                             };
 
                             Pass3_AnalysisNode(castNode.overrideNode);
@@ -2270,6 +2341,7 @@ namespace Gizbox.SemanticRule
 
                         //Func分析  
                         AnalyzeTypeExpression(callNode);
+                        Console.WriteLine("分析函数：" + callNode);
 
                         //参数个数检查暂无...
 
@@ -2313,7 +2385,7 @@ namespace Gizbox.SemanticRule
                                             },
                                         },
 
-                                        attributes = assignNode.attributes,
+                                        attributes = new(),
                                     };
 
                                     Pass3_AnalysisNode(assignNode.overrideNode);
@@ -2852,6 +2924,30 @@ namespace Gizbox.SemanticRule
                 if (result != null)
                 {
                     return result;
+                }
+            }
+
+            return null;
+        }
+
+        private SymbolTable.Record Query_OperatorOverload(string opName, string typeExpr1, string typeExpr2)
+        {
+            //顶层作用域查找  
+            List<SymbolTable.Record> result = new();
+            ilUnit.globalScope.env.GetAllRecordByFlag(SymbolTable.RecordFlag.OperatorOverloadFunc, result);
+            //库依赖中查找  
+            foreach(var lib in this.ilUnit.dependencyLibs)
+            {
+                lib.globalScope.env.GetAllRecordByFlag(SymbolTable.RecordFlag.OperatorOverloadFunc, result);
+            }
+
+            //筛选
+            string mangledName = Utils.Mangle(opName, typeExpr1, typeExpr2);
+            foreach(var opOverload in result)
+            {
+                if(opOverload.name.EndsWith(mangledName))
+                {
+                    return opOverload;
                 }
             }
 

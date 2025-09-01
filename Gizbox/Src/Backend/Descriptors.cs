@@ -41,6 +41,7 @@ namespace Gizbox.Src.Backend
     {
         public SymbolTable.Record variable;
         public List<(int def, int die)> liveRanges;
+        public List<(int start, int die)> mergedRanges;
 
         public LiveInfo(SymbolTable.Record variable)
         {
@@ -78,6 +79,7 @@ namespace Gizbox.Src.Backend
                     merged.Add(r);
                 }
             }
+            mergedRanges = merged;
         }
     }
 
@@ -255,5 +257,52 @@ namespace Gizbox.Src.Backend
     /// </summary>
     public class RegInterfGraph
     {
+        public class Node
+        {
+            public RegInterfGraph graph;
+            public X64Reg vReg;
+            public HashSet<Node> neighbors = new();
+            public bool isRecoloredNode = false;
+            public RegisterEnum assignedColor = RegisterEnum.Undefined;
+
+            public Node(RegInterfGraph graph, X64Reg vReg)
+            {
+                this.graph = graph;
+                this.vReg = vReg;
+            }
+            public Node(RegInterfGraph graph, RegisterEnum precolored)
+            {
+                this.graph = graph;
+                this.vReg = null;
+                this.isRecoloredNode = true;
+                assignedColor = precolored;
+            }
+
+            public void AddEdge(Node target)
+            {
+                if(neighbors.Add(target))
+                {
+                    target.neighbors.Add(this);
+                }
+            }
+        }
+
+        public List<Node> allNodes = new();
+
+        /// <summary> 添加变量节点 </summary>
+        public Node AddVarNode(X64Reg vReg)
+        {
+            var node = new Node(this, vReg);
+            allNodes.Add(node);
+            return node;
+        }
+
+        /// <summary> 添加预着色节点 </summary>
+        public Node AddPrecoloredNode(RegisterEnum assignedColor)
+        {
+            var node = new Node(this, assignedColor);
+            allNodes.Add(node);
+            return node;
+        }
     }
 }

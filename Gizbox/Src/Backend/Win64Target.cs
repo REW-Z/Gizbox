@@ -147,7 +147,6 @@ namespace Gizbox.Src.Backend
                 ir.AddDependencyLib(depUnit);
             }
 
-
             //本单元
             {
                 var gEnv = ir.globalScope.env;
@@ -688,14 +687,15 @@ namespace Gizbox.Src.Backend
                         break;
                     case "FUNC_END":
                         {
-                            //函数尾声
-                            instructions.AddLast(X64.mov(X64.rsp, X64.rbp));
-                            instructions.AddLast(X64.pop(X64.rbp));
-                            instructions.AddLast(X64.ret());
                             //恢复寄存器（非易失性需要由Callee保存） 
                             var placeholder = X64.placehold("callee_restore");
                             calleeRestorePlaceHolders.Add(placeholder);
                             instructions.AddLast(placeholder);
+
+                            //函数尾声
+                            instructions.AddLast(X64.mov(X64.rsp, X64.rbp));
+                            instructions.AddLast(X64.pop(X64.rbp));
+                            instructions.AddLast(X64.ret());
 
                             //函数作用域结束
                             funcEnv = null;
@@ -744,6 +744,7 @@ namespace Gizbox.Src.Backend
 
 
                             //调用前准备  
+                            int rspSub = 0;
                             {
                                 // 调用者保存寄存器（易失性寄存器需Caller保存） (选择性保存)
                                 var placeholderSave = X64.placehold("caller_save");
@@ -751,28 +752,31 @@ namespace Gizbox.Src.Backend
                                 callerSavePlaceHolders.Add(placeholderSave);
 
 
-                                // 栈帧16字节对齐
-                                instructions.AddLast(X64.and(X64.rsp, X64.imm(-16)));
-                                // 如果是奇数个参数 -> 需要8字节对齐栈指针
+                                // 栈帧16字节对齐 (如果是奇数个参数 -> 需要8字节对齐栈指针)
+                                // (寄存器保存区自己确保16字节对齐)
                                 if(tacInf.CALL_paramCount % 2 != 0)
                                 {
                                     // 如果是奇数个参数，先将rsp对齐到16字节
-                                    instructions.AddLast(X64.sub(X64.rsp, X64.imm(8)));
+                                    rspSub += 8;
                                 }
                                 // 其他栈参数空间
                                 if(tacInf.CALL_paramCount > 4)
                                 {
-                                    int len = (tacInf.CALL_paramCount - 4) * 8;
-                                    instructions.AddLast(X64.sub(X64.rsp, X64.imm(len)));
+                                    int onStackParamLen = (tacInf.CALL_paramCount - 4) * 8;
+                                    rspSub += onStackParamLen;
                                 }
                                 // 影子空间(32字节)
-                                instructions.AddLast(X64.sub(X64.rsp, X64.imm(32)));
+                                rspSub += 32;
 
+                                //移动rsp  
+                                instructions.AddLast(X64.sub(X64.rsp, X64.imm(rspSub)));
 
                                 // 参数赋值(IR中PARAM指令已经是倒序)  
                                 foreach(var paraminfo in tempParamList)
                                 {
                                     var srcOp = ParseOperand(paraminfo.oprand0);
+                                    bool isRefOfConst = paraminfo.oprand0.IsRefOfConst();
+
                                     //寄存器传参  
                                     if(paraminfo.PARAM_paramidx < 4)
                                     {
@@ -793,13 +797,30 @@ namespace Gizbox.Src.Backend
                                         //整型参数  
                                         else
                                         {
-                                            instructions.AddLast(X64.mov(intreg, srcOp));
+                                            if(isRefOfConst)
+                                            {
+                                                instructions.AddLast(X64.lea(intreg, X64.rel(paraminfo.oprand0.expr.roDataKey)));
+                                            }
+                                            else
+                                            {
+                                                instructions.AddLast(X64.mov(intreg, srcOp));
+
+                                            }
                                         }
                                     }
 
                                     //栈帧传参[rsp + 8]开始    （影子空间也需要赋值）
-                                    int offset = (8 * (paraminfo.PARAM_paramidx + 1));
-                                    instructions.AddLast(X64.mov(X64.mem(X64.rsp, displacement: offset), ParseOperand(paraminfo.oprand0)));
+                                    int offset = (8 * (paraminfo.PARAM_paramidx));
+
+                                    if(isRefOfConst)
+                                    {
+                                        instructions.AddLast(X64.lea(X64.r11, X64.rel(paraminfo.oprand0.expr.roDataKey)));
+                                        EmitMov(X64.mem(X64.rsp, displacement: offset), X64.r11, paraminfo.oprand0.typeExpr);
+                                    }
+                                    else
+                                    {
+                                        EmitMov(X64.mem(X64.rsp, displacement: offset), srcOp, paraminfo.oprand0.typeExpr);
+                                    }
                                 }
                                 tempParamList.Clear();
                             }
@@ -811,13 +832,8 @@ namespace Gizbox.Src.Backend
 
                             //调用后处理
                             {
-                                // 清理栈上的参数（如果有超过4个参数）
-                                if(tacInf.CALL_paramCount > 4)
-                                {
-                                    int stackParamCount = tacInf.CALL_paramCount - 4;
-                                    long stackCleanupBytes = stackParamCount * 8; // 每个参数8字节
-                                    instructions.AddLast(X64.add(X64.rsp, X64.imm(stackCleanupBytes)));
-                                }
+                                // 调用后完整恢复栈
+                                instructions.AddLast(X64.add(X64.rsp, X64.imm(rspSub)));
 
                                 //还原保存的寄存器(占位)  
                                 var placeholderRestore = X64.placehold("caller_restore");
@@ -845,6 +861,7 @@ namespace Gizbox.Src.Backend
 
 
                             //调用前准备(和CALL指令一致)  
+                            int rspSub = 0;
                             {
                                 // 调用者保存寄存器（易失性寄存器需Caller保存） (选择性保存)
                                 var placeholderSave = X64.placehold("caller_save");
@@ -852,28 +869,31 @@ namespace Gizbox.Src.Backend
                                 callerSavePlaceHolders.Add(placeholderSave);
 
 
-                                // 栈帧16字节对齐
-                                instructions.AddLast(X64.and(X64.rsp, X64.imm(-16)));
-                                // 如果是奇数个参数 -> 需要8字节对齐栈指针
+                                // 栈帧16字节对齐 (如果是奇数个参数 -> 需要8字节对齐栈指针)
+                                // (寄存器保存区自己确保16字节对齐)
                                 if(tacInf.CALL_paramCount % 2 != 0)
                                 {
                                     // 如果是奇数个参数，先将rsp对齐到16字节
-                                    instructions.AddLast(X64.sub(X64.rsp, X64.imm(8)));
+                                    rspSub += 8;
                                 }
                                 // 其他栈参数空间
                                 if(tacInf.CALL_paramCount > 4)
                                 {
-                                    int len = (tacInf.CALL_paramCount - 4) * 8;
-                                    instructions.AddLast(X64.sub(X64.rsp, X64.imm(len)));
+                                    int onStackParamLen = (tacInf.CALL_paramCount - 4) * 8;
+                                    rspSub += onStackParamLen;
                                 }
                                 // 影子空间(32字节)
-                                instructions.AddLast(X64.sub(X64.rsp, X64.imm(32)));
+                                rspSub += 32;
 
+                                //移动rsp  
+                                instructions.AddLast(X64.sub(X64.rsp, X64.imm(rspSub)));
 
                                 // 参数赋值(IR中PARAM指令已经是倒序)  
                                 foreach(var paraminfo in tempParamList)
                                 {
                                     var srcOp = ParseOperand(paraminfo.oprand0);
+                                    bool isRefOfConst = paraminfo.oprand0.IsRefOfConst();
+
                                     //寄存器传参  
                                     if(paraminfo.PARAM_paramidx < 4)
                                     {
@@ -894,13 +914,30 @@ namespace Gizbox.Src.Backend
                                         //整型参数  
                                         else
                                         {
-                                            instructions.AddLast(X64.mov(intreg, srcOp));
+                                            if(isRefOfConst)
+                                            {
+                                                instructions.AddLast(X64.lea(intreg, X64.rel(paraminfo.oprand0.expr.roDataKey)));
+                                            }
+                                            else
+                                            {
+                                                instructions.AddLast(X64.mov(intreg, srcOp));
+
+                                            }
                                         }
                                     }
 
                                     //栈帧传参[rsp + 8]开始    （影子空间也需要赋值）
-                                    int offset = (8 * (paraminfo.PARAM_paramidx + 1));
-                                    instructions.AddLast(X64.mov(X64.mem(X64.rsp, displacement: offset), ParseOperand(paraminfo.oprand0)));
+                                    int offset = (8 * (paraminfo.PARAM_paramidx));
+
+                                    if(isRefOfConst)
+                                    {
+                                        instructions.AddLast(X64.lea(X64.r11, X64.rel(paraminfo.oprand0.expr.roDataKey)));
+                                        EmitMov(X64.mem(X64.rsp, displacement: offset), X64.r11, paraminfo.oprand0.typeExpr);
+                                    }
+                                    else
+                                    {
+                                        EmitMov(X64.mem(X64.rsp, displacement: offset), srcOp, paraminfo.oprand0.typeExpr);
+                                    }
                                 }
                                 tempParamList.Clear();
                             }
@@ -912,13 +949,8 @@ namespace Gizbox.Src.Backend
 
                             //调用后处理
                             {
-                                // 清理栈上的参数（如果有超过4个参数）
-                                if(tacInf.CALL_paramCount > 4)
-                                {
-                                    int stackParamCount = tacInf.CALL_paramCount - 4;
-                                    long stackCleanupBytes = stackParamCount * 8; // 每个参数8字节
-                                    instructions.AddLast(X64.add(X64.rsp, X64.imm(stackCleanupBytes)));
-                                }
+                                // 调用后完整恢复栈
+                                instructions.AddLast(X64.add(X64.rsp, X64.imm(rspSub)));
 
                                 //还原保存的寄存器(占位)  
                                 var placeholderRestore = X64.placehold("caller_restore");
@@ -988,210 +1020,41 @@ namespace Gizbox.Src.Backend
                     case "=":
                         {
                             var dst = ParseOperand(tacInf.oprand0);
-                            var src = ParseOperand(tacInf.oprand1);
 
-                            if(tacInf.oprand0.IsSSEType())
+                            if(tacInf.oprand1.IsRefOfConst())
                             {
-                                if(tacInf.oprand0.typeExpr.Size == 4)
-                                    instructions.AddLast(X64.movss(dst, src));
-                                else if(tacInf.oprand0.typeExpr.Size == 8)
-                                    instructions.AddLast(X64.movsd(dst, src));
+                                var key = tacInf.oprand1.expr.roDataKey;
+                                instructions.AddLast(X64.lea(X64.r11, X64.rel(key)));
+                                EmitMov(dst, X64.r11, tacInf.oprand0.typeExpr);
                             }
                             else
                             {
-                                instructions.AddLast(X64.mov(dst, src));
+                                var src = ParseOperand(tacInf.oprand1);
+                                EmitMov(dst, src, tacInf.oprand0.typeExpr);
                             }
                         }
                         break;
                     case "+=":
-                        {
-                            var dst = ParseOperand(tacInf.oprand0);
-                            var src = ParseOperand(tacInf.oprand1);
-                            if(tacInf.oprand0.IsSSEType())
-                            {
-                                if(tacInf.oprand0.typeExpr.Size == 4) 
-                                    instructions.AddLast(X64.addss(dst, src)); 
-                                else
-                                    instructions.AddLast(X64.addsd(dst, src));
-                            }
-                            else
-                            {
-                                instructions.AddLast(X64.add(dst, src));
-                            }
-                        }
-                        break;
                     case "-=":
-                        {
-                            var dst = ParseOperand(tacInf.oprand0);
-                            var src = ParseOperand(tacInf.oprand1);
-                            if(tacInf.oprand0.IsSSEType())
-                            {
-                                if(tacInf.oprand0.typeExpr.Size == 4) 
-                                    instructions.AddLast(X64.subss(dst, src));
-                                else
-                                    instructions.AddLast(X64.subsd(dst, src));
-                            }
-                            else
-                            {
-                                instructions.AddLast(X64.sub(dst, src));
-                            }
-                        }
-                        break;
                     case "*=":
-                        {
-                            var dst = ParseOperand(tacInf.oprand0);
-                            var src = ParseOperand(tacInf.oprand1);
-                            if(tacInf.oprand0.IsSSEType())
-                            {
-                                if(tacInf.oprand0.typeExpr.Size == 4) 
-                                    instructions.AddLast(X64.mulss(dst, src)); 
-                                else
-                                    instructions.AddLast(X64.mulsd(dst, src));
-                            }
-                            else
-                            {
-                                instructions.AddLast(X64.imul(dst, src));
-                            }
-                        }
-                        break;
                     case "/=":
-                        {
-                            var dst = ParseOperand(tacInf.oprand0);
-                            var src = ParseOperand(tacInf.oprand1);
-                            if(tacInf.oprand0.IsSSEType())
-                            {
-                                if(tacInf.oprand0.typeExpr.Size == 4) 
-                                    instructions.AddLast(X64.divss(dst, src)); 
-                                else 
-                                    instructions.AddLast(X64.divsd(dst, src));
-                            }
-                            else
-                            {
-                                instructions.AddLast(X64.mov(X64.rax, dst));
-                                instructions.AddLast(X64.cqo());
-                                instructions.AddLast(X64.idiv(src));
-                                instructions.AddLast(X64.mov(dst, X64.rax));
-                            }
-                        }
-                        break;
                     case "%=":
                         {
                             var dst = ParseOperand(tacInf.oprand0);
                             var src = ParseOperand(tacInf.oprand1);
-                            instructions.AddLast(X64.mov(X64.rax, dst));
-                            instructions.AddLast(X64.cqo());
-                            instructions.AddLast(X64.idiv(src));
-                            instructions.AddLast(X64.mov(dst, X64.rdx));
+                            EmitCompoundAssign(dst, src, tacInf.oprand0.typeExpr, tac.op);
                         }
                         break;
                     case "+":
-                        {
-                            var dst = ParseOperand(tacInf.oprand0);
-                            var a = ParseOperand(tacInf.oprand1);
-                            var b = ParseOperand(tacInf.oprand2);
-                            if(tacInf.oprand0.IsSSEType())
-                            {
-                                if(tacInf.oprand0.typeExpr.Size == 4) 
-                                    instructions.AddLast(X64.movss(dst, a)); 
-                                else 
-                                    instructions.AddLast(X64.movsd(dst, a));
-
-                                if(tacInf.oprand0.typeExpr.Size == 4) 
-                                    instructions.AddLast(X64.addss(dst, b)); 
-                                else 
-                                    instructions.AddLast(X64.addsd(dst, b));
-                            }
-                            else
-                            {
-                                instructions.AddLast(X64.mov(dst, a));
-                                instructions.AddLast(X64.add(dst, b));
-                            }
-                        }
-                        break;
                     case "-":
-                        {
-                            var dst = ParseOperand(tacInf.oprand0);
-                            var a = ParseOperand(tacInf.oprand1);
-                            var b = ParseOperand(tacInf.oprand2);
-                            if(tacInf.oprand0.IsSSEType())
-                            {
-                                if(tacInf.oprand0.typeExpr.Size == 4) 
-                                    instructions.AddLast(X64.movss(dst, a)); 
-                                else 
-                                    instructions.AddLast(X64.movsd(dst, a));
-
-                                if(tacInf.oprand0.typeExpr.Size == 4) 
-                                    instructions.AddLast(X64.subss(dst, b)); 
-                                else 
-                                    instructions.AddLast(X64.subsd(dst, b));
-                            }
-                            else
-                            {
-                                instructions.AddLast(X64.mov(dst, a));
-                                instructions.AddLast(X64.sub(dst, b));
-                            }
-                        }
-                        break;
                     case "*":
-                        {
-                            var dst = ParseOperand(tacInf.oprand0);
-                            var a = ParseOperand(tacInf.oprand1);
-                            var b = ParseOperand(tacInf.oprand2);
-                            if(tacInf.oprand0.IsSSEType())
-                            {
-                                if(tacInf.oprand0.typeExpr.Size == 4) 
-                                    instructions.AddLast(X64.movss(dst, a));
-                                else 
-                                    instructions.AddLast(X64.movsd(dst, a));
-
-                                if(tacInf.oprand0.typeExpr.Size == 4) 
-                                    instructions.AddLast(X64.mulss(dst, b)); 
-                                else 
-                                    instructions.AddLast(X64.mulsd(dst, b));
-                            }
-                            else
-                            {
-                                instructions.AddLast(X64.mov(dst, a));
-                                instructions.AddLast(X64.imul(dst, b));
-                            }
-                        }
-                        break;
                     case "/":
-                        {
-                            var dst = ParseOperand(tacInf.oprand0);
-                            var a = ParseOperand(tacInf.oprand1);
-                            var b = ParseOperand(tacInf.oprand2);
-                            if(tacInf.oprand0.IsSSEType())
-                            {
-                                if(tacInf.oprand0.typeExpr.Size == 4)
-                                { 
-                                    instructions.AddLast(X64.movss(dst, a));
-                                    instructions.AddLast(X64.divss(dst, b));
-                                } 
-                                else
-                                { 
-                                    instructions.AddLast(X64.movsd(dst, a)); 
-                                    instructions.AddLast(X64.divsd(dst, b)); 
-                                }
-                            }
-                            else
-                            {
-                                instructions.AddLast(X64.mov(X64.rax, a));
-                                instructions.AddLast(X64.cqo());
-                                instructions.AddLast(X64.idiv(b));
-                                instructions.AddLast(X64.mov(dst, X64.rax));
-                            }
-                        }
-                        break;
                     case "%":
                         {
                             var dst = ParseOperand(tacInf.oprand0);
                             var a = ParseOperand(tacInf.oprand1);
                             var b = ParseOperand(tacInf.oprand2);
-                            instructions.AddLast(X64.mov(X64.rax, a));
-                            instructions.AddLast(X64.cqo());
-                            instructions.AddLast(X64.idiv(b));
-                            instructions.AddLast(X64.mov(dst, X64.rdx));
+                            EmitBiOp(dst, a, b, tacInf.oprand0.typeExpr, tac.op);
                         }
                         break;
                     case "NEG":
@@ -1379,97 +1242,29 @@ namespace Gizbox.Src.Backend
         {
             if(debugLogAsmInfos)
             {
-                StringBuilder strb = new StringBuilder();
+                Print();
+            }
 
-                //global and extern  
-                strb.AppendLine("\n");
-                foreach(var g in globalVarInfos)
+            foreach(var (_, funcRec) in funcDict)
+            {
+                RegInterfGraph graph = new();
+                
+                foreach(var (_, rec) in funcRec.envPtr.records)
                 {
-                    strb.AppendLine($"global  {g.Key}");
-                }
-                foreach(var g in globalFuncsInfos)
-                {
-                    if(g.Key == "Main")
+                    if(rec.category != SymbolTable.RecordCatagory.Variable &&
+                        rec.category != SymbolTable.RecordCatagory.Param)
+                    {
                         continue;
-                    strb.AppendLine($"global  {g.Key}");
-                }
-                foreach(var g in externVars)
-                {
-                    strb.AppendLine($"extern  {g.Key}");
-                }
-                foreach(var g in externFuncs)
-                {
-                    if(g.Key == "Main")
-                        continue;
-                    strb.AppendLine($"extern  {g.Key}");
-                }
+                    }
 
+                    cfg.varialbeLiveInfos.TryGetValue(rec, out var liveInfo);
 
-                //.data
-                strb.AppendLine("\n");
-                strb.AppendLine("section .rdata");
-                foreach(var rodata in section_rdata)
-                {
-                    if(rodata.Value.Count == 1)
-                    {
-                        var (typeExpr, valExpr) = rodata.Value[0];
-                        strb.AppendLine($"\t{rodata.Key}  {UtilsW64.GetX64DefineType(typeExpr, valExpr)}");
-                    }
-                    else
-                    {
-                        strb.AppendLine($"\t{rodata.Key}:");
-                        foreach(var (typeExpr, valExpr) in rodata.Value)
-                        {
-                            strb.AppendLine($"\t\t  {UtilsW64.GetX64DefineType(typeExpr, valExpr)}");
-                        }
-                    }
+                    //在tacInf中记录预着色的寄存器  
+                    //按照mergedRange计算冲突节点和边  
+                    //图着色解算，确定溢出，生成溢出代码（home到分配的内存空间）。  
+                    //...
+                    //变量描述符和寄存器描述符是可选的  
                 }
-                strb.AppendLine("\n");
-                strb.AppendLine("section .data");
-                foreach(var data in section_data)
-                {
-                    if(data.Value.Count == 1)
-                    {
-                        var (typeExpr, valExpr) = data.Value[0];
-                        strb.AppendLine($"\t{data.Key}  {UtilsW64.GetX64DefineType(typeExpr, valExpr)}");
-                    }
-                    else
-                    {
-                        strb.AppendLine($"\t{data.Key}:");
-                        foreach(var (typeExpr, valExpr) in data.Value)
-                        {
-                            strb.AppendLine($"\t\t  {UtilsW64.GetX64DefineType(typeExpr, valExpr)}");
-                        }
-                    }
-                }
-                strb.AppendLine("\n");
-                strb.AppendLine("section .bss");
-                foreach(var bss in section_bss)
-                {
-                    if(bss.Value.Count == 1)
-                    {
-                        var typeExpr = bss.Value[0];
-                        strb.AppendLine($"\t{bss.Key}  {UtilsW64.GetX64ReserveDefineType(typeExpr)}");
-                    }
-                    else
-                    {
-                        strb.AppendLine($"\t{bss.Key}:");
-                        foreach(var typeExpr in bss.Value)
-                        {
-                            strb.AppendLine($"\t\t  {UtilsW64.GetX64ReserveDefineType(typeExpr)}");
-                        }
-                    }
-                }
-
-                //.text  
-                strb.AppendLine();
-                strb.AppendLine("section .text");
-                strb.AppendLine();
-                foreach(var instruction in instructions)
-                {
-                    strb.Append(UtilityX64.SerializeInstruction(instruction));
-                }
-                Win64Target.Log(strb.ToString());
             }
         }
 
@@ -2108,6 +1903,230 @@ namespace Gizbox.Src.Backend
 
         #endregion
 
+        #region PASS3
+
+        private void EmitMov(X64Operand dst, X64Operand src, GType type)
+        {
+            bool IsRegOrVReg(X64Operand op) => op is X64Reg;
+
+            if(type.IsSSEType)
+            {
+                bool f32 = type.Size == 4;
+                if(IsRegOrVReg(dst) == false && IsRegOrVReg(src) == false)
+                {
+                    if(f32)
+                    { instructions.AddLast(X64.movss(X64.xmm0, src)); instructions.AddLast(X64.movss(dst, X64.xmm0)); }
+                    else
+                    { instructions.AddLast(X64.movsd(X64.xmm0, src)); instructions.AddLast(X64.movsd(dst, X64.xmm0)); }
+                }
+                else
+                {
+                    instructions.AddLast(f32 ? X64.movss(dst, src) : X64.movsd(dst, src));
+                }
+            }
+            else
+            {
+                if(IsRegOrVReg(dst) == false && IsRegOrVReg(src) == false)
+                {
+                    instructions.AddLast(X64.mov(X64.r11, src));
+                    instructions.AddLast(X64.mov(dst, X64.r11));
+                }
+                else
+                {
+                    instructions.AddLast(X64.mov(dst, src));
+                }
+            }
+        }
+
+        // 二元运算  
+        private void EmitBiOp(X64Operand dst, X64Operand a, X64Operand b, GType type, string op)
+        {
+            bool IsRegOrVReg(X64Operand op) => op is X64Reg;
+
+            if(type.IsSSEType)
+            {
+                bool f32 = type.Size == 4;
+
+                X64Instruction SseOp(X64Operand d, X64Operand s)
+                {
+                    switch(op)
+                    {
+                        case "+":
+                            return f32 ? X64.addss(d, s) : X64.addsd(d, s);
+                        case "-":
+                            return f32 ? X64.subss(d, s) : X64.subsd(d, s);
+                        case "*":
+                            return f32 ? X64.mulss(d, s) : X64.mulsd(d, s);
+                        case "/":
+                            return f32 ? X64.divss(d, s) : X64.divsd(d, s);
+                        case "%":
+                            throw new GizboxException(ExceptioName.CodeGen, "float/double 不支持 %，请改写为运行时函数");
+                    }
+                    throw new GizboxException(ExceptioName.CodeGen, $"未知操作符: {op}");
+                }
+
+                if(IsRegOrVReg(dst))
+                {
+                    if(Equals(dst, a))
+                    {
+                        instructions.AddLast(SseOp(dst, b));
+                    }
+                    else
+                    {
+                        // dst <- a; dst = dst op b
+                        instructions.AddLast(f32 ? X64.movss(dst, a) : X64.movsd(dst, a));
+                        instructions.AddLast(SseOp(dst, b));
+                    }
+                }
+                else
+                {
+                    // dst(内存) = (a op b) via xmm0
+                    if(f32)
+                        instructions.AddLast(X64.movss(X64.xmm0, a));
+                    else
+                        instructions.AddLast(X64.movsd(X64.xmm0, a));
+                    instructions.AddLast(SseOp(X64.xmm0, b));
+                    EmitMov(dst, X64.xmm0, type);
+                }
+            }
+            else
+            {
+                // 整数/指针
+                if(op == "/" || op == "%")
+                {
+                    // rdx:rax / b
+                    instructions.AddLast(X64.mov(X64.rax, a));
+                    instructions.AddLast(X64.cqo());
+                    instructions.AddLast(X64.idiv(b));
+                    EmitMov(dst, op == "/" ? (X64Operand)X64.rax : X64.rdx, type);
+                    return;
+                }
+
+                X64Instruction IntOp(string o, X64Operand d, X64Operand s)
+                {
+                    switch(o)
+                    {
+                        case "+":
+                            return X64.add(d, s);
+                        case "-":
+                            return X64.sub(d, s);
+                        case "*":
+                            return X64.imul(d, s);
+                    }
+                    throw new GizboxException(ExceptioName.CodeGen, $"未知操作符: {o}");
+                }
+
+                if(IsRegOrVReg(dst))
+                {
+                    if(Equals(dst, a))
+                    {
+                        instructions.AddLast(IntOp(op, dst, b));
+                    }
+                    else
+                    {
+                        // dst <- a; dst = dst op b
+                        instructions.AddLast(X64.mov(dst, a));
+                        instructions.AddLast(IntOp(op, dst, b));
+                    }
+                }
+                else
+                {
+                    // dst(内存) = (a op b) via r11
+                    instructions.AddLast(X64.mov(X64.r11, a));
+                    instructions.AddLast(IntOp(op, X64.r11, b));
+                    EmitMov(dst, X64.r11, type);
+                }
+            }
+        }
+
+        // 复合赋值
+        private void EmitCompoundAssign(X64Operand dst, X64Operand rhs, GType type, string op)
+        {
+            if(type.IsSSEType)
+            {
+                bool f32 = type.Size == 4;
+
+                if(f32)
+                    instructions.AddLast(X64.movss(X64.xmm0, dst));
+                else
+                    instructions.AddLast(X64.movsd(X64.xmm0, dst));
+
+                switch(op)
+                {
+                    case "+=":
+                        if(f32)
+                            instructions.AddLast(X64.addss(X64.xmm0, rhs));
+                        else
+                            instructions.AddLast(X64.addsd(X64.xmm0, rhs));
+                        break;
+                    case "-=":
+                        if(f32)
+                            instructions.AddLast(X64.subss(X64.xmm0, rhs));
+                        else
+                            instructions.AddLast(X64.subsd(X64.xmm0, rhs));
+                        break;
+                    case "*=":
+                        if(f32)
+                            instructions.AddLast(X64.mulss(X64.xmm0, rhs));
+                        else
+                            instructions.AddLast(X64.mulsd(X64.xmm0, rhs));
+                        break;
+                    case "/=":
+                        if(f32)
+                            instructions.AddLast(X64.divss(X64.xmm0, rhs));
+                        else
+                            instructions.AddLast(X64.divsd(X64.xmm0, rhs));
+                        break;
+                    case "%=":
+                        throw new GizboxException(ExceptioName.CodeGen, "浮点数不支持%");
+                    default:
+                        throw new GizboxException(ExceptioName.CodeGen, $"未知复合操作符: {op}");
+                }
+                EmitMov(dst, X64.xmm0, type);
+            }
+            else
+            {
+                switch(op)
+                {
+                    case "+=":
+                    case "-=":
+                    case "*=":
+                        {
+                            instructions.AddLast(X64.mov(X64.r11, dst));
+                            if(op == "+=")
+                                instructions.AddLast(X64.add(X64.r11, rhs));
+                            else if(op == "-=")
+                                instructions.AddLast(X64.sub(X64.r11, rhs));
+                            else
+                                instructions.AddLast(X64.imul(X64.r11, rhs));
+                            EmitMov(dst, X64.r11, type);
+                            break;
+                        }
+                    case "/=":
+                        {
+                            instructions.AddLast(X64.mov(X64.rax, dst));
+                            instructions.AddLast(X64.cqo());
+                            instructions.AddLast(X64.idiv(rhs));
+                            EmitMov(dst, X64.rax, type);
+                            break;
+                        }
+                    case "%=":
+                        {
+                            instructions.AddLast(X64.mov(X64.rax, dst));
+                            instructions.AddLast(X64.cqo());
+                            instructions.AddLast(X64.idiv(rhs));
+                            EmitMov(dst, X64.rdx, type);
+                            break;
+                        }
+                    default:
+                        throw new GizboxException(ExceptioName.CodeGen, $"未知复合操作符: {op}");
+                }
+            }
+        }
+        #endregion
+
+
+
         /// <summary>
         /// 向后查找指令  
         /// </summary>
@@ -2223,6 +2242,101 @@ namespace Gizbox.Src.Backend
             }
             return null;
         }
+
+
+        private void Print()
+        {
+            StringBuilder strb = new StringBuilder();
+
+            //global and extern  
+            strb.AppendLine("\n");
+            foreach(var g in globalVarInfos)
+            {
+                strb.AppendLine($"global  {g.Key}");
+            }
+            foreach(var g in globalFuncsInfos)
+            {
+                if(g.Key == "Main")
+                    continue;
+                strb.AppendLine($"global  {g.Key}");
+            }
+            foreach(var g in externVars)
+            {
+                strb.AppendLine($"extern  {g.Key}");
+            }
+            foreach(var g in externFuncs)
+            {
+                if(g.Key == "Main")
+                    continue;
+                strb.AppendLine($"extern  {g.Key}");
+            }
+
+            //.data
+            strb.AppendLine("\n");
+            strb.AppendLine("section .rdata");
+            foreach(var rodata in section_rdata)
+            {
+                if(rodata.Value.Count == 1)
+                {
+                    var (typeExpr, valExpr) = rodata.Value[0];
+                    strb.AppendLine($"\t{rodata.Key}  {UtilsW64.GetX64DefineType(typeExpr, valExpr)}");
+                }
+                else
+                {
+                    strb.AppendLine($"\t{rodata.Key}:");
+                    foreach(var (typeExpr, valExpr) in rodata.Value)
+                    {
+                        strb.AppendLine($"\t\t  {UtilsW64.GetX64DefineType(typeExpr, valExpr)}");
+                    }
+                }
+            }
+            strb.AppendLine("\n");
+            strb.AppendLine("section .data");
+            foreach(var data in section_data)
+            {
+                if(data.Value.Count == 1)
+                {
+                    var (typeExpr, valExpr) = data.Value[0];
+                    strb.AppendLine($"\t{data.Key}  {UtilsW64.GetX64DefineType(typeExpr, valExpr)}");
+                }
+                else
+                {
+                    strb.AppendLine($"\t{data.Key}:");
+                    foreach(var (typeExpr, valExpr) in data.Value)
+                    {
+                        strb.AppendLine($"\t\t  {UtilsW64.GetX64DefineType(typeExpr, valExpr)}");
+                    }
+                }
+            }
+            strb.AppendLine("\n");
+            strb.AppendLine("section .bss");
+            foreach(var bss in section_bss)
+            {
+                if(bss.Value.Count == 1)
+                {
+                    var typeExpr = bss.Value[0];
+                    strb.AppendLine($"\t{bss.Key}  {UtilsW64.GetX64ReserveDefineType(typeExpr)}");
+                }
+                else
+                {
+                    strb.AppendLine($"\t{bss.Key}:");
+                    foreach(var typeExpr in bss.Value)
+                    {
+                        strb.AppendLine($"\t\t  {UtilsW64.GetX64ReserveDefineType(typeExpr)}");
+                    }
+                }
+            }
+
+            //.text  
+            strb.AppendLine();
+            strb.AppendLine("section .text");
+            strb.AppendLine();
+            foreach(var instruction in instructions)
+            {
+                strb.Append(UtilityX64.SerializeInstruction(instruction));
+            }
+            Win64Target.Log(strb.ToString());
+        }
     }
 
 
@@ -2294,10 +2408,14 @@ namespace Gizbox.Src.Backend
             //是否有外部函数  
             if(tac.op == "CALL" ) //todo：MCALL通过虚函数表中函数指针调用，是否不需要导入成员函数？  
             {
-                var externFuncRec = oprand0.segmentRecs[0];
-                if(externFuncRec.category != SymbolTable.RecordCatagory.Function)
+                var funcRec = oprand0.segmentRecs[0];
+                if(funcRec.category != SymbolTable.RecordCatagory.Function)
                     throw new GizboxException(ExceptioName.Undefine, "func rec invalid.");
-                context.externFuncs.Add(externFuncRec.name, externFuncRec);
+                
+                if(funcRec.GetAdditionInf().table != context.ir.globalScope.env)
+                {
+                    context.externFuncs.Add(funcRec.name, funcRec);
+                }
             }
             //是否有外部变量  
             foreach(var operand in allOprands)
@@ -2472,9 +2590,18 @@ namespace Gizbox.Src.Backend
             }
         }
 
+        /// <summary> SSE类型 </summary>
         public bool IsSSEType()
         {
             return typeExpr.IsSSEType;
+        }
+
+        /// <summary> 是引用类型常量（目前只有字符串常量） </summary>
+        public bool IsRefOfConst()
+        {
+            return this?.expr?.type == IROperandExpr.Type.LitOrConst
+                && this.expr.segments?.Length > 0
+                && this.expr.segments[0] == "%CONSTSTRING";
         }
     }
 
@@ -2486,6 +2613,8 @@ namespace Gizbox.Src.Backend
         public SymbolTable table;
 
         public bool isGlobal = false;
+
+        public HashSet<RegisterEnum> usedRegister = new();//特定指令使用到的寄存器 -> 作为预着色节点
     }
 
     public class X64FunctionDesc

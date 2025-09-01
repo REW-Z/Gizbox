@@ -148,7 +148,7 @@ switch(cmdIdx)
 
             il.Print();
 
-            Win64Target.CodeGen(il);
+            Win64Target.CodeGen(compiler, il);
         }
         break;
 }

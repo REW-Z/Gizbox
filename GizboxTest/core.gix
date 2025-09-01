@@ -81,6 +81,8 @@ namespace Core::Extern
 	extern string LongToString(long v);
 	extern string FloatToString(float v);
 	extern string DoubleToString(double v);
+
+	extern string Concat(string a, string b);
 }
 
 
@@ -134,3 +136,11 @@ namespace Console
 	}
 }
 
+
+namespace Core::IntrinsicOperatorOverloads
+{
+	string operator add(string a, string b)
+	{
+		return Core::Extern::Concat(a, b);
+	}
+}

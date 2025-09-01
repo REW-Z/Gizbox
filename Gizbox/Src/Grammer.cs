@@ -127,6 +127,7 @@ namespace Gizbox
             "declstmt -> type ID = expr ;",
             "declstmt -> const type ID = lit ;",
             "declstmt -> type ID ( params ) { statements }",
+            "declstmt -> type operator ID ( params ) { statements }",
             "declstmt -> extern type ID ( params ) ;",
             "declstmt -> class ID inherit { declstatements }",
 

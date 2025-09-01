@@ -353,6 +353,10 @@ namespace Gizbox.Interop.CSharp
         {
             return engineContext.NewString(v.ToString());
         }
-    }
 
+        public Value Core__Extern__Concat(string a, string b)
+        {
+            return engineContext.NewString(a + b);
+        }
+    }
 }
