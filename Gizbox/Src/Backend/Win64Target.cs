@@ -48,9 +48,9 @@ namespace Gizbox.Src.Backend
     }
     public static class Win64Target
     {
-        public static void CodeGen(ILUnit ir)
+        public static void CodeGen(Compiler compiler, ILUnit ir)
         {
-            Win64CodeGenContext context = new Win64CodeGenContext(ir);
+            Win64CodeGenContext context = new Win64CodeGenContext(compiler, ir);
 
             context.StartCodeGen();
         }
@@ -70,6 +70,7 @@ namespace Gizbox.Src.Backend
 
     public class Win64CodeGenContext
     {
+        public Compiler compiler;
         public ILUnit ir;
 
         public static BuildMode buildMode = BuildMode.Debug;
@@ -133,23 +134,59 @@ namespace Gizbox.Src.Backend
 
 
 
-        public Win64CodeGenContext(ILUnit ir)
+        public Win64CodeGenContext(Compiler compiler, ILUnit ir)
         {
+            this.compiler = compiler;
             this.ir = ir;
 
-            //加载依赖单元，附加符号表信息   
+            //加载依赖单元、附加符号表信息   
             foreach(var depName in ir.dependencies)
             {
                 //Load Lib  
+                var depUnit = compiler.LoadLib(depName);
+                ir.AddDependencyLib(depUnit);
             }
+
+
+            //本单元
+            {
+                var gEnv = ir.globalScope.env;
+                foreach(var (_, gRec) in gEnv.records)
+                {
+                    var inf = gRec.GetAdditionInf();
+                    inf.isGlobal = true;
+                    inf.table = gEnv;
+                }
+
+                foreach(var scope in ir.scopes)
+                {
+                    var lEnv = scope.env;
+                    foreach(var (_, lrec) in lEnv.records)
+                    {
+                        var inf = lrec.GetAdditionInf();
+                        inf.table = lEnv;
+                    }
+                }
+            }
+            //依赖单元
             foreach(var dep in ir.dependencyLibs)
             {
                 var gEnv = dep.globalScope.env;
-                //...
+                foreach(var (_, gRec) in gEnv.records)
+                {
+                    var inf = gRec.GetAdditionInf();
+                    inf.isGlobal = true;
+                    inf.table = gEnv;
+                }
+
                 foreach(var scope in dep.scopes)
                 {
                     var lEnv = scope.env;
-                    //...
+                    foreach(var (_, lrec) in lEnv.records)
+                    {
+                        var inf = lrec.GetAdditionInf();
+                        inf.table = lEnv;
+                    }
                 }
             }
         }
@@ -2444,7 +2481,7 @@ namespace Gizbox.Src.Backend
 
     public class AdditionInfo
     {
-        public SymbolTable.Record target;
+        private SymbolTable.Record target;
 
         public SymbolTable table;
 
@@ -2547,7 +2584,7 @@ namespace Gizbox.Src.Backend
                 case GType.Kind.String://字符串常量  
                     x64DefineType = "db";
                     break;
-                case GType.Kind.Char://字符串常量  
+                case GType.Kind.Char:
                     x64DefineType = "dw";
                     break;
                 case GType.Kind.Int:
