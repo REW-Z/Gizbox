@@ -260,20 +260,20 @@ namespace Gizbox.Src.Backend
         public class Node
         {
             public RegInterfGraph graph;
-            public X64Reg vReg;
+            public SymbolTable.Record variable;
             public HashSet<Node> neighbors = new();
             public bool isRecoloredNode = false;
             public RegisterEnum assignedColor = RegisterEnum.Undefined;
 
-            public Node(RegInterfGraph graph, X64Reg vReg)
+            public Node(RegInterfGraph graph, SymbolTable.Record variable)
             {
                 this.graph = graph;
-                this.vReg = vReg;
+                this.variable = variable;
             }
             public Node(RegInterfGraph graph, RegisterEnum precolored)
             {
                 this.graph = graph;
-                this.vReg = null;
+                this.variable = null;
                 this.isRecoloredNode = true;
                 assignedColor = precolored;
             }
@@ -290,9 +290,9 @@ namespace Gizbox.Src.Backend
         public List<Node> allNodes = new();
 
         /// <summary> 添加变量节点 </summary>
-        public Node AddVarNode(X64Reg vReg)
+        public Node AddVarNode(SymbolTable.Record rec)
         {
-            var node = new Node(this, vReg);
+            var node = new Node(this, rec);
             allNodes.Add(node);
             return node;
         }

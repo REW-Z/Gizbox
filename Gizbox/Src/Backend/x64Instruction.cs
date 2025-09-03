@@ -51,6 +51,14 @@ namespace Gizbox.Src.Backend
         movss,
         movsd,
 
+        // 128-bit 
+        movaps, // aligned packed single
+        movapd, // aligned packed double
+        movups, // unaligned packed single
+        movupd, // unaligned packed double
+        movdqa, // aligned packed integer
+        movdqu, // unaligned packed integer
+
         movzx,//带符号扩展
         movsx,//填零扩展
 
@@ -255,6 +263,11 @@ namespace Gizbox.Src.Backend
             this.physReg = reg;
             this.isVirtual = false;
             this.vRegVar = null;
+
+            if(reg != RegisterEnum.Undefined)
+            {
+                X64.physRegisterUseTemp.Add(reg);
+            }
         }
         public X64Reg(SymbolTable.Record varRec)
         {
@@ -301,6 +314,9 @@ namespace Gizbox.Src.Backend
 
     public static class X64
     {
+        public static HashSet<RegisterEnum> physRegisterUseTemp = new();
+
+
         // 带标签的空行  
         public static X64Instruction emptyLine(string labelname) => new() { type = InstructionType.emptyline, label = labelname };
 
@@ -319,6 +335,14 @@ namespace Gizbox.Src.Backend
         public static X64Instruction mov(X64Operand dest, X64Operand src) => new() { type = InstructionType.mov, operand0 = dest, operand1 = src };
         public static X64Instruction movss(X64Operand dest, X64Operand src) => new() { type = InstructionType.movss, operand0 = dest, operand1 = src };
         public static X64Instruction movsd(X64Operand dest, X64Operand src) => new() { type = InstructionType.movsd, operand0 = dest, operand1 = src };
+
+        // 128bit移动  
+        public static X64Instruction movaps(X64Operand dest, X64Operand src) => new() { type = InstructionType.movaps, operand0 = dest, operand1 = src };
+        public static X64Instruction movapd(X64Operand dest, X64Operand src) => new() { type = InstructionType.movapd, operand0 = dest, operand1 = src };
+        public static X64Instruction movups(X64Operand dest, X64Operand src) => new() { type = InstructionType.movups, operand0 = dest, operand1 = src };
+        public static X64Instruction movupd(X64Operand dest, X64Operand src) => new() { type = InstructionType.movupd, operand0 = dest, operand1 = src };
+        public static X64Instruction movdqa(X64Operand dest, X64Operand src) => new() { type = InstructionType.movdqa, operand0 = dest, operand1 = src };
+        public static X64Instruction movdqu(X64Operand dest, X64Operand src) => new() { type = InstructionType.movdqu, operand0 = dest, operand1 = src };
 
         public static X64Instruction movzx(X64Operand dest, X64Operand src) => new() { type = InstructionType.movzx, operand0 = dest, operand1 = src };
         public static X64Instruction movsx(X64Operand dest, X64Operand src) => new() { type = InstructionType.movsx, operand0 = dest, operand1 = src };

@@ -61,10 +61,10 @@ namespace Gizbox.Src.Backend
             GixConsole.LogLine("Win64 >>>" + content);
         }
 
-        public static AdditionInfo GetAdditionInf(this SymbolTable.Record rec)
+        public static RecAdditionInfo GetAdditionInf(this SymbolTable.Record rec)
         {
-            rec.runtimeAdditionalInfo ??= new AdditionInfo();
-            return (rec.runtimeAdditionalInfo as AdditionInfo);
+            rec.runtimeAdditionalInfo ??= new RecAdditionInfo();
+            return (rec.runtimeAdditionalInfo as RecAdditionInfo);
         }
     }
 
@@ -1209,6 +1209,25 @@ namespace Gizbox.Src.Backend
                 }
 
 
+                //物理寄存器占用  
+                foreach(var regEnum in X64.physRegisterUseTemp)
+                {
+                    tacInf.physRegistersUse.Add(regEnum);
+                }
+                X64.physRegisterUseTemp.Clear();
+
+                //记录指令起止  
+                if(lastInstruction?.Next != null)
+                {
+                    tacInf.startX64Node = lastInstruction;
+                    tacInf.endX64Node = instructions.Last;
+                }
+                else
+                {
+                    tacInf.startX64Node = null;
+                    tacInf.endX64Node = null;
+                }
+
                 //当前IR有标签
                 if(string.IsNullOrEmpty(tac.label) == false)
                 {
@@ -1227,7 +1246,7 @@ namespace Gizbox.Src.Backend
                     }
                     else
                     {
-                        lastInstruction.value.comment += $"//  none: {tacInf.line} : {tac.ToExpression(showlabel: false, indent: false)}";
+                        lastInstruction.value.comment += $"//  + : {tacInf.line} : {tac.ToExpression(showlabel: false, indent: false)}";
                     }
                 }
                     
@@ -1245,25 +1264,60 @@ namespace Gizbox.Src.Backend
                 Print();
             }
 
-            foreach(var (_, funcRec) in funcDict)
+            //在tacInf中记录预着色的寄存器  
+            //按照mergedRange计算冲突节点和边  
+            //图着色解算，确定溢出，生成溢出代码（home到分配的内存空间）。  
+            //变量描述符和寄存器描述符是可选的  
+
+
+            List<FunctionAdditionInfo> funcInfos = new();
+            FunctionAdditionInfo currFunc = null;
+            for(int i = 0; i < ir.codes.Count; ++i)
+            {
+                var tac = ir.codes[i];
+                var tacInf = GetTacInfo(tac);
+                if(tacInf.tac.op == "FUNC_BEGIN")
+                {
+                    currFunc = new ();
+                    currFunc.funcRec = funcDict[tac.arg0];
+                    currFunc.irLineStart = i - 1;
+                }
+
+                if(tacInf.tac.op == "FUNC_END")
+                {
+                    currFunc.irLineEnd = i + 1;
+                    funcInfos.Add(currFunc);
+                    currFunc = null;
+                }
+            }
+
+            foreach(var func in funcInfos)
             {
                 RegInterfGraph graph = new();
-                
-                foreach(var (_, rec) in funcRec.envPtr.records)
+                RegInterfGraph graphSSE = new();
+
+                List<(RegInterfGraph.Node node, int start, int end)> nodeRanges = new();
+
+                for(int l = func.irLineStart; l < func.irLineEnd; ++l)
                 {
-                    if(rec.category != SymbolTable.RecordCatagory.Variable &&
-                        rec.category != SymbolTable.RecordCatagory.Param)
+                    var tac = ir.codes[l];
+                    var tacInf = GetTacInfo(tac);
+                    foreach(var reg in tacInf.physRegistersUse)
                     {
-                        continue;
+                        var precoloredNode = graph.AddPrecoloredNode(reg);
+                        nodeRanges.Add((precoloredNode, l, l));
                     }
+                }
+                foreach(var (_, rec) in func.funcRec.envPtr.records)
+                {
+                    if(rec.category != SymbolTable.RecordCatagory.Param && rec.category != SymbolTable.RecordCatagory.Variable)
+                        continue;
 
-                    cfg.varialbeLiveInfos.TryGetValue(rec, out var liveInfo);
-
-                    //在tacInf中记录预着色的寄存器  
-                    //按照mergedRange计算冲突节点和边  
-                    //图着色解算，确定溢出，生成溢出代码（home到分配的内存空间）。  
-                    //...
-                    //变量描述符和寄存器描述符是可选的  
+                    var newNode = graph.AddVarNode(rec);
+                    foreach(var range in cfg.varialbeLiveInfos[rec].mergedRanges)
+                    {
+                        nodeRanges.Add((newNode, range.start, range.die - 1));
+                    }
                 }
             }
         }
@@ -2375,7 +2429,6 @@ namespace Gizbox.Src.Backend
 
         public List<IROperand> allOprands = new();
 
-
         public int PARAM_paramidx;//参数索引（如果是PARAM指令）
         public int CALL_paramCount;//参数个数（如果是CALL指令）
         public IROperand MCALL_methodTargetObject;//this参数（如果是MCALL指令）
@@ -2433,6 +2486,13 @@ namespace Gizbox.Src.Backend
                 }
             }
         }
+
+
+        #region X64指令相关
+        public LList<X64Instruction>.Node startX64Node;
+        public LList<X64Instruction>.Node endX64Node;
+        public HashSet<RegisterEnum> physRegistersUse = new();//特定指令使用到的寄存器 -> 作为预着色节点
+        #endregion
     }
 
     public class IROperand
@@ -2606,16 +2666,22 @@ namespace Gizbox.Src.Backend
     }
 
 
-    public class AdditionInfo
+    public class RecAdditionInfo
     {
         private SymbolTable.Record target;
 
         public SymbolTable table;
 
         public bool isGlobal = false;
-
-        public HashSet<RegisterEnum> usedRegister = new();//特定指令使用到的寄存器 -> 作为预着色节点
     }
+    public class FunctionAdditionInfo
+    {
+        public SymbolTable.Record funcRec;
+        public int irLineStart;
+        public int irLineEnd;
+    }
+
+
 
     public class X64FunctionDesc
     {
