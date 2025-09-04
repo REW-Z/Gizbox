@@ -757,7 +757,7 @@ namespace Gizbox
 
         public List<GType> FunctionParamTypes => _Function_ParamTypes;
 
-        public bool IsSSEType
+        public bool IsSSE
         {
             get
             {

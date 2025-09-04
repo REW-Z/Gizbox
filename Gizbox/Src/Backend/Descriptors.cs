@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Linq;
 
 namespace Gizbox.Src.Backend
 {
@@ -280,6 +281,9 @@ namespace Gizbox.Src.Backend
 
             public void AddEdge(Node target)
             {
+                if(neighbors.Contains(target))
+                    return;
+
                 if(neighbors.Add(target))
                 {
                     target.neighbors.Add(this);
@@ -303,6 +307,56 @@ namespace Gizbox.Src.Backend
             var node = new Node(this, assignedColor);
             allNodes.Add(node);
             return node;
+        }
+
+
+        public bool TryColoring(params RegisterEnum[] colors)
+        {
+            if(colors == null || colors.Length == 0)
+                throw new GizboxException(ExceptioName.CodeGen, "TryColoring: colors 为空。");
+
+            // 排序：按度数降序；预着色节点放前面（保持其 assignedColor）
+            var orderedNodes = allNodes
+                .OrderByDescending(n => n.isRecoloredNode ? int.MaxValue : n.neighbors.Count)
+                .ThenByDescending(n => n.neighbors.Count)
+                .ToList();
+
+            foreach(var node in orderedNodes)
+            {
+                // 预着色节点  
+                if(node.isRecoloredNode)
+                {
+                    continue;
+                }
+
+                // 邻居已用颜色集合
+                HashSet<RegisterEnum> banned = new();
+                foreach(var nb in node.neighbors)
+                {
+                    if(nb.assignedColor != RegisterEnum.Undefined)
+                        banned.Add(nb.assignedColor);
+                }
+
+                // 选择第一个可用颜色
+                RegisterEnum chosen = RegisterEnum.Undefined;
+                foreach(var c in colors)
+                {
+                    if(!banned.Contains(c))
+                    {
+                        chosen = c;
+                        break;
+                    }
+                }
+
+                node.assignedColor = chosen;
+                
+                //着色失败  
+                if(chosen == RegisterEnum.Undefined)
+                    return false;
+            }
+
+            //着色完毕  
+            return true;
         }
     }
 }

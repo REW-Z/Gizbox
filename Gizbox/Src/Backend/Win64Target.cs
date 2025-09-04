@@ -1136,7 +1136,7 @@ namespace Gizbox.Src.Backend
                             }
 
                             //浮点数 -> 浮点数
-                            if(srcType.IsSSEType && targetType.IsSSEType)
+                            if(srcType.IsSSE && targetType.IsSSE)
                             {
                                 if(srcType.Size == 4 && targetType.Size == 8)
                                     instructions.AddLast(X64.cvtss2sd(dst, src));
@@ -1169,7 +1169,7 @@ namespace Gizbox.Src.Backend
                             }
 
                             //整数->浮点数
-                            if(srcType.IsInteger && targetType.IsSSEType)
+                            if(srcType.IsInteger && targetType.IsSSE)
                             {
                                 if(targetType.Size == 4)
                                     instructions.AddLast(X64.cvtsi2ss(dst, src));
@@ -1178,7 +1178,7 @@ namespace Gizbox.Src.Backend
                                 break;
                             }
                             // 浮点 -> 整数 (截断)
-                            if(srcType.IsSSEType && targetType.IsInteger)
+                            if(srcType.IsSSE && targetType.IsInteger)
                             {
                                 if(srcType.Size == 4) 
                                 {
@@ -1264,7 +1264,6 @@ namespace Gizbox.Src.Backend
                 Print();
             }
 
-            //在tacInf中记录预着色的寄存器  
             //按照mergedRange计算冲突节点和边  
             //图着色解算，确定溢出，生成溢出代码（home到分配的内存空间）。  
             //变量描述符和寄存器描述符是可选的  
@@ -1294,31 +1293,75 @@ namespace Gizbox.Src.Backend
             foreach(var func in funcInfos)
             {
                 RegInterfGraph graph = new();
-                RegInterfGraph graphSSE = new();
+                RegInterfGraph sseGraph = new();
 
                 List<(RegInterfGraph.Node node, int start, int end)> nodeRanges = new();
+                List<(RegInterfGraph.Node node, int start, int end)> sseNodeRanges = new();
 
+                //预着色节点  
                 for(int l = func.irLineStart; l < func.irLineEnd; ++l)
                 {
                     var tac = ir.codes[l];
                     var tacInf = GetTacInfo(tac);
                     foreach(var reg in tacInf.physRegistersUse)
                     {
-                        var precoloredNode = graph.AddPrecoloredNode(reg);
-                        nodeRanges.Add((precoloredNode, l, l));
+                        if(reg >= RegisterEnum.XMM0)
+                        {
+                            var precoloredNode = sseGraph.AddPrecoloredNode(reg);
+                            sseNodeRanges.Add((precoloredNode, l, l));
+                        }
+                        else
+                        {
+                            var precoloredNode = graph.AddPrecoloredNode(reg);
+                            nodeRanges.Add((precoloredNode, l, l));
+                        }
                     }
                 }
+                //变量节点
                 foreach(var (_, rec) in func.funcRec.envPtr.records)
                 {
                     if(rec.category != SymbolTable.RecordCatagory.Param && rec.category != SymbolTable.RecordCatagory.Variable)
                         continue;
 
-                    var newNode = graph.AddVarNode(rec);
-                    foreach(var range in cfg.varialbeLiveInfos[rec].mergedRanges)
+                    var type = GType.Parse(rec.typeExpression);
+                    if(type.IsSSE)
                     {
-                        nodeRanges.Add((newNode, range.start, range.die - 1));
+                        var newNode = sseGraph.AddVarNode(rec);
+                        foreach(var range in cfg.varialbeLiveInfos[rec].mergedRanges)
+                        {
+                            sseNodeRanges.Add((newNode, range.start, range.die - 1));
+                        }
+                    }
+                    else
+                    {
+                        var newNode = graph.AddVarNode(rec);
+                        foreach(var range in cfg.varialbeLiveInfos[rec].mergedRanges)
+                        {
+                            nodeRanges.Add((newNode, range.start, range.die - 1));
+                        }
                     }
                 }
+
+                //构建冲突边  
+                for(int i = 0; i < nodeRanges.Count; i++)
+                {
+                    for(int j = i + 1; j < nodeRanges.Count; j++)
+                    {
+                        if(nodeRanges[i].node == nodeRanges[j].node)
+                            continue;
+
+                        //相交  
+                        if(nodeRanges[i].end >= nodeRanges[j].start && nodeRanges[j].end >= nodeRanges[i].start)
+                        {
+                            nodeRanges[i].node.AddEdge(nodeRanges[j].node);
+                        }
+                    }
+                }
+
+
+                //尝试着色（优先只用 callee-save（非易失）寄存器）    
+                //使用 callee-save 只需在函数序言/尾声一次性保存/恢复“实际用到的非易失寄存器”，对调用点零改动，最简单直接。
+                //...
             }
         }
 
@@ -1963,7 +2006,7 @@ namespace Gizbox.Src.Backend
         {
             bool IsRegOrVReg(X64Operand op) => op is X64Reg;
 
-            if(type.IsSSEType)
+            if(type.IsSSE)
             {
                 bool f32 = type.Size == 4;
                 if(IsRegOrVReg(dst) == false && IsRegOrVReg(src) == false)
@@ -1997,7 +2040,7 @@ namespace Gizbox.Src.Backend
         {
             bool IsRegOrVReg(X64Operand op) => op is X64Reg;
 
-            if(type.IsSSEType)
+            if(type.IsSSE)
             {
                 bool f32 = type.Size == 4;
 
@@ -2096,7 +2139,7 @@ namespace Gizbox.Src.Backend
         // 复合赋值
         private void EmitCompoundAssign(X64Operand dst, X64Operand rhs, GType type, string op)
         {
-            if(type.IsSSEType)
+            if(type.IsSSE)
             {
                 bool f32 = type.Size == 4;
 
@@ -2653,7 +2696,7 @@ namespace Gizbox.Src.Backend
         /// <summary> SSE类型 </summary>
         public bool IsSSEType()
         {
-            return typeExpr.IsSSEType;
+            return typeExpr.IsSSE;
         }
 
         /// <summary> 是引用类型常量（目前只有字符串常量） </summary>
