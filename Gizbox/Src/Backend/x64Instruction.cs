@@ -42,6 +42,54 @@ namespace Gizbox.Src.Backend
         XMM14 = 114,
         XMM15 = 115,
     }
+
+    public static class X64RegisterUtility
+    {
+        public static readonly RegisterEnum[] GPCalleeSaveRegs = new RegisterEnum[]
+        {
+            RegisterEnum.RBX,
+            RegisterEnum.RBP,
+            RegisterEnum.RSI,
+            RegisterEnum.RDI,
+            RegisterEnum.R12,
+            RegisterEnum.R13,
+            RegisterEnum.R14,
+            RegisterEnum.R15,
+        };
+        public static readonly RegisterEnum[] GPCallerSaveRegs = new RegisterEnum[]
+        {
+            RegisterEnum.RAX,
+            RegisterEnum.RCX,
+            RegisterEnum.RDX,
+            RegisterEnum.R8,
+            RegisterEnum.R9,
+            RegisterEnum.R10,
+            RegisterEnum.R11,
+        };
+        public static readonly RegisterEnum[] XMMCalleeSaveRegs = new RegisterEnum[]
+        {
+            RegisterEnum.XMM6,
+            RegisterEnum.XMM7,
+            RegisterEnum.XMM8,
+            RegisterEnum.XMM9,
+            RegisterEnum.XMM10,
+            RegisterEnum.XMM11,
+            RegisterEnum.XMM12,
+            RegisterEnum.XMM13,
+            RegisterEnum.XMM14,
+            RegisterEnum.XMM15,
+        };
+        public static readonly RegisterEnum[] XMMCallerSaveRegs = new RegisterEnum[]
+        {
+            RegisterEnum.XMM0,
+            RegisterEnum.XMM1,
+            RegisterEnum.XMM2,
+            RegisterEnum.XMM3,
+            RegisterEnum.XMM4,
+            RegisterEnum.XMM5,
+        };
+    }
+
     public enum InstructionType
     {
         placeholder = -1,//用于占位

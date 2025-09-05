@@ -1359,8 +1359,13 @@ namespace Gizbox.Src.Backend
                 }
 
 
-                //尝试着色（优先只用 callee-save（非易失）寄存器）    
+                //尝试着色（目前只用 callee-save（非易失）寄存器）    
                 //使用 callee-save 只需在函数序言/尾声一次性保存/恢复“实际用到的非易失寄存器”，对调用点零改动，最简单直接。
+                bool success = graph.TryColoring(X64RegisterUtility.GPCalleeSaveRegs.Where(r => r != RegisterEnum.RBP).ToArray());
+                bool successSSE = sseGraph.TryColoring(X64RegisterUtility.XMMCalleeSaveRegs);
+
+
+                //尝试溢出  
                 //...
             }
         }
