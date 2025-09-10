@@ -1264,11 +1264,6 @@ namespace Gizbox.Src.Backend
                 Print();
             }
 
-            //按照mergedRange计算冲突节点和边  
-            //图着色解算，确定溢出，生成溢出代码（home到分配的内存空间）。  
-            //变量描述符和寄存器描述符是可选的  
-
-
             List<FunctionAdditionInfo> funcInfos = new();
             FunctionAdditionInfo currFunc = null;
             for(int i = 0; i < ir.codes.Count; ++i)
@@ -1292,7 +1287,7 @@ namespace Gizbox.Src.Backend
 
             foreach(var func in funcInfos)
             {
-                RegInterfGraph graph = new();
+                RegInterfGraph gpGraph = new();
                 RegInterfGraph sseGraph = new();
 
                 List<(RegInterfGraph.Node node, int start, int end)> nodeRanges = new();
@@ -1312,7 +1307,7 @@ namespace Gizbox.Src.Backend
                         }
                         else
                         {
-                            var precoloredNode = graph.AddPrecoloredNode(reg);
+                            var precoloredNode = gpGraph.AddPrecoloredNode(reg);
                             nodeRanges.Add((precoloredNode, l, l));
                         }
                     }
@@ -1334,7 +1329,7 @@ namespace Gizbox.Src.Backend
                     }
                     else
                     {
-                        var newNode = graph.AddVarNode(rec);
+                        var newNode = gpGraph.AddVarNode(rec);
                         foreach(var range in cfg.varialbeLiveInfos[rec].mergedRanges)
                         {
                             nodeRanges.Add((newNode, range.start, range.die - 1));
@@ -1361,12 +1356,44 @@ namespace Gizbox.Src.Backend
 
                 //尝试着色（目前只用 callee-save（非易失）寄存器）    
                 //使用 callee-save 只需在函数序言/尾声一次性保存/恢复“实际用到的非易失寄存器”，对调用点零改动，最简单直接。
-                bool success = graph.TryColoring(X64RegisterUtility.GPCalleeSaveRegs.Where(r => r != RegisterEnum.RBP).ToArray());
+                bool success = gpGraph.TryColoring(X64RegisterUtility.GPCalleeSaveRegs.Where(r => r != RegisterEnum.RBP).ToArray());
                 bool successSSE = sseGraph.TryColoring(X64RegisterUtility.XMMCalleeSaveRegs);
 
+                //需要溢出->重写图着色的迭代，直到着色成功  
+                //......
 
-                //尝试溢出  
-                //...
+                //寄存器分配后的统一重写阶段  
+                {
+                    //统计分配的结果
+                    var gpAssign = new Dictionary<SymbolTable.Record, RegisterEnum>();
+                    var sseAssign = new Dictionary<SymbolTable.Record, RegisterEnum>();
+                    foreach(var n in gpGraph.allNodes)
+                    {
+                        if(n.variable != null && n.assignedColor != RegisterEnum.Undefined)
+                            gpAssign[n.variable] = n.assignedColor;
+                    }
+                    foreach(var n in sseGraph.allNodes)
+                    {
+                        if(n.variable != null && n.assignedColor != RegisterEnum.Undefined)
+                            sseAssign[n.variable] = n.assignedColor;
+                    }
+
+                    //统计本函数实际用到的寄存器集合  
+                    var usedGpRegs = new HashSet<RegisterEnum>(gpAssign.Values);
+                    var usedXmmRegs = new HashSet<RegisterEnum>(sseAssign.Values);
+
+                    var funcUsedCalleeGP = new HashSet<RegisterEnum>(usedGpRegs.Where(r => X64RegisterUtility.GPCalleeSaveRegs.Contains(r) && r != RegisterEnum.RBP));
+                    var funcUsedCalleeXMM = new HashSet<RegisterEnum>(usedXmmRegs.Where(r => X64RegisterUtility.XMMCalleeSaveRegs.Contains(r)));
+
+                    var funcUsedCallerGP = new HashSet<RegisterEnum>(usedGpRegs.Where(r => X64RegisterUtility.GPCallerSaveRegs.Contains(r)));
+                    var funcUsedCallerXMM = new HashSet<RegisterEnum>(usedXmmRegs.Where(r => X64RegisterUtility.XMMCallerSaveRegs.Contains(r)));
+
+                    //占位展开  
+                    //todo
+
+                    //替换虚拟寄存器，尝试溢出
+                    //todo
+                }
             }
         }
 
