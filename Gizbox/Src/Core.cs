@@ -1097,11 +1097,16 @@ namespace Gizbox
         {
             Gizbox.GixConsole.LogLine(content);
         }
+        public static void Assert(bool expr)
+        {
+            if(expr == false)
+                throw new GizboxException(ExceptioName.Undefine, "assert false.");
+        }
     }
     public static class GixConsole//LSP使用时需要disable  
     {
         public static bool enableSystemConsole = true;
-
+        
         public static void Log(object msg = null)
         {
             if(GixConsole.enableSystemConsole)

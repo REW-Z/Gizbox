@@ -309,8 +309,23 @@ namespace Gizbox.Src.Backend
             return node;
         }
 
-
-        public bool TryColoring(params RegisterEnum[] colors)
+        public void Coloring(params RegisterEnum[] colors)
+        {
+            for(int i = 0; i < 10; ++i)
+            {
+                bool success = TryColoring(colors);
+                if(success)
+                {
+                    break;
+                }
+                else
+                {
+                    //todo:尝试溢出  
+                    break;
+                }
+            }
+        }
+        private bool TryColoring(params RegisterEnum[] colors)
         {
             if(colors == null || colors.Length == 0)
                 throw new GizboxException(ExceptioName.CodeGen, "TryColoring: colors 为空。");

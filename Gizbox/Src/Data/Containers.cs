@@ -203,7 +203,7 @@ namespace Gizbox
             this.Count = newCount;
         }
 
-        public void AddLast(T value)
+        public Node AddLast(T value)
         {
             if (head == null)
             {
@@ -212,7 +212,8 @@ namespace Gizbox
                 tail = firstNode;
                 allNodes.Add(firstNode);
                 Count++;
-                return;
+
+                return firstNode;
             }
 
             Node newNode = new Node(value, this, tail, null);
@@ -220,9 +221,11 @@ namespace Gizbox
             tail = newNode;
             allNodes.Add(newNode);
             Count++;
+
+            return newNode;
         }
 
-        public void AddFirst(T value)
+        public Node AddFirst(T value)
         {
             if(head == null)
             {
@@ -231,7 +234,8 @@ namespace Gizbox
                 tail = firstNode;
                 allNodes.Add(firstNode);
                 Count++;
-                return;
+
+                return firstNode;
             }
 
             Node newNode = new Node(value, this, null, head);
@@ -239,6 +243,32 @@ namespace Gizbox
             head = newNode;
             allNodes.Add(newNode);
             Count++;
+
+            return newNode;
+        }
+
+        public Node InsertAfter(Node targetNode, T val)
+        {
+            if(targetNode == null || targetNode.owner != this || allNodes.Contains(targetNode) == false)
+                throw new Exception("invalid operation.");
+
+            Node newNode = new Node(val, this, targetNode, targetNode.Next);
+
+            if(targetNode.Next != null)
+            {
+                targetNode.Next.SetPrevInternal(newNode);
+            }
+            else
+            {
+                tail = newNode;
+            }
+
+            targetNode.SetNextInternal(newNode);
+
+            allNodes.Add(newNode);
+            Count++;
+
+            return newNode;
         }
 
         public void MoveBefore(Node targetNode, Node nodeToMove)

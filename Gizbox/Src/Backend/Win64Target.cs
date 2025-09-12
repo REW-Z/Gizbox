@@ -88,10 +88,10 @@ namespace Gizbox.Src.Backend
         private LList<X64Instruction> instructions = new();//1-n  1-1  n-1
 
         // 占位指令  
-        private HashSet<X64Instruction> callerSavePlaceHolders = new();//主调函数保存寄存器指令占位
-        private HashSet<X64Instruction> calleeSavePlaceHolders = new();//被调函数保存寄存器指令占位
-        private HashSet<X64Instruction> callerRestorePlaceHolders = new();//主调函数恢复寄存器占位
-        private HashSet<X64Instruction> calleeRestorePlaceHolders = new();//被调函数恢复寄存器占位
+        private Dictionary<SymbolTable, HashSet<LList<X64Instruction>.Node>> callerSavePlaceHolders = new();//主调函数保存寄存器指令占位
+        private Dictionary<SymbolTable, HashSet<LList<X64Instruction>.Node>>  callerRestorePlaceHolders = new();//主调函数恢复寄存器占位
+        private Dictionary<SymbolTable, LList<X64Instruction>.Node> calleeSavePlaceHolders = new();//被调函数保存寄存器指令占位
+        private Dictionary<SymbolTable, LList<X64Instruction>.Node> calleeRestorePlaceHolders = new();//被调函数恢复寄存器占位
 
 
 
@@ -681,16 +681,17 @@ namespace Gizbox.Src.Backend
 
                             //保存寄存器（非易失性需要由Callee保存）  
                             var placeholder = X64.placehold("callee_save");
-                            calleeSavePlaceHolders.Add(placeholder);
-                            instructions.AddLast(placeholder);
+                            var placeholderNode = instructions.AddLast(placeholder);
+                            calleeSavePlaceHolders.Add(funcEnv, placeholderNode);
                         }
                         break;
                     case "FUNC_END":
                         {
                             //恢复寄存器（非易失性需要由Callee保存） 
+                            Debug.Assert(funcEnv != null);
                             var placeholder = X64.placehold("callee_restore");
-                            calleeRestorePlaceHolders.Add(placeholder);
-                            instructions.AddLast(placeholder);
+                            var placeholderNode = instructions.AddLast(placeholder);
+                            calleeRestorePlaceHolders.Add(funcEnv, placeholderNode);
 
                             //函数尾声
                             instructions.AddLast(X64.mov(X64.rsp, X64.rbp));
@@ -741,15 +742,19 @@ namespace Gizbox.Src.Backend
                         {
                             // 第一参数是 函数名，第二个参数是 参数个数
                             string funcName = tac.arg0;
-
+                            var targetFuncRec = tacInf.oprand0.segmentRecs[0];
+                            Debug.Assert(targetFuncRec != null);
 
                             //调用前准备  
                             int rspSub = 0;
                             {
                                 // 调用者保存寄存器（易失性寄存器需Caller保存） (选择性保存)
                                 var placeholderSave = X64.placehold("caller_save");
-                                instructions.AddLast(placeholderSave);
-                                callerSavePlaceHolders.Add(placeholderSave);
+                                var placeholderSaveNode = instructions.AddLast(placeholderSave);
+
+                                if(callerSavePlaceHolders.ContainsKey(targetFuncRec.envPtr) == false)
+                                    callerSavePlaceHolders.Add(targetFuncRec.envPtr, new());
+                                callerSavePlaceHolders[targetFuncRec.envPtr].Add(placeholderSaveNode);
 
 
                                 // 栈帧16字节对齐 (如果是奇数个参数 -> 需要8字节对齐栈指针)
@@ -837,8 +842,11 @@ namespace Gizbox.Src.Backend
 
                                 //还原保存的寄存器(占位)  
                                 var placeholderRestore = X64.placehold("caller_restore");
-                                instructions.AddLast(placeholderRestore);
-                                callerRestorePlaceHolders.Add(placeholderRestore);
+                                var placeholderRestoreNode = instructions.AddLast(placeholderRestore);
+
+                                if(callerRestorePlaceHolders.ContainsKey(targetFuncRec.envPtr) == false)
+                                    callerRestorePlaceHolders.Add(targetFuncRec.envPtr, new());
+                                callerRestorePlaceHolders[targetFuncRec.envPtr].Add(placeholderRestoreNode);
                             }
                         }
                         break;
@@ -846,6 +854,9 @@ namespace Gizbox.Src.Backend
                         {
                             // 第一参数是 方法名（未混淆），第二个参数是参数个数
                             string methodName = tac.arg0;
+
+                            var targetFuncRec = tacInf.oprand0.segmentRecs[0];
+                            Debug.Assert(targetFuncRec != null);
 
 
                             //this参数载入寄存器  
@@ -865,8 +876,11 @@ namespace Gizbox.Src.Backend
                             {
                                 // 调用者保存寄存器（易失性寄存器需Caller保存） (选择性保存)
                                 var placeholderSave = X64.placehold("caller_save");
-                                instructions.AddLast(placeholderSave);
-                                callerSavePlaceHolders.Add(placeholderSave);
+                                var placeholderSaveNode = instructions.AddLast(placeholderSave);
+
+                                if(callerSavePlaceHolders.ContainsKey(targetFuncRec.envPtr) == false)
+                                    callerSavePlaceHolders.Add(targetFuncRec.envPtr, new());
+                                callerSavePlaceHolders[targetFuncRec.envPtr].Add(placeholderSaveNode);
 
 
                                 // 栈帧16字节对齐 (如果是奇数个参数 -> 需要8字节对齐栈指针)
@@ -954,8 +968,11 @@ namespace Gizbox.Src.Backend
 
                                 //还原保存的寄存器(占位)  
                                 var placeholderRestore = X64.placehold("caller_restore");
-                                instructions.AddLast(placeholderRestore);
-                                callerRestorePlaceHolders.Add(placeholderRestore);
+                                var placeholderRestoreNode = instructions.AddLast(placeholderRestore);
+
+                                if(callerRestorePlaceHolders.ContainsKey(targetFuncRec.envPtr) == false)
+                                    callerRestorePlaceHolders.Add(targetFuncRec.envPtr, new());
+                                callerRestorePlaceHolders[targetFuncRec.envPtr].Add(placeholderRestoreNode);
                             }
                         }
                         break;
@@ -1315,8 +1332,16 @@ namespace Gizbox.Src.Backend
                 //变量节点
                 foreach(var (_, rec) in func.funcRec.envPtr.records)
                 {
-                    if(rec.category != SymbolTable.RecordCatagory.Param && rec.category != SymbolTable.RecordCatagory.Variable)
+                    if(rec.category != SymbolTable.RecordCatagory.Param &&
+                        rec.category != SymbolTable.RecordCatagory.Variable)
                         continue;
+
+                    if(cfg.varialbeLiveInfos.ContainsKey(rec) == false)
+                    {
+                        GixConsole.LogLine($"局部变量或参数 {rec.name} 没有活跃信息");
+                        var newNode = gpGraph.AddVarNode(rec);
+                        continue;
+                    }
 
                     var type = GType.Parse(rec.typeExpression);
                     if(type.IsSSE)
@@ -1354,13 +1379,11 @@ namespace Gizbox.Src.Backend
                 }
 
 
-                //尝试着色（目前只用 callee-save（非易失）寄存器）    
+                //着色（目前只用 callee-save（非易失）寄存器）    
                 //使用 callee-save 只需在函数序言/尾声一次性保存/恢复“实际用到的非易失寄存器”，对调用点零改动，最简单直接。
-                bool success = gpGraph.TryColoring(X64RegisterUtility.GPCalleeSaveRegs.Where(r => r != RegisterEnum.RBP).ToArray());
-                bool successSSE = sseGraph.TryColoring(X64RegisterUtility.XMMCalleeSaveRegs);
+                gpGraph.Coloring(X64RegisterUtility.GPCalleeSaveRegs.Where(r => r != RegisterEnum.RBP).ToArray());
+                sseGraph.Coloring(X64RegisterUtility.XMMCalleeSaveRegs);
 
-                //需要溢出->重写图着色的迭代，直到着色成功  
-                //......
 
                 //寄存器分配后的统一重写阶段  
                 {
@@ -1378,7 +1401,7 @@ namespace Gizbox.Src.Backend
                             sseAssign[n.variable] = n.assignedColor;
                     }
 
-                    //统计本函数实际用到的寄存器集合  
+                    //统计本函数实际用到的寄存器集合（不应包含rbp）  
                     var usedGpRegs = new HashSet<RegisterEnum>(gpAssign.Values);
                     var usedXmmRegs = new HashSet<RegisterEnum>(sseAssign.Values);
 
@@ -1388,8 +1411,87 @@ namespace Gizbox.Src.Backend
                     var funcUsedCallerGP = new HashSet<RegisterEnum>(usedGpRegs.Where(r => X64RegisterUtility.GPCallerSaveRegs.Contains(r)));
                     var funcUsedCallerXMM = new HashSet<RegisterEnum>(usedXmmRegs.Where(r => X64RegisterUtility.XMMCallerSaveRegs.Contains(r)));
 
-                    //占位展开  
-                    //todo
+                    //caller-save占位展开  
+                    if(callerSavePlaceHolders.TryGetValue(func.funcRec.envPtr, out var list))
+                    {
+                        foreach(var placeholder in list)
+                        {
+                            var ind = placeholder.Prev;
+                            //var right = placeholder.Next;
+
+                            instructions.Remove(placeholder);
+
+                            int bytes = funcUsedCallerGP.Count * 8 + funcUsedCallerXMM.Count * 16;
+                            
+                            //对齐字节数  
+                            if(bytes % 16 != 0)
+                            {
+                                bytes += 8;
+                            }
+                            //rsp移动  
+                            ind = instructions.InsertAfter(ind, X64.sub(X64.rsp, X64.imm(bytes)));
+
+                            //保存寄存器
+                            int offset = 0;
+                            foreach(var reg in funcUsedCallerGP)
+                            {
+                                ind = instructions.InsertAfter(ind, X64.mov(X64.mem(X64.rsp, displacement:offset), new X64Reg(reg)));
+                                offset += 8;
+                            }
+                            foreach(var reg in funcUsedCallerXMM)
+                            {
+                                ind = instructions.InsertAfter(ind, X64.movdqu(X64.mem(X64.rsp, displacement: offset), new X64Reg(reg)));
+                                offset += 16;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        throw new GizboxException(ExceptioName.Undefine, $"placeholder not exist:{func?.funcRec?.name ?? "?"}");
+                    }
+
+                    //caller-restore占位展开  
+                    if(callerRestorePlaceHolders.TryGetValue(func.funcRec.envPtr, out var restoreList))
+                    {
+                        foreach(var placeholder in restoreList)
+                        {
+                            var ind = placeholder.Prev;
+                            //var right = placeholder.Next;
+
+                            instructions.Remove(placeholder);
+
+                            int bytes = funcUsedCallerGP.Count * 8 + funcUsedCallerXMM.Count * 16;
+
+                            //对齐字节数  
+                            if(bytes % 16 != 0)
+                            {
+                                bytes += 8;
+                            }
+                            //恢复寄存器
+                            int offset = 0;
+                            foreach(var reg in funcUsedCallerGP)
+                            {
+                                ind = instructions.InsertAfter(ind, X64.mov(new X64Reg(reg), X64.mem(X64.rsp, displacement: offset)));
+                                offset += 8;
+                            }
+                            foreach(var reg in funcUsedCallerXMM)
+                            {
+                                ind = instructions.InsertAfter(ind, X64.movdqu(new X64Reg(reg), X64.mem(X64.rsp, displacement: offset)));
+                                offset += 16;
+                            }
+
+                            //rsp移动  
+                            ind = instructions.InsertAfter(ind, X64.add(X64.rsp, X64.imm(bytes)));
+                        }
+                    }
+                    else
+                    {
+                        throw new GizboxException(ExceptioName.Undefine, $"placeholder not exist:{func?.funcRec?.name ?? "?"}");
+                    }
+
+                    instructions.Rebuild();
+
+
 
                     //替换虚拟寄存器，尝试溢出
                     //todo

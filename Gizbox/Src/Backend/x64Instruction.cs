@@ -107,8 +107,8 @@ namespace Gizbox.Src.Backend
         movdqa, // aligned packed integer
         movdqu, // unaligned packed integer
 
-        movzx,//带符号扩展
-        movsx,//填零扩展
+        movzx,//填零扩展
+        movsx,//带符号扩展
 
         push,
         pop,
