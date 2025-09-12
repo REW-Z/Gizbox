@@ -356,7 +356,7 @@ namespace Gizbox.LRParse
             else if (actions[i][a].type != act.type && actions[i][a].num != act.num)
             {
                 var prevAct = actions[i][a];
-                GixConsole.LogLine("发生" + prevAct.type.ToString() + "-" + act.type.ToString() + "冲突！");
+                GixConsole.WriteLine("发生" + prevAct.type.ToString() + "-" + act.type.ToString() + "冲突！");
                 throw new Exception("语法动作冲突：ACTION[" + i + ", " + a + "]   old:" + actions[i][a].ToString() + "  new:" + act.ToString());
             }
 
@@ -617,7 +617,7 @@ namespace Gizbox.LRParse
 
 
 
-            GixConsole.LogLine(strb.ToString());
+            GixConsole.WriteLine(strb.ToString());
         }
     }
 
@@ -949,31 +949,31 @@ namespace Gizbox.LALRGenerator
             NewTerminal("$");//结束符  
 
             //文法增广  
-            GixConsole.LogLine("文法初始化完成...\n文法增广...");
+            GixConsole.WriteLine("文法初始化完成...\n文法增广...");
             outputData.augmentedStartSymbol = NewNonterminal(@"S'");
             NewProduction(@"S' -> " + outputData.startSymbol.name);
             //CRE：S' -> S产生式是隐式规约的（实际不归约）
 
 
             //FIRST集计算（从开始符号递归）  
-            GixConsole.LogLine("开始计算FIRST集");
+            GixConsole.WriteLine("开始计算FIRST集");
             InitFIRSTCollections();
 
 
             // DEBUG  
             {
-                GixConsole.LogLine("\n\n\n***输出FIRST集计算结果*** ");
+                GixConsole.WriteLine("\n\n\n***输出FIRST集计算结果*** ");
                 foreach (var nont in outputData.nonterminals)
                 {
-                    GixConsole.LogLine("符号" + nont.name + "的FIRST集:");
-                    GixConsole.LogLine("{ " + string.Concat(nont.cachedFIRST.ToArray().Select(s => (s != null ? s.name : "ε") + ",")) + "}");
+                    GixConsole.WriteLine("符号" + nont.name + "的FIRST集:");
+                    GixConsole.WriteLine("{ " + string.Concat(nont.cachedFIRST.ToArray().Select(s => (s != null ? s.name : "ε") + ",")) + "}");
                 }
             }
 
 
 
 
-            GixConsole.LogLine("开始构造项集族");
+            GixConsole.WriteLine("开始构造项集族");
 
             //构造规范LR(1)项集族（同时缓存规范GOTO表）    
             InitCanonicalItemsCollection();
@@ -1033,7 +1033,7 @@ namespace Gizbox.LALRGenerator
                 for (int i = 0; i < C.Count; ++i)
                 {
                     var I = C[i];
-                    GixConsole.LogLine("遍历第" + i + "个项集族");
+                    GixConsole.WriteLine("遍历第" + i + "个项集族");
 
                     //for(每个文法符号X)
                     foreach (var X in outputData.symbols)//文法符号X可以是终结符和非终结符  
@@ -1047,7 +1047,7 @@ namespace Gizbox.LALRGenerator
                             C.Add(gotoix);
                             anyAdded = true;
                             count++;
-                            GixConsole.LogLine("将第" + C.Count + "个状态加入项集族");
+                            GixConsole.WriteLine("将第" + C.Count + "个状态加入项集族");
 
                             //缓存  
                             int jIdx = C.Count - 1;
@@ -1056,7 +1056,7 @@ namespace Gizbox.LALRGenerator
                             if (cachedCanonicalGOTO[i].ContainsKey(X) == false)
                             {
                                 cachedCanonicalGOTO[i][X] = jIdx;
-                                GixConsole.LogLine("cache goto(" + i + ", " + X.name + ") = " + jIdx);
+                                GixConsole.WriteLine("cache goto(" + i + ", " + X.name + ") = " + jIdx);
                             }
                         }
                     }
@@ -1075,12 +1075,12 @@ namespace Gizbox.LALRGenerator
 
             //DEBUG
             {
-                GixConsole.LogLine("\n\n\n***输出项集族***");
+                GixConsole.WriteLine("\n\n\n***输出项集族***");
                 for (int i = 0; i < this.canonicalItemCollection.Count; ++i)
                 {
-                    GixConsole.LogLine("项集I" + i + ":");
+                    GixConsole.WriteLine("项集I" + i + ":");
 
-                    GixConsole.LogLine(this.canonicalItemCollection[i].ToExpression());
+                    GixConsole.WriteLine(this.canonicalItemCollection[i].ToExpression());
                 }
             }
 
@@ -1116,39 +1116,39 @@ namespace Gizbox.LALRGenerator
 
             //DEBUG  
             {
-                GixConsole.LogLine("------------------------规范LR(1)项集族的GOTO表--------------------------");
-                GixConsole.LogLine("-------------------------------------------------------------------------");
-                GixConsole.Log("状态\t|");
+                GixConsole.WriteLine("------------------------规范LR(1)项集族的GOTO表--------------------------");
+                GixConsole.WriteLine("-------------------------------------------------------------------------");
+                GixConsole.Write("状态\t|");
                 foreach (var X in outputData.symbols)
                 {
-                    GixConsole.Log("\t" + X.name);
+                    GixConsole.Write("\t" + X.name);
                 }
-                GixConsole.Log("\n");
-                GixConsole.LogLine("-------------------------------------------------------------------------");
+                GixConsole.Write("\n");
+                GixConsole.WriteLine("-------------------------------------------------------------------------");
                 for (int i = 0; i < this.canonicalItemCollection.Count; ++i)
                 {
                     if (cachedCanonicalGOTO.ContainsKey(i))
                     {
-                        GixConsole.Log(i + "\t|");
+                        GixConsole.Write(i + "\t|");
                         foreach (var X in outputData.symbols)
                         {
                             if (cachedCanonicalGOTO[i].ContainsKey(X))
                             {
-                                GixConsole.Log("\t" + cachedCanonicalGOTO[i][X]);
+                                GixConsole.Write("\t" + cachedCanonicalGOTO[i][X]);
                             }
                             else
                             {
-                                GixConsole.Log("\t ");
+                                GixConsole.Write("\t ");
                             }
                         }
-                        GixConsole.Log('\n');
+                        GixConsole.Write('\n');
                     }
                     else
                     {
-                        GixConsole.Log(i + "\t|\n");
+                        GixConsole.Write(i + "\t|\n");
                     }
                 }
-                GixConsole.LogLine("-------------------------------------------------------------------------");
+                GixConsole.WriteLine("-------------------------------------------------------------------------");
 
                 //Pause
                 Compiler.Pause("规范LR(1)项集族的GOTO表构建完毕");
@@ -1175,7 +1175,7 @@ namespace Gizbox.LALRGenerator
 
                     if (Utils_IsSameCore(this.canonicalItemCollection[i], this.canonicalItemCollection[j]))
                     {
-                        GixConsole.LogLine("第" + i + "个项集和第" + j + "个项集有相同核心，可以合并。");
+                        GixConsole.WriteLine("第" + i + "个项集和第" + j + "个项集有相同核心，可以合并。");
 
                         if (anySame == false)
                         {
@@ -1200,8 +1200,8 @@ namespace Gizbox.LALRGenerator
             //DEBUG  
             for (int i = 0; i < groups.Count; ++i)
             {
-                GixConsole.LogLine("group" + i);
-                GixConsole.LogLine("{" + string.Concat(groups[i].Select(num => num.ToString() + ",")) + "}");
+                GixConsole.WriteLine("group" + i);
+                GixConsole.WriteLine("{" + string.Concat(groups[i].Select(num => num.ToString() + ",")) + "}");
             }
             //新的LALR项集族
             outputData.lalrStates = new List<State>();
@@ -1215,7 +1215,7 @@ namespace Gizbox.LALRGenerator
                     State state = new State(i, "I_" + g[0], this.canonicalItemCollection[g[0]]);
                     outputData.lalrStates.Add(state);
 
-                    GixConsole.LogLine("创建了状态" + state.idx);
+                    GixConsole.WriteLine("创建了状态" + state.idx);
                 }
                 else
                 {
@@ -1225,7 +1225,7 @@ namespace Gizbox.LALRGenerator
                     State state = new State(i, "I" + string.Concat(g.Select(num => "_" + num.ToString())), unionSet);
                     outputData.lalrStates.Add(state);
 
-                    GixConsole.LogLine("创建了状态" + state.idx);
+                    GixConsole.WriteLine("创建了状态" + state.idx);
                 }
             }
 
@@ -1235,12 +1235,12 @@ namespace Gizbox.LALRGenerator
 
             //DEBUG
             {
-                GixConsole.LogLine("\n\n\n***新的LALR项集族***");
+                GixConsole.WriteLine("\n\n\n***新的LALR项集族***");
                 for (int i = 0; i < outputData.lalrStates.Count; ++i)
                 {
-                    GixConsole.LogLine("状态" + outputData.lalrStates[i].name + ":");
+                    GixConsole.WriteLine("状态" + outputData.lalrStates[i].name + ":");
 
-                    GixConsole.LogLine(outputData.lalrStates[i].set.ToExpression());
+                    GixConsole.WriteLine(outputData.lalrStates[i].set.ToExpression());
                 }
             }
         }

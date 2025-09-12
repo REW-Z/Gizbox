@@ -3146,7 +3146,7 @@ namespace Gizbox.SemanticRule
         public static void Log(object content)
         {
             if (!Compiler.enableLogSemanticAnalyzer) return;
-            GixConsole.LogLine("SematicAnalyzer >>>>" + content);
+            GixConsole.WriteLine("SematicAnalyzer >>>>" + content);
         }
     }
 }

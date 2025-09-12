@@ -48,8 +48,8 @@ namespace Gizbox
             SimpleParser parser = new SimpleParser();
             parser.Parse(tokens);
 
-            GixConsole.LogLine("\n\n语法分析树：");
-            GixConsole.LogLine(parser.parseTree.Serialize());
+            GixConsole.WriteLine("\n\n语法分析树：");
+            GixConsole.WriteLine(parser.parseTree.Serialize());
 
             return parser.parseTree;
         }
@@ -70,8 +70,8 @@ namespace Gizbox
             parser.Parse(tokens);
 
 
-            GixConsole.LogLine("\n\n语法分析树：");
-            GixConsole.LogLine(parser.parseTree.Serialize());
+            GixConsole.WriteLine("\n\n语法分析树：");
+            GixConsole.WriteLine(parser.parseTree.Serialize());
 
             return parser.parseTree;
         }
@@ -83,7 +83,7 @@ namespace Gizbox
         {
             return;
 
-            GixConsole.LogLine(txt + "\n按任意键继续...");
+            GixConsole.WriteLine(txt + "\n按任意键继续...");
             GixConsole.Pause();
         }
 
@@ -203,7 +203,7 @@ namespace Gizbox
             ir.name = libName;
             Gizbox.IR.ILSerializer.Serialize(savePath, ir);
 
-            Gizbox.GixConsole.LogLine($"Lib {libName} Complete Finish!");
+            Gizbox.GixConsole.WriteLine($"Lib {libName} Complete Finish!");
         }
 
         /// <summary>

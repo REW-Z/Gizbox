@@ -333,7 +333,7 @@ namespace Gizbox
         private static void Log(object content)
         {
             if(!Compiler.enableLogScanner) return;
-            GixConsole.LogLine("Scanner >>>" + content);
+            GixConsole.WriteLine("Scanner >>>" + content);
         }
     }
 }

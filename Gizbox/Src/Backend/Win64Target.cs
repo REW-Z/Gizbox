@@ -7,6 +7,8 @@ using System.Linq;
 using Gizbox;
 using Gizbox.IR;
 
+using InstructionNode = Gizbox.LList<Gizbox.Src.Backend.X64Instruction>.Node;
+
 
 
 //      (RAX, RCX, RDX, R8, R9, R10, R11、 XMM0-XMM5 是调用者保存的寄存器)
@@ -58,7 +60,7 @@ namespace Gizbox.Src.Backend
         {
             if(!Compiler.enableLogCodeGen)
                 return;
-            GixConsole.LogLine("Win64 >>>" + content);
+            GixConsole.WriteLine("Win64 >>>" + content);
         }
 
         public static RecAdditionInfo GetAdditionInf(this SymbolTable.Record rec)
@@ -120,7 +122,7 @@ namespace Gizbox.Src.Backend
         // 类名-虚函数表roKey
         public Dictionary<string, string> vtableRoKeys = new();
         // 当前函数作用域  
-        private Dictionary<SymbolTable, BiDictionary<SymbolTable.Record, X64Reg>> vRegs = new();
+        private Dictionary<SymbolTable, Dictionary<SymbolTable.Record, List<(InstructionNode instrNode, int operandIdx)>>> vRegs = new();
         private SymbolTable globalEnv = null;
         private SymbolTable funcEnv = null;
 
@@ -410,6 +412,7 @@ namespace Gizbox.Src.Backend
 
             //控制流图  
             cfg ??= new();
+            cfg.blocks = this.blocks;
             for(int i = 0; i < blocks.Count; ++i)
             {
                 var currentBlock = blocks[i];
@@ -567,12 +570,12 @@ namespace Gizbox.Src.Backend
                     $"活跃变量分析未收敛，迭代次数超过 {maxIterations}");
             }
 
-            // 计算活跃区间  
+            // 计算活跃区间并和合并  
             foreach(var b in blocks)
             {
                 b.CaculateLiveRanges();
             }
-            cfg.CaculateLiveInfos();
+            cfg.CaculateAndMergeLiveInfos();
 
             // 初步确定局部变量的栈帧布局  
             if(buildMode == BuildMode.Debug)
@@ -1338,7 +1341,7 @@ namespace Gizbox.Src.Backend
 
                     if(cfg.varialbeLiveInfos.ContainsKey(rec) == false)
                     {
-                        GixConsole.LogLine($"局部变量或参数 {rec.name} 没有活跃信息");
+                        GixConsole.WriteLine($"局部变量或参数 {rec.name} 没有活跃信息");
                         var newNode = gpGraph.AddVarNode(rec);
                         continue;
                     }
@@ -1417,8 +1420,6 @@ namespace Gizbox.Src.Backend
                         foreach(var placeholder in list)
                         {
                             var ind = placeholder.Prev;
-                            //var right = placeholder.Next;
-
                             instructions.Remove(placeholder);
 
                             int bytes = funcUsedCallerGP.Count * 8 + funcUsedCallerXMM.Count * 16;
@@ -1447,7 +1448,7 @@ namespace Gizbox.Src.Backend
                     }
                     else
                     {
-                        throw new GizboxException(ExceptioName.Undefine, $"placeholder not exist:{func?.funcRec?.name ?? "?"}");
+                        //没被调用过
                     }
 
                     //caller-restore占位展开  
@@ -1456,13 +1457,10 @@ namespace Gizbox.Src.Backend
                         foreach(var placeholder in restoreList)
                         {
                             var ind = placeholder.Prev;
-                            //var right = placeholder.Next;
-
                             instructions.Remove(placeholder);
 
                             int bytes = funcUsedCallerGP.Count * 8 + funcUsedCallerXMM.Count * 16;
-
-                            //对齐字节数  
+                            //16字节对齐
                             if(bytes % 16 != 0)
                             {
                                 bytes += 8;
@@ -1486,15 +1484,117 @@ namespace Gizbox.Src.Backend
                     }
                     else
                     {
-                        throw new GizboxException(ExceptioName.Undefine, $"placeholder not exist:{func?.funcRec?.name ?? "?"}");
+                        //没被调用过
                     }
 
+                    //callee-save占位展开  
+                    if(calleeSavePlaceHolders.TryGetValue(func.funcRec.envPtr, out var saveplaceholder))
+                    {
+                        //todo
+                        var ind = saveplaceholder.Prev;
+                        instructions.Remove(saveplaceholder);
+
+                        int bytes = funcUsedCalleeGP.Count * 8 + funcUsedCalleeXMM.Count * 16;
+                        //16字节对齐
+                        if (bytes % 16 != 8)
+                        {
+                            bytes += 8;
+                        }
+                        //rsp移动  
+                        ind = instructions.InsertAfter(ind, X64.sub(X64.rsp, X64.imm(bytes)));
+
+                        //保存寄存器  
+                        int offset = 0;
+                        foreach(var reg in funcUsedCalleeGP)
+                        {
+                            ind = instructions.InsertAfter(ind, X64.mov(X64.mem(X64.rsp, displacement: offset), new X64Reg(reg)));
+                            offset += 8;
+                        }
+                        foreach(var reg in funcUsedCalleeXMM)
+                        {
+                            ind = instructions.InsertAfter(ind, X64.movdqu(X64.mem(X64.rsp, displacement: offset), new X64Reg(reg)));
+                            offset += 16;
+                        }
+
+                    }
+                    //callee-restore占位展开  
+                    if(calleeRestorePlaceHolders.TryGetValue(func.funcRec.envPtr, out var restorenode))
+                    {
+                        var ind = restorenode.Prev;
+                        instructions.Remove(restorenode);
+
+                        int bytes = funcUsedCalleeGP.Count * 8 + funcUsedCalleeXMM.Count * 16;
+                        //16字节对齐
+                        if(bytes % 16 != 0)
+                        {
+                            bytes += 8;
+                        }
+                        //恢复寄存器
+                        int offset = 0;
+                        foreach(var reg in funcUsedCalleeGP)
+                        {
+                            ind = instructions.InsertAfter(ind, X64.mov(new X64Reg(reg), X64.mem(X64.rsp, displacement: offset)));
+                            offset += 8;
+                        }
+                        foreach(var reg in funcUsedCalleeXMM)
+                        {
+                            ind = instructions.InsertAfter(ind, X64.movdqu(new X64Reg(reg), X64.mem(X64.rsp, displacement: offset)));
+                            offset += 16;
+                        }
+
+                        //rsp移动  
+                        ind = instructions.InsertAfter(ind, X64.add(X64.rsp, X64.imm(bytes)));
+                    }
                     instructions.Rebuild();
 
 
+                    //替换虚拟寄存器，生成溢出代码  
+                    foreach(var (symbTable, dict) in this.vRegs)
+                    {
+                        foreach(var (rec, vregList) in dict)
+                        {
+                            bool hasAllocReg = false;
+                            RegisterEnum regAlloc = RegisterEnum.Undefined;
+                            if(gpAssign.ContainsKey(rec))
+                            {
+                                hasAllocReg = true;
+                                regAlloc = gpAssign[rec];
+                            }
+                            else if(sseAssign.ContainsKey(rec))
+                            {
+                                hasAllocReg = true;
+                                regAlloc = sseAssign[rec];
+                            }
 
-                    //替换虚拟寄存器，尝试溢出
-                    //todo
+                            foreach(var (instr, operandIdx) in vregList)
+                            {
+                                if(hasAllocReg)
+                                {
+                                    var operand = operandIdx == 0 ? instr.value.operand0 : instr.value.operand1;
+                                    if((operand is X64Reg vr) == true)
+                                    {
+                                        vr.AllocPhysReg(regAlloc);
+                                    }
+                                    else
+                                    {
+                                        throw new GizboxException(ExceptioName.Undefine, "operand is not vreg.");
+                                    }
+                                }
+                                else
+                                {
+                                    //homing/spill
+                                    var ind = instr;
+                                    //remove 
+                                    //...
+                                }
+                            }
+                        }
+                    }
+
+
+
+                    //mem-mem合法化  
+                    //...
                 }
             }
         }
@@ -2121,12 +2221,16 @@ namespace Gizbox.Src.Backend
             //局部变量  
             if(funcEnv != null)
             {
-                vRegs[funcEnv].TryAdd(varrec, xoperand);
+                if(vRegs[funcEnv].ContainsKey(varrec) == false)
+                    vRegs[funcEnv][varrec] = new List<X64Reg>();
+                vRegs[funcEnv][varrec].Add(xoperand);
             }
             //全局变量
             else
             {
-                vRegs[globalEnv].TryAdd(varrec, xoperand);
+                if(vRegs[globalEnv].ContainsKey(varrec) == false)
+                    vRegs[globalEnv][varrec] = new List<X64Reg>();
+                vRegs[globalEnv][varrec].Add(xoperand);
             }
 
             return xoperand;

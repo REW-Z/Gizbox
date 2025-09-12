@@ -297,7 +297,7 @@ namespace Gizbox.LRParse
         private static void Log(object content)
         {
             if (!Compiler.enableLogParser) return;
-            GixConsole.LogLine("Parser >>>" + content);
+            GixConsole.WriteLine("Parser >>>" + content);
         }
     }
 }

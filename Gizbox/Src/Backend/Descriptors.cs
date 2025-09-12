@@ -103,7 +103,7 @@ namespace Gizbox.Src.Backend
             src.successors.Add(dst);
             dst.predecessors.Add(src);
         }
-        public void CaculateLiveInfos()
+        public void CaculateAndMergeLiveInfos()
         {
             foreach(var b in blocks)
             {
@@ -246,6 +246,7 @@ namespace Gizbox.Src.Backend
                     list = newlist;
                 }
                 list.AddRange(ranges);
+                GixConsole.WriteLine($"va:{va.name} 添加了 {ranges.Count} 个区间");
             }
         }
     }

@@ -228,7 +228,7 @@ namespace Gizbox
                 var terminalNode = new SimpleParseTree.Node() { isLeaf = true, name = terminal };
                 parseTree.AppendNode(currentNode, terminalNode);
 
-                GixConsole.LogLine("成功匹配:" + terminal);
+                GixConsole.WriteLine("成功匹配:" + terminal);
 
                 lookahead++;
             }

@@ -1037,7 +1037,7 @@ namespace Gizbox.IR
         public static void Log(object content)
         {
             if (!Compiler.enableLogILGenerator) return;
-            GixConsole.LogLine("ILGen >>>" + content);
+            GixConsole.WriteLine("ILGen >>>" + content);
         }
 
     }

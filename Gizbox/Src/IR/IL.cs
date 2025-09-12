@@ -427,13 +427,13 @@ namespace Gizbox.IR
         //打印  
         public void Print()
         {
-            GixConsole.LogLine("中间代码输出：(" + codes.Count + "行)");
-            GixConsole.LogLine(new string('-', 50));
+            GixConsole.WriteLine("中间代码输出：(" + codes.Count + "行)");
+            GixConsole.WriteLine(new string('-', 50));
             for (int i = 0; i < codes.Count; ++i)
             {
-                GixConsole.LogLine($"{i.ToString().PadRight(4)}|status {scopeStatusArr[i].ToString().PadRight(3)}|{codes[i].ToExpression()}");
+                GixConsole.WriteLine($"{i.ToString().PadRight(4)}|status {scopeStatusArr[i].ToString().PadRight(3)}|{codes[i].ToExpression()}");
             }
-            GixConsole.LogLine(new string('-', 50));
+            GixConsole.WriteLine(new string('-', 50));
         }
     }
 

@@ -107,10 +107,10 @@ namespace Gizbox.ScriptEngine
 
         public void Print()
         {
-            GixConsole.LogLine("堆区(" + this.data.Count + ")");
+            GixConsole.WriteLine("堆区(" + this.data.Count + ")");
             for (int i = 1; i < this.data.Count; ++i)
             {
-                GixConsole.LogLine("(" + i + ")" + this.data[i]);
+                GixConsole.WriteLine("(" + i + ")" + this.data[i]);
             }
         }
     }
@@ -1053,7 +1053,7 @@ namespace Gizbox.ScriptEngine
         private static void Log(object content)
         {
             if (!Compiler.enableLogScriptEngine) return;
-            GixConsole.LogLine("ScriptEngine >>" + content);
+            GixConsole.WriteLine("ScriptEngine >>" + content);
         }
 
         //Profiler

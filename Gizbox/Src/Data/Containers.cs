@@ -541,7 +541,7 @@ namespace Gizbox
                 strb.AppendLine(brace + lineChar + node.value);
             }
 
-            Gizbox.GixConsole.LogLine(strb.ToString());
+            Gizbox.GixConsole.WriteLine(strb.ToString());
         }
     }
 }

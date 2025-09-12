@@ -437,10 +437,10 @@ namespace Gizbox
         public void Print()
         {
             int pad = 16;
-            GixConsole.LogLine();
-            GixConsole.LogLine($"|-{new string('-', pad)}-{new string('-', pad)}-{ this.name.PadRight(pad) + (this.parent != null ? ("(parent:" + this.parent.name + ")") : "").PadRight(pad) }-{new string('-', pad)}-{new string('-', pad)}-{new string('-', pad)}|");
-            GixConsole.LogLine($"|{"NAME".PadRight(pad)}|{"RAW".PadRight(pad)}|{"CATAGORY".PadRight(pad)}|{"TYPE".PadRight(pad)}|{"ADDR".PadRight(pad)}|{"Other".PadRight(pad)}|{"SubTable".PadRight(pad)}|");
-            GixConsole.LogLine($"|{new string('-', pad * 7 + 6)}|");
+            GixConsole.WriteLine();
+            GixConsole.WriteLine($"|-{new string('-', pad)}-{new string('-', pad)}-{ this.name.PadRight(pad) + (this.parent != null ? ("(parent:" + this.parent.name + ")") : "").PadRight(pad) }-{new string('-', pad)}-{new string('-', pad)}-{new string('-', pad)}|");
+            GixConsole.WriteLine($"|{"NAME".PadRight(pad)}|{"RAW".PadRight(pad)}|{"CATAGORY".PadRight(pad)}|{"TYPE".PadRight(pad)}|{"ADDR".PadRight(pad)}|{"Other".PadRight(pad)}|{"SubTable".PadRight(pad)}|");
+            GixConsole.WriteLine($"|{new string('-', pad * 7 + 6)}|");
             foreach (var key in records.Keys)
             {
                 var rec = records[key];
@@ -451,10 +451,10 @@ namespace Gizbox
                     otherinfo = rec.initValue.Trim();
                 }
 
-                GixConsole.LogLine($"|{rec.name.PadRight(pad)}|{rec.rawname.PadRight(pad)}|{rec.category.ToString().PadRight(pad)}|{rec.typeExpression.PadRight(pad)}|{rec.addr.ToString().PadRight(pad)}|{otherinfo.PadRight(pad)}|{(rec.envPtr != null ? rec.envPtr.name : "").PadRight(pad)}|");
+                GixConsole.WriteLine($"|{rec.name.PadRight(pad)}|{rec.rawname.PadRight(pad)}|{rec.category.ToString().PadRight(pad)}|{rec.typeExpression.PadRight(pad)}|{rec.addr.ToString().PadRight(pad)}|{otherinfo.PadRight(pad)}|{(rec.envPtr != null ? rec.envPtr.name : "").PadRight(pad)}|");
             }
-            GixConsole.LogLine($"|{new string('-', pad * 7 + 6)}|");
-            GixConsole.LogLine();
+            GixConsole.WriteLine($"|{new string('-', pad * 7 + 6)}|");
+            GixConsole.WriteLine();
 
             if(this.children .Count > 0)
             {
@@ -1095,7 +1095,7 @@ namespace Gizbox
     {
         public static void Log(object content)
         {
-            Gizbox.GixConsole.LogLine(content);
+            Gizbox.GixConsole.WriteLine(content);
         }
         public static void Assert(bool expr)
         {
@@ -1107,14 +1107,14 @@ namespace Gizbox
     {
         public static bool enableSystemConsole = true;
         
-        public static void Log(object msg = null)
+        public static void Write(object msg = null)
         {
             if(GixConsole.enableSystemConsole)
             {
                 Console.Write(msg);
             }
         }
-        public static void LogLine(object msg = null)
+        public static void WriteLine(object msg = null)
         {
             if (GixConsole.enableSystemConsole)
             {
