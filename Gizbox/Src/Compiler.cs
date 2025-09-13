@@ -23,7 +23,7 @@ namespace Gizbox
         public string parserDataPath;
 
         //lib info  
-        public Dictionary<string, ILUnit> libsCache = new Dictionary<string, ILUnit>();
+        public Dictionary<string, IRUnit> libsCache = new Dictionary<string, IRUnit>();
         public List<string> libPathFindList = new List<string>();
 
         //CTOR  
@@ -87,7 +87,7 @@ namespace Gizbox
             GixConsole.Pause();
         }
 
-        public void AddLib(string libname, ILUnit lib)
+        public void AddLib(string libname, IRUnit lib)
         {
             this.libsCache[libname] = lib;
         }
@@ -102,7 +102,7 @@ namespace Gizbox
         /// <summary>
         /// 载入或者编译库（语义分析用）  
         /// </summary>
-        public ILUnit LoadLib(string libname)
+        public IRUnit LoadLib(string libname)
         {
             //编译器中查找  
             if (this.libsCache.ContainsKey(libname))
@@ -209,7 +209,7 @@ namespace Gizbox
         /// <summary>
         /// 编译  
         /// </summary>
-        public ILUnit Compile(string source)
+        public IRUnit Compile(string source)
         {
             if (string.IsNullOrEmpty(this.parserDataPath) && parserDataHardcode == false) throw new Exception("语法分析器数据源没有设置");
 
@@ -239,7 +239,7 @@ namespace Gizbox
 
 
             //语义分析  
-            ILUnit ir = new ILUnit();
+            IRUnit ir = new IRUnit();
             SemanticRule.SemanticAnalyzer semanticAnalyzer = new SemanticRule.SemanticAnalyzer(syntaxTree, ir, this);
             semanticAnalyzer.Analysis();
 

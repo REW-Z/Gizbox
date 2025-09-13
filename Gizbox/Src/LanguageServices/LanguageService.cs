@@ -90,7 +90,7 @@ namespace Gizbox.LanguageServices
         public int lineCount = 0;
 
         //临时数据
-        public ILUnit tempUnitCompiled;
+        public IRUnit tempUnitCompiled;
         public List<Token> tempTokens;
         public SyntaxTree tempAST;
 
@@ -834,7 +834,7 @@ namespace Gizbox.LanguageServices
         {
             try
             {
-                ILUnit unit = new IR.ILUnit();
+                IRUnit unit = new IR.IRUnit();
 
                 //词法分析  
                 Scanner scanner = new Scanner();

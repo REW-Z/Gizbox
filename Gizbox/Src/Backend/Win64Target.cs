@@ -51,8 +51,14 @@ namespace Gizbox.Src.Backend
     }
     public static class Win64Target
     {
-        public static void CodeGen(Compiler compiler, ILUnit ir)
+        public static void CodeGen(Compiler compiler, IRUnit ir)
         {
+            //依赖库作为编译单元进行代码生成
+            ir.AutoLoadDependencies(compiler, true); //加载依赖单元
+            HashSet<IRUnit> allunit = new();
+            //...
+
+            //本编译单元进行代码生成  
             Win64CodeGenContext context = new Win64CodeGenContext(compiler, ir);
 
             context.StartCodeGen();
@@ -74,7 +80,7 @@ namespace Gizbox.Src.Backend
     public class Win64CodeGenContext
     {
         public Compiler compiler;
-        public ILUnit ir;
+        public IRUnit ir;
 
         public static BuildMode buildMode = BuildMode.Debug;
 
@@ -135,20 +141,11 @@ namespace Gizbox.Src.Backend
         private const bool debugLogAsmInfos = true;
 
 
-
-
-        public Win64CodeGenContext(Compiler compiler, ILUnit ir)
+        public Win64CodeGenContext(Compiler compiler, IRUnit ir)
         {
             this.compiler = compiler;
             this.ir = ir;
 
-            //加载依赖单元、附加符号表信息   
-            foreach(var depName in ir.dependencies)
-            {
-                //Load Lib  
-                var depUnit = compiler.LoadLib(depName);
-                ir.AddDependencyLib(depUnit);
-            }
 
             //本单元
             {
@@ -199,6 +196,100 @@ namespace Gizbox.Src.Backend
             Pass2();
             Pass3();
             Pass4();
+        }
+
+        public string GetResult()
+        {
+            StringBuilder strb = new StringBuilder();
+
+            //global and extern  
+            strb.AppendLine("\n");
+            foreach(var g in globalVarInfos)
+            {
+                strb.AppendLine($"global  {g.Key}");
+            }
+            foreach(var g in globalFuncsInfos)
+            {
+                if(g.Key == "Main")
+                    continue;
+                strb.AppendLine($"global  {g.Key}");
+            }
+            foreach(var g in externVars)
+            {
+                strb.AppendLine($"extern  {g.Key}");
+            }
+            foreach(var g in externFuncs)
+            {
+                if(g.Key == "Main")
+                    continue;
+                strb.AppendLine($"extern  {g.Key}");
+            }
+
+            //.data
+            strb.AppendLine("\n");
+            strb.AppendLine("section .rdata");
+            foreach(var rodata in section_rdata)
+            {
+                if(rodata.Value.Count == 1)
+                {
+                    var (typeExpr, valExpr) = rodata.Value[0];
+                    strb.AppendLine($"\t{rodata.Key}  {UtilsW64.GetX64DefineType(typeExpr, valExpr)}");
+                }
+                else
+                {
+                    strb.AppendLine($"\t{rodata.Key}:");
+                    foreach(var (typeExpr, valExpr) in rodata.Value)
+                    {
+                        strb.AppendLine($"\t\t  {UtilsW64.GetX64DefineType(typeExpr, valExpr)}");
+                    }
+                }
+            }
+            strb.AppendLine("\n");
+            strb.AppendLine("section .data");
+            foreach(var data in section_data)
+            {
+                if(data.Value.Count == 1)
+                {
+                    var (typeExpr, valExpr) = data.Value[0];
+                    strb.AppendLine($"\t{data.Key}  {UtilsW64.GetX64DefineType(typeExpr, valExpr)}");
+                }
+                else
+                {
+                    strb.AppendLine($"\t{data.Key}:");
+                    foreach(var (typeExpr, valExpr) in data.Value)
+                    {
+                        strb.AppendLine($"\t\t  {UtilsW64.GetX64DefineType(typeExpr, valExpr)}");
+                    }
+                }
+            }
+            strb.AppendLine("\n");
+            strb.AppendLine("section .bss");
+            foreach(var bss in section_bss)
+            {
+                if(bss.Value.Count == 1)
+                {
+                    var typeExpr = bss.Value[0];
+                    strb.AppendLine($"\t{bss.Key}  {UtilsW64.GetX64ReserveDefineType(typeExpr)}");
+                }
+                else
+                {
+                    strb.AppendLine($"\t{bss.Key}:");
+                    foreach(var typeExpr in bss.Value)
+                    {
+                        strb.AppendLine($"\t\t  {UtilsW64.GetX64ReserveDefineType(typeExpr)}");
+                    }
+                }
+            }
+
+            //.text  
+            strb.AppendLine();
+            strb.AppendLine("section .text");
+            strb.AppendLine();
+            foreach(var instruction in instructions)
+            {
+                strb.Append(UtilityX64.SerializeInstruction(instruction));
+            }
+            return strb.ToString();
         }
 
 
@@ -1282,7 +1373,7 @@ namespace Gizbox.Src.Backend
         {
             //if(debugLogAsmInfos)
             //{
-            //    Print();
+            //    Win64Target.Log(GetResult());
             //}
 
             //变量虚拟寄存器信息  
@@ -1423,145 +1514,81 @@ namespace Gizbox.Src.Backend
                 sseGraph.Coloring(X64RegisterUtility.XMMCalleeSaveRegs);
 
 
-                //寄存器分配后的统一重写阶段  
+                // *** 寄存器分配后的统一重写阶段  *** 
+
+                //统计分配的结果
+                var gpAssign = new Dictionary<SymbolTable.Record, RegisterEnum>();
+                var sseAssign = new Dictionary<SymbolTable.Record, RegisterEnum>();
+                foreach(var n in gpGraph.allNodes)
                 {
-                    //统计分配的结果
-                    var gpAssign = new Dictionary<SymbolTable.Record, RegisterEnum>();
-                    var sseAssign = new Dictionary<SymbolTable.Record, RegisterEnum>();
-                    foreach(var n in gpGraph.allNodes)
+                    if(n.variable != null && n.assignedColor != RegisterEnum.Undefined)
+                        gpAssign[n.variable] = n.assignedColor;
+                }
+                foreach(var n in sseGraph.allNodes)
+                {
+                    if(n.variable != null && n.assignedColor != RegisterEnum.Undefined)
+                        sseAssign[n.variable] = n.assignedColor;
+                }
+
+                //统计本函数实际用到的寄存器集合（不应包含rbp）  
+                var usedGpRegs = new HashSet<RegisterEnum>(gpAssign.Values);
+                var usedXmmRegs = new HashSet<RegisterEnum>(sseAssign.Values);
+
+                var funcUsedCalleeGP = new HashSet<RegisterEnum>(usedGpRegs.Where(r => X64RegisterUtility.GPCalleeSaveRegs.Contains(r) && r != RegisterEnum.RBP));
+                var funcUsedCalleeXMM = new HashSet<RegisterEnum>(usedXmmRegs.Where(r => X64RegisterUtility.XMMCalleeSaveRegs.Contains(r)));
+
+                var funcUsedCallerGP = new HashSet<RegisterEnum>(usedGpRegs.Where(r => X64RegisterUtility.GPCallerSaveRegs.Contains(r)));
+                var funcUsedCallerXMM = new HashSet<RegisterEnum>(usedXmmRegs.Where(r => X64RegisterUtility.XMMCallerSaveRegs.Contains(r)));
+
+                GixConsole.WriteLine($"*****函数{func.funcRec.name}可以使用的寄存器：{string.Join(",", X64RegisterUtility.GPCalleeSaveRegs.Where(r => r != RegisterEnum.RBP).ToArray())}");
+                GixConsole.WriteLine($"*****函数{func.funcRec.name}使用到的寄存器：{string.Join(", ", (usedGpRegs).Select(r => r.ToString()))}");
+
+                //caller-save占位展开  
+                if(callerSavePlaceHolders.TryGetValue(func.funcRec.envPtr, out var list))
+                {
+                    foreach(var placeholder in list)
                     {
-                        if(n.variable != null && n.assignedColor != RegisterEnum.Undefined)
-                            gpAssign[n.variable] = n.assignedColor;
-                    }
-                    foreach(var n in sseGraph.allNodes)
-                    {
-                        if(n.variable != null && n.assignedColor != RegisterEnum.Undefined)
-                            sseAssign[n.variable] = n.assignedColor;
-                    }
+                        var ind = placeholder.Prev;
+                        instructions.Remove(placeholder);
 
-                    //统计本函数实际用到的寄存器集合（不应包含rbp）  
-                    var usedGpRegs = new HashSet<RegisterEnum>(gpAssign.Values);
-                    var usedXmmRegs = new HashSet<RegisterEnum>(sseAssign.Values);
+                        int bytes = funcUsedCallerGP.Count * 8 + funcUsedCallerXMM.Count * 16;
 
-                    var funcUsedCalleeGP = new HashSet<RegisterEnum>(usedGpRegs.Where(r => X64RegisterUtility.GPCalleeSaveRegs.Contains(r) && r != RegisterEnum.RBP));
-                    var funcUsedCalleeXMM = new HashSet<RegisterEnum>(usedXmmRegs.Where(r => X64RegisterUtility.XMMCalleeSaveRegs.Contains(r)));
-
-                    var funcUsedCallerGP = new HashSet<RegisterEnum>(usedGpRegs.Where(r => X64RegisterUtility.GPCallerSaveRegs.Contains(r)));
-                    var funcUsedCallerXMM = new HashSet<RegisterEnum>(usedXmmRegs.Where(r => X64RegisterUtility.XMMCallerSaveRegs.Contains(r)));
-
-                    GixConsole.WriteLine($"*****函数{func.funcRec.name}可以使用的寄存器：{string.Join(",", X64RegisterUtility.GPCalleeSaveRegs.Where(r => r != RegisterEnum.RBP).ToArray())}");
-                    GixConsole.WriteLine($"*****函数{func.funcRec.name}使用到的寄存器：{string.Join(", ", (usedGpRegs).Select(r => r.ToString()))}");
-
-                    //caller-save占位展开  
-                    if(callerSavePlaceHolders.TryGetValue(func.funcRec.envPtr, out var list))
-                    {
-                        foreach(var placeholder in list)
-                        {
-                            var ind = placeholder.Prev;
-                            instructions.Remove(placeholder);
-
-                            int bytes = funcUsedCallerGP.Count * 8 + funcUsedCallerXMM.Count * 16;
-                            
-                            //对齐字节数  
-                            if(bytes % 16 != 0)
-                            {
-                                bytes += 8;
-                            }
-                            //rsp移动  
-                            ind = instructions.InsertAfter(ind, X64.sub(X64.rsp, X64.imm(bytes)));
-
-                            //保存寄存器
-                            int offset = 0;
-                            foreach(var reg in funcUsedCallerGP)
-                            {
-                                ind = instructions.InsertAfter(ind, X64.mov(X64.mem(X64.rsp, displacement:offset), new X64Reg(reg)));
-                                offset += 8;
-                            }
-                            foreach(var reg in funcUsedCallerXMM)
-                            {
-                                ind = instructions.InsertAfter(ind, X64.movdqu(X64.mem(X64.rsp, displacement: offset), new X64Reg(reg)));
-                                offset += 16;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        //没被调用过
-                    }
-
-                    //caller-restore占位展开  
-                    if(callerRestorePlaceHolders.TryGetValue(func.funcRec.envPtr, out var restoreList))
-                    {
-                        foreach(var placeholder in restoreList)
-                        {
-                            var ind = placeholder.Prev;
-                            instructions.Remove(placeholder);
-
-                            int bytes = funcUsedCallerGP.Count * 8 + funcUsedCallerXMM.Count * 16;
-                            //16字节对齐
-                            if(bytes % 16 != 0)
-                            {
-                                bytes += 8;
-                            }
-                            //恢复寄存器
-                            int offset = 0;
-                            foreach(var reg in funcUsedCallerGP)
-                            {
-                                ind = instructions.InsertAfter(ind, X64.mov(new X64Reg(reg), X64.mem(X64.rsp, displacement: offset)));
-                                offset += 8;
-                            }
-                            foreach(var reg in funcUsedCallerXMM)
-                            {
-                                ind = instructions.InsertAfter(ind, X64.movdqu(new X64Reg(reg), X64.mem(X64.rsp, displacement: offset)));
-                                offset += 16;
-                            }
-
-                            //rsp移动  
-                            ind = instructions.InsertAfter(ind, X64.add(X64.rsp, X64.imm(bytes)));
-                        }
-                    }
-                    else
-                    {
-                        //没被调用过
-                    }
-
-                    //callee-save占位展开  
-                    if(calleeSavePlaceHolders.TryGetValue(func.funcRec.envPtr, out var saveplaceholder))
-                    {
-                        //todo
-                        var ind = saveplaceholder.Prev;
-                        instructions.Remove(saveplaceholder);
-
-                        int bytes = funcUsedCalleeGP.Count * 8 + funcUsedCalleeXMM.Count * 16;
-                        //16字节对齐
-                        if (bytes % 16 != 8)
+                        //对齐字节数  
+                        if(bytes % 16 != 0)
                         {
                             bytes += 8;
                         }
                         //rsp移动  
                         ind = instructions.InsertAfter(ind, X64.sub(X64.rsp, X64.imm(bytes)));
 
-                        //保存寄存器  
+                        //保存寄存器
                         int offset = 0;
-                        foreach(var reg in funcUsedCalleeGP)
+                        foreach(var reg in funcUsedCallerGP)
                         {
                             ind = instructions.InsertAfter(ind, X64.mov(X64.mem(X64.rsp, displacement: offset), new X64Reg(reg)));
                             offset += 8;
                         }
-                        foreach(var reg in funcUsedCalleeXMM)
+                        foreach(var reg in funcUsedCallerXMM)
                         {
                             ind = instructions.InsertAfter(ind, X64.movdqu(X64.mem(X64.rsp, displacement: offset), new X64Reg(reg)));
                             offset += 16;
                         }
-
                     }
-                    //callee-restore占位展开  
-                    if(calleeRestorePlaceHolders.TryGetValue(func.funcRec.envPtr, out var restorenode))
-                    {
-                        var ind = restorenode.Prev;
-                        instructions.Remove(restorenode);
+                }
+                else
+                {
+                    //没被调用过
+                }
 
-                        int bytes = funcUsedCalleeGP.Count * 8 + funcUsedCalleeXMM.Count * 16;
+                //caller-restore占位展开  
+                if(callerRestorePlaceHolders.TryGetValue(func.funcRec.envPtr, out var restoreList))
+                {
+                    foreach(var placeholder in restoreList)
+                    {
+                        var ind = placeholder.Prev;
+                        instructions.Remove(placeholder);
+
+                        int bytes = funcUsedCallerGP.Count * 8 + funcUsedCallerXMM.Count * 16;
                         //16字节对齐
                         if(bytes % 16 != 0)
                         {
@@ -1569,12 +1596,12 @@ namespace Gizbox.Src.Backend
                         }
                         //恢复寄存器
                         int offset = 0;
-                        foreach(var reg in funcUsedCalleeGP)
+                        foreach(var reg in funcUsedCallerGP)
                         {
                             ind = instructions.InsertAfter(ind, X64.mov(new X64Reg(reg), X64.mem(X64.rsp, displacement: offset)));
                             offset += 8;
                         }
-                        foreach(var reg in funcUsedCalleeXMM)
+                        foreach(var reg in funcUsedCallerXMM)
                         {
                             ind = instructions.InsertAfter(ind, X64.movdqu(new X64Reg(reg), X64.mem(X64.rsp, displacement: offset)));
                             offset += 16;
@@ -1583,63 +1610,128 @@ namespace Gizbox.Src.Backend
                         //rsp移动  
                         ind = instructions.InsertAfter(ind, X64.add(X64.rsp, X64.imm(bytes)));
                     }
-                    instructions.Rebuild();
+                }
+                else
+                {
+                    //没被调用过
+                }
 
+                //callee-save占位展开  
+                if(calleeSavePlaceHolders.TryGetValue(func.funcRec.envPtr, out var saveplaceholder))
+                {
+                    //todo
+                    var ind = saveplaceholder.Prev;
+                    instructions.Remove(saveplaceholder);
 
-                    //替换虚拟寄存器，生成溢出代码  
-                    foreach(var (symbTable, dict) in this.vRegs)
+                    int bytes = funcUsedCalleeGP.Count * 8 + funcUsedCalleeXMM.Count * 16;
+                    //16字节对齐
+                    if(bytes % 16 != 8)
                     {
-                        foreach(var (rec, vregList) in dict)
-                        {
-                            bool hasAllocReg = false;
-                            RegisterEnum regAlloc = RegisterEnum.Undefined;
-                            if(gpAssign.ContainsKey(rec))
-                            {
-                                hasAllocReg = true;
-                                regAlloc = gpAssign[rec];
-                            }
-                            else if(sseAssign.ContainsKey(rec))
-                            {
-                                hasAllocReg = true;
-                                regAlloc = sseAssign[rec];
-                            }
+                        bytes += 8;
+                    }
+                    //rsp移动  
+                    ind = instructions.InsertAfter(ind, X64.sub(X64.rsp, X64.imm(bytes)));
 
-                            foreach(var (instr, operandIdx) in vregList)
-                            {
-                                var operand = operandIdx == 0 ? instr.value.operand0 : instr.value.operand1;
-
-                                if((operand is X64Reg vr) == true && vr.isVirtual == true)
-                                {
-                                    if(vr.vRegVar == null)
-                                        throw new GizboxException(ExceptioName.Undefine, $"vreg variable null.");
-                                    if(vr.vRegVar != rec)
-                                        throw new GizboxException(ExceptioName.Undefine, $"vreg variable error.{vr.vRegVar.name} vs {rec.name}");
-
-                                    if(hasAllocReg)
-                                    {
-                                        vr.AllocPhysReg(regAlloc);
-                                        instr.value.comment += $"  (vreg {vr.vRegVar.name} alloc {regAlloc})";
-                                    }
-                                    else
-                                    {
-
-                                        if(operandIdx == 0)
-                                            instr.value.operand0 = X64.mem(X64.rbp, displacement: vr.vRegVar.addr);
-                                        else
-                                            instr.value.operand1 = X64.mem(X64.rbp, displacement: vr.vRegVar.addr);
-
-                                        instr.value.comment += $"  (vreg {vr.vRegVar.name} home to mem.)";
-                                    }
-
-                                }
-                            }
-                        }
+                    //保存寄存器  
+                    int offset = 0;
+                    foreach(var reg in funcUsedCalleeGP)
+                    {
+                        ind = instructions.InsertAfter(ind, X64.mov(X64.mem(X64.rsp, displacement: offset), new X64Reg(reg)));
+                        offset += 8;
+                    }
+                    foreach(var reg in funcUsedCalleeXMM)
+                    {
+                        ind = instructions.InsertAfter(ind, X64.movdqu(X64.mem(X64.rsp, displacement: offset), new X64Reg(reg)));
+                        offset += 16;
                     }
 
                 }
+                //callee-restore占位展开  
+                if(calleeRestorePlaceHolders.TryGetValue(func.funcRec.envPtr, out var restorenode))
+                {
+                    var ind = restorenode.Prev;
+                    instructions.Remove(restorenode);
+
+                    int bytes = funcUsedCalleeGP.Count * 8 + funcUsedCalleeXMM.Count * 16;
+                    //16字节对齐
+                    if(bytes % 16 != 0)
+                    {
+                        bytes += 8;
+                    }
+                    //恢复寄存器
+                    int offset = 0;
+                    foreach(var reg in funcUsedCalleeGP)
+                    {
+                        ind = instructions.InsertAfter(ind, X64.mov(new X64Reg(reg), X64.mem(X64.rsp, displacement: offset)));
+                        offset += 8;
+                    }
+                    foreach(var reg in funcUsedCalleeXMM)
+                    {
+                        ind = instructions.InsertAfter(ind, X64.movdqu(new X64Reg(reg), X64.mem(X64.rsp, displacement: offset)));
+                        offset += 16;
+                    }
+
+                    //rsp移动  
+                    ind = instructions.InsertAfter(ind, X64.add(X64.rsp, X64.imm(bytes)));
+                }
+                instructions.Rebuild();
+
+
+
+                //替换虚拟寄存器，生成溢出代码  
+                if(this.vRegs.TryGetValue(func.funcRec.envPtr, out var dict))
+                {
+                    foreach(var (rec, vregList) in dict)
+                    {
+                        bool hasAllocReg = false;
+                        RegisterEnum regAlloc = RegisterEnum.Undefined;
+                        if(gpAssign.ContainsKey(rec))
+                        {
+                            hasAllocReg = true;
+                            regAlloc = gpAssign[rec];
+                        }
+                        else if(sseAssign.ContainsKey(rec))
+                        {
+                            hasAllocReg = true;
+                            regAlloc = sseAssign[rec];
+                        }
+
+                        foreach(var (instr, operandIdx) in vregList)
+                        {
+                            var operand = operandIdx == 0 ? instr.value.operand0 : instr.value.operand1;
+
+                            if((operand is X64Reg vr) == true && vr.isVirtual == true)
+                            {
+                                if(vr.vRegVar == null)
+                                    throw new GizboxException(ExceptioName.Undefine, $"vreg variable null.");
+                                if(vr.vRegVar != rec)
+                                    throw new GizboxException(ExceptioName.Undefine, $"vreg variable error.{vr.vRegVar.name} vs {rec.name}");
+
+                                if(hasAllocReg)
+                                {
+                                    vr.AllocPhysReg(regAlloc);
+                                    GixConsole.WriteLine($"{vr.vRegVar.name} 分配物理寄存器 {regAlloc}");
+                                    instr.value.comment += $"  (vreg {vr.vRegVar.name} alloc {regAlloc})";
+                                }
+                                else
+                                {
+
+                                    if(operandIdx == 0)
+                                        instr.value.operand0 = X64.mem(X64.rbp, displacement: vr.vRegVar.addr);
+                                    else
+                                        instr.value.operand1 = X64.mem(X64.rbp, displacement: vr.vRegVar.addr);
+
+                                    GixConsole.WriteLine($"{vr.vRegVar.name} 溢出home到内存");
+
+                                    instr.value.comment += $"  (vreg {vr.vRegVar.name} home to mem.)";
+                                }
+
+                            }
+                        }
+                    }
+                }
+
             }
-
-
 
             //mem-mem指令合法化  
             {
@@ -1650,7 +1742,7 @@ namespace Gizbox.Src.Backend
             //最终结果
             if(debugLogAsmInfos)
             {
-                Print();
+                Win64Target.Log(GetResult());
             }
         }
 
@@ -2827,101 +2919,6 @@ namespace Gizbox.Src.Backend
                 }
             }
             return null;
-        }
-
-
-        private void Print()
-        {
-            StringBuilder strb = new StringBuilder();
-
-            //global and extern  
-            strb.AppendLine("\n");
-            foreach(var g in globalVarInfos)
-            {
-                strb.AppendLine($"global  {g.Key}");
-            }
-            foreach(var g in globalFuncsInfos)
-            {
-                if(g.Key == "Main")
-                    continue;
-                strb.AppendLine($"global  {g.Key}");
-            }
-            foreach(var g in externVars)
-            {
-                strb.AppendLine($"extern  {g.Key}");
-            }
-            foreach(var g in externFuncs)
-            {
-                if(g.Key == "Main")
-                    continue;
-                strb.AppendLine($"extern  {g.Key}");
-            }
-
-            //.data
-            strb.AppendLine("\n");
-            strb.AppendLine("section .rdata");
-            foreach(var rodata in section_rdata)
-            {
-                if(rodata.Value.Count == 1)
-                {
-                    var (typeExpr, valExpr) = rodata.Value[0];
-                    strb.AppendLine($"\t{rodata.Key}  {UtilsW64.GetX64DefineType(typeExpr, valExpr)}");
-                }
-                else
-                {
-                    strb.AppendLine($"\t{rodata.Key}:");
-                    foreach(var (typeExpr, valExpr) in rodata.Value)
-                    {
-                        strb.AppendLine($"\t\t  {UtilsW64.GetX64DefineType(typeExpr, valExpr)}");
-                    }
-                }
-            }
-            strb.AppendLine("\n");
-            strb.AppendLine("section .data");
-            foreach(var data in section_data)
-            {
-                if(data.Value.Count == 1)
-                {
-                    var (typeExpr, valExpr) = data.Value[0];
-                    strb.AppendLine($"\t{data.Key}  {UtilsW64.GetX64DefineType(typeExpr, valExpr)}");
-                }
-                else
-                {
-                    strb.AppendLine($"\t{data.Key}:");
-                    foreach(var (typeExpr, valExpr) in data.Value)
-                    {
-                        strb.AppendLine($"\t\t  {UtilsW64.GetX64DefineType(typeExpr, valExpr)}");
-                    }
-                }
-            }
-            strb.AppendLine("\n");
-            strb.AppendLine("section .bss");
-            foreach(var bss in section_bss)
-            {
-                if(bss.Value.Count == 1)
-                {
-                    var typeExpr = bss.Value[0];
-                    strb.AppendLine($"\t{bss.Key}  {UtilsW64.GetX64ReserveDefineType(typeExpr)}");
-                }
-                else
-                {
-                    strb.AppendLine($"\t{bss.Key}:");
-                    foreach(var typeExpr in bss.Value)
-                    {
-                        strb.AppendLine($"\t\t  {UtilsW64.GetX64ReserveDefineType(typeExpr)}");
-                    }
-                }
-            }
-
-            //.text  
-            strb.AppendLine();
-            strb.AppendLine("section .text");
-            strb.AppendLine();
-            foreach(var instruction in instructions)
-            {
-                strb.Append(UtilityX64.SerializeInstruction(instruction));
-            }
-            Win64Target.Log(strb.ToString());
         }
     }
 

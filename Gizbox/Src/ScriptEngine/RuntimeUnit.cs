@@ -18,7 +18,7 @@ namespace Gizbox.ScriptEngine
         }
 
 
-        public static Operand Parse(string argStr, ILUnit unit, int line)
+        public static Operand Parse(string argStr, IRUnit unit, int line)
         {
             if(string.IsNullOrEmpty(argStr))
             {
@@ -127,7 +127,7 @@ namespace Gizbox.ScriptEngine
         public Operand array;
         public Operand index;
 
-        public OperandElementAccess(string expr, ILUnit unit, int line) : base(expr)
+        public OperandElementAccess(string expr, IRUnit unit, int line) : base(expr)
         {
             int lbracket = expr.IndexOf('[');
             int rbracket = expr.IndexOf(']');
@@ -157,7 +157,7 @@ namespace Gizbox.ScriptEngine
         public Operand obj;
         public string fieldname;
 
-        public OperandMemberAccess (string expr, ILUnit unit, int line) : base(expr)
+        public OperandMemberAccess (string expr, IRUnit unit, int line) : base(expr)
         {
             var (start, end) = expr.GetSubStringIndex("->");
             var variableExpr = expr.Substring(0, start);
@@ -186,7 +186,7 @@ namespace Gizbox.ScriptEngine
 
         public SymbolTable.Record record;
 
-        public OperandSingleIdentifier(string str, ILUnit unit, int line) : base(str)
+        public OperandSingleIdentifier(string str, IRUnit unit, int line) : base(str)
         {
             this.name = str;
             this.record = unit.Query(this.name, line);
@@ -208,7 +208,7 @@ namespace Gizbox.ScriptEngine
         public Operand arg1;
         public Operand arg2;
 
-        public RuntimeCode(TAC tac, ILUnit unit, int line)
+        public RuntimeCode(TAC tac, IRUnit unit, int line)
         {
             if(string.IsNullOrEmpty(tac.label))
             {
@@ -302,7 +302,7 @@ namespace Gizbox.ScriptEngine
 
 
         //构造    
-        public RuntimeUnit(ScriptEngine engineContext, ILUnit ilunit)
+        public RuntimeUnit(ScriptEngine engineContext, IRUnit ilunit)
         {
             this.name = ilunit.name;
 

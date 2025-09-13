@@ -221,7 +221,7 @@ namespace Gizbox.ScriptEngine
         }
  
 
-        public void Load(ILUnit ir)
+        public void Load(IRUnit ir)
         {
             Log("载入主程序");
             //运行时
@@ -241,7 +241,7 @@ namespace Gizbox.ScriptEngine
             this.envStack = this.mainUnit.GetEnvStack(-1, 0); 
         }
 
-        public void Execute(ILUnit ir)
+        public void Execute(IRUnit ir)
         {
             Load(ir);
 
@@ -611,14 +611,14 @@ namespace Gizbox.ScriptEngine
         // ----------------------  Load Libs ---------------------------
 
         private List<string> libSearchDirectories = new List<string>();
-        private List<ILUnit> libsCached = new List<ILUnit>();
+        private List<IRUnit> libsCached = new List<IRUnit>();
         
         public void AddLibSearchDirectory(string dir)
         {
             this.libSearchDirectories.Add(dir);
         }
 
-        public ILUnit LoadLib(string libname)
+        public IRUnit LoadLib(string libname)
         {
             foreach(var libCache in libsCached)
             {

@@ -1241,7 +1241,7 @@ namespace Gizbox.SemanticRule
 
         public SyntaxTree ast;
 
-        public ILUnit ilUnit;
+        public IRUnit ilUnit;
 
         private Gizbox.GStack<SymbolTable> envStack;
 
@@ -1260,7 +1260,7 @@ namespace Gizbox.SemanticRule
         /// <summary>
         /// 构造  
         /// </summary>
-        public SemanticAnalyzer(SyntaxTree ast, ILUnit ilUnit, Compiler compilerContext)
+        public SemanticAnalyzer(SyntaxTree ast, IRUnit ilUnit, Compiler compilerContext)
         {
             this.compilerContext = compilerContext;
 

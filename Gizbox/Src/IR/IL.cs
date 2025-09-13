@@ -80,9 +80,16 @@ namespace Gizbox.IR
         }
     }
 
+
+
+    public class IRUnitsCache
+    {
+        public List<IRUnit> units;
+    }
+
     [Serializable]
     [DataContract(IsReference = true)]
-    public class ILUnit
+    public class IRUnit
     {
         //名称    
         [DataMember]
@@ -126,31 +133,47 @@ namespace Gizbox.IR
 
 
         //(不序列化) 临时载入的依赖      
-        public List<ILUnit> dependencyLibs = new List<ILUnit>();
+        public List<IRUnit> dependencyLibs = new List<IRUnit>();
         //(不序列化) 
-        public List<ILUnit> libsDenpendThis = new List<ILUnit>();
+        public List<IRUnit> libsDenpendThis = new List<IRUnit>();
 
 
 
 
         //构造函数  
-        public ILUnit()
+        public IRUnit()
         {
             var globalSymbolTable = new SymbolTable("global", SymbolTable.TableCatagory.GlobalScope);
             this.globalScope = new Scope() { env = globalSymbolTable };
         }
 
 
+        //自动加载所有依赖  
+        public void AutoLoadDependencies(Compiler loader, bool includeDeps = true)
+        {
+            if(this.dependencyLibs.Count == 0 && this.dependencies.Count != 0)
+            {
+                foreach(var depName in this.dependencies)
+                {
+                    var depUnit = loader.LoadLib(depName);
+                    this.AddDependencyLib(depUnit);
 
+                    if(includeDeps)
+                    {
+                        depUnit.AutoLoadDependencies(loader);
+                    }
+                }
+            }
+        }
         //添加依赖  
-        public void AddDependencyLib(ILUnit dep)
+        public void AddDependencyLib(IRUnit dep)
         {
             if (dep == null) throw new GizboxException(ExceptioName.LibraryDependencyCannotBeEmpty);
 
-            if (dependencyLibs == null) dependencyLibs = new List<ILUnit>();
+            if (dependencyLibs == null) dependencyLibs = new List<IRUnit>();
             dependencyLibs.Add(dep);
 
-            if (dep.libsDenpendThis == null) dep.libsDenpendThis = new List<ILUnit>();
+            if (dep.libsDenpendThis == null) dep.libsDenpendThis = new List<IRUnit>();
             dep.libsDenpendThis.Add(this);
         }
 
@@ -410,7 +433,7 @@ namespace Gizbox.IR
             return GetEnvStackAtLine(line).Peek();
         }
 
-        private void AddGlobalEnvsToList(ILUnit unit, List<SymbolTable> list)
+        private void AddGlobalEnvsToList(IRUnit unit, List<SymbolTable> list)
         {
             if (list.Contains(unit.globalScope.env)) return;
 

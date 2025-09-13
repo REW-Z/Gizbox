@@ -14,7 +14,7 @@ namespace Gizbox.IR
         //public  
         public SyntaxTree ast;
 
-        public ILUnit ilUnit;
+        public IRUnit ilUnit;
 
 
         //temp env  
@@ -31,13 +31,13 @@ namespace Gizbox.IR
         private GStack<string> loopExitStack = new GStack<string>();
 
 
-        public ILGenerator(SyntaxTree ast, ILUnit ir)
+        public ILGenerator(SyntaxTree ast, IRUnit ir)
         {
             this.ilUnit = ir;
             this.ast = ast;
         }
 
-        public ILUnit Generate()
+        public IRUnit Generate()
         {
             tmpCounter = 0;
 

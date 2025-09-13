@@ -10,9 +10,9 @@ namespace Gizbox.IR
 {
     public class ILSerializer
     {
-        public static void Serialize(string path, ILUnit unit)
+        public static void Serialize(string path, IRUnit unit)
         {
-            var serializer = new DataContractSerializer(typeof(ILUnit));
+            var serializer = new DataContractSerializer(typeof(IRUnit));
 
             using (var stream = new System.IO.FileStream(path, FileMode.Create))
             {
@@ -20,13 +20,13 @@ namespace Gizbox.IR
                 stream.Position = 0;
             }
         }
-        public static ILUnit Deserialize(string path)
+        public static IRUnit Deserialize(string path)
         {
-            var serializer = new DataContractSerializer(typeof(ILUnit));
+            var serializer = new DataContractSerializer(typeof(IRUnit));
 
             using (var stream = new System.IO.FileStream(path, FileMode.Open))
             {
-                return (ILUnit)serializer.ReadObject(stream);
+                return (IRUnit)serializer.ReadObject(stream);
             }
         }
     }
