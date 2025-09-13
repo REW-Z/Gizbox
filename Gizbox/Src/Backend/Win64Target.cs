@@ -8,6 +8,7 @@ using Gizbox;
 using Gizbox.IR;
 
 using InstructionNode = Gizbox.LList<Gizbox.Src.Backend.X64Instruction>.Node;
+using SymbolRecord = Gizbox.SymbolTable.Record;
 
 
 
@@ -755,9 +756,9 @@ namespace Gizbox.Src.Backend
                                 var placeholderSave = X64.placehold("caller_save");
                                 var placeholderSaveNode = instructions.AddLast(placeholderSave);
 
-                                if(callerSavePlaceHolders.ContainsKey(targetFuncRec.envPtr) == false)
-                                    callerSavePlaceHolders.Add(targetFuncRec.envPtr, new());
-                                callerSavePlaceHolders[targetFuncRec.envPtr].Add(placeholderSaveNode);
+                                if(callerSavePlaceHolders.ContainsKey(funcEnv) == false)
+                                    callerSavePlaceHolders.Add(funcEnv, new());
+                                callerSavePlaceHolders[funcEnv].Add(placeholderSaveNode);
 
 
                                 // 栈帧16字节对齐 (如果是奇数个参数 -> 需要8字节对齐栈指针)
@@ -847,9 +848,9 @@ namespace Gizbox.Src.Backend
                                 var placeholderRestore = X64.placehold("caller_restore");
                                 var placeholderRestoreNode = instructions.AddLast(placeholderRestore);
 
-                                if(callerRestorePlaceHolders.ContainsKey(targetFuncRec.envPtr) == false)
-                                    callerRestorePlaceHolders.Add(targetFuncRec.envPtr, new());
-                                callerRestorePlaceHolders[targetFuncRec.envPtr].Add(placeholderRestoreNode);
+                                if(callerRestorePlaceHolders.ContainsKey(funcEnv) == false)
+                                    callerRestorePlaceHolders.Add(funcEnv, new());
+                                callerRestorePlaceHolders[funcEnv].Add(placeholderRestoreNode);
                             }
                         }
                         break;
@@ -881,9 +882,9 @@ namespace Gizbox.Src.Backend
                                 var placeholderSave = X64.placehold("caller_save");
                                 var placeholderSaveNode = instructions.AddLast(placeholderSave);
 
-                                if(callerSavePlaceHolders.ContainsKey(targetFuncRec.envPtr) == false)
-                                    callerSavePlaceHolders.Add(targetFuncRec.envPtr, new());
-                                callerSavePlaceHolders[targetFuncRec.envPtr].Add(placeholderSaveNode);
+                                if(callerSavePlaceHolders.ContainsKey(funcEnv) == false)
+                                    callerSavePlaceHolders.Add(funcEnv, new());
+                                callerSavePlaceHolders[funcEnv].Add(placeholderSaveNode);
 
 
                                 // 栈帧16字节对齐 (如果是奇数个参数 -> 需要8字节对齐栈指针)
@@ -973,9 +974,9 @@ namespace Gizbox.Src.Backend
                                 var placeholderRestore = X64.placehold("caller_restore");
                                 var placeholderRestoreNode = instructions.AddLast(placeholderRestore);
 
-                                if(callerRestorePlaceHolders.ContainsKey(targetFuncRec.envPtr) == false)
-                                    callerRestorePlaceHolders.Add(targetFuncRec.envPtr, new());
-                                callerRestorePlaceHolders[targetFuncRec.envPtr].Add(placeholderRestoreNode);
+                                if(callerRestorePlaceHolders.ContainsKey(funcEnv) == false)
+                                    callerRestorePlaceHolders.Add(funcEnv, new());
+                                callerRestorePlaceHolders[funcEnv].Add(placeholderRestoreNode);
                             }
                         }
                         break;
@@ -1279,11 +1280,43 @@ namespace Gizbox.Src.Backend
         // <summary> 寄存器分配 </summary>
         private void Pass4()
         {
-            if(debugLogAsmInfos)
+            //if(debugLogAsmInfos)
+            //{
+            //    Print();
+            //}
+
+            //变量虚拟寄存器信息  
+            var curr = instructions.First;
+            while(curr != null)
             {
-                Print();
+                if(curr.value.operand0 is X64Reg reg && reg.isVirtual)
+                {
+                    var varEnv = reg.vRegVar.GetAdditionInf().table;
+
+                    if(vRegs.ContainsKey(varEnv) == false)
+                        vRegs[varEnv] = new();
+                    if(vRegs[varEnv].ContainsKey(reg.vRegVar) == false)
+                        vRegs[varEnv][reg.vRegVar] = new();
+
+                    vRegs[varEnv][reg.vRegVar].Add((instrNode: curr, operandIdx: 0));
+                }
+                if(curr.value.operand1 is X64Reg reg1 && reg1.isVirtual)
+                {
+                    var varEnv = reg1.vRegVar.GetAdditionInf().table;
+
+                    if(vRegs.ContainsKey(varEnv) == false)
+                        vRegs[varEnv] = new();
+                    if(vRegs[varEnv].ContainsKey(reg1.vRegVar) == false)
+                        vRegs[varEnv][reg1.vRegVar] = new();
+
+                    vRegs[varEnv][reg1.vRegVar].Add((instrNode: curr, operandIdx: 1));
+                }
+
+                curr = curr.Next;
             }
 
+
+            //函数信息  
             List<FunctionAdditionInfo> funcInfos = new();
             FunctionAdditionInfo currFunc = null;
             for(int i = 0; i < ir.codes.Count; ++i)
@@ -1304,6 +1337,8 @@ namespace Gizbox.Src.Backend
                     currFunc = null;
                 }
             }
+
+
 
             foreach(var func in funcInfos)
             {
@@ -1413,6 +1448,9 @@ namespace Gizbox.Src.Backend
 
                     var funcUsedCallerGP = new HashSet<RegisterEnum>(usedGpRegs.Where(r => X64RegisterUtility.GPCallerSaveRegs.Contains(r)));
                     var funcUsedCallerXMM = new HashSet<RegisterEnum>(usedXmmRegs.Where(r => X64RegisterUtility.XMMCallerSaveRegs.Contains(r)));
+
+                    GixConsole.WriteLine($"*****函数{func.funcRec.name}可以使用的寄存器：{string.Join(",", X64RegisterUtility.GPCalleeSaveRegs.Where(r => r != RegisterEnum.RBP).ToArray())}");
+                    GixConsole.WriteLine($"*****函数{func.funcRec.name}使用到的寄存器：{string.Join(", ", (usedGpRegs).Select(r => r.ToString()))}");
 
                     //caller-save占位展开  
                     if(callerSavePlaceHolders.TryGetValue(func.funcRec.envPtr, out var list))
@@ -1568,34 +1606,51 @@ namespace Gizbox.Src.Backend
 
                             foreach(var (instr, operandIdx) in vregList)
                             {
-                                if(hasAllocReg)
+                                var operand = operandIdx == 0 ? instr.value.operand0 : instr.value.operand1;
+
+                                if((operand is X64Reg vr) == true && vr.isVirtual == true)
                                 {
-                                    var operand = operandIdx == 0 ? instr.value.operand0 : instr.value.operand1;
-                                    if((operand is X64Reg vr) == true)
+                                    if(vr.vRegVar == null)
+                                        throw new GizboxException(ExceptioName.Undefine, $"vreg variable null.");
+                                    if(vr.vRegVar != rec)
+                                        throw new GizboxException(ExceptioName.Undefine, $"vreg variable error.{vr.vRegVar.name} vs {rec.name}");
+
+                                    if(hasAllocReg)
                                     {
                                         vr.AllocPhysReg(regAlloc);
+                                        instr.value.comment += $"  (vreg {vr.vRegVar.name} alloc {regAlloc})";
                                     }
                                     else
                                     {
-                                        throw new GizboxException(ExceptioName.Undefine, "operand is not vreg.");
+
+                                        if(operandIdx == 0)
+                                            instr.value.operand0 = X64.mem(X64.rbp, displacement: vr.vRegVar.addr);
+                                        else
+                                            instr.value.operand1 = X64.mem(X64.rbp, displacement: vr.vRegVar.addr);
+
+                                        instr.value.comment += $"  (vreg {vr.vRegVar.name} home to mem.)";
                                     }
-                                }
-                                else
-                                {
-                                    //homing/spill
-                                    var ind = instr;
-                                    //remove 
-                                    //...
+
                                 }
                             }
                         }
                     }
 
-
-
-                    //mem-mem合法化  
-                    //...
                 }
+            }
+
+
+
+            //mem-mem指令合法化  
+            {
+                LegalizeMemMemAndDestConstraints();
+            }
+
+
+            //最终结果
+            if(debugLogAsmInfos)
+            {
+                Print();
             }
         }
 
@@ -2217,22 +2272,6 @@ namespace Gizbox.Src.Backend
         public X64Reg vreg(SymbolTable.Record varrec)
         {
             var xoperand = new X64Reg(varrec);
-
-            //局部变量  
-            if(funcEnv != null)
-            {
-                if(vRegs[funcEnv].ContainsKey(varrec) == false)
-                    vRegs[funcEnv][varrec] = new List<X64Reg>();
-                vRegs[funcEnv][varrec].Add(xoperand);
-            }
-            //全局变量
-            else
-            {
-                if(vRegs[globalEnv].ContainsKey(varrec) == false)
-                    vRegs[globalEnv][varrec] = new List<X64Reg>();
-                vRegs[globalEnv][varrec].Add(xoperand);
-            }
-
             return xoperand;
         }
 
@@ -2460,6 +2499,218 @@ namespace Gizbox.Src.Backend
         }
         #endregion
 
+
+        #region PASS$
+        // Win64CodeGenContext 内新增辅助方法
+        private bool IsMemOperand(X64Operand op) => op is X64Mem || op is X64Rel;
+        private LList<X64Instruction>.Node InsertBefore(LList<X64Instruction>.Node node, X64Instruction inst)
+        {
+            return node.Prev != null ? instructions.InsertAfter(node.Prev, inst) : instructions.AddFirst(inst);
+        }
+
+        // Win64CodeGenContext 内新增：mem-mem 合法化
+        private void LegalizeMemMemAndDestConstraints()
+        {
+            var node = instructions.First;
+            while(node != null)
+            {
+                var instr = node.value;
+
+                switch(instr.type)
+                {
+                    // 普通 mov：不允许 mem-mem
+                    case InstructionType.mov:
+                        if(IsMemOperand(instr.operand0) && IsMemOperand(instr.operand1))
+                        {
+                            InsertBefore(node, X64.mov(X64.r11, instr.operand1));
+                            instr.operand1 = X64.r11;
+                        }
+                        break;
+
+                    // 浮点/128bit 搬运：不允许 mem-mem
+                    case InstructionType.movss:
+                    case InstructionType.movsd:
+                    case InstructionType.movaps:
+                    case InstructionType.movapd:
+                    case InstructionType.movups:
+                    case InstructionType.movupd:
+                    case InstructionType.movdqa:
+                    case InstructionType.movdqu:
+                        if(IsMemOperand(instr.operand0) && IsMemOperand(instr.operand1))
+                        {
+                            if(instr.type == InstructionType.movss)
+                            {
+                                InsertBefore(node, X64.movss(X64.xmm0, instr.operand1));
+                                instr.operand1 = X64.xmm0;
+                            }
+                            else if(instr.type == InstructionType.movsd)
+                            {
+                                InsertBefore(node, X64.movsd(X64.xmm0, instr.operand1));
+                                instr.operand1 = X64.xmm0;
+                            }
+                            else
+                            {
+                                // 统一用 movdqu 做中转加载（无对齐要求）
+                                InsertBefore(node, X64.movdqu(X64.xmm0, instr.operand1));
+                                instr.operand1 = X64.xmm0;
+                            }
+                        }
+                        break;
+
+                    // 整数二元：不允许 mem-mem
+                    case InstructionType.add:
+                    case InstructionType.sub:
+                    case InstructionType.and:
+                    case InstructionType.or:
+                    case InstructionType.xor:
+                        if(IsMemOperand(instr.operand0) && IsMemOperand(instr.operand1))
+                        {
+                            InsertBefore(node, X64.mov(X64.r11, instr.operand1));
+                            instr.operand1 = X64.r11;
+                        }
+                        break;
+
+                    // imul（二操作数形式）：目的必须是寄存器
+                    case InstructionType.imul:
+                        {
+                            bool dstIsMem = IsMemOperand(instr.operand0);
+                            bool srcIsMem = IsMemOperand(instr.operand1);
+                            X64Operand origDst = instr.operand0;
+
+                            if(dstIsMem)
+                            {
+                                InsertBefore(node, X64.mov(X64.r11, instr.operand0));
+                                instr.operand0 = X64.r11;
+                            }
+                            if(srcIsMem)
+                            {
+                                // 若目的已占用 R11，则用 R10 做第二中转
+                                InsertBefore(node, X64.mov(X64.r10, instr.operand1));
+                                instr.operand1 = X64.r10;
+                            }
+                            if(dstIsMem)
+                            {
+                                instructions.InsertAfter(node, X64.mov(origDst, X64.r11));
+                            }
+                            break;
+                        }
+
+                    // SSE 标量算术：目的必须是 XMM
+                    case InstructionType.addss:
+                    case InstructionType.subss:
+                    case InstructionType.mulss:
+                    case InstructionType.divss:
+                        if(IsMemOperand(instr.operand0))
+                        {
+                            var dst = instr.operand0;
+                            InsertBefore(node, X64.movss(X64.xmm0, dst));
+                            instr.operand0 = X64.xmm0;
+                            instructions.InsertAfter(node, X64.movss(dst, X64.xmm0));
+                        }
+                        break;
+                    case InstructionType.addsd:
+                    case InstructionType.subsd:
+                    case InstructionType.mulsd:
+                    case InstructionType.divsd:
+                        if(IsMemOperand(instr.operand0))
+                        {
+                            var dst = instr.operand0;
+                            InsertBefore(node, X64.movsd(X64.xmm0, dst));
+                            instr.operand0 = X64.xmm0;
+                            instructions.InsertAfter(node, X64.movsd(dst, X64.xmm0));
+                        }
+                        break;
+
+                    // 比较/测试：不允许 mem-mem
+                    case InstructionType.cmp:
+                    case InstructionType.test:
+                        if(IsMemOperand(instr.operand0) && IsMemOperand(instr.operand1))
+                        {
+                            // 保持 op0 为原内存，载入 op1 到 R11
+                            InsertBefore(node, X64.mov(X64.r11, instr.operand1));
+                            instr.operand1 = X64.r11;
+                        }
+                        break;
+
+                    // lea：目的必须是寄存器
+                    case InstructionType.lea:
+                        if(IsMemOperand(instr.operand0))
+                        {
+                            InsertBefore(node, X64.lea(X64.r11, instr.operand1));
+                            // 当前指令转为 mov [mem], r11
+                            instr.type = InstructionType.mov;
+                            instr.operand1 = X64.r11;
+                        }
+                        break;
+
+                    // movzx/movsx：目的必须是寄存器
+                    case InstructionType.movzx:
+                    case InstructionType.movsx:
+                        if(IsMemOperand(instr.operand0))
+                        {
+                            InsertBefore(node, instr.type == InstructionType.movzx ? X64.movzx(X64.r11, instr.operand1) : X64.movsx(X64.r11, instr.operand1));
+                            instr.type = InstructionType.mov;
+                            instr.operand1 = X64.r11;
+                        }
+                        break;
+
+                    // 整数->浮点：目的必须 XMM
+                    case InstructionType.cvtsi2ss:
+                    case InstructionType.cvtsi2sd:
+                        if(IsMemOperand(instr.operand0))
+                        {
+                            // 先算到 xmm0，再存回
+                            if(instr.type == InstructionType.cvtsi2ss)
+                                InsertBefore(node, X64.cvtsi2ss(X64.xmm0, instr.operand1));
+                            else
+                                InsertBefore(node, X64.cvtsi2sd(X64.xmm0, instr.operand1));
+
+                            instr.type = (instr.type == InstructionType.cvtsi2ss) ? InstructionType.movss : InstructionType.movsd;
+                            instr.operand1 = X64.xmm0;
+                        }
+                        break;
+
+                    // 浮点<->浮点：目的必须 XMM
+                    case InstructionType.cvtss2sd:
+                    case InstructionType.cvtsd2ss:
+                        if(IsMemOperand(instr.operand0))
+                        {
+                            var t = instr.type;
+                            if(t == InstructionType.cvtss2sd)
+                                InsertBefore(node, X64.cvtss2sd(X64.xmm0, instr.operand1));
+                            else
+                                InsertBefore(node, X64.cvtsd2ss(X64.xmm0, instr.operand1));
+
+                            instr.type = (t == InstructionType.cvtss2sd) ? InstructionType.movsd : InstructionType.movss;
+                            instr.operand1 = X64.xmm0;
+                        }
+                        break;
+
+                    // 浮点->整数：目的必须 GP
+                    case InstructionType.cvttss2si:
+                    case InstructionType.cvttss2siq:
+                    case InstructionType.cvttsd2si:
+                    case InstructionType.cvttsd2siq:
+                        if(IsMemOperand(instr.operand0))
+                        {
+                            var t = instr.type;
+                            InsertBefore(node,
+                                t == InstructionType.cvttss2si ? X64.cvttss2si(X64.r11, instr.operand1) :
+                                t == InstructionType.cvttss2siq ? X64.cvttss2siq(X64.r11, instr.operand1) :
+                                t == InstructionType.cvttsd2si ? X64.cvttsd2si(X64.r11, instr.operand1) :
+                                                                 X64.cvttsd2siq(X64.r11, instr.operand1));
+                            instr.type = InstructionType.mov;
+                            instr.operand1 = X64.r11;
+                        }
+                        break;
+                }
+
+                node = node.Next;
+            }
+
+            instructions.Rebuild();
+        }
+        #endregion
 
 
         /// <summary>

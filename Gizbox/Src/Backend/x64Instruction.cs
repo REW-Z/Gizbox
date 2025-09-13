@@ -327,7 +327,7 @@ namespace Gizbox.Src.Backend
         {
             isVirtual = false;
             physReg = reg;
-            vRegVar = null;
+            //vRegVar = null;
         }
     }
     public class X64Mem : X64Operand
