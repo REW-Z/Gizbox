@@ -199,7 +199,7 @@ namespace Gizbox
         /// </summary>
         public void CompileToLib(string source, string libName, string savePath)
         {
-            var ir = this.Compile(source);
+            var ir = this.CompileToIR(source);
             ir.name = libName;
             Gizbox.IR.ILSerializer.Serialize(savePath, ir);
 
@@ -207,9 +207,9 @@ namespace Gizbox
         }
 
         /// <summary>
-        /// 编译  
+        /// 编译为IR  
         /// </summary>
-        public IRUnit Compile(string source)
+        public IRUnit CompileToIR(string source)
         {
             if (string.IsNullOrEmpty(this.parserDataPath) && parserDataHardcode == false) throw new Exception("语法分析器数据源没有设置");
 
@@ -244,11 +244,20 @@ namespace Gizbox
             semanticAnalyzer.Analysis();
 
             //中间代码生成    
-            ILGenerator ilGenerator = new IR.ILGenerator(syntaxTree, ir);
-            var ilUnit = ilGenerator.Generate();
+            IRGenerator irGenerator = new IR.IRGenerator(syntaxTree, ir);
+            var irUnit = irGenerator.Generate();
 
 
-            return ilUnit;
+            return irUnit;
+        }
+
+
+        /// <summary>
+        /// 编译为汇编码  
+        /// </summary>
+        public void CompileToAsm(string dir)
+        {
+
         }
     }
 

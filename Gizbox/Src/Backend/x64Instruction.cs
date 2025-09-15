@@ -189,14 +189,111 @@ namespace Gizbox.Src.Backend
     }
 
 
-    public class UtilityX64
+    public class UtilityNASM
     {
+        public static string Emit(Win64CodeGenContext context,
+            LList<X64Instruction> instructions,
+             Dictionary<string, List<(GType typeExpr, string valExpr)>> section_data,
+              Dictionary<string, List<(GType typeExpr, string valExpr)>> section_rdata,
+              Dictionary<string, List<GType>>  section_bss)
+        {
+            StringBuilder strb = new StringBuilder();
+
+            //global and extern  
+            strb.AppendLine("\n");
+            foreach(var g in context.globalVarInfos)
+            {
+                strb.AppendLine($"global  {UtilsW64.LegalizeName(g.Key)}");
+            }
+            foreach(var g in context.globalFuncsInfos)
+            {
+                if(g.Key == "Main")
+                    continue;
+                strb.AppendLine($"global  {UtilsW64.LegalizeName(g.Key)}");
+            }
+            foreach(var g in context.externVars)
+            {
+                strb.AppendLine($"extern  {UtilsW64.LegalizeName(g.Key)}");
+            }
+            foreach(var g in context.externFuncs)
+            {
+                if(g.Key == "Main")
+                    continue;
+                strb.AppendLine($"extern  {UtilsW64.LegalizeName(g.Key)}");
+            }
+
+            //.data
+            strb.AppendLine("\n");
+            strb.AppendLine("section .rdata");
+            foreach(var rodata in section_rdata)
+            {
+                if(rodata.Value.Count == 1)
+                {
+                    var (typeExpr, valExpr) = rodata.Value[0];
+                    strb.AppendLine($"\t{UtilsW64.LegalizeName(rodata.Key)}  {UtilsW64.GetX64DefineType(typeExpr, valExpr)}");
+                }
+                else
+                {
+                    strb.AppendLine($"\t{UtilsW64.LegalizeName(rodata.Key)}:");
+                    foreach(var (typeExpr, valExpr) in rodata.Value)
+                    {
+                        strb.AppendLine($"\t\t  {UtilsW64.GetX64DefineType(typeExpr, valExpr)}");
+                    }
+                }
+            }
+            strb.AppendLine("\n");
+            strb.AppendLine("section .data");
+            foreach(var data in section_data)
+            {
+                if(data.Value.Count == 1)
+                {
+                    var (typeExpr, valExpr) = data.Value[0];
+                    strb.AppendLine($"\t{UtilsW64.LegalizeName(data.Key)}  {UtilsW64.GetX64DefineType(typeExpr, valExpr)}");
+                }
+                else
+                {
+                    strb.AppendLine($"\t{UtilsW64.LegalizeName(data.Key)}:");
+                    foreach(var (typeExpr, valExpr) in data.Value)
+                    {
+                        strb.AppendLine($"\t\t  {UtilsW64.GetX64DefineType(typeExpr, valExpr)}");
+                    }
+                }
+            }
+            strb.AppendLine("\n");
+            strb.AppendLine("section .bss");
+            foreach(var bss in section_bss)
+            {
+                if(bss.Value.Count == 1)
+                {
+                    var typeExpr = bss.Value[0];
+                    strb.AppendLine($"\t{UtilsW64.LegalizeName(bss.Key)}  {UtilsW64.GetX64ReserveDefineType(typeExpr)}");
+                }
+                else
+                {
+                    strb.AppendLine($"\t{UtilsW64.LegalizeName(bss.Key)}:");
+                    foreach(var typeExpr in bss.Value)
+                    {
+                        strb.AppendLine($"\t\t  {UtilsW64.GetX64ReserveDefineType(typeExpr)}");
+                    }
+                }
+            }
+
+            //.text  
+            strb.AppendLine();
+            strb.AppendLine("section .text");
+            strb.AppendLine();
+            foreach(var instruction in instructions)
+            {
+                strb.Append(UtilityNASM.SerializeInstruction(instruction));
+            }
+            return strb.ToString();
+        }
         public static string SerializeInstruction(X64Instruction instr)
         {
             StringBuilder strb = new();
             if(string.IsNullOrEmpty(instr.label) == false)
             {
-                strb.AppendLine(instr.label);
+                strb.AppendLine(UtilsW64.LegalizeName(instr.label));
             }
 
             if(instr.type == InstructionType.placeholder)
@@ -250,11 +347,11 @@ namespace Gizbox.Src.Backend
                 case X64Reg reg:
                     return reg.isVirtual ? ("vreg%" + reg.vRegVar.name) : reg.physReg.ToString();
                 case X64Rel rel:
-                    return "[rel " + rel.symbolName + (rel.displacement != 0 ? ("+" + rel.displacement.ToString()) : "") + "]";
+                    return "[rel " + UtilsW64.LegalizeName(rel.symbolName) + (rel.displacement != 0 ? ("+" + rel.displacement.ToString()) : "") + "]";
                 case X64Immediate im:
                     return (im).value.ToString();
                 case X64Label lb:
-                    return (lb).name;
+                    return UtilsW64.LegalizeName((lb).name);
                 case X64Mem mem:
                     return "[" +
                         (mem.baseReg != null ? SerializeOprand(mem.baseReg) : "") +

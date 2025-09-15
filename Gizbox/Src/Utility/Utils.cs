@@ -128,7 +128,7 @@ namespace Gizbox
                 cursor = addr;
             }
 
-            // 返回 RBP 以下总大小（包含 header）
+            // 返回 RBP 以下总大小
             long frameSize = -cursor;
             return frameSize;
         }

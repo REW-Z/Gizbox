@@ -11,7 +11,22 @@ float globalVar2 = 1.0f;
 void test()
 {
 	int result = globalVar1 + (int)globalVar2;
+
+	int v1 = 1;
+	int v2 = 1;
+	int v3 = 1;
+	int v4 = 1;
+	int v5 = 1;
+	int v6 = 1;
+	int v7 = 1;
+	int v8 = 1;
+
 	Console::Log("result:" + (string)result);
+
+	int rs = v1 + v8;
+	rs += v2 + v7;
+	rs += v3 + v6;
+	rs += v4 + v5;
 }
 
 GC::Disable();
@@ -20,129 +35,5 @@ test();
 
 
 // 中间代码  
-// --------------------------------------------------
-// 0   |status 3  |entry:test@:
-// 1   |status 3  |func_begin:test@:   FUNC_BEGIN test@
-// 2   |status 3  |                    CAST tmp@0 int globalVar2
-// 3   |status 3  |                    + tmp@1 globalVar1 tmp@0
-// 4   |status 3  |                    = result tmp@1
-// 5   |status 3  |                    PARAM result
-// 6   |status 3  |                    CALL Core::Extern::IntToString@_int %LITINT:1
-// 7   |status 3  |                    = tmp@4 %RET
-// 8   |status 3  |                    PARAM tmp@4
-// 9   |status 3  |                    PARAM %CONSTSTRING:0
-// 10  |status 3  |                    CALL Core::IntrinsicOperatorOverloads::add@_string_string %LITINT:2
-// 11  |status 3  |                    = tmp@3 %RET
-// 12  |status 3  |                    PARAM tmp@3
-// 13  |status 3  |                    CALL Console::Log@_string %LITINT:1
-// 14  |status 3  |                    = tmp@2 %RET
-// 15  |status 3  |                    RETURN
-// 16  |status 3  |func_end:test@:     FUNC_END test@
-// 17  |status 3  |exit:test@:
-// 18  |status 2  |entry:Main:
-// 19  |status 2  |func_begin:Main:    FUNC_BEGIN Main
-// 20  |status 2  |                    = globalVar1 %LITINT:1
-// 21  |status 2  |                    = globalVar2 %LITFLOAT:1.0f
-// 22  |status 2  |                    CALL Core::GC::Disable@ %LITINT:0
-// 23  |status 2  |                    = tmp@5 %RET
-// 24  |status 2  |                    CALL test@ %LITINT:0
-// 25  |status 2  |                    = tmp@6 %RET
-// 26  |status 2  |
-// 27  |status 2  |func_end:Main:      FUNC_END Main
-// 28  |status 2  |exit:Main:
-// --------------------------------------------------
 
 //  汇编编译结果（未完成）
-//  global  globalVar1
-//  global  globalVar2
-//  global  test@
-//  extern  Core::Extern::IntToString@_int
-//  extern  Core::IntrinsicOperatorOverloads::add@_string_string
-//  extern  Console::Log@_string
-//  extern  Core::GC::Disable@
-//  
-//  
-//  section .rdata
-//          CONSTSTRING_0  db  "result:"
-//          LITFLOAT_1_0f  dd  1.0
-//  
-//  
-//  section .data
-//          globalVar1  dd  1
-//          globalVar2  dd  1.0
-//  
-//  
-//  section .bss
-//  
-//  section .text
-//  
-//  entry:test@
-//  func_begin:test@
-//          push  RBP                                         ; // 1 : FUNC_BEGIN test@
-//          mov  RBP,  RSP
-//           <callee_save>
-//          cvttss2si  vreg%tmp@0,  [rel globalVar2]          ; // 2 : CAST tmp@0 int globalVar2
-//          mov  vreg%tmp@1,  [rel globalVar1]                ; // 3 : + tmp@1 globalVar1 tmp@0
-//          add  vreg%tmp@1,  vreg%tmp@0
-//          mov  vreg%result,  vreg%tmp@1                     ; // 4 : = result tmp@1//  none: 5 : PARAM result
-//           <caller_save>                                    ; // 6 : CALL Core::Extern::IntToString@_int %LITINT:1
-//          sub  RSP,  32
-//          mov  RCX,  vreg%result
-//          mov  [RSP],  vreg%result
-//          call  Core::Extern::IntToString@_int
-//          add  RSP,  32
-//           <caller_restore>
-//          mov  vreg%tmp@4,  RAX                             ; // 7 : = tmp@4 %RET//  none: 8 : PARAM tmp@4//  none: 9 : PARAM %CONSTSTRING:0
-//           <caller_save>                                    ; // 10 : CALL Core::IntrinsicOperatorOverloads::add@_string_string %LITINT:2
-//          sub  RSP,  32
-//          mov  RCX,  vreg%tmp@4
-//          mov  [RSP],  vreg%tmp@4
-//          lea  RDX,  [rel CONSTSTRING_0]
-//          lea  R11,  [rel CONSTSTRING_0]
-//          mov  [RSP+8],  R11
-//          call  Core::IntrinsicOperatorOverloads::add@_string_string
-//          add  RSP,  32
-//           <caller_restore>
-//          mov  vreg%tmp@3,  RAX                             ; // 11 : = tmp@3 %RET//  none: 12 : PARAM tmp@3
-//           <caller_save>                                    ; // 13 : CALL Console::Log@_string %LITINT:1
-//          sub  RSP,  32
-//          mov  RCX,  vreg%tmp@3
-//          mov  [RSP],  vreg%tmp@3
-//          call  Console::Log@_string
-//          add  RSP,  32
-//           <caller_restore>
-//          mov  vreg%tmp@2,  RAX                             ; // 14 : = tmp@2 %RET
-//          jmp  func_end:test@                               ; // 15 : RETURN
-//  func_end:test@
-//           <callee_restore>                                 ; // 16 : FUNC_END test@
-//          mov  RSP,  RBP
-//          pop  RBP
-//          ret
-//  exit:test@
-//  entry:Main
-//  func_begin:Main
-//          push  RBP                                         ; // 19 : FUNC_BEGIN Main
-//          mov  RBP,  RSP
-//           <callee_save>
-//          mov  R11,  1                                      ; // 20 : = globalVar1 %LITINT:1
-//          mov  [rel globalVar1],  R11
-//          movss  XMM0,  [rel LITFLOAT_1_0f]                 ; // 21 : = globalVar2 %LITFLOAT:1.0f
-//          movss  [rel globalVar2],  XMM0
-//           <caller_save>                                    ; // 22 : CALL Core::GC::Disable@ %LITINT:0
-//          sub  RSP,  32
-//          call  Core::GC::Disable@
-//          add  RSP,  32
-//           <caller_restore>
-//          mov  vreg%tmp@5,  RAX                             ; // 23 : = tmp@5 %RET
-//           <caller_save>                                    ; // 24 : CALL test@ %LITINT:0
-//          sub  RSP,  32
-//          call  test@
-//          add  RSP,  32
-//           <caller_restore>
-//          mov  vreg%tmp@6,  RAX                             ; // 25 : = tmp@6 %RET
-//  func_end:Main
-//           <callee_restore>                                 ; // 27 : FUNC_END Main
-//          mov  RSP,  RBP
-//          pop  RBP
-//          ret
-//  exit:Main

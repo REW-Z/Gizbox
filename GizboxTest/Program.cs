@@ -107,7 +107,7 @@ switch(cmdIdx)
             compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
             compiler.ConfigParserDataSource(hardcode: true);
             //compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
-            var il = compiler.Compile(source);
+            var il = compiler.CompileToIR(source);
             Compiler.Pause("Compile End");
 
             il.Print();
@@ -143,7 +143,7 @@ switch(cmdIdx)
             compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
             compiler.ConfigParserDataSource(hardcode: true);
             //compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
-            var il = compiler.Compile(source);
+            var il = compiler.CompileToIR(source);
             Compiler.Pause("Compile End");
 
             il.Print();

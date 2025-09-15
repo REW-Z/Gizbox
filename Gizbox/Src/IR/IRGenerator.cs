@@ -9,7 +9,7 @@ namespace Gizbox.IR
     /// <summary>
     /// 中间代码生成器  
     /// </summary>
-    public class ILGenerator
+    public class IRGenerator
     {
         //public  
         public SyntaxTree ast;
@@ -31,7 +31,7 @@ namespace Gizbox.IR
         private GStack<string> loopExitStack = new GStack<string>();
 
 
-        public ILGenerator(SyntaxTree ast, IRUnit ir)
+        public IRGenerator(SyntaxTree ast, IRUnit ir)
         {
             this.ilUnit = ir;
             this.ast = ast;

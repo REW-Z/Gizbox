@@ -247,6 +247,13 @@ namespace Gizbox
             return newNode;
         }
 
+        public Node InsertBefore(Node targetNode, T val)
+        {
+            return targetNode.Prev != null 
+                ? this.InsertAfter(targetNode.Prev, val) 
+                : this.AddFirst(val);
+        }
+
         public Node InsertAfter(Node targetNode, T val)
         {
             if(targetNode == null || targetNode.owner != this || allNodes.Contains(targetNode) == false)
