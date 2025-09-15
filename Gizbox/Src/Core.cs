@@ -103,6 +103,7 @@ namespace Gizbox
             None = 0,
             OperatorOverloadFunc = 1,
             ExternFunc = 2,
+            Ctor = 4,
         }
 
         [DataContract(IsReference = true)]
@@ -564,6 +565,11 @@ namespace Gizbox
             type._RawTypeExpression = typeExpression;
             typeExpressionCache[typeExpression] = type;
             return type;
+        }
+
+        public static GType GenFuncType(GType returnType, params GType[] paramTypes)
+        {
+            return GType.Parse($"{string.Join(",", paramTypes.Select(p => p.ToString()))} => {returnType.ToString()}");
         }
 
         private string _RawTypeExpression;

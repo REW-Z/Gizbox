@@ -151,19 +151,26 @@ namespace Gizbox.IR
         //自动加载所有依赖  
         public void AutoLoadDependencies(Compiler loader, bool includeDeps = true)
         {
+            if(dependencyLibs == null)
+                dependencyLibs = new();
+
             if(this.dependencyLibs.Count == 0 && this.dependencies.Count != 0)
             {
                 foreach(var depName in this.dependencies)
                 {
                     var depUnit = loader.LoadLib(depName);
                     this.AddDependencyLib(depUnit);
-
-                    if(includeDeps)
-                    {
-                        depUnit.AutoLoadDependencies(loader);
-                    }
                 }
             }
+
+            if(includeDeps && this.dependencyLibs != null)
+            {
+                foreach(var dep in this.dependencyLibs)
+                {
+                    dep.AutoLoadDependencies(loader);
+                }
+            }
+
         }
         //添加依赖  
         public void AddDependencyLib(IRUnit dep)

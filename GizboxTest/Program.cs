@@ -148,7 +148,7 @@ switch(cmdIdx)
 
             il.Print();
 
-            Win64Target.CodeGen(compiler, il);
+            Win64Target.GenAllAsm(compiler, il, System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
         }
         break;
 }

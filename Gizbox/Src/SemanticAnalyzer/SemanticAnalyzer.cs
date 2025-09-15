@@ -1827,9 +1827,9 @@ namespace Gizbox.SemanticRule
                             TryCompleteIdenfier(classDeclNode.baseClassNameNode);
 
                         //新建虚函数表  
-                        string classname = classDeclNode.classNameNode.FullName;
-                        var vtable = ilUnit.vtables[classname] = new VTable(classname);
-                        Log("新的虚函数表：" + classname);
+                        string classFullName = classDeclNode.classNameNode.FullName;
+                        var vtable = ilUnit.vtables[classFullName] = new VTable(classFullName);
+                        Log("新的虚函数表：" + classFullName);
 
                         //进入类作用域  
                         envStack.Push(newEnv);
@@ -1880,6 +1880,17 @@ namespace Gizbox.SemanticRule
                         //默认隐藏构造函数的符号表  
                         var ctorEnv = new SymbolTable(classDeclNode.classNameNode.FullName + ".ctor", SymbolTable.TableCatagory.FuncScope, newEnv);
                         ctorEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, classDeclNode.classNameNode.FullName);
+
+
+                        //添加条目-构造函数    
+                        var ctorRec = newEnv.NewRecord(
+                            classDeclNode.classNameNode.FullName + ".ctor",
+                            SymbolTable.RecordCatagory.Function,
+                            GType.GenFuncType(GType.Parse("void"), GType.Parse(classDeclNode.classNameNode.FullName)).ToString(),
+                            ctorEnv
+                        );
+                        ctorRec.rawname = classDeclNode.classNameNode.FullName + ".ctor";
+                        ctorRec.flags |= SymbolTable.RecordFlag.Ctor;
 
 
                         //离开类作用域  

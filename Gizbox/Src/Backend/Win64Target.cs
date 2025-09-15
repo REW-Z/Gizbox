@@ -38,6 +38,26 @@ FuncA:
 FuncB:
     ; 函数实现
     ret
+
+
+示例2：
+section .data align=8
+extern Foo_Virtual0
+extern Foo_Virtual1
+
+; vtable（函数指针数组）
+Foo_vtable:
+    dq Foo_Virtual0
+    dq Foo_Virtual1
+
+; 一个对象实例：vptr + 一个数据字段
+; 这里用静态初始化把 vptr 指向 Foo_vtable
+Foo_instance:
+    dq Foo_vtable       ; vptr
+    dq 42               ; data 成员示意
+
+section .text align=16
+global main
  */
 
 
@@ -51,18 +71,46 @@ namespace Gizbox.Src.Backend
     }
     public static class Win64Target
     {
-        public static void CodeGen(Compiler compiler, IRUnit ir)
+        public static void GenAllAsm(Compiler compiler, IRUnit mainUnit, string outputDir)
         {
-            //依赖库作为编译单元进行代码生成
-            ir.AutoLoadDependencies(compiler, true); //加载依赖单元
+            //对所有编译单元进行汇编代码生成
+            mainUnit.AutoLoadDependencies(compiler, true);
             HashSet<IRUnit> allunit = new();
-            //...
+            CollectIRUnits(allunit, mainUnit);
+            foreach(var unit in allunit)
+            {
+                string name;
+                if(unit == mainUnit)
+                    name = "main";
+                else
+                    name = unit.name;
 
-            //本编译单元进行代码生成  
-            Win64CodeGenContext context = new Win64CodeGenContext(compiler, ir);
-
-            context.StartCodeGen();
+                GixConsole.WriteLine("尝试生成：" + name);
+                GenSingleAsm(compiler, unit, name, outputDir);
+            }
+            GixConsole.WriteLine($"已生成{allunit.Count}个单元");
         }
+
+        private static void CollectIRUnits(HashSet<IRUnit> units, IRUnit ir)
+        {
+            if(ir.dependencyLibs != null)
+            {
+                foreach(var dep in ir.dependencyLibs)
+                {
+                    CollectIRUnits(units, dep);
+                }
+            }
+            units.Add(ir);
+        }
+
+        private static void GenSingleAsm(Compiler compiler, IRUnit irunit, string name, string outputDir)
+        {
+            Win64CodeGenContext context = new Win64CodeGenContext(compiler, irunit);
+            context.StartCodeGen();
+            var result = context.GetResult();
+            System.IO.File.WriteAllText(System.IO.Path.Combine(outputDir, $"{name}.asm"), result);
+        }
+
         public static void Log(string content)
         {
             if(!Compiler.enableLogCodeGen)
@@ -1800,6 +1848,8 @@ namespace Gizbox.Src.Backend
                 {
                     if(rec.category != SymbolTable.RecordCatagory.Function)
                         continue;
+                    if((rec.flags & SymbolTable.RecordFlag.Ctor) != 0)
+                        continue;
 
                     int index = rec.index;
                     rec.addr = index * 8;
@@ -1815,7 +1865,7 @@ namespace Gizbox.Src.Backend
 
                 //填充rodata  
                 string rokey = $"vtable_{classRec.name}";
-                section_rdata.Add(rokey, vtableData.Select(v => (GType.Parse("FuncPtr"), v.name)).ToList());
+                section_rdata.Add(rokey, vtableData.Select(v => (GType.Parse("(FuncPtr)"), v.name)).ToList());
                 vtableRoKeys.Add(classRec.name, rokey);
             }
         }
@@ -2140,13 +2190,13 @@ namespace Gizbox.Src.Backend
                                 break;
                             case "%LITINT":
                                 {
-                                    var value = int.Parse(iroperandExpr.segments[1]);
+                                    var value = int.Parse(UtilsW64.GLitToW64Lit(irOperand.typeExpr, iroperandExpr.segments[1]));//int.Parse(iroperandExpr.segments[1]);
                                     return X64.imm(value);
                                 }
                                 break;
                             case "%LITLONG":
                                 {
-                                    var value = long.Parse(iroperandExpr.segments[1]);
+                                    var value = long.Parse(UtilsW64.GLitToW64Lit(irOperand.typeExpr, iroperandExpr.segments[1])); //long.Parse(iroperandExpr.segments[1]);
                                     return X64.imm(value);
                                 }
                                 break;
@@ -3088,6 +3138,10 @@ namespace Gizbox.Src.Backend
                     {
                         typeExpr = GType.Parse("(type)");
                     }
+                    else if(owner.tac.op == "EXTERN_IMPL")
+                    {
+                        typeExpr = GType.Parse("(other)");
+                    }
                     else
                     {
                         rec = context.Query(segments[0], tacinf.line);
@@ -3291,7 +3345,20 @@ namespace Gizbox.Src.Backend
                     {
                         return $"\"{gLiterial}\"";
                     }
+                    break;
+                case GType.Kind.Other:
+                    {
+                        if(gType.ToString() == "(FuncPtr)")
+                        {
+                            return gLiterial;//label
+                        }
+                        throw new GizboxException(ExceptioName.Undefine, $"not support lit type:{gType.ToString()}");
+                    }
+                    break;
                 default:
+                    {
+
+                    }
                     throw new GizboxException(ExceptioName.Undefine, $"not support lit type:{gType.ToString()}");
                     
             }
