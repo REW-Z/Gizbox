@@ -59,5 +59,6 @@
 
 **Gizbox TODO**   
 
-rsp移动到局部变量之后。
 for循环的循环变量特殊处理。  
+数组测试。  
+this->field寄存器未分配。  

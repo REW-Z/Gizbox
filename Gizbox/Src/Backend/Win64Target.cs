@@ -745,13 +745,22 @@ namespace Gizbox.Src.Backend
                             int localVarsSize = localVarsSpaceSize[currFuncEnv];
                             if(localVarsSize % 16 != 0)
                                 localVarsSize = ((localVarsSize / 16) + 1) * 16;
-                            var subInstr = X64.sub(X64.rsp, X64.imm(localVarsSize), X64Size.qword);
-                            subInstr.comment += $"(local variables space)";
-                            instructions.AddLast(subInstr);
+                            var subrsp = X64.sub(X64.rsp, X64.imm(localVarsSize), X64Size.qword);
+                            subrsp.comment += $"(local variables space alloc)";
+                            instructions.AddLast(subrsp);
                         }
                         break;
                     case "FUNC_END":
                         {
+                            //回收局部变量空间  
+                            int localVarsSize = localVarsSpaceSize[currFuncEnv];
+                            if(localVarsSize % 16 != 0)
+                                localVarsSize = ((localVarsSize / 16) + 1) * 16;
+                            var addrsp = X64.add(X64.rsp, X64.imm(localVarsSize), X64Size.qword);
+                            addrsp.comment += $"(local variables space release)";
+                            instructions.AddLast(addrsp);
+
+
                             //恢复寄存器（非易失性需要由Callee保存） 
                             Debug.Assert(currFuncEnv != null);
                             var placeholder = X64.placehold("callee_restore");
@@ -1172,7 +1181,8 @@ namespace Gizbox.Src.Backend
                         {
                             var dst = ParseOperand(tacInf.oprand0);
                             var src = ParseOperand(tacInf.oprand1);
-                            instructions.AddLast(X64.mov(dst, src));
+                            var size = tacInf.oprand0.typeExpr.Size;
+                            instructions.AddLast(X64.mov(dst, src, (X64Size)size));
                             instructions.AddLast(X64.test(dst, dst));
                             instructions.AddLast(X64.sete(dst));
                         }
@@ -1187,7 +1197,8 @@ namespace Gizbox.Src.Backend
                             var dst = ParseOperand(tacInf.oprand0);
                             var a = ParseOperand(tacInf.oprand1);
                             var b = ParseOperand(tacInf.oprand2);
-                            instructions.AddLast(X64.mov(dst, a));
+                            var size = tacInf.oprand1.typeExpr.Size;
+                            instructions.AddLast(X64.mov(dst, a, (X64Size)size));
                             instructions.AddLast(X64.cmp(dst, b));
                             switch(tac.op)
                             {
@@ -1203,13 +1214,15 @@ namespace Gizbox.Src.Backend
                     case "++":
                         {
                             var dst = ParseOperand(tacInf.oprand0);
-                            if(!tacInf.oprand0.IsSSEType()) instructions.AddLast(X64.inc(dst));
+                            var size = tacInf.oprand0.typeExpr.Size;
+                            if(!tacInf.oprand0.IsSSEType()) instructions.AddLast(X64.inc(dst, (X64Size)size));
                         }
                         break;
                     case "--":
                         {
                             var dst = ParseOperand(tacInf.oprand0);
-                            if(!tacInf.oprand0.IsSSEType()) instructions.AddLast(X64.dec(dst));
+                            var size = tacInf.oprand0.typeExpr.Size;
+                            if(!tacInf.oprand0.IsSSEType()) instructions.AddLast(X64.dec(dst, (X64Size)size));
                         }
                         break;
                     case "CAST"://CAST [tmp15] Human [tmp14]   tmp15 = (Human)tmp14
@@ -1220,18 +1233,22 @@ namespace Gizbox.Src.Backend
                             var targetType = GType.Parse(tacInf.tac.arg1);
                             var srcType = tacInf.oprand2.typeExpr;
 
+                            var sizeDst = targetType.Size;
+                            var sizeSrc = srcType.Size;
+
+
                             //相同类型
                             if(srcType.ToString() == targetType.ToString())
                             {
                                 if(dst != src)
-                                    instructions.AddLast(X64.mov(dst, src));
+                                    instructions.AddLast(X64.mov(dst, src, (X64Size)sizeDst));
                                 break;
                             }
 
                             //指针类型转换 -> 指针直接赋值  
                             if(srcType.IsPointerType && targetType.IsPointerType)
                             {
-                                instructions.AddLast(X64.mov(dst, src));
+                                instructions.AddLast(X64.mov(dst, src, X64Size.qword));
                                 break;
                             }
 
@@ -1251,19 +1268,19 @@ namespace Gizbox.Src.Backend
                             {
                                 if(srcType.Size == targetType.Size)
                                 {
-                                    instructions.AddLast(X64.mov(dst, src));
+                                    instructions.AddLast(X64.mov(dst, src, (X64Size)sizeDst));
                                 }
                                 else if(srcType.Size < targetType.Size)//扩展
                                 {
                                     
                                     if(srcType.IsSigned)
-                                        instructions.AddLast(X64.movsx(dst, src));
+                                        instructions.AddLast(X64.movsx(dst, src, (X64Size)sizeDst, (X64Size)sizeSrc));
                                     else
-                                        instructions.AddLast(X64.movzx(dst, src));
+                                        instructions.AddLast(X64.movzx(dst, src, (X64Size)sizeDst, (X64Size)sizeSrc));
                                 }
                                 else //截断
                                 {
-                                    instructions.AddLast(X64.mov(dst, src));
+                                    instructions.AddLast(X64.mov(dst, src, (X64Size)sizeDst));
                                 }
                                 break;
                             }
@@ -1556,7 +1573,7 @@ namespace Gizbox.Src.Backend
                             bytes += 8;
                         }
                         //rsp移动  
-                        ind = instructions.InsertAfter(ind, X64.sub(X64.rsp, X64.imm(bytes)));
+                        ind = instructions.InsertAfter(ind, X64.sub(X64.rsp, X64.imm(bytes), X64Size.qword));
                         ind.value.label = holdlabel;
                         ind.value.comment = holdcomment + $"(caller-save of {func.funcRec.name} start)";
 
@@ -1564,7 +1581,7 @@ namespace Gizbox.Src.Backend
                         int offset = 0;
                         foreach(var reg in funcUsedCallerGP)
                         {
-                            ind = instructions.InsertAfter(ind, X64.mov(X64.mem(X64.rsp, displacement: offset), new X64Reg(reg)));
+                            ind = instructions.InsertAfter(ind, X64.mov(X64.mem(X64.rsp, displacement: offset), new X64Reg(reg), X64Size.qword));
                             offset += 8;
                         }
                         foreach(var reg in funcUsedCallerXMM)
@@ -1603,7 +1620,7 @@ namespace Gizbox.Src.Backend
                         int offset = 0;
                         foreach(var reg in funcUsedCallerGP)
                         {
-                            ind = instructions.InsertAfter(ind, X64.mov(new X64Reg(reg), X64.mem(X64.rsp, displacement: offset)));
+                            ind = instructions.InsertAfter(ind, X64.mov(new X64Reg(reg), X64.mem(X64.rsp, displacement: offset), X64Size.qword));
                             if(copyTo == null)
                                 copyTo = ind;
                             
@@ -1619,7 +1636,7 @@ namespace Gizbox.Src.Backend
                         }
 
                         //rsp移动  
-                        ind = instructions.InsertAfter(ind, X64.add(X64.rsp, X64.imm(bytes)));
+                        ind = instructions.InsertAfter(ind, X64.add(X64.rsp, X64.imm(bytes), X64Size.qword));
                         if(copyTo == null)
                             copyTo = ind;
 
@@ -1658,7 +1675,7 @@ namespace Gizbox.Src.Backend
                     localvarsMoveBytes = bytes;
 
                     //rsp移动  
-                    ind = instructions.InsertAfter(ind, X64.sub(X64.rsp, X64.imm(bytes)));
+                    ind = instructions.InsertAfter(ind, X64.sub(X64.rsp, X64.imm(bytes), X64Size.qword));
                     ind.value.label = holdlabel;
                     ind.value.comment = holdcomment;
                     ind.value.comment += $"(callee-save of {func.funcRec.name} start)";
@@ -1667,7 +1684,7 @@ namespace Gizbox.Src.Backend
                     int offset = 0;
                     foreach(var reg in funcUsedCalleeGP)
                     {
-                        ind = instructions.InsertAfter(ind, X64.mov(X64.mem(X64.rsp, displacement: offset), new X64Reg(reg)));
+                        ind = instructions.InsertAfter(ind, X64.mov(X64.mem(X64.rsp, displacement: offset), new X64Reg(reg), X64Size.qword));
                         offset += 8;
                     }
                     foreach(var reg in funcUsedCalleeXMM)
@@ -1713,7 +1730,7 @@ namespace Gizbox.Src.Backend
                     int offset = 0;
                     foreach(var reg in funcUsedCalleeGP)
                     {
-                        ind = instructions.InsertAfter(ind, X64.mov(new X64Reg(reg), X64.mem(X64.rsp, displacement: offset)));
+                        ind = instructions.InsertAfter(ind, X64.mov(new X64Reg(reg), X64.mem(X64.rsp, displacement: offset), X64Size.qword));
                         if(copyTo == null)
                             copyTo = ind;
 
@@ -1729,7 +1746,7 @@ namespace Gizbox.Src.Backend
                     }
 
                     //rsp移动  
-                    ind = instructions.InsertAfter(ind, X64.add(X64.rsp, X64.imm(bytes)));
+                    ind = instructions.InsertAfter(ind, X64.add(X64.rsp, X64.imm(bytes), X64Size.qword));
                     if(copyTo == null)
                         copyTo = ind;
 
@@ -2460,14 +2477,15 @@ namespace Gizbox.Src.Backend
             }
             else
             {
+                X64Size size = (X64Size)type.Size;
                 if(IsRegOrVReg(dst) == false && IsRegOrVReg(src) == false)
                 {
-                    instructions.AddLast(X64.mov(X64.r11, src));
-                    instructions.AddLast(X64.mov(dst, X64.r11));
+                    instructions.AddLast(X64.mov(X64.r11, src, size));
+                    instructions.AddLast(X64.mov(dst, X64.r11, size));
                 }
                 else
                 {
-                    instructions.AddLast(X64.mov(dst, src));
+                    instructions.AddLast(X64.mov(dst, src, size));
                 }
             }
         }
@@ -2525,13 +2543,15 @@ namespace Gizbox.Src.Backend
             }
             else
             {
+                X64Size size = (X64Size)type.Size;
+
                 // 整数/指针
                 if(op == "/" || op == "%")
                 {
                     // rdx:rax / b
-                    instructions.AddLast(X64.mov(X64.rax, a));
+                    instructions.AddLast(X64.mov(X64.rax, a, size));
                     instructions.AddLast(X64.cqo());
-                    instructions.AddLast(X64.idiv(b));
+                    instructions.AddLast(X64.idiv(b, size));
                     EmitMov(dst, op == "/" ? (X64Operand)X64.rax : X64.rdx, type);
                     return;
                 }
@@ -2541,11 +2561,11 @@ namespace Gizbox.Src.Backend
                     switch(o)
                     {
                         case "+":
-                            return X64.add(d, s);
+                            return X64.add(d, s, size);
                         case "-":
-                            return X64.sub(d, s);
+                            return X64.sub(d, s, size);
                         case "*":
-                            return X64.imul(d, s);
+                            return X64.imul(d, s, size);
                     }
                     throw new GizboxException(ExceptioName.CodeGen, $"未知操作符: {o}");
                 }
@@ -2559,14 +2579,14 @@ namespace Gizbox.Src.Backend
                     else
                     {
                         // dst <- a; dst = dst op b
-                        instructions.AddLast(X64.mov(dst, a));
+                        instructions.AddLast(X64.mov(dst, a, size));
                         instructions.AddLast(IntOp(op, dst, b));
                     }
                 }
                 else
                 {
                     // dst(内存) = (a op b) via r11
-                    instructions.AddLast(X64.mov(X64.r11, a));
+                    instructions.AddLast(X64.mov(X64.r11, a, size));
                     instructions.AddLast(IntOp(op, X64.r11, b));
                     EmitMov(dst, X64.r11, type);
                 }
@@ -2620,35 +2640,36 @@ namespace Gizbox.Src.Backend
             }
             else
             {
+                X64Size size = (X64Size)type.Size;
                 switch(op)
                 {
                     case "+=":
                     case "-=":
                     case "*=":
                         {
-                            instructions.AddLast(X64.mov(X64.r11, dst));
+                            instructions.AddLast(X64.mov(X64.r11, dst, size));
                             if(op == "+=")
-                                instructions.AddLast(X64.add(X64.r11, rhs));
+                                instructions.AddLast(X64.add(X64.r11, rhs, size));
                             else if(op == "-=")
-                                instructions.AddLast(X64.sub(X64.r11, rhs));
+                                instructions.AddLast(X64.sub(X64.r11, rhs, size));
                             else
-                                instructions.AddLast(X64.imul(X64.r11, rhs));
+                                instructions.AddLast(X64.imul(X64.r11, rhs, size));
                             EmitMov(dst, X64.r11, type);
                             break;
                         }
                     case "/=":
                         {
-                            instructions.AddLast(X64.mov(X64.rax, dst));
+                            instructions.AddLast(X64.mov(X64.rax, dst, size));
                             instructions.AddLast(X64.cqo());
-                            instructions.AddLast(X64.idiv(rhs));
+                            instructions.AddLast(X64.idiv(rhs, size));
                             EmitMov(dst, X64.rax, type);
                             break;
                         }
                     case "%=":
                         {
-                            instructions.AddLast(X64.mov(X64.rax, dst));
+                            instructions.AddLast(X64.mov(X64.rax, dst, size));
                             instructions.AddLast(X64.cqo());
-                            instructions.AddLast(X64.idiv(rhs));
+                            instructions.AddLast(X64.idiv(rhs, size));
                             EmitMov(dst, X64.rdx, type);
                             break;
                         }
@@ -2669,34 +2690,36 @@ namespace Gizbox.Src.Backend
             {
                 var instr = node.value;
 
+                var size = instr.sizeMark;
+
                 switch(instr.type)
                 {
                     // 普通 mov：不允许 mem-mem
-                    case InstructionType.mov:
+                    case InstructionKind.mov:
                         if(UtilsW64.IsMemOperand(instr.operand0) && UtilsW64.IsMemOperand(instr.operand1))
                         {
-                            instructions.InsertBefore(node, X64.mov(X64.r11, instr.operand1));
+                            instructions.InsertBefore(node, X64.mov(X64.r11, instr.operand1, size));
                             instr.operand1 = X64.r11;
                         }
                         break;
 
                     // 浮点/128bit 搬运：不允许 mem-mem
-                    case InstructionType.movss:
-                    case InstructionType.movsd:
-                    case InstructionType.movaps:
-                    case InstructionType.movapd:
-                    case InstructionType.movups:
-                    case InstructionType.movupd:
-                    case InstructionType.movdqa:
-                    case InstructionType.movdqu:
+                    case InstructionKind.movss:
+                    case InstructionKind.movsd:
+                    case InstructionKind.movaps:
+                    case InstructionKind.movapd:
+                    case InstructionKind.movups:
+                    case InstructionKind.movupd:
+                    case InstructionKind.movdqa:
+                    case InstructionKind.movdqu:
                         if(UtilsW64.IsMemOperand(instr.operand0) && UtilsW64.IsMemOperand(instr.operand1))
                         {
-                            if(instr.type == InstructionType.movss)
+                            if(instr.type == InstructionKind.movss)
                             {
                                 instructions.InsertBefore(node, X64.movss(X64.xmm0, instr.operand1));
                                 instr.operand1 = X64.xmm0;
                             }
-                            else if(instr.type == InstructionType.movsd)
+                            else if(instr.type == InstructionKind.movsd)
                             {
                                 instructions.InsertBefore(node, X64.movsd(X64.xmm0, instr.operand1));
                                 instr.operand1 = X64.xmm0;
@@ -2711,20 +2734,20 @@ namespace Gizbox.Src.Backend
                         break;
 
                     // 整数二元：不允许 mem-mem
-                    case InstructionType.add:
-                    case InstructionType.sub:
-                    case InstructionType.and:
-                    case InstructionType.or:
-                    case InstructionType.xor:
+                    case InstructionKind.add:
+                    case InstructionKind.sub:
+                    case InstructionKind.and:
+                    case InstructionKind.or:
+                    case InstructionKind.xor:
                         if(UtilsW64.IsMemOperand(instr.operand0) && UtilsW64.IsMemOperand(instr.operand1))
                         {
-                            instructions.InsertBefore(node, X64.mov(X64.r11, instr.operand1));
+                            instructions.InsertBefore(node, X64.mov(X64.r11, instr.operand1, size));
                             instr.operand1 = X64.r11;
                         }
                         break;
 
                     // imul（二操作数形式）：目的必须是寄存器
-                    case InstructionType.imul:
+                    case InstructionKind.imul:
                         {
                             bool dstIsMem = UtilsW64.IsMemOperand(instr.operand0);
                             bool srcIsMem = UtilsW64.IsMemOperand(instr.operand1);
@@ -2732,27 +2755,27 @@ namespace Gizbox.Src.Backend
 
                             if(dstIsMem)
                             {
-                                instructions.InsertBefore(node, X64.mov(X64.r11, instr.operand0));
+                                instructions.InsertBefore(node, X64.mov(X64.r11, instr.operand0, size));
                                 instr.operand0 = X64.r11;
                             }
                             if(srcIsMem)
                             {
                                 // 若目的已占用 R11，则用 R10 做第二中转
-                                instructions.InsertBefore(node, X64.mov(X64.r10, instr.operand1));
+                                instructions.InsertBefore(node, X64.mov(X64.r10, instr.operand1, size));
                                 instr.operand1 = X64.r10;
                             }
                             if(dstIsMem)
                             {
-                                instructions.InsertAfter(node, X64.mov(origDst, X64.r11));
+                                instructions.InsertAfter(node, X64.mov(origDst, X64.r11, size));
                             }
                             break;
                         }
 
                     // SSE 标量算术：目的必须是 XMM
-                    case InstructionType.addss:
-                    case InstructionType.subss:
-                    case InstructionType.mulss:
-                    case InstructionType.divss:
+                    case InstructionKind.addss:
+                    case InstructionKind.subss:
+                    case InstructionKind.mulss:
+                    case InstructionKind.divss:
                         if(UtilsW64.IsMemOperand(instr.operand0))
                         {
                             var dst = instr.operand0;
@@ -2761,10 +2784,10 @@ namespace Gizbox.Src.Backend
                             instructions.InsertAfter(node, X64.movss(dst, X64.xmm0));
                         }
                         break;
-                    case InstructionType.addsd:
-                    case InstructionType.subsd:
-                    case InstructionType.mulsd:
-                    case InstructionType.divsd:
+                    case InstructionKind.addsd:
+                    case InstructionKind.subsd:
+                    case InstructionKind.mulsd:
+                    case InstructionKind.divsd:
                         if(UtilsW64.IsMemOperand(instr.operand0))
                         {
                             var dst = instr.operand0;
@@ -2775,84 +2798,91 @@ namespace Gizbox.Src.Backend
                         break;
 
                     // 比较/测试：不允许 mem-mem
-                    case InstructionType.cmp:
-                    case InstructionType.test:
+                    case InstructionKind.cmp:
+                    case InstructionKind.test:
                         if(UtilsW64.IsMemOperand(instr.operand0) && UtilsW64.IsMemOperand(instr.operand1))
                         {
                             // 保持 op0 为原内存，载入 op1 到 R11
-                            instructions.InsertBefore(node, X64.mov(X64.r11, instr.operand1));
+                            instructions.InsertBefore(node, X64.mov(X64.r11, instr.operand1, size));
                             instr.operand1 = X64.r11;
                         }
                         break;
 
                     // lea：目的必须是寄存器
-                    case InstructionType.lea:
+                    case InstructionKind.lea:
                         if(UtilsW64.IsMemOperand(instr.operand0))
                         {
                             instructions.InsertBefore(node, X64.lea(X64.r11, instr.operand1));
                             // 当前指令转为 mov [mem], r11
-                            instr.type = InstructionType.mov;
+                            instr.type = InstructionKind.mov;
                             instr.operand1 = X64.r11;
                         }
                         break;
 
                     // movzx/movsx：目的必须是寄存器
-                    case InstructionType.movzx:
-                    case InstructionType.movsx:
+                    case InstructionKind.movzx:
+                    case InstructionKind.movsx:
                         if(UtilsW64.IsMemOperand(instr.operand0))
                         {
-                            instructions.InsertBefore(node, instr.type == InstructionType.movzx ? X64.movzx(X64.r11, instr.operand1) : X64.movsx(X64.r11, instr.operand1));
-                            instr.type = InstructionType.mov;
+                            var sizeOprand0 = instr.sizeMark;
+                            var sizeOprand1 = instr.sizeMarkAdditional;
+                            instructions.InsertBefore(node, instr.type == InstructionKind.movzx 
+                                ? X64.movzx(X64.r11, instr.operand1, sizeOprand0, sizeOprand1) 
+                                : X64.movsx(X64.r11, instr.operand1, sizeOprand0, sizeOprand1));
+                            instr.type = InstructionKind.mov;
                             instr.operand1 = X64.r11;
+
+                            //隐含size已改变
+                            instr.sizeMarkAdditional = instr.sizeMark = sizeOprand0;
                         }
                         break;
 
                     // 整数->浮点：目的必须 XMM
-                    case InstructionType.cvtsi2ss:
-                    case InstructionType.cvtsi2sd:
+                    case InstructionKind.cvtsi2ss:
+                    case InstructionKind.cvtsi2sd:
                         if(UtilsW64.IsMemOperand(instr.operand0))
                         {
                             // 先算到 xmm0，再存回
-                            if(instr.type == InstructionType.cvtsi2ss)
+                            if(instr.type == InstructionKind.cvtsi2ss)
                                 instructions.InsertBefore(node, X64.cvtsi2ss(X64.xmm0, instr.operand1));
                             else
                                 instructions.InsertBefore(node, X64.cvtsi2sd(X64.xmm0, instr.operand1));
 
-                            instr.type = (instr.type == InstructionType.cvtsi2ss) ? InstructionType.movss : InstructionType.movsd;
+                            instr.type = (instr.type == InstructionKind.cvtsi2ss) ? InstructionKind.movss : InstructionKind.movsd;
                             instr.operand1 = X64.xmm0;
                         }
                         break;
 
                     // 浮点<->浮点：目的必须 XMM
-                    case InstructionType.cvtss2sd:
-                    case InstructionType.cvtsd2ss:
+                    case InstructionKind.cvtss2sd:
+                    case InstructionKind.cvtsd2ss:
                         if(UtilsW64.IsMemOperand(instr.operand0))
                         {
                             var t = instr.type;
-                            if(t == InstructionType.cvtss2sd)
+                            if(t == InstructionKind.cvtss2sd)
                                 instructions.InsertBefore(node, X64.cvtss2sd(X64.xmm0, instr.operand1));
                             else
                                 instructions.InsertBefore(node, X64.cvtsd2ss(X64.xmm0, instr.operand1));
 
-                            instr.type = (t == InstructionType.cvtss2sd) ? InstructionType.movsd : InstructionType.movss;
+                            instr.type = (t == InstructionKind.cvtss2sd) ? InstructionKind.movsd : InstructionKind.movss;
                             instr.operand1 = X64.xmm0;
                         }
                         break;
 
                     // 浮点->整数：目的必须 GP
-                    case InstructionType.cvttss2si:
-                    case InstructionType.cvttss2siq:
-                    case InstructionType.cvttsd2si:
-                    case InstructionType.cvttsd2siq:
+                    case InstructionKind.cvttss2si:
+                    case InstructionKind.cvttss2siq:
+                    case InstructionKind.cvttsd2si:
+                    case InstructionKind.cvttsd2siq:
                         if(UtilsW64.IsMemOperand(instr.operand0))
                         {
                             var t = instr.type;
                             instructions.InsertBefore(node,
-                                t == InstructionType.cvttss2si ? X64.cvttss2si(X64.r11, instr.operand1) :
-                                t == InstructionType.cvttss2siq ? X64.cvttss2siq(X64.r11, instr.operand1) :
-                                t == InstructionType.cvttsd2si ? X64.cvttsd2si(X64.r11, instr.operand1) :
+                                t == InstructionKind.cvttss2si ? X64.cvttss2si(X64.r11, instr.operand1) :
+                                t == InstructionKind.cvttss2siq ? X64.cvttss2siq(X64.r11, instr.operand1) :
+                                t == InstructionKind.cvttsd2si ? X64.cvttsd2si(X64.r11, instr.operand1) :
                                                                  X64.cvttsd2siq(X64.r11, instr.operand1));
-                            instr.type = InstructionType.mov;
+                            instr.type = InstructionKind.mov;
                             instr.operand1 = X64.r11;
                         }
                         break;
@@ -3406,59 +3436,67 @@ namespace Gizbox.Src.Backend
 
         public static string GetX64DefineType(GType gtype, string val)
         {
-            string x64DefineType = string.Empty;
+            X64DefSize x64DefineType = X64DefSize.undefined;
             switch(gtype.Category)
             {
                 case GType.Kind.Void:
                 case GType.Kind.Bool:
                 case GType.Kind.String://字符串常量  
-                    x64DefineType = "db";
+                    x64DefineType = (X64DefSize)1;
                     break;
-                case GType.Kind.Char:
-                    x64DefineType = "dw";
+                case GType.Kind.Char://UNICODE char  
+                    x64DefineType = (X64DefSize)2;
                     break;
                 case GType.Kind.Int:
                 case GType.Kind.Float:
-                    x64DefineType = "dd";
+                    x64DefineType = (X64DefSize)4;
                     break;
                 case GType.Kind.Long:
                 case GType.Kind.Double:
-                    x64DefineType = "dq";
+                    x64DefineType = (X64DefSize)8;
                     break;
                 case GType.Kind.Array:
                 default:
-                    x64DefineType = "dq";//引用类型指针  
+                    x64DefineType = (X64DefSize)8;//引用类型指针  
                     break;
             }
 
             string x64ValExpr = GLitToW64Lit(gtype, val);
 
-            return $"{x64DefineType}  {x64ValExpr}";
+            return $"{x64DefineType.ToString()}  {x64ValExpr}";
         }
 
         public static string GetX64ReserveDefineType(GType gtype)
         {
+            X64ResSize resSize = X64ResSize.undefined;
             switch(gtype.Category)
             {
                 case GType.Kind.Void:
                 case GType.Kind.Bool:
-                    return "resb  1";
+                    resSize =(X64ResSize)1;
+                    break;
                 case GType.Kind.Char://字符串常量  
-                    return "resw 1";
+                    resSize = (X64ResSize)2;
+                    break;
                 case GType.Kind.Int:
                 case GType.Kind.Float:
-                    return "resd 1";
+                    resSize = (X64ResSize)4;
+                    break;
                 case GType.Kind.Long:
                 case GType.Kind.Double:
-                    return "resq 1";
+                    resSize = (X64ResSize)8;
+                    break;
                 case GType.Kind.Array://引用类型
                 case GType.Kind.Object://引用类型
                 case GType.Kind.String://非常量字符串
-                    return "resq 1";//指针
+                    resSize = (X64ResSize)8;
+                    break;
                 default:
                     throw new GizboxException(ExceptioName.Undefine, $"not support .bss type:{gtype.ToString()}");
                     break;
             }
+
+            return $"{resSize.ToString()} 1";
         }
 
         public static X64Reg GetParamReg(int paramIdx, bool isSSE)
