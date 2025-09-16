@@ -90,14 +90,21 @@ namespace Gizbox.Src.Backend
         };
     }
 
+    public enum X64Size
+    {
+        @byte = 1,
+        word = 2,
+        dword = 4,
+        qword = 8,
+    }
     public enum InstructionType
     {
         placeholder = -1,//用于占位
         emptyline,//空行
 
         mov,
-        movss,
-        movsd,
+        movss,//scalar-single
+        movsd,//scalar-double
 
         // 128-bit 
         movaps, // aligned packed single
@@ -122,12 +129,12 @@ namespace Gizbox.Src.Backend
         subsd,
 
         mul,
-        imul,
+        imul,//有符号
         mulss,
         mulsd,
 
         div,
-        idiv,
+        idiv,//有符号
         divss,
         divsd,
 
@@ -184,6 +191,7 @@ namespace Gizbox.Src.Backend
         public string label;//标签
         public X64Operand operand0;
         public X64Operand operand1;
+        public X64Size oprandSizeMark;
         public string mark;//占位标记  
         public string comment = string.Empty;//指令注释
     }
@@ -198,6 +206,9 @@ namespace Gizbox.Src.Backend
               Dictionary<string, List<GType>>  section_bss)
         {
             StringBuilder strb = new StringBuilder();
+
+            //defines  
+            strb.AppendLine("bits 64");
 
             //global and extern  
             strb.AppendLine("\n");
@@ -293,7 +304,7 @@ namespace Gizbox.Src.Backend
             StringBuilder strb = new();
             if(string.IsNullOrEmpty(instr.label) == false)
             {
-                strb.AppendLine(UtilsW64.LegalizeName(instr.label));
+                strb.AppendLine(UtilsW64.LegalizeName(instr.label) + ":");
             }
 
             if(instr.type == InstructionType.placeholder)
@@ -347,7 +358,7 @@ namespace Gizbox.Src.Backend
                 case X64Reg reg:
                     return reg.isVirtual ? ("vreg%" + reg.vRegVar.name) : reg.physReg.ToString();
                 case X64Rel rel:
-                    return "[rel " + UtilsW64.LegalizeName(rel.symbolName) + (rel.displacement != 0 ? ("+" + rel.displacement.ToString()) : "") + "]";
+                    return "[rel " + UtilsW64.LegalizeName(rel.symbolName) + (rel.displacement != 0 ? ((rel.displacement > 0 ? "+" : "-") + Math.Abs(rel.displacement).ToString()) : "") + "]";
                 case X64Immediate im:
                     return (im).value.ToString();
                 case X64Label lb:
@@ -356,7 +367,7 @@ namespace Gizbox.Src.Backend
                     return "[" +
                         (mem.baseReg != null ? SerializeOprand(mem.baseReg) : "") +
                         (mem.indexReg != null ? ("+" + SerializeOprand(mem.indexReg) + (mem.scale != 1 ? ("*" + mem.scale.ToString()) : "")) : "") +
-                        (mem.displacement != 0 ? ("+" + mem.displacement.ToString()) : "")
+                        (mem.displacement != 0 ? ((mem.displacement > 0 ? "+" : "-") + Math.Abs(mem.displacement).ToString()) : "")
                         + "]";
                 default:
                     return operand.Kind.ToString();
@@ -477,7 +488,7 @@ namespace Gizbox.Src.Backend
         public static X64Instruction jge(string labelname) => new() { type = InstructionType.jge, operand0 = new X64Label(labelname) };
 
         // 数据移动
-        public static X64Instruction mov(X64Operand dest, X64Operand src) => new() { type = InstructionType.mov, operand0 = dest, operand1 = src };
+        public static X64Instruction mov(X64Operand dest, X64Operand src, X64Size size) => new() { type = InstructionType.mov, operand0 = dest, operand1 = src, oprandSizeMark = size };
         public static X64Instruction movss(X64Operand dest, X64Operand src) => new() { type = InstructionType.movss, operand0 = dest, operand1 = src };
         public static X64Instruction movsd(X64Operand dest, X64Operand src) => new() { type = InstructionType.movsd, operand0 = dest, operand1 = src };
 
@@ -497,14 +508,14 @@ namespace Gizbox.Src.Backend
         public static X64Instruction pop(X64Operand operand) => new() { type = InstructionType.pop, operand0 = operand };
 
         // 算术运算 - 标量整数/指针
-        public static X64Instruction add(X64Operand dest, X64Operand src) => new() { type = InstructionType.add, operand0 = dest, operand1 = src };
-        public static X64Instruction sub(X64Operand dest, X64Operand src) => new() { type = InstructionType.sub, operand0 = dest, operand1 = src };
+        public static X64Instruction add(X64Operand dest, X64Operand src, X64Size size) => new() { type = InstructionType.add, operand0 = dest, operand1 = src, oprandSizeMark = size };
+        public static X64Instruction sub(X64Operand dest, X64Operand src, X64Size size) => new() { type = InstructionType.sub, operand0 = dest, operand1 = src, oprandSizeMark = size };
 
         // 乘除（使用显式两操作数形式/一操作数形式）
-        public static X64Instruction imul(X64Operand dest, X64Operand src) => new() { type = InstructionType.imul, operand0 = dest, operand1 = src };
-        public static X64Instruction mul(X64Operand src) => new() { type = InstructionType.mul, operand0 = src };
-        public static X64Instruction idiv(X64Operand src) => new() { type = InstructionType.idiv, operand0 = src };
-        public static X64Instruction div(X64Operand src) => new() { type = InstructionType.div, operand0 = src };
+        public static X64Instruction imul(X64Operand dest, X64Operand src, X64Size size) => new() { type = InstructionType.imul, operand0 = dest, operand1 = src, oprandSizeMark = size };
+        public static X64Instruction mul(X64Operand src, X64Size size) => new() { type = InstructionType.mul, operand0 = src, oprandSizeMark = size };
+        public static X64Instruction idiv(X64Operand src, X64Size size) => new() { type = InstructionType.idiv, operand0 = src, oprandSizeMark = size };
+        public static X64Instruction div(X64Operand src, X64Size size) => new() { type = InstructionType.div, operand0 = src, oprandSizeMark = size };
 
         // SSE 标量浮点算术
         public static X64Instruction addss(X64Operand dest, X64Operand src) => new() { type = InstructionType.addss, operand0 = dest, operand1 = src };
@@ -516,10 +527,10 @@ namespace Gizbox.Src.Backend
         public static X64Instruction divss(X64Operand dest, X64Operand src) => new() { type = InstructionType.divss, operand0 = dest, operand1 = src };
         public static X64Instruction divsd(X64Operand dest, X64Operand src) => new() { type = InstructionType.divsd, operand0 = dest, operand1 = src };
 
-        public static X64Instruction inc(X64Operand operand) => new() { type = InstructionType.inc, operand0 = operand };
-        public static X64Instruction dec(X64Operand operand) => new() { type = InstructionType.dec, operand0 = operand };
-        public static X64Instruction neg(X64Operand operand) => new() { type = InstructionType.neg, operand0 = operand };
-        public static X64Instruction not(X64Operand operand) => new() { type = InstructionType.not, operand0 = operand };
+        public static X64Instruction inc(X64Operand operand, X64Size size) => new() { type = InstructionType.inc, operand0 = operand, oprandSizeMark = size };
+        public static X64Instruction dec(X64Operand operand, X64Size size) => new() { type = InstructionType.dec, operand0 = operand, oprandSizeMark = size };
+        public static X64Instruction neg(X64Operand operand, X64Size size) => new() { type = InstructionType.neg, operand0 = operand, oprandSizeMark = size };
+        public static X64Instruction not(X64Operand operand, X64Size size) => new() { type = InstructionType.not, operand0 = operand, oprandSizeMark = size };
 
         // 逻辑运算
         public static X64Instruction and(X64Operand dest, X64Operand src) => new() { type = InstructionType.and, operand0 = dest, operand1 = src };

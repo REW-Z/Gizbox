@@ -331,6 +331,7 @@ namespace Gizbox
             if(allNodes.Contains(node) == false)
                 throw new Exception("invalid operation.");
 
+
             //不是头节点
             if(node.Prev != null)
             {
