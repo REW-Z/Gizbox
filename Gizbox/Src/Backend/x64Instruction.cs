@@ -114,6 +114,7 @@ namespace Gizbox.Src.Backend
         word = 2,
         dword = 4,
         qword = 8,
+        oword = 16,
     }
     public enum InstructionKind
     {
@@ -121,8 +122,12 @@ namespace Gizbox.Src.Backend
         emptyline,//空行
 
         mov,
-        movss,//scalar-single
-        movsd,//scalar-double
+
+        movd,//SSE指令 （可以 用于XMM和GPR互通）
+        movq,//SSE指令 （可以 用于XMM和GPR互通）
+
+        movss,//SSE指令 scalar-single  (不能与GPR互通)
+        movsd,//SSE指令 scalar-double  (不能与GPR互通)
 
         // 128-bit 
         movaps, // aligned packed single
@@ -343,9 +348,10 @@ namespace Gizbox.Src.Backend
 
                 if(instr.operand0 != null)
                 {
-                    X64Size size0 = instr.sizeMark != X64Size.undefined
-                        ? instr.sizeMark
-                        : X64Size.qword;
+                    X64Size size0 = X64Size.qword;
+                    if(instr.sizeMark != X64Size.undefined)
+                        size0 = instr.sizeMark;
+                        
 
                     SerializeOprand(instr.operand0, size0, strb);
                 }
@@ -392,7 +398,7 @@ namespace Gizbox.Src.Backend
             {
                 case X64Reg reg:
                     {
-                        strb.Append(reg.isVirtual ? ("vreg%" + reg.vRegVar.name) : reg.GetName(size));
+                        strb.Append(reg.GetName(size));
                     }
                     break;
                 case X64Rel rel:
@@ -425,6 +431,7 @@ namespace Gizbox.Src.Backend
             }
         }
     }
+
 
 
     /// <summary>
@@ -484,6 +491,9 @@ namespace Gizbox.Src.Backend
         }
         public string GetName(X64Size size)
         {
+            if(isVirtual)
+                return $"vreg%{vRegVar.name}";
+
             string name = physReg.ToString();
 
             // XMM 寄存器名不随 size 变化
@@ -531,6 +541,16 @@ namespace Gizbox.Src.Backend
                 default:
                     return name;
             }
+        }
+        public bool IsXXM()
+        {
+            if(isVirtual)
+                throw new GizboxException(ExceptioName.Undefine, "vreg not alloc physics reg.");
+
+            if(physReg >= RegisterEnum.XMM0 && physReg >= RegisterEnum.XMM15)
+                return true;
+            else
+                return false;
         }
         public void AllocPhysReg(RegisterEnum reg)
         {
@@ -590,16 +610,19 @@ namespace Gizbox.Src.Backend
 
         // 数据移动
         public static X64Instruction mov(X64Operand dest, X64Operand src, X64Size size) => new() { type = InstructionKind.mov, operand0 = dest, operand1 = src, sizeMark = size };
-        public static X64Instruction movss(X64Operand dest, X64Operand src) => new() { type = InstructionKind.movss, operand0 = dest, operand1 = src };
-        public static X64Instruction movsd(X64Operand dest, X64Operand src) => new() { type = InstructionKind.movsd, operand0 = dest, operand1 = src };
+        public static X64Instruction movd(X64Operand dest, X64Operand src) => new() { type = InstructionKind.movd, operand0 = dest, operand1 = src, sizeMark = X64Size.dword };
+        public static X64Instruction movq(X64Operand dest, X64Operand src) => new() { type = InstructionKind.movq, operand0 = dest, operand1 = src, sizeMark = X64Size.qword };
+
+        public static X64Instruction movss(X64Operand dest, X64Operand src) => new() { type = InstructionKind.movss, operand0 = dest, operand1 = src, sizeMark = X64Size.dword };
+        public static X64Instruction movsd(X64Operand dest, X64Operand src) => new() { type = InstructionKind.movsd, operand0 = dest, operand1 = src, sizeMark = X64Size.qword };
 
         // 128bit移动  
-        public static X64Instruction movaps(X64Operand dest, X64Operand src) => new() { type = InstructionKind.movaps, operand0 = dest, operand1 = src };
-        public static X64Instruction movapd(X64Operand dest, X64Operand src) => new() { type = InstructionKind.movapd, operand0 = dest, operand1 = src };
-        public static X64Instruction movups(X64Operand dest, X64Operand src) => new() { type = InstructionKind.movups, operand0 = dest, operand1 = src };
-        public static X64Instruction movupd(X64Operand dest, X64Operand src) => new() { type = InstructionKind.movupd, operand0 = dest, operand1 = src };
-        public static X64Instruction movdqa(X64Operand dest, X64Operand src) => new() { type = InstructionKind.movdqa, operand0 = dest, operand1 = src };
-        public static X64Instruction movdqu(X64Operand dest, X64Operand src) => new() { type = InstructionKind.movdqu, operand0 = dest, operand1 = src };
+        public static X64Instruction movaps(X64Operand dest, X64Operand src) => new() { type = InstructionKind.movaps, operand0 = dest, operand1 = src, sizeMark = X64Size.oword };
+        public static X64Instruction movapd(X64Operand dest, X64Operand src) => new() { type = InstructionKind.movapd, operand0 = dest, operand1 = src, sizeMark = X64Size.oword };
+        public static X64Instruction movups(X64Operand dest, X64Operand src) => new() { type = InstructionKind.movups, operand0 = dest, operand1 = src, sizeMark = X64Size.oword };
+        public static X64Instruction movupd(X64Operand dest, X64Operand src) => new() { type = InstructionKind.movupd, operand0 = dest, operand1 = src, sizeMark = X64Size.oword };
+        public static X64Instruction movdqa(X64Operand dest, X64Operand src) => new() { type = InstructionKind.movdqa, operand0 = dest, operand1 = src, sizeMark = X64Size.oword };
+        public static X64Instruction movdqu(X64Operand dest, X64Operand src) => new() { type = InstructionKind.movdqu, operand0 = dest, operand1 = src, sizeMark = X64Size.oword };
 
         public static X64Instruction movzx(X64Operand dest, X64Operand src, X64Size dstSize, X64Size srcSize) => new() { type = InstructionKind.movzx, operand0 = dest, operand1 = src, sizeMark = dstSize, sizeMarkAdditional = srcSize };
         public static X64Instruction movsx(X64Operand dest, X64Operand src, X64Size dstSize, X64Size srcSize) => new() { type = InstructionKind.movsx, operand0 = dest, operand1 = src, sizeMark = dstSize, sizeMarkAdditional = srcSize };
@@ -619,14 +642,14 @@ namespace Gizbox.Src.Backend
         public static X64Instruction div(X64Operand src, X64Size size) => new() { type = InstructionKind.div, operand0 = src, sizeMark = size };
 
         // SSE 标量浮点算术
-        public static X64Instruction addss(X64Operand dest, X64Operand src) => new() { type = InstructionKind.addss, operand0 = dest, operand1 = src };
-        public static X64Instruction addsd(X64Operand dest, X64Operand src) => new() { type = InstructionKind.addsd, operand0 = dest, operand1 = src };
-        public static X64Instruction subss(X64Operand dest, X64Operand src) => new() { type = InstructionKind.subss, operand0 = dest, operand1 = src };
-        public static X64Instruction subsd(X64Operand dest, X64Operand src) => new() { type = InstructionKind.subsd, operand0 = dest, operand1 = src };
-        public static X64Instruction mulss(X64Operand dest, X64Operand src) => new() { type = InstructionKind.mulss, operand0 = dest, operand1 = src };
-        public static X64Instruction mulsd(X64Operand dest, X64Operand src) => new() { type = InstructionKind.mulsd, operand0 = dest, operand1 = src };
-        public static X64Instruction divss(X64Operand dest, X64Operand src) => new() { type = InstructionKind.divss, operand0 = dest, operand1 = src };
-        public static X64Instruction divsd(X64Operand dest, X64Operand src) => new() { type = InstructionKind.divsd, operand0 = dest, operand1 = src };
+        public static X64Instruction addss(X64Operand dest, X64Operand src) => new() { type = InstructionKind.addss, operand0 = dest, operand1 = src, sizeMark = X64Size.dword };
+        public static X64Instruction addsd(X64Operand dest, X64Operand src) => new() { type = InstructionKind.addsd, operand0 = dest, operand1 = src, sizeMark = X64Size.qword };
+        public static X64Instruction subss(X64Operand dest, X64Operand src) => new() { type = InstructionKind.subss, operand0 = dest, operand1 = src, sizeMark = X64Size.dword };
+        public static X64Instruction subsd(X64Operand dest, X64Operand src) => new() { type = InstructionKind.subsd, operand0 = dest, operand1 = src, sizeMark = X64Size.qword };
+        public static X64Instruction mulss(X64Operand dest, X64Operand src) => new() { type = InstructionKind.mulss, operand0 = dest, operand1 = src, sizeMark = X64Size.dword };
+        public static X64Instruction mulsd(X64Operand dest, X64Operand src) => new() { type = InstructionKind.mulsd, operand0 = dest, operand1 = src, sizeMark = X64Size.qword };
+        public static X64Instruction divss(X64Operand dest, X64Operand src) => new() { type = InstructionKind.divss, operand0 = dest, operand1 = src, sizeMark = X64Size.dword };
+        public static X64Instruction divsd(X64Operand dest, X64Operand src) => new() { type = InstructionKind.divsd, operand0 = dest, operand1 = src, sizeMark = X64Size.qword };
 
         public static X64Instruction inc(X64Operand operand, X64Size size) => new() { type = InstructionKind.inc, operand0 = operand, sizeMark = size };
         public static X64Instruction dec(X64Operand operand, X64Size size) => new() { type = InstructionKind.dec, operand0 = operand, sizeMark = size };

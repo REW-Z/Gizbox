@@ -23,6 +23,22 @@ namespace Gizbox
         }
     }
 
+    public static class DictionaryExtensions
+    {
+        public static Tv GetOrCreate<Tk, Tv>(this Dictionary<Tk, Tv> dict, Tk key)
+        {
+            if(dict.TryGetValue(key, out var val) == true)
+            {
+                return val;
+            }
+            else
+            {
+                dict[key] = Activator.CreateInstance<Tv>();
+                return dict[key];
+            }
+        }
+    }
+
     public static class StringExtensions
     {
         /// <summary>

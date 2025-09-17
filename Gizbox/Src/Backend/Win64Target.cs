@@ -175,11 +175,13 @@ namespace Gizbox.Src.Backend
 
         // 类名-虚函数表roKey
         public Dictionary<string, string> vtableRoKeys = new();
+        
+        
+        // 所有虚拟寄存器  
+        private Dictionary<SymbolTable, Dictionary<SymbolTable.Record, List<VRegDesc>>> vRegDict = new();
         // 当前函数作用域  
-        private Dictionary<SymbolTable, Dictionary<SymbolTable.Record, List<(InstructionNode instrNode, int operandIdx)>>> vRegs = new();
         private SymbolTable globalEnv = null;
         private SymbolTable currFuncEnv = null;
-
 
         // 附加数据  
         private Dictionary<SymbolTable, int> localVarsSpaceSize = new();
@@ -690,8 +692,6 @@ namespace Gizbox.Src.Backend
         /// <summary> 指令选择 </summary>
         private void Pass3()
         {
-            vRegs.Add(globalEnv, new());
-
             // 参数临时列表
             List<TACInfo> tempParamList = new();
             // 上一个IR生成的X64指令  
@@ -729,7 +729,6 @@ namespace Gizbox.Src.Backend
                         {
                             //函数作用域开始
                             currFuncEnv = ir.GetOutermostEnvAtLine(i);
-                            vRegs.Add(currFuncEnv, new());
 
 
                             //函数序言
@@ -1383,29 +1382,33 @@ namespace Gizbox.Src.Backend
         {
             //变量虚拟寄存器信息  
             var curr = instructions.First;
+            X64Operand[] oprands = new X64Operand[2];
             while(curr != null)
             {
-                if(curr.value.operand0 is X64Reg reg && reg.isVirtual)
+                oprands[0] = curr.value.operand0;
+                oprands[1] = curr.value.operand1;
+
+                for(int i = 0; i < 2; ++i)
                 {
-                    var varEnv = reg.vRegVar.GetAdditionInf().table;
-
-                    if(vRegs.ContainsKey(varEnv) == false)
-                        vRegs[varEnv] = new();
-                    if(vRegs[varEnv].ContainsKey(reg.vRegVar) == false)
-                        vRegs[varEnv][reg.vRegVar] = new();
-
-                    vRegs[varEnv][reg.vRegVar].Add((instrNode: curr, operandIdx: 0));
-                }
-                if(curr.value.operand1 is X64Reg reg1 && reg1.isVirtual)
-                {
-                    var varEnv = reg1.vRegVar.GetAdditionInf().table;
-
-                    if(vRegs.ContainsKey(varEnv) == false)
-                        vRegs[varEnv] = new();
-                    if(vRegs[varEnv].ContainsKey(reg1.vRegVar) == false)
-                        vRegs[varEnv][reg1.vRegVar] = new();
-
-                    vRegs[varEnv][reg1.vRegVar].Add((instrNode: curr, operandIdx: 1));
+                    var targetOperand = oprands[i];
+                    if(targetOperand is X64Reg reg && reg.isVirtual)
+                    {
+                        var varEnv = reg.vRegVar.GetAdditionInf().table;
+                        vRegDict.GetOrCreate(varEnv).GetOrCreate(reg.vRegVar).Add(new(curr, i, VRegDesc.Kind.Oprand));
+                    }
+                    if(targetOperand is X64Mem xMem0)
+                    {
+                        if(xMem0.baseReg != null && xMem0.baseReg.isVirtual)
+                        {
+                            var varEnv = xMem0.baseReg.vRegVar.GetAdditionInf().table;
+                            vRegDict.GetOrCreate(varEnv).GetOrCreate(xMem0.baseReg.vRegVar).Add(new(curr, i, VRegDesc.Kind.OprandBase));
+                        }
+                        if(xMem0.indexReg != null && xMem0.indexReg.isVirtual)
+                        {
+                            var varEnv = xMem0.indexReg.vRegVar.GetAdditionInf().table;
+                            vRegDict.GetOrCreate(varEnv).GetOrCreate(xMem0.indexReg.vRegVar).Add(new(curr, i, VRegDesc.Kind.OprandIndex));
+                        }
+                    }
                 }
 
                 curr = curr.Next;
@@ -1762,7 +1765,7 @@ namespace Gizbox.Src.Backend
 
 
                 //替换虚拟寄存器，生成溢出代码  
-                if(this.vRegs.TryGetValue(func.funcRec.envPtr, out var dict))
+                if(this.vRegDict.TryGetValue(func.funcRec.envPtr, out var dict))
                 {
                     foreach(var (rec, vregList) in dict)
                     {
@@ -1779,48 +1782,98 @@ namespace Gizbox.Src.Backend
                             regAlloc = sseAssign[rec];
                         }
 
-                        foreach(var (instr, operandIdx) in vregList)
+                        foreach(var desc in vregList)
                         {
-                            var operand = operandIdx == 0 ? instr.value.operand0 : instr.value.operand1;
-
-                            if((operand is X64Reg vr) == true && vr.isVirtual == true)
+                            InstructionNode instr = desc.targetInstructionNode;
+                            X64Operand oprand = desc.oprandIdx == 0 ? instr.value.operand0 : instr.value.operand1;
+                            X64Reg vr = null;
+                            switch(desc.kind)
                             {
-                                if(vr.vRegVar == null)
-                                    throw new GizboxException(ExceptioName.Undefine, $"vreg at operand{operandIdx} variable null.");
-                                if(vr.vRegVar != rec)
-                                    throw new GizboxException(ExceptioName.Undefine, $"vreg at operand{operandIdx} variable error.{vr.vRegVar.name} vs {rec.name}");
+                                case VRegDesc.Kind.Oprand:
+                                    vr = oprand as X64Reg;
+                                    break;
+                                case VRegDesc.Kind.OprandBase:
+                                    vr = (oprand as X64Mem).baseReg;
+                                    break;
+                                case VRegDesc.Kind.OprandIndex:
+                                    vr = (oprand as X64Mem).indexReg;
+                                    break;
+                            }
+                            if(vr.isVirtual == false)
+                                continue;//已经被分配物理寄存器了
 
-                                if(hasAllocReg)
-                                {
-                                    vr.AllocPhysReg(regAlloc);
-                                    GixConsole.WriteLine($"{vr.vRegVar.name} 分配物理寄存器 {regAlloc}");
-                                    instr.value.comment += $"  (vreg \"{vr.vRegVar.name}\" at {operandIdx} alloc {regAlloc})";
-                                }
-                                else
-                                {
+                            if(vr.vRegVar != rec)
+                                throw new GizboxException(ExceptioName.Undefine, $"vreg variable error.{vr.vRegVar.name} not match {rec.name}");
 
-                                    if(operandIdx == 0)
+                            //分配物理寄存器  
+                            if(hasAllocReg)
+                            {
+                                vr.AllocPhysReg(regAlloc);
+                                GixConsole.WriteLine($"{vr.vRegVar.name} 分配物理寄存器 {regAlloc}");
+                                instr.value.comment += $"  (vreg \"{vr.vRegVar.name}\" at {desc.kind}{desc.oprandIdx} alloc {regAlloc})";
+                            }
+                            //溢出到内存  
+                            else
+                            {
+                                if(desc.kind == VRegDesc.Kind.Oprand)
+                                {
+                                    if(desc.oprandIdx == 0)
                                         instr.value.operand0 = X64.mem(X64.rbp, displacement: vr.vRegVar.addr);
                                     else
                                         instr.value.operand1 = X64.mem(X64.rbp, displacement: vr.vRegVar.addr);
 
-                                    GixConsole.WriteLine($"{vr.vRegVar.name} 溢出homing到内存");
-
-                                    instr.value.comment += $"  (vreg \"{vr.vRegVar.name}\" at {operandIdx} home to mem.)";
+                                    instr.value.comment += $"  (vreg \"{vr.vRegVar.name}\" at {desc.kind}{desc.oprandIdx} home to mem.)";
                                 }
+                                // 作为地址基址：r11中转
+                                else if(desc.kind == VRegDesc.Kind.OprandBase)
+                                {
+                                    //(（指针 64 位）)
+                                    var xmem = (oprand as X64Mem);
+                                    instructions.InsertBefore(instr, X64.mov(
+                                        X64.r11, X64.mem(X64.rbp, displacement: vr.vRegVar.addr), X64Size.qword));
+                                    xmem.baseReg = X64.r11;
 
+                                    instr.value.comment += $"  (materialize base vreg \"{vr.vRegVar.name}\" -> r11)";
+                                }
+                                // 作为地址变址：r10中转，并做符号或零扩展到 64 位
+                                else if(desc.kind == VRegDesc.Kind.OprandIndex)
+                                {
+                                    var xmem = (oprand as X64Mem);
+                                    var vtype = GType.Parse(vr.vRegVar.typeExpression);
+                                    int sz = vtype.Size;
+
+                                    if(sz == 8)
+                                    {
+                                        instructions.InsertBefore(instr, X64.mov(
+                                            X64.r10, X64.mem(X64.rbp, displacement: vr.vRegVar.addr), X64Size.qword));
+                                    }
+                                    else
+                                    {
+                                        var srcSize = (X64Size)sz;
+                                        if(vtype.IsSigned)
+                                            instructions.InsertBefore(instr, X64.movsx(
+                                                X64.r10, X64.mem(X64.rbp, displacement: vr.vRegVar.addr), X64Size.qword, srcSize));
+                                        else
+                                            instructions.InsertBefore(instr, X64.movzx(
+                                                X64.r10, X64.mem(X64.rbp, displacement: vr.vRegVar.addr), X64Size.qword, srcSize));
+                                    }
+
+                                    xmem.indexReg = X64.r10;
+                                    instr.value.comment += $"  (materialize index vreg \"{vr.vRegVar.name}\" -> r10)";
+                                }
                             }
                         }
+
                     }
                 }
 
             }
 
             //mem-mem指令合法化  
-            {
-                LegalizeMemToMem();
-            }
+            LegalizeMemToMem();
 
+            //mov合法化  
+            LegalizeMov();
 
             //最终结果
             if(debugLogAsmInfos)
@@ -2235,10 +2288,12 @@ namespace Gizbox.Src.Backend
                                     return X64.imm(value);
                                 }
                                 break;
-                            case "LITCHAR":
+                            case "%LITCHAR":
                                 {
                                     var charValue = iroperandExpr.segments[1];
-                                    return X64.imm((long)charValue[0]);
+                                    if(charValue.Length != 3)//单引号 + 字符 + 单引号
+                                        throw new GizboxException(ExceptioName.CodeGen, $"lit char value error.({charValue.Length})");
+                                    return X64.imm((long)charValue[1]);
                                 }
                                 break;
                             case "%LITNULL":
@@ -2291,7 +2346,7 @@ namespace Gizbox.Src.Backend
                             //局部变量  
                             else
                             {
-                                return vreg(varRec);
+                                return VReg(varRec);
                             }
                             
                         }
@@ -2315,7 +2370,7 @@ namespace Gizbox.Src.Backend
                             throw new GizboxException(ExceptioName.CodeGen, $"field not found for member access \"{objName}.{fieldName}\" at line {irOperand.owner.line}");
 
                         // 对象变量是一个指针值，在虚拟寄存器
-                        var baseVreg = vreg(objRec);
+                        var baseVreg = VReg(objRec);
 
                         // 生成内存操作数
                         return X64.mem(baseVreg, displacement: fieldRec.addr);
@@ -2333,13 +2388,13 @@ namespace Gizbox.Src.Backend
                         var elemType = GType.Parse(arrayRec.typeExpression);
                         int elemSize = elemType.Size;
 
-                        var baseV = vreg(arrayRec);
+                        var baseV = VReg(arrayRec);
 
                         // 所有可能是LITINT或者变量  
                         var idxRec = Query(indexExpr, irOperand.owner.line);
                         if(idxRec != null)
                         {
-                            var idxV = vreg(idxRec);
+                            var idxV = VReg(idxRec);
                             return X64.mem(baseV, idxV, elemSize, 0);
                         }
                         else
@@ -2446,7 +2501,7 @@ namespace Gizbox.Src.Backend
         }
 
 
-        public X64Reg vreg(SymbolTable.Record varrec)
+        public X64Reg VReg(SymbolTable.Record varrec)
         {
             var xoperand = new X64Reg(varrec);
             return xoperand;
@@ -2893,6 +2948,53 @@ namespace Gizbox.Src.Backend
 
             instructions.Rebuild();
         }
+        
+        // mov 合法化  
+        private void LegalizeMov()
+        {
+            var node = instructions.First;
+            while(node != null)
+            {
+                var instr = node.value;
+
+                var size = instr.sizeMark;
+
+                switch(instr.type)
+                {
+                    case InstructionKind.mov:
+                        {
+                            if(instr.operand0 is X64Reg reg0 && instr.operand1 is X64Reg reg1)
+                            {
+                                if(reg0.isVirtual)
+                                {
+                                    GixConsole.WriteLine("vreg:" + reg0.vRegVar.name);
+                                }
+                                if(reg1.isVirtual)
+                                {
+                                    GixConsole.WriteLine("vreg:" + reg1.vRegVar.name);
+                                }
+
+                                if(reg0.IsXXM() != reg1.IsXXM())
+                                {
+                                    if(instr.sizeMark == X64Size.dword)
+                                    {
+                                        instr.type = InstructionKind.movd;
+                                    }
+                                    else if(instr.sizeMark == X64Size.qword)
+                                    {
+                                        instr.type = InstructionKind.movq;
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                }
+
+                node = node.Next;
+            }
+
+            //instructions.Rebuild();//没有其他指令插入   
+        }
         #endregion
 
 
@@ -3305,7 +3407,28 @@ namespace Gizbox.Src.Backend
         public int irLineEnd;
     }
 
+    public class VRegDesc
+    {
+        public enum Kind
+        {
+            Oprand,
+            OprandBase,
+            OprandIndex,
+        }
 
+        public InstructionNode targetInstructionNode;
+
+        public int oprandIdx;
+
+        public Kind kind;
+
+        public VRegDesc(InstructionNode targetInstructionNode, int oprandIdx, Kind kind)
+        {
+            this.targetInstructionNode = targetInstructionNode;
+            this.oprandIdx = oprandIdx;
+            this.kind = kind;
+        }
+    }
 
     public class X64FunctionDesc
     {
