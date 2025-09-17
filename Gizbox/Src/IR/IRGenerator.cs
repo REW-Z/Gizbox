@@ -142,7 +142,9 @@ namespace Gizbox.IR
                             //GenerateCode("JUMP", "%LABEL:exit:" + funcFullName);
 
                             //函数开始    
-                            EnvBegin(envStackTemp.Peek().GetTableInChildren(classDeclNode.classNameNode.FullName + ".ctor"));
+                            var ctorEnv = envStackTemp.Peek().GetTableInChildren(classDeclNode.classNameNode.FullName + ".ctor");
+                            envStackTemp.Push(ctorEnv);
+                            EnvBegin(ctorEnv);
 
                             GenerateCode("").label = "entry:" + funcFullName;
                             
@@ -181,7 +183,8 @@ namespace Gizbox.IR
                             
                             GenerateCode("").label = "exit:" + funcFullName;
 
-                            EnvEnd(envStackTemp.Peek().GetTableInChildren(classDeclNode.classNameNode.FullName + ".ctor"));
+                            EnvEnd(ctorEnv);
+                            envStackTemp.Pop();
                         }
 
                         //成员函数
@@ -876,7 +879,15 @@ namespace Gizbox.IR
         {
             string tempVarName = "tmp@" + tmpCounter++;
 
-            envStackTemp.Peek().NewRecord(tempVarName, SymbolTable.RecordCatagory.Variable, type);
+            var env = envStackTemp.Peek();
+            
+            //类定义作用域产生的临时变量->移到构造函数符号表  
+            //if(env.tableCatagory == SymbolTable.TableCatagory.ClassScope)
+            //{
+            //    todo;
+            //}
+
+            env.NewRecord(tempVarName, SymbolTable.RecordCatagory.Variable, type);
 
             return tempVarName;
         }

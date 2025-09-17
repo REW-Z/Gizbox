@@ -544,8 +544,8 @@ namespace Gizbox.Src.Backend
         }
         public bool IsXXM()
         {
-            if(isVirtual)
-                throw new GizboxException(ExceptioName.Undefine, "vreg not alloc physics reg.");
+            //if(isVirtual)
+            //    throw new GizboxException(ExceptioName.Undefine, "vreg not alloc physics reg.");
 
             if(physReg >= RegisterEnum.XMM0 && physReg >= RegisterEnum.XMM15)
                 return true;

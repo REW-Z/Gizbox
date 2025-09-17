@@ -10,23 +10,33 @@ float globalVar2 = 1.0f;
 
 void test()
 {
-	int result = globalVar1 + (int)globalVar2;
+	//int result = globalVar1 + (int)globalVar2;
+	//
+	//int v1 = 1;
+	//int v2 = 1;
+	//int v3 = 1;
+	//int v4 = 1;
+	//int v5 = 1;
+	//int v6 = 1;
+	//int v7 = 1;
+	//int v8 = 1;
+	//
+	//Console::Log("result:" + (string)result);
+	//
+	//int rs = v1 + v8;
+	//rs += v2 + v7;
+	//rs += v3 + v6;
+	//rs += v4 + v5;
 
-	int v1 = 1;
-	int v2 = 1;
-	int v3 = 1;
-	int v4 = 1;
-	int v5 = 1;
-	int v6 = 1;
-	int v7 = 1;
-	int v8 = 1;
 
-	Console::Log("result:" + (string)result);
-
-	int rs = v1 + v8;
-	rs += v2 + v7;
-	rs += v3 + v6;
-	rs += v4 + v5;
+	for(int i = 0 ; i < 99; ++i)
+	{
+		int ass = 1;
+	}
+	for(int i = 0 ; i < 99; ++i)
+	{
+		int ass2 = 1;
+	}
 }
 
 GC::Disable();

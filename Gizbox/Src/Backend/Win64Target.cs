@@ -119,7 +119,7 @@ namespace Gizbox.Src.Backend
 
         public static RecAdditionInfo GetAdditionInf(this SymbolTable.Record rec)
         {
-            rec.runtimeAdditionalInfo ??= new RecAdditionInfo();
+            rec.runtimeAdditionalInfo ??= new RecAdditionInfo(rec);
             return (rec.runtimeAdditionalInfo as RecAdditionInfo);
         }
     }
@@ -697,6 +697,8 @@ namespace Gizbox.Src.Backend
             // 上一个IR生成的X64指令  
             LList<X64Instruction>.Node lastInstruction = null;
 
+
+
             // 指令选择  
             for(int i = 0; i < ir.codes.Count; ++i)
             {
@@ -745,7 +747,7 @@ namespace Gizbox.Src.Backend
                             if(localVarsSize % 16 != 0)
                                 localVarsSize = ((localVarsSize / 16) + 1) * 16;
                             var subrsp = X64.sub(X64.rsp, X64.imm(localVarsSize), X64Size.qword);
-                            subrsp.comment += $"(local variables space alloc)";
+                            subrsp.comment += $"    (local variables space alloc)";
                             instructions.AddLast(subrsp);
                         }
                         break;
@@ -756,7 +758,7 @@ namespace Gizbox.Src.Backend
                             if(localVarsSize % 16 != 0)
                                 localVarsSize = ((localVarsSize / 16) + 1) * 16;
                             var addrsp = X64.add(X64.rsp, X64.imm(localVarsSize), X64Size.qword);
-                            addrsp.comment += $"(local variables space release)";
+                            addrsp.comment += $"    (local variables space release)";
                             instructions.AddLast(addrsp);
 
 
@@ -822,108 +824,14 @@ namespace Gizbox.Src.Backend
 
                             //调用前准备  
                             int rspSub = 0;
-                            {
-                                // 调用者保存寄存器（易失性寄存器需Caller保存） (选择性保存)
-                                var placeholderSave = X64.placehold("caller_save");
-                                var placeholderSaveNode = instructions.AddLast(placeholderSave);
-
-                                if(callerSavePlaceHolders.ContainsKey(currFuncEnv) == false)
-                                    callerSavePlaceHolders.Add(currFuncEnv, new());
-                                callerSavePlaceHolders[currFuncEnv].Add(placeholderSaveNode);
-
-
-                                // 栈帧16字节对齐 (如果是奇数个参数 -> 需要8字节对齐栈指针)
-                                // (寄存器保存区自己确保16字节对齐)
-                                if(tacInf.CALL_paramCount % 2 != 0)
-                                {
-                                    // 如果是奇数个参数，先将rsp对齐到16字节
-                                    rspSub += 8;
-                                }
-                                // 其他栈参数空间
-                                if(tacInf.CALL_paramCount > 4)
-                                {
-                                    int onStackParamLen = (tacInf.CALL_paramCount - 4) * 8;
-                                    rspSub += onStackParamLen;
-                                }
-                                // 影子空间(32字节)
-                                rspSub += 32;
-
-                                //移动rsp  
-                                instructions.AddLast(X64.sub(X64.rsp, X64.imm(rspSub), X64Size.qword));
-
-                                // 参数赋值(IR中PARAM指令已经是倒序)  
-                                foreach(var paraminfo in tempParamList)
-                                {
-                                    var srcOp = ParseOperand(paraminfo.oprand0);
-                                    bool isRefOfConst = paraminfo.oprand0.IsRefOfConst();
-
-                                    //寄存器传参  
-                                    if(paraminfo.PARAM_paramidx < 4)
-                                    {
-                                        var isSse = paraminfo.oprand0.IsSSEType();
-                                        var size = paraminfo.oprand0.typeExpr.Size;
-                                        var ssereg = UtilsW64.GetParamReg(paraminfo.PARAM_paramidx, true);
-                                        var intreg = UtilsW64.GetParamReg(paraminfo.PARAM_paramidx, false);
-                                        //浮点参数  
-                                        if(isSse)
-                                        {
-                                            if(paraminfo.oprand0.typeExpr.Size == 4)
-                                                instructions.AddLast(X64.movss(ssereg, srcOp));
-                                            else
-                                                instructions.AddLast(X64.movsd(ssereg, srcOp));
-
-                                            //浮点参数也需要在整数寄存器rcx,rdx,r8,r9中，以支持可变参数  
-                                            instructions.AddLast(X64.mov(intreg, srcOp, (X64Size)size));
-                                        }
-                                        //整型参数  
-                                        else
-                                        {
-                                            if(isRefOfConst)
-                                            {
-                                                instructions.AddLast(X64.lea(intreg, X64.rel(paraminfo.oprand0.expr.roDataKey)));
-                                            }
-                                            else
-                                            {
-                                                instructions.AddLast(X64.mov(intreg, srcOp, (X64Size)size));
-
-                                            }
-                                        }
-                                    }
-
-                                    //栈帧传参[rsp + 8]开始    （影子空间也需要赋值）
-                                    int offset = (8 * (paraminfo.PARAM_paramidx));
-
-                                    if(isRefOfConst)
-                                    {
-                                        instructions.AddLast(X64.lea(X64.r11, X64.rel(paraminfo.oprand0.expr.roDataKey)));
-                                        EmitMov(X64.mem(X64.rsp, displacement: offset), X64.r11, paraminfo.oprand0.typeExpr);
-                                    }
-                                    else
-                                    {
-                                        EmitMov(X64.mem(X64.rsp, displacement: offset), srcOp, paraminfo.oprand0.typeExpr);
-                                    }
-                                }
-                                tempParamList.Clear();
-                            }
-
+                            BeforeCall(tacInf, tempParamList, out rspSub);
 
                             // 实际的函数调用
                             // （CALL 指令会自动把返回地址（下一条指令的 RIP）压入栈顶）  
                             instructions.AddLast(X64.call(funcName));
 
                             //调用后处理
-                            {
-                                // 调用后完整恢复栈
-                                instructions.AddLast(X64.add(X64.rsp, X64.imm(rspSub), X64Size.qword));
-
-                                //还原保存的寄存器(占位)  
-                                var placeholderRestore = X64.placehold("caller_restore");
-                                var placeholderRestoreNode = instructions.AddLast(placeholderRestore);
-
-                                if(callerRestorePlaceHolders.ContainsKey(currFuncEnv) == false)
-                                    callerRestorePlaceHolders.Add(currFuncEnv, new());
-                                callerRestorePlaceHolders[currFuncEnv].Add(placeholderRestoreNode);
-                            }
+                            AfterCall(rspSub);
                         }
                         break;
                     case "MCALL":
@@ -949,108 +857,15 @@ namespace Gizbox.Src.Backend
 
                             //调用前准备(和CALL指令一致)  
                             int rspSub = 0;
-                            {
-                                // 调用者保存寄存器（易失性寄存器需Caller保存） (选择性保存)
-                                var placeholderSave = X64.placehold("caller_save");
-                                var placeholderSaveNode = instructions.AddLast(placeholderSave);
-
-                                if(callerSavePlaceHolders.ContainsKey(currFuncEnv) == false)
-                                    callerSavePlaceHolders.Add(currFuncEnv, new());
-                                callerSavePlaceHolders[currFuncEnv].Add(placeholderSaveNode);
-
-
-                                // 栈帧16字节对齐 (如果是奇数个参数 -> 需要8字节对齐栈指针)
-                                // (寄存器保存区自己确保16字节对齐)
-                                if(tacInf.CALL_paramCount % 2 != 0)
-                                {
-                                    // 如果是奇数个参数，先将rsp对齐到16字节
-                                    rspSub += 8;
-                                }
-                                // 其他栈参数空间
-                                if(tacInf.CALL_paramCount > 4)
-                                {
-                                    int onStackParamLen = (tacInf.CALL_paramCount - 4) * 8;
-                                    rspSub += onStackParamLen;
-                                }
-                                // 影子空间(32字节)
-                                rspSub += 32;
-
-                                //移动rsp  
-                                instructions.AddLast(X64.sub(X64.rsp, X64.imm(rspSub), X64Size.qword));
-
-                                // 参数赋值(IR中PARAM指令已经是倒序)  
-                                foreach(var paraminfo in tempParamList)
-                                {
-                                    var srcOp = ParseOperand(paraminfo.oprand0);
-                                    bool isRefOfConst = paraminfo.oprand0.IsRefOfConst();
-
-                                    //寄存器传参  
-                                    if(paraminfo.PARAM_paramidx < 4)
-                                    {
-                                        var isSse = paraminfo.oprand0.IsSSEType();
-                                        var size = paraminfo.oprand0.typeExpr.Size;
-                                        var ssereg = UtilsW64.GetParamReg(paraminfo.PARAM_paramidx, true);
-                                        var intreg = UtilsW64.GetParamReg(paraminfo.PARAM_paramidx, false);
-                                        //浮点参数  
-                                        if(isSse)
-                                        {
-                                            if(paraminfo.oprand0.typeExpr.Size == 4)
-                                                instructions.AddLast(X64.movss(ssereg, srcOp));
-                                            else
-                                                instructions.AddLast(X64.movsd(ssereg, srcOp));
-
-                                            //浮点参数也需要在整数寄存器rcx,rdx,r8,r9中，以支持可变参数  
-                                            instructions.AddLast(X64.mov(intreg, srcOp, (X64Size)size));
-                                        }
-                                        //整型参数  
-                                        else
-                                        {
-                                            if(isRefOfConst)
-                                            {
-                                                instructions.AddLast(X64.lea(intreg, X64.rel(paraminfo.oprand0.expr.roDataKey)));
-                                            }
-                                            else
-                                            {
-                                                instructions.AddLast(X64.mov(intreg, srcOp, (X64Size)size));
-
-                                            }
-                                        }
-                                    }
-
-                                    //栈帧传参[rsp + 8]开始    （影子空间也需要赋值）
-                                    int offset = (8 * (paraminfo.PARAM_paramidx));
-
-                                    if(isRefOfConst)
-                                    {
-                                        instructions.AddLast(X64.lea(X64.r11, X64.rel(paraminfo.oprand0.expr.roDataKey)));
-                                        EmitMov(X64.mem(X64.rsp, displacement: offset), X64.r11, paraminfo.oprand0.typeExpr);
-                                    }
-                                    else
-                                    {
-                                        EmitMov(X64.mem(X64.rsp, displacement: offset), srcOp, paraminfo.oprand0.typeExpr);
-                                    }
-                                }
-                                tempParamList.Clear();
-                            }
-
+                            BeforeCall(tacInf, tempParamList, out rspSub);
+                            
 
                             //调用
                             instructions.AddLast(X64.call(X64.rax));
 
 
                             //调用后处理
-                            {
-                                // 调用后完整恢复栈
-                                instructions.AddLast(X64.add(X64.rsp, X64.imm(rspSub), X64Size.qword));
-
-                                //还原保存的寄存器(占位)  
-                                var placeholderRestore = X64.placehold("caller_restore");
-                                var placeholderRestoreNode = instructions.AddLast(placeholderRestore);
-
-                                if(callerRestorePlaceHolders.ContainsKey(currFuncEnv) == false)
-                                    callerRestorePlaceHolders.Add(currFuncEnv, new());
-                                callerRestorePlaceHolders[currFuncEnv].Add(placeholderRestoreNode);
-                            }
+                            AfterCall(rspSub);
                         }
                         break;
                     case "ALLOC":
@@ -1363,11 +1178,11 @@ namespace Gizbox.Src.Backend
                 {
                     if(lastInstruction.Next != null)
                     {
-                        lastInstruction.Next.value.comment += $"(IR-{tacInf.line} : {tac.ToExpression(showlabel: false, indent: false)})";
+                        lastInstruction.Next.value.comment = $"(IR-{tacInf.line} : {tac.ToExpression(showlabel: false, indent: false)})" + lastInstruction.Next.value.comment;
                     }
                     else
                     {
-                        lastInstruction.value.comment += $"(DiscardIR-{tacInf.line} : {tac.ToExpression(showlabel: false, indent: false)})";
+                        lastInstruction.value.comment = $"(DiscardIR-{tacInf.line} : {tac.ToExpression(showlabel: false, indent: false)})" + lastInstruction.value.comment;
                     }
                 }
                     
@@ -1393,20 +1208,20 @@ namespace Gizbox.Src.Backend
                     var targetOperand = oprands[i];
                     if(targetOperand is X64Reg reg && reg.isVirtual)
                     {
-                        var varEnv = reg.vRegVar.GetAdditionInf().table;
-                        vRegDict.GetOrCreate(varEnv).GetOrCreate(reg.vRegVar).Add(new(curr, i, VRegDesc.Kind.Oprand));
+                        var funcEnv = reg.vRegVar.GetAdditionInf().GetFunctionEnv();
+                        vRegDict.GetOrCreate(funcEnv).GetOrCreate(reg.vRegVar).Add(new(curr, i, VRegDesc.Kind.Oprand));
                     }
                     if(targetOperand is X64Mem xMem0)
                     {
                         if(xMem0.baseReg != null && xMem0.baseReg.isVirtual)
                         {
-                            var varEnv = xMem0.baseReg.vRegVar.GetAdditionInf().table;
-                            vRegDict.GetOrCreate(varEnv).GetOrCreate(xMem0.baseReg.vRegVar).Add(new(curr, i, VRegDesc.Kind.OprandBase));
+                            var funcEnv = xMem0.baseReg.vRegVar.GetAdditionInf().GetFunctionEnv();
+                            vRegDict.GetOrCreate(funcEnv).GetOrCreate(xMem0.baseReg.vRegVar).Add(new(curr, i, VRegDesc.Kind.OprandBase));
                         }
                         if(xMem0.indexReg != null && xMem0.indexReg.isVirtual)
                         {
-                            var varEnv = xMem0.indexReg.vRegVar.GetAdditionInf().table;
-                            vRegDict.GetOrCreate(varEnv).GetOrCreate(xMem0.indexReg.vRegVar).Add(new(curr, i, VRegDesc.Kind.OprandIndex));
+                            var funcEnv = xMem0.indexReg.vRegVar.GetAdditionInf().GetFunctionEnv();
+                            vRegDict.GetOrCreate(funcEnv).GetOrCreate(xMem0.indexReg.vRegVar).Add(new(curr, i, VRegDesc.Kind.OprandIndex));
                         }
                     }
                 }
@@ -1471,7 +1286,7 @@ namespace Gizbox.Src.Backend
                     }
                 }
                 //变量节点
-                foreach(var (_, rec) in func.funcRec.envPtr.records)
+                foreach(var (_, rec) in func.funcRec.envPtr.GetRecordsRecursive())
                 {
                     if(rec.category != SymbolTable.RecordCatagory.Param &&
                         rec.category != SymbolTable.RecordCatagory.Variable)
@@ -1578,7 +1393,7 @@ namespace Gizbox.Src.Backend
                         //rsp移动  
                         ind = instructions.InsertAfter(ind, X64.sub(X64.rsp, X64.imm(bytes), X64Size.qword));
                         ind.value.label = holdlabel;
-                        ind.value.comment = holdcomment + $"(caller-save of {func.funcRec.name} start)";
+                        ind.value.comment = holdcomment + $"    (caller-save of {func.funcRec.name} start)";
 
                         //保存寄存器
                         int offset = 0;
@@ -1592,7 +1407,7 @@ namespace Gizbox.Src.Backend
                             ind = instructions.InsertAfter(ind, X64.movdqu(X64.mem(X64.rsp, displacement: offset), new X64Reg(reg)));
                             offset += 16;
                         }
-                        ind.value.comment += $"(caller-save of {func.funcRec.name} finish)";
+                        ind.value.comment += $"    (caller-save of {func.funcRec.name} finish)";
                     }
                 }
                 else
@@ -1647,8 +1462,8 @@ namespace Gizbox.Src.Backend
                         copyTo.value.label = holdlabel;
                         copyTo.value.comment = holdcomment;
 
-                        copyTo.value.comment += $"(caller-restore of {func.funcRec.name} start)";
-                        ind.value.comment += $"(caller-restore of {func.funcRec.name} finish)";
+                        copyTo.value.comment += $"    (caller-restore of {func.funcRec.name} start)";
+                        ind.value.comment += $"    (caller-restore of {func.funcRec.name} finish)";
                     }
                 }
                 else
@@ -1681,7 +1496,7 @@ namespace Gizbox.Src.Backend
                     ind = instructions.InsertAfter(ind, X64.sub(X64.rsp, X64.imm(bytes), X64Size.qword));
                     ind.value.label = holdlabel;
                     ind.value.comment = holdcomment;
-                    ind.value.comment += $"(callee-save of {func.funcRec.name} start)";
+                    ind.value.comment += $"    (callee-save of {func.funcRec.name} start)";
 
                     //保存寄存器  
                     int offset = 0;
@@ -1697,7 +1512,7 @@ namespace Gizbox.Src.Backend
                     }
 
 
-                    ind.value.comment += $"(callee-save of {func.funcRec.name} finish)";
+                    ind.value.comment += $"    (callee-save of {func.funcRec.name} finish)";
 
                 }
                 //局部变量位移  
@@ -1756,9 +1571,9 @@ namespace Gizbox.Src.Backend
 
                     copyTo.value.label = holdlabel;
                     copyTo.value.comment = holdcomment;
-                    copyTo.value.comment += $"(callee-restore of {func.funcRec.name} start)";
+                    copyTo.value.comment += $"    (callee-restore of {func.funcRec.name} start)";
 
-                    ind.value.comment += $"(callee-restore of {func.funcRec.name} finish)";
+                    ind.value.comment += $"    (callee-restore of {func.funcRec.name} finish)";
                 }
                 instructions.Rebuild();
 
@@ -1810,7 +1625,7 @@ namespace Gizbox.Src.Backend
                             {
                                 vr.AllocPhysReg(regAlloc);
                                 GixConsole.WriteLine($"{vr.vRegVar.name} 分配物理寄存器 {regAlloc}");
-                                instr.value.comment += $"  (vreg \"{vr.vRegVar.name}\" at {desc.kind}{desc.oprandIdx} alloc {regAlloc})";
+                                instr.value.comment += $"    (vreg \"{vr.vRegVar.name}\" at {desc.kind}{desc.oprandIdx} alloc {regAlloc})";
                             }
                             //溢出到内存  
                             else
@@ -1822,7 +1637,7 @@ namespace Gizbox.Src.Backend
                                     else
                                         instr.value.operand1 = X64.mem(X64.rbp, displacement: vr.vRegVar.addr);
 
-                                    instr.value.comment += $"  (vreg \"{vr.vRegVar.name}\" at {desc.kind}{desc.oprandIdx} home to mem.)";
+                                    instr.value.comment += $"    (vreg \"{vr.vRegVar.name}\" at {desc.kind}{desc.oprandIdx} home to mem.)";
                                 }
                                 // 作为地址基址：r11中转
                                 else if(desc.kind == VRegDesc.Kind.OprandBase)
@@ -1833,7 +1648,7 @@ namespace Gizbox.Src.Backend
                                         X64.r11, X64.mem(X64.rbp, displacement: vr.vRegVar.addr), X64Size.qword));
                                     xmem.baseReg = X64.r11;
 
-                                    instr.value.comment += $"  (materialize base vreg \"{vr.vRegVar.name}\" -> r11)";
+                                    instr.value.comment += $"    (materialize base vreg \"{vr.vRegVar.name}\" -> r11)";
                                 }
                                 // 作为地址变址：r10中转，并做符号或零扩展到 64 位
                                 else if(desc.kind == VRegDesc.Kind.OprandIndex)
@@ -1859,7 +1674,7 @@ namespace Gizbox.Src.Backend
                                     }
 
                                     xmem.indexReg = X64.r10;
-                                    instr.value.comment += $"  (materialize index vreg \"{vr.vRegVar.name}\" -> r10)";
+                                    instr.value.comment += $"    (materialize index vreg \"{vr.vRegVar.name}\" -> r10)";
                                 }
                             }
                         }
@@ -2511,6 +2326,117 @@ namespace Gizbox.Src.Backend
 
         #region PASS3
 
+        // Call调用前  
+        private void BeforeCall(TACInfo tacInf, List<TACInfo> tempParamList, out int rspSub)
+        {
+            rspSub = 0;
+            {
+                // 调用者保存寄存器（易失性寄存器需Caller保存） (选择性保存)
+                var placeholderSave = X64.placehold("caller_save");
+                var placeholderSaveNode = instructions.AddLast(placeholderSave);
+
+                if(callerSavePlaceHolders.ContainsKey(currFuncEnv) == false)
+                    callerSavePlaceHolders.Add(currFuncEnv, new());
+                callerSavePlaceHolders[currFuncEnv].Add(placeholderSaveNode);
+
+
+                // 栈帧16字节对齐 (如果是奇数个参数 -> 需要8字节对齐栈指针)
+                // (寄存器保存区自己确保16字节对齐)
+                if(tacInf.CALL_paramCount % 2 != 0)
+                {
+                    // 如果是奇数个参数，先将rsp对齐到16字节
+                    rspSub += 8;
+                }
+                // 其他栈参数空间
+                if(tacInf.CALL_paramCount > 4)
+                {
+                    int onStackParamLen = (tacInf.CALL_paramCount - 4) * 8;
+                    rspSub += onStackParamLen;
+                }
+                // 影子空间(32字节)
+                rspSub += 32;
+
+                //移动rsp  
+                instructions.AddLast(X64.sub(X64.rsp, X64.imm(rspSub), X64Size.qword));
+
+                //注释  
+                instructions.Last.value.comment += $"    (shadow space and stack-params)";
+
+                // 参数赋值(IR中PARAM指令已经是倒序)  
+                foreach(var paraminfo in tempParamList)
+                {
+                    var srcOp = ParseOperand(paraminfo.oprand0);
+                    bool isRefOfConst = paraminfo.oprand0.IsRefOfConst();
+
+                    //寄存器传参  
+                    if(paraminfo.PARAM_paramidx < 4)
+                    {
+                        var isSse = paraminfo.oprand0.IsSSEType();
+                        var size = paraminfo.oprand0.typeExpr.Size;
+                        var ssereg = UtilsW64.GetParamReg(paraminfo.PARAM_paramidx, true);
+                        var intreg = UtilsW64.GetParamReg(paraminfo.PARAM_paramidx, false);
+                        //浮点参数  
+                        if(isSse)
+                        {
+                            if(paraminfo.oprand0.typeExpr.Size == 4)
+                                instructions.AddLast(X64.movss(ssereg, srcOp));
+                            else
+                                instructions.AddLast(X64.movsd(ssereg, srcOp));
+
+                            //浮点参数也需要在整数寄存器rcx,rdx,r8,r9中，以支持可变参数  
+                            instructions.AddLast(X64.mov(intreg, srcOp, (X64Size)size));
+                        }
+                        //整型参数  
+                        else
+                        {
+                            if(isRefOfConst)
+                            {
+                                instructions.AddLast(X64.lea(intreg, X64.rel(paraminfo.oprand0.expr.roDataKey)));
+                            }
+                            else
+                            {
+                                instructions.AddLast(X64.mov(intreg, srcOp, (X64Size)size));
+
+                            }
+                        }
+                    }
+
+                    //栈帧传参[rsp + 8]开始    （影子空间也需要赋值）
+                    int offset = (8 * (paraminfo.PARAM_paramidx));
+
+                    if(isRefOfConst)
+                    {
+                        instructions.AddLast(X64.lea(X64.r11, X64.rel(paraminfo.oprand0.expr.roDataKey)));
+                        EmitMov(X64.mem(X64.rsp, displacement: offset), X64.r11, paraminfo.oprand0.typeExpr);
+                    }
+                    else
+                    {
+                        EmitMov(X64.mem(X64.rsp, displacement: offset), srcOp, paraminfo.oprand0.typeExpr);
+                    }
+                }
+                tempParamList.Clear();
+            }
+        }
+
+        // Call调用后  
+        private void AfterCall(int rspSub)
+        {
+            // 调用后完整恢复栈
+            instructions.AddLast(X64.add(X64.rsp, X64.imm(rspSub), X64Size.qword));
+
+            //注释  
+            instructions.Last.value.comment += $"    (release shadow space and stack-params)";
+
+            //还原保存的寄存器(占位)  
+            var placeholderRestore = X64.placehold("caller_restore");
+            var placeholderRestoreNode = instructions.AddLast(placeholderRestore);
+
+            if(callerRestorePlaceHolders.ContainsKey(currFuncEnv) == false)
+                callerRestorePlaceHolders.Add(currFuncEnv, new());
+            callerRestorePlaceHolders[currFuncEnv].Add(placeholderRestoreNode);
+        }
+
+        // Mov  
         private void EmitMov(X64Operand dst, X64Operand src, GType type)
         {
             bool IsRegOrVReg(X64Operand op) => op is X64Reg;
@@ -2965,15 +2891,6 @@ namespace Gizbox.Src.Backend
                         {
                             if(instr.operand0 is X64Reg reg0 && instr.operand1 is X64Reg reg1)
                             {
-                                if(reg0.isVirtual)
-                                {
-                                    GixConsole.WriteLine("vreg:" + reg0.vRegVar.name);
-                                }
-                                if(reg1.isVirtual)
-                                {
-                                    GixConsole.WriteLine("vreg:" + reg1.vRegVar.name);
-                                }
-
                                 if(reg0.IsXXM() != reg1.IsXXM())
                                 {
                                     if(instr.sizeMark == X64Size.dword)
@@ -3399,6 +3316,24 @@ namespace Gizbox.Src.Backend
         public SymbolTable table;
 
         public bool isGlobal = false;
+
+        public RecAdditionInfo(SymbolRecord rec)
+        {
+            target = rec;
+        }
+        public SymbolTable GetFunctionEnv()
+        {
+            var curr = table;
+            while(curr != null)
+            {
+                if(curr.tableCatagory == SymbolTable.TableCatagory.FuncScope)
+                    return curr;
+
+                curr = curr.parent;
+            }
+
+            throw new GizboxException(ExceptioName.CodeGen, $"function env of {target.name} not found. curr env:{table.name}");
+        }
     }
     public class FunctionAdditionInfo
     {

@@ -434,6 +434,34 @@ namespace Gizbox
             env.depth = this.depth + 1;
         }
 
+        public IEnumerable<KeyValuePair<string, Record>> GetRecordsRecursive()
+        {
+            if(this.records != null)
+            {
+                foreach(var kv in this.records)
+                {
+                    yield return kv;
+                }
+            }
+
+            if(this.children != null)
+            {
+                foreach(var child in this.children)
+                {
+                    if(child == null)
+                        continue;
+
+                    var seq = child.GetRecordsRecursive();
+                    if(seq == null)
+                        continue;
+
+                    foreach(var rec in seq)
+                    {
+                        yield return rec;
+                    }
+                }
+            }
+        }
 
         public void Print()
         {
