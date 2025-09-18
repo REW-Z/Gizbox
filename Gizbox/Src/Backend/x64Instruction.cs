@@ -195,6 +195,13 @@ namespace Gizbox.Src.Backend
         setge,
         sete,
         setne,
+        setb,
+        setbe,
+        seta,
+        setae,
+
+        ucomiss,
+        ucomisd,
 
         cqo,
 
@@ -674,14 +681,21 @@ namespace Gizbox.Src.Backend
         public static X64Instruction ret() => new() { type = InstructionKind.ret };
         public static X64Instruction lea(X64Operand dest, X64Operand src) => new() { type = InstructionKind.lea, operand0 = dest, operand1 = src };
 
-        // 条件设置
-        public static X64Instruction setl(X64Operand operand) => new() { type = InstructionKind.setl, operand0 = operand };
-        public static X64Instruction setle(X64Operand operand) => new() { type = InstructionKind.setle, operand0 = operand };
-        public static X64Instruction setg(X64Operand operand) => new() { type = InstructionKind.setg, operand0 = operand };
-        public static X64Instruction setge(X64Operand operand) => new() { type = InstructionKind.setge, operand0 = operand };
-        public static X64Instruction sete(X64Operand operand) => new() { type = InstructionKind.sete, operand0 = operand };
-        public static X64Instruction setne(X64Operand operand) => new() { type = InstructionKind.setne, operand0 = operand };
+        // 条件设置  
+        public static X64Instruction setl(X64Operand operand) => new() { type = InstructionKind.setl, operand0 = operand, sizeMark = X64Size.@byte };
+        public static X64Instruction setle(X64Operand operand) => new() { type = InstructionKind.setle, operand0 = operand, sizeMark = X64Size.@byte };
+        public static X64Instruction setg(X64Operand operand) => new() { type = InstructionKind.setg, operand0 = operand, sizeMark = X64Size.@byte };
+        public static X64Instruction setge(X64Operand operand) => new() { type = InstructionKind.setge, operand0 = operand, sizeMark = X64Size.@byte };
+        public static X64Instruction sete(X64Operand operand) => new() { type = InstructionKind.sete, operand0 = operand, sizeMark = X64Size.@byte };
+        public static X64Instruction setne(X64Operand operand) => new() { type = InstructionKind.setne, operand0 = operand, sizeMark = X64Size.@byte };
+        public static X64Instruction setb(X64Operand operand) => new() { type = InstructionKind.setb, operand0 = operand, sizeMark = X64Size.@byte };
+        public static X64Instruction setbe(X64Operand operand) => new() { type = InstructionKind.setbe, operand0 = operand, sizeMark = X64Size.@byte };
+        public static X64Instruction seta(X64Operand operand) => new() { type = InstructionKind.seta, operand0 = operand, sizeMark = X64Size.@byte };
+        public static X64Instruction setae(X64Operand operand) => new() { type = InstructionKind.setae, operand0 = operand, sizeMark = X64Size.@byte };
 
+        // 浮点比较（不写目的，只影响标志位）
+        public static X64Instruction ucomiss(X64Operand a, X64Operand b) => new() { type = InstructionKind.ucomiss, operand0 = a, operand1 = b };
+        public static X64Instruction ucomisd(X64Operand a, X64Operand b) => new() { type = InstructionKind.ucomisd, operand0 = a, operand1 = b };
         public static X64Instruction cqo() => new() { type = InstructionKind.cqo };
 
         // 整数 -> 浮点

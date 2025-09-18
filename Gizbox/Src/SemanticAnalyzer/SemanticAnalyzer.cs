@@ -720,7 +720,6 @@ namespace Gizbox.SemanticRule
                     };
                 });
             }
-            string[] compareOprators = new string[] { ">", "<", ">=", "<=", "==", "!=", };
             foreach (var opname in compareOprators)
             {
                 AddActionAtTail("bexpr -> aexpr " + opname + " aexpr", (psr, production) => {

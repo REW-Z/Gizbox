@@ -523,7 +523,15 @@ namespace Gizbox.IR
                         //    throw new SemanticException(binaryOp.rightNode, "type未设置!");
 
                         //表达式的返回变量  
-                        SetRet(binaryOp, NewTemp((string)binaryOp.leftNode.attributes["type"]));
+                        if(binaryOp.IsCompare)
+                        {
+                            SetRet(binaryOp, NewTemp("bool"));
+                        }
+                        else
+                        {
+                            SetRet(binaryOp, NewTemp((string)binaryOp.leftNode.attributes["type"]));
+                        }
+                        
 
                         GenerateCode(binaryOp.op, GetRet(binaryOp), GetRet(binaryOp.leftNode), GetRet(binaryOp.rightNode));
                     }

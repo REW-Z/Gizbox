@@ -198,26 +198,102 @@ namespace Gizbox
 
         public static int Run(string fileName, string args, string workingDir = "")
         {
+            // 工作目录
+            string workDir = string.IsNullOrEmpty(workingDir) ? Environment.CurrentDirectory : workingDir;
+            try
+            {
+                if(string.IsNullOrEmpty(workDir) || System.IO.Directory.Exists(workDir) == false)
+                    workDir = Environment.CurrentDirectory;
+            }
+            catch
+            {
+                workDir = Environment.CurrentDirectory;
+            }
+
+            string resolved = null;
+
+            // 查找  
+            string pathEnv = Environment.GetEnvironmentVariable("Path") ?? "";
+            string pathEnv2 = Environment.GetEnvironmentVariable("PATH") ?? "";
+            string pathext = Environment.GetEnvironmentVariable("PATHEXT") ?? ".EXE;.CMD;.BAT;.COM";
+            var paths = pathEnv.Split(System.IO.Path.PathSeparator);
+            var paths2 = pathEnv2.Split(System.IO.Path.PathSeparator);
+            List<string> allpaths = new();
+            allpaths.AddRange(paths);
+            allpaths.AddRange(paths2);
+            var exts = pathext.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+
+            foreach(var dir in allpaths)
+            {
+                if(string.IsNullOrWhiteSpace(dir))
+                    continue;
+                try
+                {
+                    var cand0 = System.IO.Path.Combine(dir, fileName);
+                    if(System.IO.File.Exists(cand0))
+                    {
+                        resolved = cand0;
+                        break;
+                    }
+
+                    foreach(var ext in exts)
+                    {
+                        var extClean = ext.Trim();
+                        var cand = cand0;
+                        if(System.IO.Path.HasExtension(cand) == false)
+                            cand = cand0 + extClean;
+
+                        if(System.IO.File.Exists(cand))
+                        {
+                            resolved = cand;
+                            break;
+                        }
+                    }
+                    if(resolved != null)
+                        break;
+                }
+                catch { /* ignore directories we cannot access */ }
+            }
+
+            if(resolved == null)
+                resolved = fileName;
+
+            Console.WriteLine("resolved:" + resolved);
+
             var psi = new ProcessStartInfo
             {
-                FileName = fileName,
+                FileName = resolved,
                 Arguments = args,
-                WorkingDirectory = string.IsNullOrEmpty(workingDir) ? Environment.CurrentDirectory : workingDir,
+                WorkingDirectory = workDir,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true,
             };
 
-            using var proc = new Process { StartInfo = psi };
-            proc.OutputDataReceived += (s, e) => { if(e.Data != null) Console.WriteLine("[OUT] " + e.Data); };
-            proc.ErrorDataReceived += (s, e) => { if(e.Data != null) Console.WriteLine("[ERR] " + e.Data); };
+            using(var proc = new Process { StartInfo = psi })
+            {
+                proc.OutputDataReceived += (s, e) => { if(e != null && e.Data != null) Console.WriteLine("[OUT] " + e.Data); };
+                proc.ErrorDataReceived += (s, e) => { if(e != null && e.Data != null) Console.WriteLine("[ERR] " + e.Data); };
 
-            proc.Start();
-            proc.BeginOutputReadLine();
-            proc.BeginErrorReadLine();
-            proc.WaitForExit();
-            return proc.ExitCode;
+                try
+                {
+                    proc.Start();
+                }
+                catch(Exception ex)
+                {
+                    string extra = string.Equals(resolved, fileName, StringComparison.OrdinalIgnoreCase)
+                        ? ""
+                        : $" (resolved '{fileName}' -> '{resolved}')";
+                    string msg = $"无法启动进程 '{fileName}'{extra}. WorkingDirectory='{workDir}'. 原始错误: {ex.Message}";
+                    throw new System.InvalidOperationException(msg, ex);
+                }
+
+                proc.BeginOutputReadLine();
+                proc.BeginErrorReadLine();
+                proc.WaitForExit();
+                return proc.ExitCode;
+            }
         }
 
         /// <summary>
@@ -292,6 +368,9 @@ namespace Gizbox
         }
 
 
+        /// <summary>
+        /// 编译为可执行文件  
+        /// </summary>
         public void CompileIRToExe(IRUnit ir, string outputDir, CompileOptions options = null)
         {
             if(options == null)
@@ -307,6 +386,7 @@ namespace Gizbox
 
             foreach(var fileName in fileNames)
             {
+                Console.WriteLine($">>>nasm -f win64 {fileName}.asm -o {fileName}.obj");
                 Run("nasm", $"-f win64 {fileName}.asm -o {fileName}.obj", outputDir);
             }
 
@@ -317,7 +397,6 @@ namespace Gizbox
 
 
     //Compile Options  
-
     public enum BuildMode
     {
         Debug,

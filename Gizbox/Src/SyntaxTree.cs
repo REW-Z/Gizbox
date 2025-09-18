@@ -102,6 +102,9 @@ namespace Gizbox
     /// </summary>
     public class SyntaxTree
     {
+        public static string[] compareOprators = new string[] { ">", "<", ">=", "<=", "==", "!=", };
+
+
         public abstract class Node 
         {
             private Node[] children;
@@ -442,6 +445,8 @@ namespace Gizbox
             public ExprNode leftNode;
             public ExprNode rightNode;
 
+            public bool IsCompare
+                => compareOprators.Contains(op);
             public string GetOpName()
             {
                 switch(op)

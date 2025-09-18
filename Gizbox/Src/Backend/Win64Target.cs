@@ -261,6 +261,12 @@ namespace Gizbox.Src.Backend
         {
             this.globalEnv = ir.globalScope.env;
 
+            //常用常量  
+            if(!section_rdata.ContainsKey("__const_neg_one_f32"))
+                section_rdata["__const_neg_one_f32"] = new() { (GType.Parse("float"), "-1.0") };
+            if(!section_rdata.ContainsKey("__const_neg_one_f64"))
+                section_rdata["__const_neg_one_f64"] = new() { (GType.Parse("double"), "-1.0") };
+
             //收集全局和外部信息    
             var envs = ir.GetAllGlobalEnvs();
             foreach(var env in envs)
@@ -974,15 +980,51 @@ namespace Gizbox.Src.Backend
                             var size = (X64Size)tacInf.oprand0.typeExpr.Size;
                             if(tacInf.oprand0.IsSSEType())
                             {
-                                if(size == X64Size.qword)
+                                bool isF32 = size == X64Size.dword;
+
+                                // 工作寄存器
+                                X64Operand work = dst;
+                                bool needStoreBack = false;
+
+                                // 目标已是XMM
+                                if(work is X64Reg r && r.isVirtual == false && r.IsXXM())
                                 {
-                                    instructions.AddLast(X64.movsd(dst, src));
+                                    //若dst != src先复制  
+                                    if(!Equals(dst, src))
+                                    {
+                                        if(isF32)
+                                            instructions.AddLast(X64.movss(work, src));
+                                        else
+                                            instructions.AddLast(X64.movsd(work, src));
+                                    }
                                 }
-                                else if (size == X64Size.dword)
+                                // 若目标不是XMM（可能是内存） -> 用xmm0中转
+                                else
                                 {
-                                    instructions.AddLast(X64.movss(dst, src));
+                                    work = X64.xmm0;
+                                    needStoreBack = true;
+
+                                    // 加载src
+                                    if(isF32)
+                                        instructions.AddLast(X64.movss(work, src));
+                                    else
+                                        instructions.AddLast(X64.movsd(work, src));
                                 }
-                                instructions.AddLast(X64.neg(dst, size));
+
+                                // 乘以-1f或者-1d  
+                                if(isF32)
+                                    instructions.AddLast(X64.mulss(work, X64.rel("__const_neg_one_f32")));
+                                else
+                                    instructions.AddLast(X64.mulsd(work, X64.rel("__const_neg_one_f64")));
+
+                                // 回写
+                                if(needStoreBack)
+                                {
+                                    if(isF32)
+                                        instructions.AddLast(X64.movss(dst, work));
+                                    else
+                                        instructions.AddLast(X64.movsd(dst, work));
+                                }
                             }
                             else
                             {
@@ -1008,21 +1050,7 @@ namespace Gizbox.Src.Backend
                     case "==":
                     case "!=":
                         {
-                            var dst = ParseOperand(tacInf.oprand0);
-                            var a = ParseOperand(tacInf.oprand1);
-                            var b = ParseOperand(tacInf.oprand2);
-                            var size = tacInf.oprand1.typeExpr.Size;
-                            instructions.AddLast(X64.mov(dst, a, (X64Size)size));
-                            instructions.AddLast(X64.cmp(dst, b));
-                            switch(tac.op)
-                            {
-                                case "<": instructions.AddLast(X64.setl(dst)); break;
-                                case "<=": instructions.AddLast(X64.setle(dst)); break;
-                                case ">": instructions.AddLast(X64.setg(dst)); break;
-                                case ">=": instructions.AddLast(X64.setge(dst)); break;
-                                case "==": instructions.AddLast(X64.sete(dst)); break;
-                                case "!=": instructions.AddLast(X64.setne(dst)); break;
-                            }
+                            EmitCompare(tacInf, tac.op);
                         }
                         break;
                     case "++":
@@ -2569,6 +2597,100 @@ namespace Gizbox.Src.Backend
             }
         }
 
+        // 比较运算  
+        private void EmitCompare(TACInfo tacInf, string op)
+        {
+            var boolDst = ParseOperand(tacInf.oprand0); // 布尔目标
+            var a = ParseOperand(tacInf.oprand1);
+            var b = ParseOperand(tacInf.oprand2);
+            var aType = tacInf.oprand1.typeExpr;
+            bool isSse = tacInf.oprand1.IsSSEType();
+
+            if(isSse)
+            {
+                bool isF32 = aType.Size == 4;
+
+                // 需要第一个操作数在 XMM 寄存器
+                X64Operand aReg = a;
+                if(a is X64Reg r && r.isVirtual == false && r.IsXXM() == false)
+                {
+                    throw new GizboxException(ExceptioName.CodeGen, "compare lhs cant be gpr!");
+                }
+
+
+                // imm或其它 -> 加载
+                if(!(a is X64Reg) && !(a is X64Mem) && !(a is X64Rel))
+                {
+                    if(isF32) 
+                        instructions.AddLast(X64.movss(X64.xmm0, a));
+                    else 
+                        instructions.AddLast(X64.movsd(X64.xmm0, a));
+                    aReg = X64.xmm0;
+                }
+                // mem操作数 -> 加载  
+                else if(a is X64Mem || a is X64Rel)
+                {
+                    if(isF32)
+                        instructions.AddLast(X64.movss(X64.xmm0, a));
+                    else
+                        instructions.AddLast(X64.movsd(X64.xmm0, a));
+                    aReg = X64.xmm0;
+                }
+
+                // 第二操作数可为 reg/mem
+                if(isF32)
+                    instructions.AddLast(X64.ucomiss(aReg, b)); 
+                else 
+                    instructions.AddLast(X64.ucomisd(aReg, b));
+
+                // 暂不处理 NaN（unordered）细节，默认与普通有序比较一致（TODO）
+                switch(op)
+                {
+                    case "<": instructions.AddLast(X64.setb(boolDst)); break;   // CF=1 && ZF=0
+                    case "<=": instructions.AddLast(X64.setbe(boolDst)); break; // CF=1 || ZF=1
+                    case ">": instructions.AddLast(X64.seta(boolDst)); break;   // CF=0 && ZF=0
+                    case ">=": instructions.AddLast(X64.setae(boolDst)); break; // CF=0
+                    case "==": instructions.AddLast(X64.sete(boolDst)); break;  // ZF=1 (NaN 会产生 ZF=1/PF=1 -> 未区分)
+                    case "!=": instructions.AddLast(X64.setne(boolDst)); break; // ZF=0
+                }
+                return;
+            }
+            // 整数/指针比较
+            else
+            {
+                // cmp 要求第一个操作数不可为立即数；若 a 是立即数使用 r11 中转
+                bool aIsImm = a is X64Immediate;
+                if(aIsImm)
+                {
+                    instructions.AddLast(X64.mov(X64.r11, a, (X64Size)aType.Size));
+                    a = X64.r11;
+                }
+                // 直接 cmp a,b（mem-mem 会在后续合法化阶段修正）
+                instructions.AddLast(X64.cmp(a, b));
+
+                switch(op)
+                {
+                    case "<":
+                        instructions.AddLast(X64.setl(boolDst));
+                        break;
+                    case "<=":
+                        instructions.AddLast(X64.setle(boolDst));
+                        break;
+                    case ">":
+                        instructions.AddLast(X64.setg(boolDst));
+                        break;
+                    case ">=":
+                        instructions.AddLast(X64.setge(boolDst));
+                        break;
+                    case "==":
+                        instructions.AddLast(X64.sete(boolDst));
+                        break;
+                    case "!=":
+                        instructions.AddLast(X64.setne(boolDst));
+                        break;
+                }
+            }
+        }
         // 复合赋值
         private void EmitCompoundAssign(X64Operand dst, X64Operand rhs, GType type, string op)
         {
@@ -2896,6 +3018,18 @@ namespace Gizbox.Src.Backend
                                 else if(instr.sizeMark == X64Size.qword)
                                 {
                                     instr.type = InstructionKind.movq;
+                                }
+                            }
+
+                            if(oprand0IsXXM == true && oprand1IsXXM == true)
+                            {
+                                if(instr.sizeMark == X64Size.dword)
+                                {
+                                    instr.type = InstructionKind.movss;
+                                }
+                                else if(instr.sizeMark == X64Size.qword)
+                                {
+                                    instr.type = InstructionKind.movsd;
                                 }
                             }
                         }
