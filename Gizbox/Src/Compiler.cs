@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Linq;
+using System.Diagnostics;
 using Gizbox.IR;
 
 namespace Gizbox
@@ -25,6 +27,7 @@ namespace Gizbox
         //lib info  
         public Dictionary<string, IRUnit> libsCache = new Dictionary<string, IRUnit>();
         public List<string> libPathFindList = new List<string>();
+
 
         //CTOR  
         public Compiler()
@@ -193,13 +196,36 @@ namespace Gizbox
         }
 
 
+        public static int Run(string fileName, string args, string workingDir = "")
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = fileName,
+                Arguments = args,
+                WorkingDirectory = string.IsNullOrEmpty(workingDir) ? Environment.CurrentDirectory : workingDir,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+
+            using var proc = new Process { StartInfo = psi };
+            proc.OutputDataReceived += (s, e) => { if(e.Data != null) Console.WriteLine("[OUT] " + e.Data); };
+            proc.ErrorDataReceived += (s, e) => { if(e.Data != null) Console.WriteLine("[ERR] " + e.Data); };
+
+            proc.Start();
+            proc.BeginOutputReadLine();
+            proc.BeginErrorReadLine();
+            proc.WaitForExit();
+            return proc.ExitCode;
+        }
 
         /// <summary>
         /// 编译库  
         /// </summary>
         public void CompileToLib(string source, string libName, string savePath)
         {
-            var ir = this.CompileToIR(source);
+            var ir = this.CompileToIR(source, "__main_discard");
             ir.name = libName;
             Gizbox.IR.ILSerializer.Serialize(savePath, ir);
 
@@ -209,9 +235,12 @@ namespace Gizbox
         /// <summary>
         /// 编译为IR  
         /// </summary>
-        public IRUnit CompileToIR(string source)
+        public IRUnit CompileToIR(string source, string entryName = null)
         {
             if (string.IsNullOrEmpty(this.parserDataPath) && parserDataHardcode == false) throw new Exception("语法分析器数据源没有设置");
+            if(entryName == null)
+                entryName = "Main";
+
 
             //词法分析  
             Scanner scanner = new Scanner();
@@ -253,12 +282,55 @@ namespace Gizbox
 
 
         /// <summary>
-        /// 编译为汇编码  
+        /// 编译为NASM汇编  
         /// </summary>
-        public void CompileToAsm(string dir)
+        public void CompileIRToAsm(IRUnit ir, string outputDir, CompileOptions options = null)
         {
+            if(options == null)
+                options = new CompileOptions();
+            var allfiles = Gizbox.Src.Backend.Win64Target.GenAsms(this, ir, outputDir, options);
+        }
 
+
+        public void CompileIRToExe(IRUnit ir, string outputDir, CompileOptions options = null)
+        {
+            if(options == null)
+                options = new CompileOptions();
+            var allfiles = Gizbox.Src.Backend.Win64Target.GenAsms(this, ir, outputDir, options);
+
+            List<string> fileNames = new();
+
+            foreach(var fileFullName in allfiles)
+            {
+                fileNames.Add(System.IO.Path.GetFileNameWithoutExtension(fileFullName));
+            }
+
+            foreach(var fileName in fileNames)
+            {
+                Run("nasm", $"-f win64 {fileName}.asm -o {fileName}.obj", outputDir);
+            }
+
+            Run("gcc", $"{string.Join(" ", fileNames.Select(f => $"{f}.obj"))} -o app.exe", outputDir);
         }
     }
 
+
+
+    //Compile Options  
+
+    public enum BuildMode
+    {
+        Debug,
+        Release,
+    }
+    public enum Platform
+    {
+        Windows_X64,
+    }
+
+    public class CompileOptions
+    {
+        public BuildMode buildMode = BuildMode.Debug;
+        public Platform platform = Platform.Windows_X64;
+    }
 }

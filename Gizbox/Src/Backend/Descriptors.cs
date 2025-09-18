@@ -370,13 +370,11 @@ namespace Gizbox.Src.Backend
                 //着色失败  
                 if(chosen == RegisterEnum.Undefined)
                 {
-                    GixConsole.WriteLine("00000着色失败");
                     return false;
                 }
             }
 
             //着色完毕  
-            GixConsole.WriteLine("00000着色成功");
             return true;
         }
     }

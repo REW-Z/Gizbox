@@ -144,11 +144,10 @@ switch(cmdIdx)
             compiler.ConfigParserDataSource(hardcode: true);
             //compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
             var il = compiler.CompileToIR(source);
-            Compiler.Pause("Compile End");
 
             il.Print();
 
-            Win64Target.GenAllAsm(compiler, il, System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
+            compiler.CompileIRToExe(il, System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
         }
         break;
 }

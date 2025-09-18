@@ -64,19 +64,16 @@ global main
 
 namespace Gizbox.Src.Backend
 {
-    public enum BuildMode
-    {
-        Debug,
-        Release,
-    }
     public static class Win64Target
     {
-        public static void GenAllAsm(Compiler compiler, IRUnit mainUnit, string outputDir)
+        public static string[] GenAsms(Compiler compiler, IRUnit mainUnit, string outputDir, Gizbox.CompileOptions options)
         {
             //对所有编译单元进行汇编代码生成
             mainUnit.AutoLoadDependencies(compiler, true);
             HashSet<IRUnit> allunit = new();
             CollectIRUnits(allunit, mainUnit);
+            string[] allpath = new string[allunit.Count];
+            int currIdx = 0;
             foreach(var unit in allunit)
             {
                 string name;
@@ -85,9 +82,11 @@ namespace Gizbox.Src.Backend
                 else
                     name = unit.name;
 
-                GenSingleAsm(compiler, unit, name, outputDir);
+                allpath[currIdx] = GenSingleAsm(compiler, unit, name, options, outputDir);
+                currIdx++;
             }
             GixConsole.WriteLine($"已生成{allunit.Count}个单元");
+            return allpath;
         }
 
         private static void CollectIRUnits(HashSet<IRUnit> units, IRUnit ir)
@@ -102,12 +101,15 @@ namespace Gizbox.Src.Backend
             units.Add(ir);
         }
 
-        private static void GenSingleAsm(Compiler compiler, IRUnit irunit, string name, string outputDir)
+        private static string GenSingleAsm(Compiler compiler, IRUnit irunit, string name, CompileOptions options, string outputDir)
         {
-            Win64CodeGenContext context = new Win64CodeGenContext(compiler, irunit);
+            Win64CodeGenContext context = new Win64CodeGenContext(compiler, irunit, options);
             context.StartCodeGen();
             var result = context.GetResult();
-            System.IO.File.WriteAllText(System.IO.Path.Combine(outputDir, $"{name}.asm"), result);
+            var path = System.IO.Path.Combine(outputDir, $"{name}.asm");
+            System.IO.File.WriteAllText(path, result);
+
+            return path;
         }
 
         public static void Log(string content)
@@ -129,12 +131,10 @@ namespace Gizbox.Src.Backend
         public Compiler compiler;
         public IRUnit ir;
 
-        public static BuildMode buildMode = BuildMode.Debug;
+        public Gizbox.CompileOptions options;
 
         private ControlFlowGraph cfg;
         private List<BasicBlock> blocks;
-
-
 
 
         private Dictionary<string, IROperandExpr> operandCache = new();
@@ -193,11 +193,11 @@ namespace Gizbox.Src.Backend
         private const bool debugLogAsmInfos = true;
 
 
-        public Win64CodeGenContext(Compiler compiler, IRUnit ir)
+        public Win64CodeGenContext(Compiler compiler, IRUnit ir, CompileOptions options)
         {
             this.compiler = compiler;
             this.ir = ir;
-
+            this.options = options;
 
             //本单元
             {
@@ -633,7 +633,7 @@ namespace Gizbox.Src.Backend
             cfg.CaculateAndMergeLiveInfos();
 
             // 初步确定局部变量的栈帧布局  
-            if(buildMode == BuildMode.Debug)
+            if(options.buildMode == BuildMode.Debug)
             {
                 //Debug:局部变量内存不重叠  
                 foreach(var (funcName, funcRec) in funcDict)
@@ -1252,11 +1252,6 @@ namespace Gizbox.Src.Backend
                 }
             }
 
-
-            if(debugLogAsmInfos)
-            {
-                Win64Target.Log(GetResult());
-            }
 
             foreach(var func in funcInfos)
             {
@@ -2889,18 +2884,18 @@ namespace Gizbox.Src.Backend
                 {
                     case InstructionKind.mov:
                         {
-                            if(instr.operand0 is X64Reg reg0 && instr.operand1 is X64Reg reg1)
+                            bool oprand0IsXXM = (instr.operand0 is X64Reg reg0 && reg0.IsXXM());
+                            bool oprand1IsXXM = (instr.operand1 is X64Reg reg1 && reg1.IsXXM());
+
+                            if(oprand0IsXXM != oprand1IsXXM)
                             {
-                                if(reg0.IsXXM() != reg1.IsXXM())
+                                if(instr.sizeMark == X64Size.dword)
                                 {
-                                    if(instr.sizeMark == X64Size.dword)
-                                    {
-                                        instr.type = InstructionKind.movd;
-                                    }
-                                    else if(instr.sizeMark == X64Size.qword)
-                                    {
-                                        instr.type = InstructionKind.movq;
-                                    }
+                                    instr.type = InstructionKind.movd;
+                                }
+                                else if(instr.sizeMark == X64Size.qword)
+                                {
+                                    instr.type = InstructionKind.movq;
                                 }
                             }
                         }
@@ -3390,7 +3385,6 @@ namespace Gizbox.Src.Backend
 
         public static string ConvertLabel(string label)
         {
-            Console.WriteLine("label:" + label);
             if(label.StartsWith("entry"))
             {
                 return label.Substring(6);

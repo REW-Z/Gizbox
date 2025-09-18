@@ -59,7 +59,6 @@
 
 **Gizbox TODO**   
 
-for块内的虚拟寄存器未分配。  
 for循环的循环变量特殊处理。  
 数组测试。  
 this->field寄存器未分配。  
