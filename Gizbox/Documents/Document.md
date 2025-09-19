@@ -59,6 +59,7 @@
 
 **Gizbox TODO**   
 
+去除externFunc的中间代码生成，修改解释器，修改AOT。  
 for循环的循环变量特殊处理。  
 数组测试。  
 this->field寄存器未分配。  

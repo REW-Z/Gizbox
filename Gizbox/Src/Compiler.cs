@@ -301,8 +301,7 @@ namespace Gizbox
         /// </summary>
         public void CompileToLib(string source, string libName, string savePath)
         {
-            var ir = this.CompileToIR(source, "__main_discard");
-            ir.name = libName;
+            var ir = this.CompileToIR(source, isMainUnit:false, libName);
             Gizbox.IR.ILSerializer.Serialize(savePath, ir);
 
             Gizbox.GixConsole.WriteLine($"Lib {libName} Complete Finish!");
@@ -311,12 +310,11 @@ namespace Gizbox
         /// <summary>
         /// 编译为IR  
         /// </summary>
-        public IRUnit CompileToIR(string source, string entryName = null)
+        public IRUnit CompileToIR(string source, bool isMainUnit, string name)
         {
             if (string.IsNullOrEmpty(this.parserDataPath) && parserDataHardcode == false) throw new Exception("语法分析器数据源没有设置");
-            if(entryName == null)
-                entryName = "Main";
-
+            if(name == null)
+                throw new Exception("ir name cant be empty");
 
             //词法分析  
             Scanner scanner = new Scanner();
@@ -345,11 +343,12 @@ namespace Gizbox
 
             //语义分析  
             IRUnit ir = new IRUnit();
+            ir.name = name;
             SemanticRule.SemanticAnalyzer semanticAnalyzer = new SemanticRule.SemanticAnalyzer(syntaxTree, ir, this);
             semanticAnalyzer.Analysis();
 
             //中间代码生成    
-            IRGenerator irGenerator = new IR.IRGenerator(syntaxTree, ir);
+            IRGenerator irGenerator = new IR.IRGenerator(syntaxTree, ir, isMainUnit);
             var irUnit = irGenerator.Generate();
 
 
@@ -390,7 +389,7 @@ namespace Gizbox
                 Run("nasm", $"-f win64 {fileName}.asm -o {fileName}.obj", outputDir);
             }
 
-            Run("gcc", $"{string.Join(" ", fileNames.Select(f => $"{f}.obj"))} -o app.exe", outputDir);
+            Run("gcc", $"{string.Join(" ", fileNames.Select(f => $"{f}.obj"))} -o {ir.name}.exe", outputDir);
         }
     }
 

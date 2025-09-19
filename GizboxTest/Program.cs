@@ -107,12 +107,12 @@ switch(cmdIdx)
             compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
             compiler.ConfigParserDataSource(hardcode: true);
             //compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
-            var il = compiler.CompileToIR(source);
+            var il = compiler.CompileToIR(source, isMainUnit:true, "test");
             Compiler.Pause("Compile End");
 
             il.Print();
 
-            ScriptEngine engine = new ScriptEngine();
+            ScriptEngine engine = new ScriptEngine(compiler);
             engine.AddLibSearchDirectory(AppDomain.CurrentDomain.BaseDirectory);
             engine.csharpInteropContext.ConfigExternCallClasses(new Type[] {
                 typeof(TestExternCalls),
@@ -143,7 +143,7 @@ switch(cmdIdx)
             compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
             compiler.ConfigParserDataSource(hardcode: true);
             //compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
-            var il = compiler.CompileToIR(source);
+            var il = compiler.CompileToIR(source, isMainUnit: true, "test");
 
             il.Print();
 

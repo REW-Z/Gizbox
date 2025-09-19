@@ -169,6 +169,7 @@ namespace Gizbox.ScriptEngine
     //脚本引擎  
     public class ScriptEngine
     {
+        public Compiler compiler;
         //运行时单元  
         public Gizbox.ScriptEngine.RuntimeUnit mainUnit;
 
@@ -214,16 +215,21 @@ namespace Gizbox.ScriptEngine
 
 
 
-        public ScriptEngine()
+        public ScriptEngine(Compiler compiler)
         {
-            caculator = new Calculator(this);
-            csharpInteropContext = new Interop.CSharp.InteropContext(this);
+            this.compiler = compiler;
+            this.caculator = new Calculator(this);
+            this.csharpInteropContext = new Interop.CSharp.InteropContext(this);
         }
  
 
         public void Load(IRUnit ir)
         {
             Log("载入主程序");
+
+            //加载依赖  
+            ir.AutoLoadDependencies(this.compiler);
+
             //运行时
             this.mainUnit = new RuntimeUnit(this, ir);
             this.mainUnit.MainUnitLinkLibs();
@@ -262,8 +268,8 @@ namespace Gizbox.ScriptEngine
 
 
             //entry  
-            var entryAddr = mainUnit.QueryLabel("entry", "Main", currUnit);
-            var exitAddr = mainUnit.QueryLabel("exit", "Main", currUnit);
+            var entryAddr = mainUnit.QueryLabel("entry", "main", currUnit);
+            var exitAddr = mainUnit.QueryLabel("exit", "main", currUnit);
             this.curr = entryAddr.Item2;
             this.callStack[this.callStack.Top + 1].returnPtr = new Tuple<int, int>(-1, mainUnit.codes.Count - 1);//返回到最后  
 
@@ -386,28 +392,24 @@ namespace Gizbox.ScriptEngine
 
                         return;
                     }
-                case "EXTERN_IMPL":
-                    {
-                        List<Value> arguments = callStack[callStack.Top].args.AsList();
-                        arguments.Reverse();
+                //case "EXTERN_IMPL":
+                //    {
+                //        List<Value> arguments = callStack[callStack.Top].args.AsList();
+                //        arguments.Reverse();
 
-                        Value result = csharpInteropContext.ExternCall((code.arg0 as OperandSingleIdentifier).name, arguments);
+                //        Value result = csharpInteropContext.ExternCall((code.arg0 as OperandSingleIdentifier).name, arguments);
 
-                        retRegister = result;
+                //        retRegister = result;
 
-                        var jumpAddr = mainUnit.QueryLabel("exit", envStack.Peek().name, currUnit); 
-                        int exitLine = jumpAddr.Item2;
-                        int endLine = exitLine - 1;
+                //        var jumpAddr = mainUnit.QueryLabel("exit", envStack.Peek().name, currUnit); 
+                //        int exitLine = jumpAddr.Item2;
+                //        int endLine = exitLine - 1;
 
-                        //if (ir.codes[endLine].op != "METHOD_END" && ir.codes[endLine].op != "FUNC_END")
-                        //{
-                        //    throw new Exception("函数或方法的END没有紧接exit标签");
-                        //}
-                        this.curr = endLine;
-                        this.currUnit = jumpAddr.Item1;
+                //        this.curr = endLine;
+                //        this.currUnit = jumpAddr.Item1;
 
-                        return;
-                    }
+                //        return;
+                //    }
                 case "PARAM":
                     {
                         Value arg = GetValue(code.arg0); 
@@ -421,6 +423,7 @@ namespace Gizbox.ScriptEngine
                 case "CALL":
                     {
                         string funcMangledName = code.arg0.str;
+                        GixConsole.WriteLine((code.arg0 as OperandSingleIdentifier).record.name);
 
                         if (GetValue(code.arg1).Type != GizType.Int) throw new GizboxException(ExceptioName.Undefine, "arg count not integer");
                         int argCount = GetValue(code.arg1).AsInt;

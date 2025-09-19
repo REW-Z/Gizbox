@@ -8,6 +8,8 @@ using Collections;
 int globalVar1 = 1;
 float globalVar2 = 1.0f;
 
+extern void print(string str);
+
 void test()
 {
 	//int result = globalVar1 + (int)globalVar2;
@@ -37,6 +39,8 @@ void test()
 	{
 		int ass2 = 1;
 	}
+
+	Console::Log("HelloWorld!");
 }
 
 GC::Disable();

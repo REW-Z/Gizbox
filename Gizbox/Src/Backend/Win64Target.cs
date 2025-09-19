@@ -77,12 +77,19 @@ namespace Gizbox.Src.Backend
             foreach(var unit in allunit)
             {
                 string name;
+                bool isMainUnit;
                 if(unit == mainUnit)
+                {
                     name = "main";
+                    isMainUnit = true;
+                }
                 else
+                {
                     name = unit.name;
-
-                allpath[currIdx] = GenSingleAsm(compiler, unit, name, options, outputDir);
+                    isMainUnit = false;
+                }
+                
+                allpath[currIdx] = GenSingleAsm(compiler, unit, isMainUnit, name, options, outputDir);
                 currIdx++;
             }
             GixConsole.WriteLine($"已生成{allunit.Count}个单元");
@@ -101,9 +108,9 @@ namespace Gizbox.Src.Backend
             units.Add(ir);
         }
 
-        private static string GenSingleAsm(Compiler compiler, IRUnit irunit, string name, CompileOptions options, string outputDir)
+        private static string GenSingleAsm(Compiler compiler, IRUnit irunit, bool isMainUnit, string name, CompileOptions options, string outputDir)
         {
-            Win64CodeGenContext context = new Win64CodeGenContext(compiler, irunit, options);
+            Win64CodeGenContext context = new Win64CodeGenContext(compiler, irunit, isMainUnit, options);
             context.StartCodeGen();
             var result = context.GetResult();
             var path = System.IO.Path.Combine(outputDir, $"{name}.asm");
@@ -130,6 +137,7 @@ namespace Gizbox.Src.Backend
     {
         public Compiler compiler;
         public IRUnit ir;
+        private bool isMainUnit;
 
         public Gizbox.CompileOptions options;
 
@@ -164,8 +172,7 @@ namespace Gizbox.Src.Backend
         // 外部变量表  
         public Dictionary<string, SymbolTable.Record> externVars = new();
         // 外部函数表  
-        public Dictionary<string, SymbolTable.Record> externFuncs = new();
-
+        public Dictionary<string, SymbolTable.Record> externFuncs = new();//value可以为空
 
 
         // 类表
@@ -193,10 +200,11 @@ namespace Gizbox.Src.Backend
         private const bool debugLogAsmInfos = true;
 
 
-        public Win64CodeGenContext(Compiler compiler, IRUnit ir, CompileOptions options)
+        public Win64CodeGenContext(Compiler compiler, IRUnit ir, bool isMainUnit, CompileOptions options)
         {
             this.compiler = compiler;
             this.ir = ir;
+            this.isMainUnit = isMainUnit;
             this.options = options;
 
             //本单元
@@ -261,6 +269,10 @@ namespace Gizbox.Src.Backend
         {
             this.globalEnv = ir.globalScope.env;
 
+            //常用C外部调用  
+            externFuncs.Add("malloc", null);
+            externFuncs.Add("free", null);
+
             //常用常量  
             if(!section_rdata.ContainsKey("__const_neg_one_f32"))
                 section_rdata["__const_neg_one_f32"] = new() { (GType.Parse("float"), "-1.0") };
@@ -289,7 +301,16 @@ namespace Gizbox.Src.Backend
                         else if(rec.category == SymbolTable.RecordCatagory.Function)
                         {
                             rec.GetAdditionInf().isGlobal = true;
-                            globalFuncsInfos.Add(rec.name, rec);
+                            
+                            if((rec.flags.HasFlag(SymbolTable.RecordFlag.ExternFunc)))
+                            {
+                                externFuncs.Add(rec.name, rec);
+                            }
+                            else
+                            {
+                                globalFuncsInfos.Add(rec.name, rec);
+                            }
+                            
                         }
                     }
                 }
@@ -813,7 +834,11 @@ namespace Gizbox.Src.Backend
                             instructions.AddLast(X64.jmp(funcEndLabel));
                         }
                         break;
-                    case "EXTERN_IMPL"://无需处理
+                    case "EXTERN_IMPL":
+                        {
+                            //外部实现  
+
+                        }
                         break;
                     case "PARAM":
                         {
@@ -916,7 +941,7 @@ namespace Gizbox.Src.Backend
                             int elemSize = elemType.Size;
 
                             instructions.AddLast(X64.mov(X64.rax, lenOp, X64Size.qword));//RAX 作为中间寄存器
-                            instructions.AddLast(X64.mul(X64.imm(elemSize), X64Size.qword));
+                            instructions.AddLast(X64.imul_2(X64.rax, X64.imm(elemSize), X64Size.qword));
                             instructions.AddLast(X64.mov(X64.rcx, X64.rax, X64Size.qword));
 
                             //动态分配  
@@ -1198,7 +1223,14 @@ namespace Gizbox.Src.Backend
                         throw new GizboxException(ExceptioName.CodeGen, $"label repeat:{lastInstruction.Next.value.label}  &  {tac.label}");
                     }
 
-                    lastInstruction.Next.value.label = UtilsW64.ConvertLabel(tac.label);
+
+                    string label = tac.label;
+                    if(this.isMainUnit == false && label == "main")
+                    {
+                        label = "discard_main";
+                    }
+
+                    lastInstruction.Next.value.label = UtilsW64.ConvertLabel(label);
                 }
 
                 //添加注释
@@ -2569,7 +2601,7 @@ namespace Gizbox.Src.Backend
                         case "-":
                             return X64.sub(d, s, size);
                         case "*":
-                            return X64.imul(d, s, size);
+                            return X64.imul_2(d, s, size);
                     }
                     throw new GizboxException(ExceptioName.CodeGen, $"未知操作符: {o}");
                 }
@@ -2751,7 +2783,7 @@ namespace Gizbox.Src.Backend
                             else if(op == "-=")
                                 instructions.AddLast(X64.sub(X64.r11, rhs, size));
                             else
-                                instructions.AddLast(X64.imul(X64.r11, rhs, size));
+                                instructions.AddLast(X64.imul_2(X64.r11, rhs, size));
                             EmitMov(dst, X64.r11, type);
                             break;
                         }
@@ -3598,7 +3630,7 @@ namespace Gizbox.Src.Backend
                     }
                 case GType.Kind.String:
                     {
-                        return $"\"{gLiterial}\"";
+                        return $"\"{gLiterial}\", 0";
                     }
                     break;
                 case GType.Kind.Other:

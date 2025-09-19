@@ -1499,11 +1499,12 @@ namespace Gizbox.SemanticRule
 
                             //函数修饰名称  
                             var paramTypeArr = externFuncDeclNode.parametersNode.parameterNodes.Select(n => n.typeNode.TypeExpression()).ToArray();
-                            var funcMangledName = Utils.Mangle(externFuncDeclNode.identifierNode.FullName, paramTypeArr);
-                            externFuncDeclNode.attributes["mangled_name"] = funcMangledName;
+                            //var funcFullName = Utils.Mangle(externFuncDeclNode.identifierNode.FullName, paramTypeArr);
+                            var funcFullName = Utils.ToExternFuncName(externFuncDeclNode.identifierNode.FullName);
+                            externFuncDeclNode.attributes["extern_name"] = funcFullName;
 
                             //新的作用域  
-                            string envName = funcMangledName;
+                            string envName = funcFullName;
 
                             var newEnv = new SymbolTable(envName, SymbolTable.TableCatagory.FuncScope, envStack.Peek());
                             externFuncDeclNode.attributes["env"] = newEnv;
@@ -1511,7 +1512,7 @@ namespace Gizbox.SemanticRule
 
                             //添加条目  
                             var newRec = envStack.Peek().NewRecord(
-                                funcMangledName,
+                                funcFullName,
                                 SymbolTable.RecordCatagory.Function,
                                 typeExpr,
                                 newEnv
@@ -2634,6 +2635,9 @@ namespace Gizbox.SemanticRule
 
                             if (typeExpr.Contains("=>") == false) throw new SemanticException(ExceptioName.ObjectMemberNotFunction, callNode, typeExpr);
                             nodeTypeExprssion = typeExpr.Split(' ').LastOrDefault();
+
+
+                            callNode.attributes["mangled_name"] = funcMangledName;
                         }
                         else
                         {
@@ -2646,18 +2650,32 @@ namespace Gizbox.SemanticRule
                             bool anyFunc = TryQueryAndMatchFunction(funcId.FullName, argTypeArr, paramTypeArr);
                             if(anyFunc == false) throw new SemanticException(ExceptioName.FunctionNotFound, callNode, funcId.FullName);
 
+
+                            bool isExternFunc = false;
                             funcMangledName = Utils.Mangle(funcId.FullName, paramTypeArr);
-
                             var idRec = Query(funcMangledName);
+                            if(idRec == null)
+                            {
+                                idRec = Query(Utils.ToExternFuncName(funcId.FullName));
+                                if(idRec != null)
+                                    isExternFunc = true;
+                            }
 
-                            if (idRec == null) throw new SemanticException(ExceptioName.FunctionNotFound, callNode, funcMangledName);
+                            if (idRec == null) throw new SemanticException(ExceptioName.FunctionNotFound, callNode, funcId.FullName);
 
                             string typeExpr = idRec.typeExpression.Split(' ').LastOrDefault();
 
                             nodeTypeExprssion = typeExpr;
-                        }
 
-                        callNode.attributes["mangled_name"] = funcMangledName;
+                            if(isExternFunc)
+                            {
+                                callNode.attributes["extern_name"] = Utils.ToExternFuncName(funcId.FullName);
+                            }
+                            else
+                            {
+                                callNode.attributes["mangled_name"] = funcMangledName;
+                            }
+                        }
                     }
                     break;
                 case SyntaxTree.NewObjectNode newObjNode:

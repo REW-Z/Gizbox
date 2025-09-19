@@ -154,6 +154,9 @@ namespace Gizbox.IR
             if(dependencyLibs == null)
                 dependencyLibs = new();
 
+            if(dependencyLibs.Count > 0 && dependencies.Count != dependencyLibs.Count)
+                throw new GizboxException(ExceptioName.Undefine, "libs loaded error.");
+
             if(this.dependencyLibs.Count == 0 && this.dependencies.Count != 0)
             {
                 foreach(var depName in this.dependencies)
@@ -163,7 +166,7 @@ namespace Gizbox.IR
                 }
             }
 
-            if(includeDeps && this.dependencyLibs != null)
+            if(includeDeps)
             {
                 foreach(var dep in this.dependencyLibs)
                 {
@@ -286,6 +289,13 @@ namespace Gizbox.IR
                     {
                         return env.GetRecord(name);
                     }
+                }
+            }
+            else
+            {
+                if(globalScope.env.records.TryGetValue(name, out var record))
+                {
+                    return record;
                 }
             }
             //库依赖中查找  

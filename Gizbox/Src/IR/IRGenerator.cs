@@ -15,6 +15,7 @@ namespace Gizbox.IR
         public SyntaxTree ast;
 
         public IRUnit ilUnit;
+        private string topFunc;
 
 
         //temp env  
@@ -31,10 +32,22 @@ namespace Gizbox.IR
         private GStack<string> loopExitStack = new GStack<string>();
 
 
-        public IRGenerator(SyntaxTree ast, IRUnit ir)
+        public IRGenerator(SyntaxTree ast, IRUnit ir, bool isMainUnit, string entryNameOfMainUnit = null)
         {
             this.ilUnit = ir;
             this.ast = ast;
+
+            if(isMainUnit)
+            {
+                if(string.IsNullOrEmpty(entryNameOfMainUnit))
+                    this.topFunc = "main";
+                else
+                    this.topFunc = entryNameOfMainUnit;
+            }
+            else
+            {
+                this.topFunc = $"libtop_{ir.name}";
+            }
         }
 
         public IRUnit Generate()
@@ -260,31 +273,32 @@ namespace Gizbox.IR
                 //extern函数声明  
                 case ExternFuncDeclareNode externFuncDeclNode:
                     {
-                        //函数全名    
-                        string funcFullName = (string)externFuncDeclNode.attributes["mangled_name"];
+                        //外部函数声明不再生成中间代码  
 
-                        //函数开始    
+                        ////函数全名 (外部函数不Mangle函数名)    
+                        ////string funcFullName = (string)externFuncDeclNode.attributes["mangled_name"];
+                        //string funcFullName = Utils.ToExternFuncName(externFuncDeclNode.identifierNode.FullName);
 
-                        envStackTemp.Push(externFuncDeclNode.attributes["env"] as SymbolTable);
-                        EnvBegin(externFuncDeclNode.attributes["env"] as SymbolTable);
+                        ////函数开始    
 
-                        GenerateCode("").label = "entry:" + funcFullName;
+                        //envStackTemp.Push(externFuncDeclNode.attributes["env"] as SymbolTable);
+                        //EnvBegin(externFuncDeclNode.attributes["env"] as SymbolTable);
 
-                        GenerateCode("FUNC_BEGIN", funcFullName).label = "func_begin:" + funcFullName;
-                        ;
+                        //GenerateCode("").label = "entry:" + funcFullName;
 
-
-                        GenerateCode("EXTERN_IMPL", externFuncDeclNode.identifierNode.FullName);
-
-
-                        GenerateCode("FUNC_END", funcFullName).label = "func_end:" + funcFullName;
-                        ;
+                        //GenerateCode("FUNC_BEGIN", funcFullName).label = "func_begin:" + funcFullName;
 
 
-                        GenerateCode("").label = "exit:" + funcFullName;
+                        //GenerateCode("EXTERN_IMPL", externFuncDeclNode.identifierNode.FullName);
 
-                        EnvEnd(externFuncDeclNode.attributes["env"] as SymbolTable);
-                        envStackTemp.Pop();
+
+                        //GenerateCode("FUNC_END", funcFullName).label = "func_end:" + funcFullName;
+
+
+                        //GenerateCode("").label = "exit:" + funcFullName;
+
+                        //EnvEnd(externFuncDeclNode.attributes["env"] as SymbolTable);
+                        //envStackTemp.Pop();
                     }
                     break;
                 //常量声明
@@ -558,10 +572,22 @@ namespace Gizbox.IR
                     break;
                 case CallNode callNode:
                     {
-                        if (callNode.attributes.ContainsKey("mangled_name") == false)
-                            throw new SemanticException(ExceptioName.FunctionObfuscationNameNotSet, callNode, "");
                         //函数全名  
-                        string mangledName = (string)callNode.attributes["mangled_name"];
+                        string fullName;
+                        if(callNode.attributes.TryGetValue("mangled_name", out object oMangleName))
+                        {
+                            fullName = (string)oMangleName;
+                        }
+                        else if(callNode.attributes.TryGetValue("extern_name", out object oExternName))
+                        {
+                            fullName= (string)oExternName;
+                        }
+                        else
+                        {
+                            throw new SemanticException(ExceptioName.FunctionObfuscationNameNotSet, callNode, "Mangled function name and extern function name not found.");
+                        }
+
+
                         //函数返回类型    
                         string returnType = (string)callNode.attributes["type"];
 
@@ -622,12 +648,12 @@ namespace Gizbox.IR
 
                         if (callNode.isMemberAccessFunction == true)
                         {
-                            GenerateCode("MCALL", mangledName, "%LITINT:" + argCount);
+                            GenerateCode("MCALL", fullName, "%LITINT:" + argCount);
                             GenerateCode("=", GetRet(callNode), "%RET");
                         }
                         else
                         {
-                            GenerateCode("CALL", mangledName, "%LITINT:" + argCount);
+                            GenerateCode("CALL", fullName, "%LITINT:" + argCount);
                             GenerateCode("=", GetRet(callNode), "%RET");
                         }
                     }
@@ -780,16 +806,16 @@ namespace Gizbox.IR
             AppendLast(temp2.Count, temp2);
 
             //顶级语句部分-组装Main函数    
-            var mainEntry = new TAC() { op = string.Empty, label = "entry:Main" };
+            var mainEntry = new TAC() { op = string.Empty, label = $"entry:{this.topFunc}" };
             ilUnit.codes.Add(mainEntry);
-            ilUnit.codes.Add(new TAC() { op = "FUNC_BEGIN", arg0 = "Main", label = "func_begin:Main" });
+            ilUnit.codes.Add(new TAC() { op = "FUNC_BEGIN", arg0 = $"{this.topFunc}", label = $"func_begin:{this.topFunc}" });
             AppendLast(temp1.Count, temp1);
-            ilUnit.codes.Add(new TAC() { op = "FUNC_END", arg0 = "Main", label = "func_end:Main" });
-            var mainExit = new TAC() { op = string.Empty, label = "exit:Main" };
+            ilUnit.codes.Add(new TAC() { op = "FUNC_END", arg0 = $"{this.topFunc}", label = $"func_end:{this.topFunc}" });
+            var mainExit = new TAC() { op = string.Empty, label = $"exit:{this.topFunc}" };
             ilUnit.codes.Add(mainExit);
 
             //Main作用域构建
-            var mainEnv = new SymbolTable("Main", SymbolTable.TableCatagory.FuncScope, globalEnv);
+            var mainEnv = new SymbolTable($"{this.topFunc}", SymbolTable.TableCatagory.FuncScope, globalEnv);
             var mainScope = new Scope() { env = mainEnv };
             var mainScopeDesc = new ScopeDesc() { env = mainEnv, finalScope = mainScope, tacFrom = mainEntry, tacTo = mainExit };
             var mainNode = scopeTree.root.Add(mainScope);
@@ -837,7 +863,7 @@ namespace Gizbox.IR
             }
 
             //global符号表中添加Main函数记录  
-            var mainRec = globalEnv.NewRecord("Main", SymbolTable.RecordCatagory.Function, "-> void", mainEnv);
+            var mainRec = globalEnv.NewRecord($"{this.topFunc}", SymbolTable.RecordCatagory.Function, "-> void", mainEnv);
 
 
             //tac下标  

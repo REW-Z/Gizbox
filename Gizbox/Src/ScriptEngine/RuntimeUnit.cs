@@ -190,6 +190,16 @@ namespace Gizbox.ScriptEngine
         {
             this.name = str;
             this.record = unit.Query(this.name, line);
+
+
+            if(this.record == null)
+            {
+                if(unit.dependencyLibs == null)
+                {
+                    GixConsole.WriteLine("单元" + unit.name + " de库未加载");
+                }
+                GixConsole.WriteLine("找不到记录：" + this.name);
+            }
         }
     }
 

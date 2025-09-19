@@ -118,101 +118,101 @@ namespace Gizbox.Src.Backend
     }
     public enum InstructionKind
     {
-        placeholder = -1,//用于占位
-        emptyline,//空行
+        placeholder = -1, // 生成阶段的占位伪指令（仅用于中间拼接/回填，不输出真实机器指令）
+        emptyline,        // 空行（可用于带标签的占位行或格式化）
 
-        mov,
+        mov,              // 通用数据移动（GPR/XMM/内存，宽度由 sizeMark 决定）
 
-        movd,//SSE指令 （可以 用于XMM和GPR互通）
-        movq,//SSE指令 （可以 用于XMM和GPR互通）
+        movd,             // SSE2：32位整数与XMM之间或XMM<->m32的移动（可在XMM与GPR间互通，低32位）
+        movq,             // SSE2：64位整数与XMM之间或XMM<->m64/XMM<->XMM的移动（XMM与GPR可互通，64位）
 
-        movss,//SSE指令 scalar-single  (不能与GPR互通)
-        movsd,//SSE指令 scalar-double  (不能与GPR互通)
+        movss,            // SSE：标量单精度浮点移动（XMM<->XMM/m32；不直接与GPR互通）
+        movsd,            // SSE2：标量双精度浮点移动（XMM<->XMM/m64；不直接与GPR互通；非字符串指令的movsd）
 
-        // 128-bit 
-        movaps, // aligned packed single
-        movapd, // aligned packed double
-        movups, // unaligned packed single
-        movupd, // unaligned packed double
-        movdqa, // aligned packed integer
-        movdqu, // unaligned packed integer
+        // 128-bit packed moves
+        movaps,           // 对齐打包单精度移动（XMM<->XMM/m128，packed single，要求内存16字节对齐）
+        movapd,           // 对齐打包双精度移动（XMM<->XMM/m128, packed double，要求内存16字节对齐）
+        movups,           // 非对齐打包单精度移动（XMM<->XMM/m128，packed single）
+        movupd,           // 非对齐打包双精度移动（XMM<->XMM/m128，packed double）
+        movdqa,           // 对齐打包整数移动（XMM<->XMM/m128，packed integer，要求内存16字节对齐）
+        movdqu,           // 非对齐打包整数移动（XMM<->XMM/m128，packed integer）
 
-        movzx,//填零扩展
-        movsx,//带符号扩展
+        movzx,            // 零扩展移动（srcSize -> dstSize，仅整数/GPR；sizeMark=dst，sizeMarkAdditional=src）
+        movsx,            // 符号扩展移动（srcSize -> dstSize，仅整数/GPR；sizeMark=dst，sizeMarkAdditional=src）
 
-        push,
-        pop,
+        push,             // 入栈（隐式使用RSP，按操作数宽度压栈）
+        pop,              // 出栈（隐式使用RSP，按操作数宽度出栈）
 
-        add,
-        addss,
-        addsd,
+        add,              // 整数/指针加法（按 sizeMark 宽度）
+        addss,            // SSE：标量单精度浮点加法（XMM）
+        addsd,            // SSE2：标量双精度浮点加法（XMM）
 
-        sub,
-        subss,
-        subsd,
+        sub,              // 整数/指针减法（按 sizeMark 宽度）
+        subss,            // SSE：标量单精度浮点减法（XMM）
+        subsd,            // SSE2：标量双精度浮点减法（XMM）
 
-        mul,
-        imul,//有符号
-        mulss,
-        mulsd,
+        mul,              // 无符号/隐式乘法：RAX*src -> RDX:RAX（单操作数形式，按 sizeMark）
+        imul,             // 有符号乘法（两操作数形式常用：dest = dest * src，按 sizeMark）
+        mulss,            // SSE：标量单精度浮点乘法（XMM）
+        mulsd,            // SSE2：标量双精度浮点乘法（XMM）
 
-        div,
-        idiv,//有符号
-        divss,
-        divsd,
+        div,              // 无符号除法：RDX:RAX / src，商->RAX，余->RDX（单操作数形式，按 sizeMark）
+        idiv,             // 有符号除法：RDX:RAX / src，商->RAX，余->RDX（单操作数形式，按 sizeMark）
+        divss,            // SSE：标量单精度浮点除法（XMM）
+        divsd,            // SSE2：标量双精度浮点除法（XMM）
 
-        inc,
-        dec,
-        neg,
-        not,
+        inc,              // 自增（整数，按 sizeMark）
+        dec,              // 自减（整数，按 sizeMark）
+        neg,              // 取负（整数，二补码，按 sizeMark）
+        not,              // 按位取反（整数，按 sizeMark）
 
-        and,
-        or,
-        xor,
+        and,              // 按位与（整数/位运算，不改变操作数宽度）
+        or,               // 按位或（整数/位运算，不改变操作数宽度）
+        xor,              // 按位异或（整数/位运算，不改变操作数宽度）
 
-        cmp,
-        test,
+        cmp,              // 比较：op1 - op2，只影响标志位（不写回结果）
+        test,             // 按位测试：op1 & op2，只影响标志位（不写回结果）
 
-        jmp,
-        jz,
-        jnz,
-        je,
-        jne,
-        jl,
-        jle,
-        jg,
-        jge,
+        jmp,              // 无条件跳转
+        jz,               // ZF=1 跳转（等于/为零）
+        jnz,              // ZF=0 跳转（不等/非零）
+        je,               // 等价于 jz（ZF=1）
+        jne,              // 等价于 jnz（ZF=0）
+        jl,               // 有符号小于跳转（SF!=OF）
+        jle,              // 有符号小于等于跳转（ZF=1 或 SF!=OF）
+        jg,               // 有符号大于跳转（ZF=0 且 SF=OF）
+        jge,              // 有符号大于等于跳转（SF=OF）
 
-        call,
-        leave,
-        ret,
+        call,             // 近调用（push 返回地址并跳转）
+        leave,            // 离开栈帧（mov rsp, rbp; pop rbp）
+        ret,              // 返回（从栈顶弹出返回地址并跳转）
 
-        lea,
+        lea,              // 加载有效地址（不触发内存访问，常用于地址计算）
 
-        setl,
-        setle,
-        setg,
-        setge,
-        sete,
-        setne,
-        setb,
-        setbe,
-        seta,
-        setae,
+        setl,             // 有符号小于 -> 置1，否则置0（ZF=0 且 SF!=OF，写1字节）
+        setle,            // 有符号小于等于 -> 置1，否则置0（ZF=1 或 SF!=OF，写1字节）
+        setg,             // 有符号大于 -> 置1，否则置0（ZF=0 且 SF=OF，写1字节）
+        setge,            // 有符号大于等于 -> 置1，否则置0（SF=OF，写1字节）
+        sete,             // 等于 -> 置1，否则置0（ZF=1，写1字节）
+        setne,            // 不等 -> 置1，否则置0（ZF=0，写1字节）
+        setb,             // 无符号小于(below) -> 置1，否则置0（CF=1，写1字节）
+        setbe,            // 无符号小于等于 -> 置1，否则置0（CF=1 或 ZF=1，写1字节）
+        seta,             // 无符号大于(above) -> 置1，否则置0（CF=0 且 ZF=0，写1字节）
+        setae,            // 无符号大于等于 -> 置1，否则置0（CF=0，写1字节）
 
-        ucomiss,
-        ucomisd,
+        ucomiss,          // 无序比较标量单精度（XMM/m32 与 XMM；仅影响 ZF/PF/CF；NaN 置 PF=1）
+        ucomisd,          // 无序比较标量双精度（XMM/m64 与 XMM；仅影响 ZF/PF/CF；NaN 置 PF=1）
 
-        cqo,
+        cqo,              // 符号扩展 RAX -> RDX:RAX（64->128位，常在 idiv 前使用）
 
-        cvtsi2ss,
-        cvtsi2sd,
-        cvttss2si,
-        cvttss2siq,  
-        cvttsd2si,
-        cvttsd2siq,  
-        cvtss2sd,
-        cvtsd2ss,
+        cvtsi2ss,         // 整数(GPR 32/64) -> 标量单精度（写 XMM）
+        cvtsi2sd,         // 整数(GPR 32/64) -> 标量双精度（写 XMM）
+        cvttss2si,        // 标量单精度 -> 32位整数（截断，写GPR）
+        cvttss2siq,       // 标量单精度 -> 64位整数（截断，写GPR）
+        cvttsd2si,        // 标量双精度 -> 32位整数（截断，写GPR）
+        cvttsd2siq,       // 标量双精度 -> 64位整数（截断，写GPR）
+        cvtss2sd,         // 单精度 -> 双精度（XMM -> XMM）
+        cvtsd2ss,         // 双精度 -> 单精度（XMM -> XMM）
     }
 
     public class X64Instruction
@@ -262,7 +262,7 @@ namespace Gizbox.Src.Backend
                 strb.AppendLine($"extern  {UtilsW64.LegalizeName(g.Key)}");
             }
 
-            //.data
+            //.rdata
             strb.AppendLine("\n");
             strb.AppendLine("section .rdata");
             foreach(var rodata in section_rdata)
@@ -281,6 +281,7 @@ namespace Gizbox.Src.Backend
                     }
                 }
             }
+            //.data
             strb.AppendLine("\n");
             strb.AppendLine("section .data");
             foreach(var data in section_data)
@@ -643,7 +644,8 @@ namespace Gizbox.Src.Backend
         public static X64Instruction sub(X64Operand dest, X64Operand src, X64Size size) => new() { type = InstructionKind.sub, operand0 = dest, operand1 = src, sizeMark = size };
 
         // 乘除（使用显式两操作数形式/一操作数形式）
-        public static X64Instruction imul(X64Operand dest, X64Operand src, X64Size size) => new() { type = InstructionKind.imul, operand0 = dest, operand1 = src, sizeMark = size };
+        public static X64Instruction imul_2(X64Operand dest, X64Operand src, X64Size size) => new() { type = InstructionKind.imul, operand0 = dest, operand1 = src, sizeMark = size };
+        public static X64Instruction imul_1(X64Operand src, X64Size size) => new() { type = InstructionKind.imul, operand0 = src, sizeMark = size };
         public static X64Instruction mul(X64Operand src, X64Size size) => new() { type = InstructionKind.mul, operand0 = src, sizeMark = size };
         public static X64Instruction idiv(X64Operand src, X64Size size) => new() { type = InstructionKind.idiv, operand0 = src, sizeMark = size };
         public static X64Instruction div(X64Operand src, X64Size size) => new() { type = InstructionKind.div, operand0 = src, sizeMark = size };

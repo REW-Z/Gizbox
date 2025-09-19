@@ -17,6 +17,11 @@ namespace Gizbox
             return result;
         }
 
+        public static string ToExternFuncName(string gizFullName)
+        {
+            return gizFullName.Replace("::", "__");
+        }
+
         public static GType CtorType(SymbolTable.Record classRec)
         {
             return GType.Parse($"{classRec.name} => void");
