@@ -190,16 +190,6 @@ namespace Gizbox.ScriptEngine
         {
             this.name = str;
             this.record = unit.Query(this.name, line);
-
-
-            if(this.record == null)
-            {
-                if(unit.dependencyLibs == null)
-                {
-                    GixConsole.WriteLine("单元" + unit.name + " de库未加载");
-                }
-                GixConsole.WriteLine("找不到记录：" + this.name);
-            }
         }
     }
 
@@ -294,20 +284,16 @@ namespace Gizbox.ScriptEngine
         public int[] scopeStatusArr;
         public List<Scope> scopes = new List<Scope>();
         public Scope globalScope;
+
         public Dictionary<string, VTable> vtables = new Dictionary<string, VTable>();
         private Dictionary<string, int> label2Line = new Dictionary<string, int>();
         public Dictionary<int, Gizbox.GStack<SymbolTable>> stackDic;
         public List<object> constData = new List<object>();
 
-
         private Dictionary<string, Dictionary<string, int>> specialLabels = new ();
-
-
-
 
         public List<RuntimeUnit> allUnits = new List<RuntimeUnit>();
         public Dictionary<string, Value> globalData = new Dictionary<string, Value>();
-
 
 
 
@@ -316,10 +302,9 @@ namespace Gizbox.ScriptEngine
         {
             this.name = ilunit.name;
 
-            foreach(var depName in ilunit.dependencies)
+            foreach(var dep in ilunit.dependencyLibs)
             {
-                var libIr = engineContext.LoadLib(depName);
-                this.directlyDependencies.Add(new RuntimeUnit(engineContext, libIr));
+                this.directlyDependencies.Add(new RuntimeUnit(engineContext, dep));
             }
 
             for(int i = 0; i < ilunit.codes.Count; ++i)

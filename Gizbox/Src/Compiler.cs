@@ -219,6 +219,7 @@ namespace Gizbox
             var paths = pathEnv.Split(System.IO.Path.PathSeparator);
             var paths2 = pathEnv2.Split(System.IO.Path.PathSeparator);
             List<string> allpaths = new();
+            allpaths.Add(workDir);
             allpaths.AddRange(paths);
             allpaths.AddRange(paths2);
             var exts = pathext.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
@@ -258,8 +259,6 @@ namespace Gizbox
             if(resolved == null)
                 resolved = fileName;
 
-            Console.WriteLine("resolved:" + resolved);
-
             var psi = new ProcessStartInfo
             {
                 FileName = resolved,
@@ -295,6 +294,7 @@ namespace Gizbox
                 return proc.ExitCode;
             }
         }
+
 
         /// <summary>
         /// 编译库  
@@ -383,13 +383,37 @@ namespace Gizbox
                 fileNames.Add(System.IO.Path.GetFileNameWithoutExtension(fileFullName));
             }
 
+            //编译核心C运行库    
+            string mingw_gcc = "x86_64-w64-mingw32-gcc";
+
+#if DEBUG
+            //测试：使用把corert.c编译为win64的asm
+            Run(mingw_gcc, $"-S -m64 -masm=intel -o corert.s corert.c", AppDomain.CurrentDomain.BaseDirectory);
+#endif
+
+            Run(mingw_gcc, $"-c corert.c -o corert.obj", AppDomain.CurrentDomain.BaseDirectory);
+
+            //复制corert.obj到outputDir
+            var srcPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "corert.obj");
+            if(System.IO.File.Exists(srcPath) == false)
+                throw new GizboxException(ExceptioName.Link, "obj not exist:" + srcPath);
+
+            var dstPath = System.IO.Path.Combine(outputDir, "corert.obj");
+            if(System.IO.File.Exists(dstPath))
+                System.IO.File.Delete(dstPath);
+
+
+            System.IO.File.Copy(srcPath, dstPath);
+
             foreach(var fileName in fileNames)
             {
                 Console.WriteLine($">>>nasm -f win64 {fileName}.asm -o {fileName}.obj");
                 Run("nasm", $"-f win64 {fileName}.asm -o {fileName}.obj", outputDir);
             }
 
-            Run("gcc", $"{string.Join(" ", fileNames.Select(f => $"{f}.obj"))} -o {ir.name}.exe", outputDir);
+            var ret = Run(mingw_gcc, $"corert.obj {string.Join(" ", fileNames.Select(f => $"{f}.obj"))} -o {ir.name}.exe", outputDir);
+
+            GixConsole.WriteLine($"编译完成...结束码:{ret}");
         }
     }
 

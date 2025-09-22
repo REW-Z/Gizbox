@@ -66,13 +66,6 @@ namespace Core
 
 }
 
-namespace Core::GC
-{
-	extern void Enable();
-	extern void Disable();
-	extern void Collect();
-}
-
 namespace Core::Extern
 {
 	extern string BoolToString(bool v);
@@ -104,36 +97,11 @@ namespace Core::Double
 	const int size = 64;
 }
 
-
 namespace Console
 {
-	extern void Log(string text);
-	
-	void LogHelloWorld()
-	{
-		Console::Log("Hello World!");
-	}
-
-	void Log(bool b)
-	{
-		Console::Log((string)b);
-	}
-	void Log(int num)
-	{
-		Console::Log((string)num);
-	}
-	void Log(float num)
-	{
-		Console::Log((string)num);
-	}
-	void Log(double num)
-	{
-		Console::Log((string)num);
-	}
-	void Log(char c)
-	{
-		Console::Log((string)c);
-	}
+	extern void Print(string text);
+	extern void PrintLn(string text);
+	extern string GetLine();
 }
 
 

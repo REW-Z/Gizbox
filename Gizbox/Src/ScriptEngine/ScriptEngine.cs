@@ -422,23 +422,43 @@ namespace Gizbox.ScriptEngine
                     break;
                 case "CALL":
                     {
-                        string funcMangledName = code.arg0.str;
-                        GixConsole.WriteLine((code.arg0 as OperandSingleIdentifier).record.name);
+                        var globalfuncRec = (code.arg0 as OperandSingleIdentifier).record;
 
-                        if (GetValue(code.arg1).Type != GizType.Int) throw new GizboxException(ExceptioName.Undefine, "arg count not integer");
-                        int argCount = GetValue(code.arg1).AsInt;
+                        if(globalfuncRec.flags.HasFlag(SymbolTable.RecordFlag.ExternFunc))
+                        {
+                            string externFuncName = globalfuncRec.name;
 
-                        this.callStack[this.callStack.Top + 1].returnPtr = new Tuple<int, int>(this.currUnit, (this.curr + 1));
+                            List<Value> arguments = callStack[callStack.Top + 1].args.AsList();
+                            arguments.Reverse();
 
-                        string funcFinalName = funcMangledName;
+                            Value result = csharpInteropContext.ExternCall(externFuncName, arguments);
 
-                        this.callStack[this.callStack.Top + 1].name = funcFinalName;
+                            callStack[callStack.Top + 1].args.Clear();
+                            retRegister = result;
 
-                        var jumpAddr = mainUnit.QueryLabel("entry", funcFinalName, currUnit);
-                        this.curr = jumpAddr.Item2;
-                        this.currUnit = jumpAddr.Item1;
+                            curr++;
+                            return;
+                        }
+                        else
+                        {
+                            string funcMangledName = globalfuncRec.name;
 
-                        return;
+                            if(GetValue(code.arg1).Type != GizType.Int)
+                                throw new GizboxException(ExceptioName.Undefine, "arg count not integer");
+                            int argCount = GetValue(code.arg1).AsInt;
+
+                            this.callStack[this.callStack.Top + 1].returnPtr = new Tuple<int, int>(this.currUnit, (this.curr + 1));
+
+                            string funcFinalName = funcMangledName;
+
+                            this.callStack[this.callStack.Top + 1].name = funcFinalName;
+
+                            var jumpAddr = mainUnit.QueryLabel("entry", funcFinalName, currUnit);
+                            this.curr = jumpAddr.Item2;
+                            this.currUnit = jumpAddr.Item1;
+
+                            return;
+                        }
                     }
                 case "MCALL":
                     {
@@ -613,44 +633,10 @@ namespace Gizbox.ScriptEngine
 
         // ----------------------  Load Libs ---------------------------
 
-        private List<string> libSearchDirectories = new List<string>();
-        private List<IRUnit> libsCached = new List<IRUnit>();
-        
         public void AddLibSearchDirectory(string dir)
         {
-            this.libSearchDirectories.Add(dir);
+            this.compiler.AddLibPath(dir);
         }
-
-        public IRUnit LoadLib(string libname)
-        {
-            foreach(var libCache in libsCached)
-            {
-                if(libCache.name == libname)
-                {
-                    return libCache;
-                }
-            }
-            if (this.libSearchDirectories.Count == 0) throw new GizboxException(ExceptioName.LibraryLoadPathNotSet);
-            foreach (var dir in this.libSearchDirectories)
-            {
-                System.IO.DirectoryInfo dirInfo = new System.IO.DirectoryInfo(dir);
-                foreach (var f in dirInfo.GetFiles())
-                {
-                    if (System.IO.Path.GetFileNameWithoutExtension(f.Name) == libname)
-                    {
-                        if (System.IO.Path.GetExtension(f.Name).EndsWith("gixlib"))
-                        {
-                            var unit = Gizbox.IR.ILSerializer.Deserialize(f.FullName);
-                            Log("导入库文件：" + f.Name + " 库名：" + unit.name);
-                            return unit;
-                        }
-                    }
-                }
-            }
-
-            throw new GizboxException(ExceptioName.LibraryFileNotFound,  libname + ".gixlib" );
-        }
-
 
 
         // ----------------------- Interfaces ---------------------------

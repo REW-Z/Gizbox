@@ -148,6 +148,17 @@ switch(cmdIdx)
             il.Print();
 
             compiler.CompileIRToExe(il, System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
+
+            //执行测试  
+            Console.WriteLine("按E执行，按其他退出");
+            if(Console.ReadKey().Key == ConsoleKey.E)
+            {
+                Compiler.Run("test", "", System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
+            }
+            else
+            {
+            }
+            
         }
         break;
 }
@@ -161,9 +172,13 @@ namespace GizboxTest
 
     public class TestExternCalls
     {
-        public static void Console__Log(string text)
+        public static void Console__Print(string text)
         {
-            Console.WriteLine("GizboxTest >>>" + text);
+            Console.Write(text);
+        }
+        public static void Console__PrintLn(string text)
+        {
+            Console.WriteLine(text);
         }
 
         public static TestClass[] GetObjects()

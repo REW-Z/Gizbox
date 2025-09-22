@@ -756,9 +756,9 @@ namespace Gizbox.Src.Backend
 
         public static X64Rel rel(string symbolName, long displacement = 0) => new X64Rel(symbolName, displacement);
 
-        public static X64Mem mem(X64Reg baseVReg, X64Reg indexVReg = null, int scale = 1, long displacement = 0)
+        public static X64Mem mem(X64Reg baseVReg, X64Reg indexVReg = null, int scale = 1, long disp = 0)
         {
-            return new X64Mem(baseVReg, indexVReg, scale, displacement);
+            return new X64Mem(baseVReg, indexVReg, scale, disp);
         }
     }
 }

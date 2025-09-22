@@ -117,6 +117,8 @@ namespace Gizbox.Src.Backend
             foreach(var (rec, info) in varialbeLiveInfos)
             {
                 info.MergeRanges();
+                GixConsole.WriteLine($"变量：{rec.name} 的 活跃IR区间为\n：{string.Join("\n", info.liveRanges.Select(r => r.def + "~" + r.die))}");
+                GixConsole.WriteLine($"变量：{rec.name} 的 合并活跃IR区间为\n：{string.Join("\n", info.mergedRanges.Select(r => r.start + "~" + r.die))}");
             }
         }
     }
@@ -246,7 +248,6 @@ namespace Gizbox.Src.Backend
                     list = newlist;
                 }
                 list.AddRange(ranges);
-                GixConsole.WriteLine($"va:{va.name} 添加了 {ranges.Count} 个区间");
             }
         }
     }

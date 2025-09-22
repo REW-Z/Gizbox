@@ -40,8 +40,190 @@ void test()
 		int ass2 = 1;
 	}
 
-	Console::Log("HelloWorld!");
+	Console::PrintLn("test!");
 }
 
-GC::Disable();
-test();
+void printStrings(string pStr1, string pStr2, string pStr3)
+{
+	Console::PrintLn("printstr1 :");
+	Console::PrintLn(pStr1);
+	Console::PrintLn("printstr2 :");
+	Console::PrintLn(pStr2);
+	Console::PrintLn("printstr3 :");
+	Console::PrintLn(pStr3);
+}
+
+int sum(int x, int y, int z)
+{
+	return x + y - z;
+}
+
+//test();
+
+
+int num1 = 1000;
+int num2 = 200;
+int num3 = 100;
+int num4 = sum(num1, num2, num3);
+Console::PrintLn("Calc:");
+Console::PrintLn((string)num4);
+
+
+Console::PrintLn("Print StrConst:");
+Console::PrintLn("Hello!");
+
+
+Console::PrintLn("Print Str Var:");
+string strvar = "ZQJ";
+Console::PrintLn(strvar);
+
+Console::PrintLn("Print CastToStr:");
+Console::PrintLn((string)233);
+
+Console::Print("PrintStrings Call:");
+printStrings("XXX", "YYY", "ZZZ");
+
+Console::PrintLn("TryConcat: (Call)");
+Console::PrintLn(Core::IntrinsicOperatorOverloads::add("AAA", "BBB"));
+
+Console::PrintLn("TryConcat: (Operator)");
+Console::PrintLn("Hello " + "Gizbox AOT!");
+
+Console::PrintLn("Loop Test");
+for(int i = 0; i < 3; i++)
+{
+	Console::PrintLn((string)i);
+}
+Console::PrintLn("Loop Test End");
+
+
+Console::PrintLn("If-Else Test");
+if(num1 > num2)
+{
+	Console::PrintLn("num1 > num2");
+}
+else if(num1 == num2)
+{
+	Console::PrintLn("num1 == num2");
+}
+else
+{
+	Console::PrintLn("num1 < num2");
+}
+
+Console::PrintLn("Array Test");
+int[] arr = new int[3];
+arr[0] = 11;
+arr[1] = 22;
+arr[2] = 33;
+Console::PrintLn((string)arr[0]);
+Console::PrintLn((string)arr[1]);
+Console::PrintLn((string)arr[2]);
+
+Console::PrintLn("ReadLine Test");
+string input = Console::GetLine();
+Console::PrintLn(input);
+
+Console::PrintLn("All Test Finished!");
+
+// IR输出结果：  
+// 122 |status 8  |                    = i %LITINT:0
+// 123 |status 8  |For_2:
+// 124 |status 8  |                    < tmp@29 i %LITINT:3
+// 125 |status 8  |                    IF_FALSE_JUMP tmp@29 %LABEL:EndFor_2
+// 126 |status 11 |                    PARAM i
+// 127 |status 11 |                    CALL Core__Extern__IntToString %LITINT:1
+// 128 |status 11 |                    = tmp@31 %RET
+// 129 |status 11 |                    PARAM tmp@31
+// 130 |status 11 |                    CALL Console__PrintLn %LITINT:1
+// 131 |status 11 |                    = tmp@30 %RET     //注释：冗余指令PrintLn没有返回值
+// 132 |status 8  |                    = tmp@32 i      //注释：i++保存的临时值  
+// 133 |status 8  |                    ++ i
+// 134 |status 8  |                    JUMP %LABEL:For_2
+// 135 |status 8  |EndFor_2:
+
+
+
+// 活跃区间输出结果：
+// 变量：i 的 合并活跃IR区间为
+// ：122~134
+// 变量：tmp@29 的 活跃IR区间为
+// ：124~126
+// 变量：tmp@29 的 合并活跃IR区间为
+// ：124~126
+// 变量：tmp@31 的 活跃IR区间为
+// ：128~130
+// 变量：tmp@31 的 合并活跃IR区间为
+// ：128~130
+// 变量：tmp@30 的 活跃IR区间为
+// ：
+// 变量：tmp@30 的 合并活跃IR区间为
+// ：
+// 变量：tmp@32 的 活跃IR区间为
+// ：
+// 变量：tmp@32 的 合并活跃IR区间为
+// ：
+// 变量：tmp@33 的 活跃IR区间为
+// ：
+// 变量：tmp@33 的 合并活跃IR区间为
+// ：
+// 变量：tmp@34 的 活跃IR区间为
+// ：
+// 变量：tmp@34 的 合并活跃IR区间为
+// ：
+
+// 图着色输出结果：  
+// i着色为：RBX
+// tmp@31着色为：RSI
+// tmp@11着色为：RBX
+// tmp@14着色为：RBX
+// tmp@21着色为：RBX
+// tmp@26着色为：RBX
+// tmp@29着色为：RSI
+// tmp@12着色为：RBX
+// tmp@13着色为：RBX
+// tmp@15着色为：RBX
+// tmp@16着色为：RBX
+// tmp@17着色为：RBX
+// tmp@18着色为：RBX
+// tmp@19着色为：RBX
+// tmp@20着色为：RBX
+// tmp@22着色为：RBX
+// tmp@23着色为：RBX
+// tmp@24着色为：RBX
+// tmp@25着色为：RBX
+// tmp@27着色为：RBX
+// tmp@28着色为：RBX
+// tmp@33着色为：RBX
+// tmp@34着色为：RBX
+// tmp@32着色为：RBX
+// tmp@30着色为：RBX
+
+
+//汇编输出结果：
+//          mov  EBX,  0                                      ; (IR-122 : = i %LITINT:0)    (vreg "i" at Oprand0 alloc RBX)
+//  For_2:
+//          cmp  RBX,  3                                      ; (IR-124 : < tmp@29 i %LITINT:3)    (vreg "i" at Oprand0 alloc RBX)
+//          setl  SIL                                         ;     (vreg "tmp@29" at Oprand0 alloc RSI)
+//          test  RSI,  RSI                                   ; (IR-125 : IF_FALSE_JUMP tmp@29 %LABEL:EndFor_2)    (vreg "tmp@29" at Oprand0 alloc RSI)
+//          jz  EndFor_2                                      ; (DiscardIR-126 : PARAM i)
+//          sub  RSP,  0                                      ; (IR-127 : CALL Core__Extern__IntToString %LITINT:1)    (caller-save of main start)    (caller-save of main finish)
+//          sub  RSP,  32                                     ;     (shadow space and stack-params)
+//          mov  ECX,  EBX                                    ;     (vreg "i" at Oprand1 alloc RBX)
+//          mov  dword [RSP],  EBX
+//          call  Core__Extern__IntToString
+//          add  RSP,  32                                     ;     (release shadow space and stack-params)
+//          add  RSP,  0                                      ;     (caller-restore of main start)    (caller-restore of main finish)
+//          mov  RSI,  RAX                                    ; (DiscardIR-129 : PARAM tmp@31)(IR-128 : = tmp@31 %RET)    (vreg "tmp@31" at Oprand0 alloc RSI)
+//          sub  RSP,  0                                      ; (IR-130 : CALL Console__PrintLn %LITINT:1)    (caller-save of main start)    (caller-save of main finish)
+//          sub  RSP,  32                                     ;     (shadow space and stack-params)
+//          mov  RCX,  RSI                                    ;     (vreg "tmp@31" at Oprand1 alloc RSI)
+//          mov  qword [RSP],  RSI
+//          call  Console__PrintLn
+//          add  RSP,  32                                     ;     (release shadow space and stack-params)
+//          add  RSP,  0                                      ;     (caller-restore of main start)    (caller-restore of main finish)
+//          mov  RBX,  RAX                                    ; (IR-131 : = tmp@30 %RET)    (vreg "tmp@30" at Oprand0 alloc RBX)
+//          mov  EBX,  EBX                                    ; (IR-132 : = tmp@32 i)    (vreg "i" at Oprand1 alloc RBX)    (vreg "tmp@32" at Oprand0 alloc RBX)
+//          inc  EBX                                          ; (IR-133 : ++ i)    (vreg "i" at Oprand0 alloc RBX)
+//          jmp  For_2                                        ; (IR-134 : JUMP %LABEL:For_2)
+//  EndFor_2:

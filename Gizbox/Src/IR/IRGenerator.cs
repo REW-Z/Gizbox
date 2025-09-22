@@ -591,8 +591,16 @@ namespace Gizbox.IR
                         //函数返回类型    
                         string returnType = (string)callNode.attributes["type"];
 
+                        //是否有返回值且作为右值  
+                        bool returnTypeNotVoid = GType.Parse(returnType).Category != GType.Kind.Void;
+                        bool isSingleExprStmt = (callNode.Parent is SingleExprStmtNode stmt && stmt.exprNode == callNode);
+
+
                         //表达式的返回变量  
-                        SetRet(callNode, NewTemp(returnType));
+                        if(returnTypeNotVoid == true && isSingleExprStmt == false)
+                        {
+                            SetRet(callNode, NewTemp(returnType));
+                        }
 
                         //参数数量  
                         int argCount;
@@ -644,17 +652,24 @@ namespace Gizbox.IR
                             }
                         }
 
-
-
+                        //调用  
                         if (callNode.isMemberAccessFunction == true)
                         {
                             GenerateCode("MCALL", fullName, "%LITINT:" + argCount);
-                            GenerateCode("=", GetRet(callNode), "%RET");
+
+                            if(returnTypeNotVoid == true && isSingleExprStmt == false)//返回值不为null且不是单表达式节点  
+                            {
+                                GenerateCode("=", GetRet(callNode), "%RET");
+                            }
                         }
                         else
                         {
                             GenerateCode("CALL", fullName, "%LITINT:" + argCount);
-                            GenerateCode("=", GetRet(callNode), "%RET");
+
+                            if(returnTypeNotVoid == true && isSingleExprStmt == false)//返回值不为null且不是单表达式节点  
+                            {
+                                GenerateCode("=", GetRet(callNode), "%RET");
+                            }
                         }
                     }
                     break;
@@ -720,7 +735,13 @@ namespace Gizbox.IR
                         else//i++
                         {
                             SetRet(incDecNode, NewTemp(Query(identifierName).typeExpression));
-                            GenerateCode("=", GetRet(incDecNode), identifierName);
+
+                            bool isSingleExprStmt = incDecNode.Parent is SingleExprStmtNode;
+                            if(isSingleExprStmt == false)
+                            {
+                                GenerateCode("=", GetRet(incDecNode), identifierName);
+                            }
+                            
                             GenerateCode(incDecNode.op, identifierName);
                         }
                     }
@@ -914,12 +935,6 @@ namespace Gizbox.IR
             string tempVarName = "tmp@" + tmpCounter++;
 
             var env = envStackTemp.Peek();
-            
-            //类定义作用域产生的临时变量->移到构造函数符号表  
-            //if(env.tableCatagory == SymbolTable.TableCatagory.ClassScope)
-            //{
-            //    todo;
-            //}
 
             env.NewRecord(tempVarName, SymbolTable.RecordCatagory.Variable, type);
 

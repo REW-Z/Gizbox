@@ -316,15 +316,15 @@ namespace Gizbox.Interop.CSharp
     {
         public ScriptEngine.ScriptEngine engineContext;
 
-        public void Core__GC__Collect()
+        public void ScriptEngine__GC__Collect()
         {
             engineContext.GCCollect();
         }
-        public void Core__GC__Enable()
+        public void ScriptEngine__GC__Enable()
         {
             engineContext.GCEnable(true);
         }
-        public void Core__GC__Disable()
+        public void ScriptEngine__GC__Disable()
         {
             engineContext.GCEnable(false);
         }

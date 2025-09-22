@@ -91,6 +91,9 @@ namespace Gizbox
 
         //5.
         CodeGen,
+
+        //6.
+        Link
     }
 
 
