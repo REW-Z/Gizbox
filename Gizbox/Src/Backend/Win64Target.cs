@@ -2655,6 +2655,12 @@ namespace Gizbox.Src.Backend
             callerRestorePlaceHolders[currFuncEnv].Add(placeholderRestoreNode);
         }
 
+        // 指令附加信息  
+        private InstructionAdditionalInfo GetInstructionInfo(X64Instruction instr)
+        {
+
+        }
+
         // Mov  
         private void EmitMov(X64Operand dst, X64Operand src, GType type)
         {
@@ -3733,6 +3739,12 @@ namespace Gizbox.Src.Backend
         public SymbolTable.Record funcRec;
         public int irLineStart;
         public int irLineEnd;
+    }
+
+    public class InstructionAdditionalInfo
+    {
+        public X64Instruction target;
+        public List<RegisterUsageInfo> regUsages = new();
     }
 
     public class VRegDesc

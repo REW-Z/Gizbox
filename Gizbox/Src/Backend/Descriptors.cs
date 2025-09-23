@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Text;
 using System.Linq;
 
+using InstructionNode = Gizbox.LList<Gizbox.Src.Backend.X64Instruction>.Node;
+
 namespace Gizbox.Src.Backend
 {
     /// <summary>
@@ -34,6 +36,17 @@ namespace Gizbox.Src.Backend
     {
         public List<VariableDescriptor> variables = new();
     }
+
+    /// <summary>
+    /// 寄存器占用信息  
+    /// </summary>
+    public class RegisterUsageInfo
+    {
+        public RegisterEnum reg;
+        public InstructionNode start;
+        public InstructionNode end;
+    }
+
 
     /// <summary>
     /// 变量活跃信息  
