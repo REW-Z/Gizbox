@@ -222,7 +222,7 @@ namespace Gizbox.Src.Backend
         public X64Operand operand0;
         public X64Operand operand1;
         public X64Size sizeMark = X64Size.undefined;
-        public X64Size sizeMarkAdditional = X64Size.undefined;
+        public X64Size sizeMarkSrc = X64Size.undefined;
         public string mark;//占位标记  
         public string comment = string.Empty;//指令注释
     }
@@ -369,8 +369,8 @@ namespace Gizbox.Src.Backend
                     if(instr.sizeMark != X64Size.undefined)
                     {
                         size1 = instr.sizeMark;
-                        if(instr.sizeMarkAdditional != X64Size.undefined && instr.sizeMarkAdditional != instr.sizeMark)
-                            size1 = instr.sizeMarkAdditional;
+                        if(instr.sizeMarkSrc != X64Size.undefined && instr.sizeMarkSrc != instr.sizeMark)
+                            size1 = instr.sizeMarkSrc;
                     }
 
                     strb.Append(",  ");
@@ -411,7 +411,7 @@ namespace Gizbox.Src.Backend
                     break;
                 case X64Rel rel:
                     {
-                        strb.Append("[rel " + UtilsW64.LegalizeName(rel.symbolName) + (rel.displacement != 0 ? ((rel.displacement > 0 ? "+" : "-") + Math.Abs(rel.displacement).ToString()) : "") + "]");
+                        strb.Append(size.ToString() + " [rel " + UtilsW64.LegalizeName(rel.symbolName) + (rel.displacement != 0 ? ((rel.displacement > 0 ? "+" : "-") + Math.Abs(rel.displacement).ToString()) : "") + "]");
                     }
                     break;
                 case X64Immediate im:
@@ -632,8 +632,8 @@ namespace Gizbox.Src.Backend
         public static X64Instruction movdqa(X64Operand dest, X64Operand src) => new() { type = InstructionKind.movdqa, operand0 = dest, operand1 = src, sizeMark = X64Size.oword };
         public static X64Instruction movdqu(X64Operand dest, X64Operand src) => new() { type = InstructionKind.movdqu, operand0 = dest, operand1 = src, sizeMark = X64Size.oword };
 
-        public static X64Instruction movzx(X64Operand dest, X64Operand src, X64Size dstSize, X64Size srcSize) => new() { type = InstructionKind.movzx, operand0 = dest, operand1 = src, sizeMark = dstSize, sizeMarkAdditional = srcSize };
-        public static X64Instruction movsx(X64Operand dest, X64Operand src, X64Size dstSize, X64Size srcSize) => new() { type = InstructionKind.movsx, operand0 = dest, operand1 = src, sizeMark = dstSize, sizeMarkAdditional = srcSize };
+        public static X64Instruction movzx(X64Operand dest, X64Operand src, X64Size dstSize, X64Size srcSize) => new() { type = InstructionKind.movzx, operand0 = dest, operand1 = src, sizeMark = dstSize, sizeMarkSrc = srcSize };
+        public static X64Instruction movsx(X64Operand dest, X64Operand src, X64Size dstSize, X64Size srcSize) => new() { type = InstructionKind.movsx, operand0 = dest, operand1 = src, sizeMark = dstSize, sizeMarkSrc = srcSize };
 
         // 栈操作
         public static X64Instruction push(X64Operand operand) => new() { type = InstructionKind.push, operand0 = operand };
@@ -696,18 +696,18 @@ namespace Gizbox.Src.Backend
         public static X64Instruction setae(X64Operand operand) => new() { type = InstructionKind.setae, operand0 = operand, sizeMark = X64Size.@byte };
 
         // 浮点比较（不写目的，只影响标志位）
-        public static X64Instruction ucomiss(X64Operand a, X64Operand b) => new() { type = InstructionKind.ucomiss, operand0 = a, operand1 = b };
-        public static X64Instruction ucomisd(X64Operand a, X64Operand b) => new() { type = InstructionKind.ucomisd, operand0 = a, operand1 = b };
+        public static X64Instruction ucomiss(X64Operand a, X64Operand b) => new() { type = InstructionKind.ucomiss, operand0 = a, operand1 = b, sizeMark = X64Size.dword };
+        public static X64Instruction ucomisd(X64Operand a, X64Operand b) => new() { type = InstructionKind.ucomisd, operand0 = a, operand1 = b, sizeMark = X64Size.qword };
         public static X64Instruction cqo() => new() { type = InstructionKind.cqo };
 
         // 整数 -> 浮点
-        public static X64Instruction cvtsi2ss(X64Operand dest, X64Operand src) => new() { type = InstructionKind.cvtsi2ss, operand0 = dest, operand1 = src };
-        public static X64Instruction cvtsi2sd(X64Operand dest, X64Operand src) => new() { type = InstructionKind.cvtsi2sd, operand0 = dest, operand1 = src };
+        public static X64Instruction cvtsi2ss(X64Operand dest, X64Operand src, X64Size srcIntSize) => new() { type = InstructionKind.cvtsi2ss, operand0 = dest, operand1 = src, sizeMark = X64Size.dword, sizeMarkSrc = srcIntSize };
+        public static X64Instruction cvtsi2sd(X64Operand dest, X64Operand src, X64Size srcIntSize) => new() { type = InstructionKind.cvtsi2sd, operand0 = dest, operand1 = src, sizeMark = X64Size.qword, sizeMarkSrc = srcIntSize };
         // 浮点 -> 整数  
-        public static X64Instruction cvttss2si(X64Operand dest, X64Operand src) => new() { type = InstructionKind.cvttss2si, operand0 = dest, operand1 = src };
-        public static X64Instruction cvttss2siq(X64Operand dest, X64Operand src) => new() { type = InstructionKind.cvttss2siq, operand0 = dest, operand1 = src };
-        public static X64Instruction cvttsd2si(X64Operand dest, X64Operand src) => new() { type = InstructionKind.cvttsd2si, operand0 = dest, operand1 = src };
-        public static X64Instruction cvttsd2siq(X64Operand dest, X64Operand src) => new() { type = InstructionKind.cvttsd2siq, operand0 = dest, operand1 = src };
+        public static X64Instruction cvttss2si(X64Operand dest, X64Operand src) => new() { type = InstructionKind.cvttss2si, operand0 = dest, operand1 = src, sizeMark = X64Size.dword, sizeMarkSrc = X64Size.dword };
+        public static X64Instruction cvttss2siq(X64Operand dest, X64Operand src) => new() { type = InstructionKind.cvttss2siq, operand0 = dest, operand1 = src, sizeMark = X64Size.qword, sizeMarkSrc = X64Size.dword };
+        public static X64Instruction cvttsd2si(X64Operand dest, X64Operand src) => new() { type = InstructionKind.cvttsd2si, operand0 = dest, operand1 = src, sizeMark = X64Size.dword, sizeMarkSrc = X64Size.qword };
+        public static X64Instruction cvttsd2siq(X64Operand dest, X64Operand src) => new() { type = InstructionKind.cvttsd2siq, operand0 = dest, operand1 = src, sizeMark = X64Size.qword, sizeMarkSrc = X64Size.qword };
         // float <-> double
         public static X64Instruction cvtss2sd(X64Operand dest, X64Operand src) => new() { type = InstructionKind.cvtss2sd, operand0 = dest, operand1 = src };
         public static X64Instruction cvtsd2ss(X64Operand dest, X64Operand src) => new() { type = InstructionKind.cvtsd2ss, operand0 = dest, operand1 = src };

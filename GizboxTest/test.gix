@@ -89,12 +89,34 @@ Console::PrintLn(Core::IntrinsicOperatorOverloads::add("AAA", "BBB"));
 Console::PrintLn("TryConcat: (Operator)");
 Console::PrintLn("Hello " + "Gizbox AOT!");
 
-Console::PrintLn("Loop Test");
+
+Console::PrintLn("CastConcat: (Operator)");
+long longNum = (long)1234;
+Console::PrintLn("int32->int64 " + (string)longNum);
+float floatNum = (float)2345;
+Console::PrintLn("int32->float32 " + (string)floatNum);
+double doubleNum = (double)3456;
+Console::PrintLn("int32->float64 " + (string)floatNum);
+int intNum = (int)4567.5d;
+Console::PrintLn("float64->int32 " + (string)intNum);
+
+
+
+Console::PrintLn("ForLoop Test");
 for(int i = 0; i < 3; i++)
 {
 	Console::PrintLn((string)i);
 }
-Console::PrintLn("Loop Test End");
+Console::PrintLn("ForLoop Test End");
+
+
+Console::PrintLn("WhileLoop Test");
+int itor = 0;
+while(itor < 5)
+{
+	Console::PrintLn((string)(itor++));
+}
+Console::PrintLn("WhileLoop Test End");
 
 
 Console::PrintLn("If-Else Test");

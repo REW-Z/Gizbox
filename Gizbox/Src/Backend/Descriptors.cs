@@ -37,37 +37,6 @@ namespace Gizbox.Src.Backend
         public List<VariableDescriptor> variables = new();
     }
 
-    /// <summary>
-    /// 寄存器占用信息  
-    /// </summary>
-    public class RegisterUsageInfo
-    {
-        public RegisterEnum reg;
-        public InstructionNode start;
-        public InstructionNode end;
-
-        public static RegisterUsageInfo Create(Win64CodeGenContext context, InstructionNode startNode, InstructionNode endNode)
-        {
-            var useInf = new RegisterUsageInfo();
-            useInf.start = startNode;
-            useInf.end = endNode;
-
-            var curr = useInf.start;
-            while (curr != null)
-            {
-                var instructionInfo = context.GetInstructionInfo(curr.value);
-                instructionInfo.regUsages.Add(useInf);
-
-                if(curr == useInf.end)
-                    break;
-
-                curr = curr.Next;
-            }
-
-            return useInf;
-        }
-    }
-
 
     /// <summary>
     /// 变量活跃信息  

@@ -553,3 +553,463 @@ namespace Gizbox
         }
     }
 }
+
+
+
+
+    // 可插入有序的链表 + 区间索引
+    // 目标：插入不影响已存在区间边界；按节点快速查询命中区间
+    public sealed class LinkedIntervalList<T>
+    {
+        public sealed class Node
+        {
+            internal Node Prev;
+            internal Node Next;
+            internal long Label; // 用于全序与区间索引
+            public T Value;
+
+            internal Node(T value, long label)
+            {
+                Value = value;
+                Label = label;
+            }
+
+            public Node Previous => Prev;
+            public Node NextNode => Next;
+        }
+
+        public sealed class Interval
+        {
+            internal long Id;
+            internal Node StartNode;
+            internal Node EndNode;
+            internal long StartLabel;
+            internal long EndLabel;
+
+            // 便于删除：记录其所在的 IntervalTree 节点
+            public IntervalTree.Node OwnerTreeNode;
+
+            public Node Start => StartNode;
+            public Node End => EndNode;
+
+            public override string ToString() => $"[{StartLabel}, {EndLabel}]";
+        }
+
+        private Node _head;
+        private Node _tail;
+        private int _count;
+        private long _nextIntervalId = 1;
+
+        // 初始步长，便于在中间插入时取 Label 中点
+        private const long InitialStep = 1_000;
+
+        private readonly IntervalTree _index = new IntervalTree();
+
+        public int Count => _count;
+        public Node Head => _head;
+        public Node Tail => _tail;
+
+        public Node AddFirst(T value)
+        {
+            if(_head == null)
+            {
+                var node = new Node(value, 0);
+                _head = _tail = node;
+                _count = 1;
+                return node;
+            }
+            return InsertBefore(_head, value);
+        }
+
+        public Node AddLast(T value)
+        {
+            if(_tail == null)
+            {
+                var node = new Node(value, 0);
+                _head = _tail = node;
+                _count = 1;
+                return node;
+            }
+            return InsertAfter(_tail, value);
+        }
+
+        public Node InsertAfter(Node node, T value)
+        {
+            if(node == null)
+                throw new ArgumentNullException(nameof(node));
+            var next = node.Next;
+            long label;
+            if(next == null)
+            {
+                label = node.Label + InitialStep;
+            }
+            else
+            {
+                label = Mid(node.Label, next.Label);
+                if(label == node.Label || label == next.Label)
+                {
+                    RelabelAll();
+                    // 重新计算
+                    label = Mid(node.Label, next.Label);
+                }
+            }
+
+            var newNode = new Node(value, label);
+            // 链接
+            newNode.Prev = node;
+            newNode.Next = next;
+            node.Next = newNode;
+            if(next != null)
+                next.Prev = newNode;
+            if(_tail == node)
+                _tail = newNode;
+            _count++;
+            return newNode;
+        }
+
+        public Node InsertBefore(Node node, T value)
+        {
+            if(node == null)
+                throw new ArgumentNullException(nameof(node));
+            var prev = node.Previous;
+            long label;
+            if(prev == null)
+            {
+                label = node.Label - InitialStep;
+            }
+            else
+            {
+                label = Mid(prev.Label, node.Label);
+                if(label == prev.Label || label == node.Label)
+                {
+                    RelabelAll();
+                    label = Mid(prev.Label, node.Label);
+                }
+            }
+
+            var newNode = new Node(value, label);
+            // 链接
+            newNode.Next = node;
+            newNode.Prev = prev;
+            node.Prev = newNode;
+            if(prev != null)
+                prev.Next = newNode;
+            if(_head == node)
+                _head = newNode;
+            _count++;
+            return newNode;
+        }
+
+        // 注意：若删除作为某些区间的端点的节点，需先调整/删除这些区间再删节点
+        public void Remove(Node node)
+        {
+            if(node == null)
+                throw new ArgumentNullException(nameof(node));
+            // 保护：不允许直接删除仍被作为区间端点的节点
+            if(_index.HasIntervalEndpoint(node.Label))
+                throw new InvalidOperationException("先移除或调整以该节点作为端点的区间，再删除该节点。");
+
+            var prev = node.Previous;
+            var next = node.NextNode;
+
+            if(prev != null)
+                prev.Next = next;
+            else
+                _head = next;
+            if(next != null)
+                next.Prev = prev;
+            else
+                _tail = prev;
+            _count--;
+        }
+
+        // 定义一个区间，端点顺序可任意；内部会规范化 [minLabel, maxLabel]
+        public Interval AddInterval(Node a, Node b)
+        {
+            if(a == null || b == null)
+                throw new ArgumentNullException("区间端点不可为空。");
+            long s = a.Label;
+            long e = b.Label;
+            if(s > e)
+            { var t = s; s = e; e = t; }
+
+            var iv = new Interval
+            {
+                Id = _nextIntervalId++,
+                StartNode = a,
+                EndNode = b,
+                StartLabel = s,
+                EndLabel = e
+            };
+            _index.Insert(iv);
+            return iv;
+        }
+
+        public void RemoveInterval(Interval iv)
+        {
+            if(iv == null)
+                return;
+            _index.Remove(iv);
+        }
+
+        // 查询：给定节点，返回包含该节点的所有区间
+        public List<Interval> GetIntervalsAt(Node node)
+        {
+            if(node == null)
+                throw new ArgumentNullException(nameof(node));
+            var result = new List<Interval>();
+            _index.Stab(node.Label, result);
+            return result;
+        }
+
+        // 全表重标：线性一次，极少发生（只有在无间隙时）
+        private void RelabelAll()
+        {
+            long label = 0;
+            var cur = _head;
+            while(cur != null)
+            {
+                cur.Label = label;
+                label += InitialStep;
+                cur = cur.Next;
+            }
+
+            // 重标不影响已建区间（区间以端点“节点引用”为准），
+            // 但索引中存储的是标签范围，需要重新构建索引
+            _index.RebuildFromIntervals(GetAllIntervalsSnapshot());
+        }
+
+        private static long Mid(long a, long b)
+        {
+            // 防溢出的中点
+            return a + (b - a) / 2;
+        }
+
+        // 维护 Interval 列表的快照以便重建（仅在极端情况下使用）
+        private List<Interval> GetAllIntervalsSnapshot()
+        {
+            return _index.GetAllIntervals();
+        }
+
+        // ---------------- Interval Tree（中心分割法，动态插入/删除，刺探查询） ----------------
+
+        public sealed class IntervalTree
+        {
+            public sealed class Node
+            {
+                internal long Center;
+                internal Node Left;
+                internal Node Right;
+                // 覆盖 Center 的区间：
+                // 为提升查询效率，同时维护两种排序
+                internal readonly List<Interval> ByStartAsc = new List<Interval>();
+                internal readonly List<Interval> ByEndDesc = new List<Interval>();
+
+                internal Node(long center) { Center = center; }
+            }
+
+            private Node _root;
+            private readonly HashSet<long> _endpointLabels = new HashSet<long>(); // 用于防止删除端点节点（可选）
+            private readonly List<Interval> _all = new List<Interval>(); // 重建用
+
+            // 动态插入
+            internal void Insert(Interval iv)
+            {
+                _all.Add(iv);
+                _endpointLabels.Add(iv.StartLabel);
+                _endpointLabels.Add(iv.EndLabel);
+
+                if(_root == null)
+                {
+                    _root = new Node(Mid(iv.StartLabel, iv.EndLabel));
+                    AddToNode(_root, iv);
+                    return;
+                }
+                Insert(_root, iv);
+            }
+
+            internal void Remove(Interval iv)
+            {
+                if(iv.OwnerTreeNode != null)
+                {
+                    RemoveFromNode(iv.OwnerTreeNode, iv);
+                }
+                _all.Remove(iv);
+                // 端点是否仍被其它区间使用？简单起见，保留/或尝试移除（非功能关键）
+                // 这里不移除，HasIntervalEndpoint 仅用作保护，并不要求绝对精准
+            }
+
+            internal bool HasIntervalEndpoint(long label) => _endpointLabels.Contains(label);
+
+            internal void Stab(long x, List<Interval> result)
+            {
+                Stab(_root, x, result);
+            }
+
+            internal List<Interval> GetAllIntervals()
+            {
+                return new List<Interval>(_all);
+            }
+
+            internal void RebuildFromIntervals(List<Interval> intervals)
+            {
+                _root = null;
+                _endpointLabels.Clear();
+                _all.Clear();
+                foreach(var iv in intervals)
+                {
+                    // 端点的标签改变了（重标），需要同步刷新
+                    iv.StartLabel = Math.Min(iv.StartNode.Label, iv.EndNode.Label);
+                    iv.EndLabel = Math.Max(iv.StartNode.Label, iv.EndNode.Label);
+                    Insert(iv);
+                }
+            }
+
+            private void Insert(Node node, Interval iv)
+            {
+                if(iv.EndLabel < node.Center)
+                {
+                    if(node.Left == null)
+                    {
+                        node.Left = new Node(Mid(iv.StartLabel, iv.EndLabel));
+                        AddToNode(node.Left, iv);
+                    }
+                    else
+                        Insert(node.Left, iv);
+                }
+                else if(iv.StartLabel > node.Center)
+                {
+                    if(node.Right == null)
+                    {
+                        node.Right = new Node(Mid(iv.StartLabel, iv.EndLabel));
+                        AddToNode(node.Right, iv);
+                    }
+                    else
+                        Insert(node.Right, iv);
+                }
+                else
+                {
+                    AddToNode(node, iv);
+                }
+            }
+
+            private static void AddToNode(Node node, Interval iv)
+            {
+                // 插入到覆盖Center的列表中
+                // ByStartAsc按StartLabel升序
+                int i = node.ByStartAsc.BinarySearch(iv, StartAscComparer.Instance);
+                if(i < 0)
+                    i = ~i;
+                node.ByStartAsc.Insert(i, iv);
+
+                // ByEndDesc按EndLabel降序
+                int j = node.ByEndDesc.BinarySearch(iv, EndDescComparer.Instance);
+                if(j < 0)
+                    j = ~j;
+                node.ByEndDesc.Insert(j, iv);
+
+                iv.OwnerTreeNode = node;
+            }
+
+            private static void RemoveFromNode(Node node, Interval iv)
+            {
+                // 线性移除也可，但这里利用二分近似定位后向两边扫描
+                int i = node.ByStartAsc.BinarySearch(iv, StartAscComparer.Instance);
+                if(i < 0)
+                    i = ~i;
+                // 扫描定位相同元素
+                for(int k = Math.Max(0, i - 2); k < node.ByStartAsc.Count && k <= i + 2; k++)
+                {
+                    if(ReferenceEquals(node.ByStartAsc[k], iv))
+                    {
+                        node.ByStartAsc.RemoveAt(k);
+                        break;
+                    }
+                }
+                int j = node.ByEndDesc.BinarySearch(iv, EndDescComparer.Instance);
+                if(j < 0)
+                    j = ~j;
+                for(int k = Math.Max(0, j - 2); k < node.ByEndDesc.Count && k <= j + 2; k++)
+                {
+                    if(ReferenceEquals(node.ByEndDesc[k], iv))
+                    {
+                        node.ByEndDesc.RemoveAt(k);
+                        break;
+                    }
+                }
+                iv.OwnerTreeNode = null;
+            }
+
+            private static void Stab(Node node, long x, List<Interval> result)
+            {
+                if(node == null)
+                    return;
+
+                if(x < node.Center)
+                {
+                    // 按Start升序扫描，直到Start > x 即可停止
+                    var list = node.ByStartAsc;
+                    for(int i = 0; i < list.Count; i++)
+                    {
+                        var iv = list[i];
+                        if(iv.StartLabel <= x)
+                            result.Add(iv);
+                        else
+                            break;
+                    }
+                    Stab(node.Left, x, result);
+                }
+                else if(x > node.Center)
+                {
+                    // 按End降序扫描，直到End < x 即可停止
+                    var list = node.ByEndDesc;
+                    for(int i = 0; i < list.Count; i++)
+                    {
+                        var iv = list[i];
+                        if(iv.EndLabel >= x)
+                            result.Add(iv);
+                        else
+                            break;
+                    }
+                    Stab(node.Right, x, result);
+                }
+                else
+                {
+                    // x == Center，当前节点列表全命中
+                    result.AddRange(node.ByStartAsc);
+                }
+            }
+
+            private static long Mid(long a, long b) => a + (b - a) / 2;
+
+            private sealed class StartAscComparer : IComparer<Interval>
+            {
+                public static readonly StartAscComparer Instance = new StartAscComparer();
+                public int Compare(Interval x, Interval y)
+                {
+                    int c = x.StartLabel.CompareTo(y.StartLabel);
+                    if(c != 0)
+                        return c;
+                    c = x.EndLabel.CompareTo(y.EndLabel);
+                    if(c != 0)
+                        return c;
+                    return x.Id.CompareTo(y.Id);
+                }
+            }
+
+            private sealed class EndDescComparer : IComparer<Interval>
+            {
+                public static readonly EndDescComparer Instance = new EndDescComparer();
+                public int Compare(Interval x, Interval y)
+                {
+                    int c = y.EndLabel.CompareTo(x.EndLabel); // 降序
+                    if(c != 0)
+                        return c;
+                    c = x.StartLabel.CompareTo(y.StartLabel);
+                    if(c != 0)
+                        return c;
+                    return x.Id.CompareTo(y.Id);
+                }
+            }
+        }
+    }
