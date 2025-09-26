@@ -948,28 +948,33 @@ namespace Gizbox.Src.Backend
 
                             int rspSub;
                             List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs = new();
-                            List<(X64Operand srcOperand, int idx, GType type, bool isRefOfConst, string? rokey)> paramInfos = new() { (X64.imm(objectSize), 0, GType.Parse("int"), false, null) } ;
+                            List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey)> paramInfos 
+                                = new() { (X64.imm(objectSize), 0, GType.Parse("int"), false, null) } ;
                             BeforeCall(1, paramInfos, out rspSub, ref homedRegs);
-
                             // 调用malloc分配堆内存（参数是字节数）
                             Emit(X64.call("malloc"));
-
                             AfterCall(rspSub, homedRegs);
 
                             // 分配的内存地址存储到目标变量  
                             var targetVar = ParseOperand(tacInf.oprand0);
                             Emit(X64.mov(targetVar, X64.rax, X64Size.qword));
 
-                            // 将虚函数表地址写入对象的前8字节
-                            Emit(X64.mov(X64.rdx, X64.rel(vtableRoKeys[typeName]), X64Size.qword));
+                            // 将虚函数表地址写入对象的前8字节(地址)
+                            Emit(X64.lea(X64.rdx, X64.rel(vtableRoKeys[typeName])));
                             Emit(X64.mov(X64.mem(X64.rax, disp: 0), X64.rdx, X64Size.qword));
                         }
                         break; 
                     case "DEL":
                         {
                             var objPtr = ParseOperand(tacInf.oprand0);
-                            Emit(X64.mov(X64.rcx, objPtr, X64Size.qword));
+
+                            int rspSub;
+                            List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs = new();
+                            List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey)> paramInfos
+                                = new() { (objPtr, 0, tacInf.oprand0.typeExpr, false, null) };
+                            BeforeCall(1, paramInfos, out rspSub, ref homedRegs);
                             Emit(X64.call("free"));
+                            AfterCall(rspSub, homedRegs);
                         }
                         break;
                     case "ALLOC_ARRAY":
@@ -982,10 +987,17 @@ namespace Gizbox.Src.Backend
 
                             Emit(X64.mov(X64.rax, lenOp, X64Size.qword));//RAX 作为中间寄存器
                             Emit(X64.imul_2(X64.rax, X64.imm(elemSize), X64Size.qword));
-                            Emit(X64.mov(X64.rcx, X64.rax, X64Size.qword));
 
                             //动态分配  
+                            int rspSub;
+                            List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs = new();
+                            List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey)> paramInfos
+                                = new() { (X64.rax, 0, GType.Parse("int"), false, null) };
+                            BeforeCall(1, paramInfos, out rspSub, ref homedRegs);
                             Emit(X64.call("malloc"));
+                            AfterCall(rspSub, homedRegs);
+
+
                             //返回指针在RAX，写入目标变量  
                             Emit(X64.mov(target, X64.rax, X64Size.qword));
                         }
@@ -1018,7 +1030,7 @@ namespace Gizbox.Src.Backend
                         {
                             var dst = ParseOperand(tacInf.oprand0);
 
-                            if(tacInf.oprand1.IsRefOfConst())
+                            if(tacInf.oprand1.IsConstAddrSemantic())
                             {
                                 var key = tacInf.oprand1.expr.roDataKey;
 
@@ -2570,17 +2582,17 @@ namespace Gizbox.Src.Backend
                 var tSrcOperand = ParseOperand(p.oprand0);
                 int tIdx = p.PARAM_paramidx;
                 GType tType = p.oprand0.typeExpr;
-                bool tIsRefOfConst = p.oprand0.IsRefOfConst();
+                bool tIsConstAddrSemantic = p.oprand0.IsConstAddrSemantic();
                 string tRokey = p.oprand0.expr.roDataKey;
 
-                paraminfos.Add((tSrcOperand, tIdx, tType, tIsRefOfConst, tRokey));
+                paraminfos.Add((tSrcOperand, tIdx, tType, tIsConstAddrSemantic, tRokey));
             }
 
             BeforeCall(paramCount, paraminfos, out rspSub, ref homedRegs);
 
             tempParamList.Clear();
         }
-        private void BeforeCall(int paramCount, List<(X64Operand srcOperand, int idx, GType type, bool isRefOfConst, string? rokey)> tempParamInfos, out int rspSub, ref List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs)
+        private void BeforeCall(int paramCount, List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey)> tempParamInfos, out int rspSub, ref List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs)
         {
             rspSub = 0;
             homedRegs ??= new();
@@ -2687,7 +2699,7 @@ namespace Gizbox.Src.Backend
                     //int trueParamIndex = (tempParamList.Count - 1) - paraminfo.PARAM_paramidx;
 
                     var srcOperand = paraminfo.srcOperand;
-                    bool isRefOfConst = paraminfo.isRefOfConst;
+                    bool isConstAddrSemantic = paraminfo.isConstAddrSemantic;
 
                     int trueParamIndex = (tempParamInfos.Count - 1) - paraminfo.idx;
 
@@ -2719,7 +2731,7 @@ namespace Gizbox.Src.Backend
                         //整型参数  
                         else
                         {
-                            if(isRefOfConst)
+                            if(isConstAddrSemantic)
                             {
                                 //Emit(X64.lea(intreg, X64.rel(paraminfo.oprand0.expr.roDataKey)));
                                 Emit(X64.lea(intreg, X64.rel(paraminfo.rokey)));
@@ -2735,7 +2747,7 @@ namespace Gizbox.Src.Backend
 
                     //栈帧传参rsp开始 （影子空间也需要赋值）
                     int offset = 8 * (trueParamIndex);
-                    if(isRefOfConst)
+                    if(isConstAddrSemantic)
                     {
                         using(new RegUsageRange(this, RegisterEnum.R11))
                         {
@@ -3315,18 +3327,29 @@ namespace Gizbox.Src.Backend
                     var targetOperand = oprands[i];
                     if(targetOperand is X64Reg reg && reg.isVirtual)
                     {
+                        var vartype = GType.Parse(reg.vRegVar.typeExpression);
+
                         if(reg.vRegVar.category == SymbolTable.RecordCatagory.Param)
                         {
-                            var scratchReg = TryGetIdleScratchReg(curr.Prev, curr, GType.Parse(reg.vRegVar.typeExpression).IsSSE);
+                            var scratchReg = TryGetIdleScratchReg(curr.Prev, curr, vartype.IsSSE);
                             reg.AllocPhysReg(scratchReg);
                             var newinsn = InsertBefore(curr, X64.mov(new X64Reg(scratchReg), X64.mem(X64.rbp, disp: (reg.vRegVar.addr)), X64Size.qword));
                             UseScratchRegister(newinsn, curr, scratchReg);
                         }
                         else if(reg.vRegVar.category == SymbolTable.RecordCatagory.Variable && reg.vRegVar.GetAdditionInf().isGlobal)
                         {
-                            var scratchReg = TryGetIdleScratchReg(curr.Prev, curr, GType.Parse(reg.vRegVar.typeExpression).IsSSE);
+                            var scratchReg = TryGetIdleScratchReg(curr.Prev, curr, vartype.IsSSE);
                             reg.AllocPhysReg(scratchReg);
-                            var newinsn = InsertBefore(curr, X64.lea(new X64Reg(scratchReg), X64.rel(reg.vRegVar.name)));
+
+                            InstructionNode newinsn;
+                            if(UtilsW64.IsConstAddrSemantic(reg.vRegVar))
+                            {
+                                newinsn = InsertBefore(curr, X64.lea(new X64Reg(scratchReg), X64.rel(reg.vRegVar.name)));
+                            }
+                            else
+                            {
+                                newinsn = InsertBefore(curr, X64.mov(new X64Reg(scratchReg), X64.rel(reg.vRegVar.name), (X64Size)vartype.Size));
+                            }
                             UseScratchRegister(newinsn, curr, scratchReg);
                         }
                     }
@@ -3334,18 +3357,38 @@ namespace Gizbox.Src.Backend
                     {
                         if(xMem.baseReg != null && xMem.baseReg.isVirtual)
                         {
+                            var baseregVarType = GType.Parse(xMem.baseReg.vRegVar.typeExpression);
+
                             if(xMem.baseReg.vRegVar.category == SymbolTable.RecordCatagory.Param)
                             {
                                 var scratchReg = TryGetIdleScratchReg(curr.Prev, curr, isSSE:false, regPrefer:RegisterEnum.R11);
                                 xMem.baseReg.AllocPhysReg(scratchReg);
-                                var newinsn = InsertBefore(curr, X64.mov(new X64Reg(scratchReg), X64.mem(X64.rbp, disp: (xMem.baseReg.vRegVar.addr)), X64Size.qword));
+                                InstructionNode newinsn;
+                                if(UtilsW64.IsConstAddrSemantic(xMem.baseReg.vRegVar))//通常不会出现这种情况
+                                {
+                                    newinsn = InsertBefore(curr, X64.lea(new X64Reg(scratchReg), X64.mem(X64.rbp, disp: (xMem.baseReg.vRegVar.addr))));
+                                }
+                                else
+                                {
+                                    newinsn = InsertBefore(curr, X64.mov(new X64Reg(scratchReg), X64.mem(X64.rbp, disp: (xMem.baseReg.vRegVar.addr)), X64Size.qword));
+                                }
                                 UseScratchRegister(newinsn, curr, scratchReg);
                             }
                             else if(xMem.baseReg.vRegVar.category == SymbolTable.RecordCatagory.Variable && xMem.baseReg.vRegVar.GetAdditionInf().isGlobal)
                             {
                                 var scratchReg = TryGetIdleScratchReg(curr.Prev, curr, isSSE: false, regPrefer:RegisterEnum.R11);
                                 xMem.baseReg.AllocPhysReg(scratchReg);
-                                var newinsn = InsertBefore(curr, X64.lea(new X64Reg(scratchReg), X64.rel(xMem.baseReg.vRegVar.name)));
+
+                                InstructionNode newinsn;
+                                if(UtilsW64.IsConstAddrSemantic(xMem.baseReg.vRegVar))//通常不会出现这种情况
+                                {
+                                    newinsn = InsertBefore(curr, X64.lea(new X64Reg(scratchReg), X64.rel(xMem.baseReg.vRegVar.name)));
+                                }
+                                else
+                                {
+                                    newinsn = InsertBefore(curr, X64.mov(new X64Reg(scratchReg), X64.rel(xMem.baseReg.vRegVar.name), X64Size.qword));
+                                }
+                                    
                                 UseScratchRegister(newinsn, curr, scratchReg);
                             }
                         }
@@ -3732,7 +3775,6 @@ namespace Gizbox.Src.Backend
             return null;
         }
 
-
         public (SymbolTable.Record, SymbolTable.Record) QueryClassAndMember(string objDefineType, string memberName)
         {
             if(classDict.Count == 0 || classDict.ContainsKey(objDefineType) == false)
@@ -3740,12 +3782,14 @@ namespace Gizbox.Src.Backend
             return (classDict[objDefineType], QueryMember(classDict[objDefineType], memberName));
 
         }
+        
         public SymbolTable.Record QueryMember(string objDefineType, string memberName)
         {
             if(classDict.Count == 0)
                 return null;
             return QueryMember(classDict[objDefineType], memberName);
         }
+        
         private SymbolTable.Record QueryMember(SymbolTable.Record classRec, string memberName)
         {
             return classRec.envPtr.GetRecord(memberName);
@@ -3765,6 +3809,7 @@ namespace Gizbox.Src.Backend
             var globalRec = ir.QueryTopSymbol(name);
             return globalRec;
         }
+        
         private SymbolTable.Record Query(string name, Gizbox.GStack<SymbolTable> envStack)
         {
             if(name == null)
@@ -4101,7 +4146,7 @@ namespace Gizbox.Src.Backend
         }
 
         /// <summary> 是引用类型常量（目前只有字符串常量） </summary>
-        public bool IsRefOfConst()
+        public bool IsConstAddrSemantic()
         {
             return this?.expr?.type == IROperandExpr.Type.LitOrConst
                 && this.expr.segments?.Length > 0
@@ -4517,6 +4562,14 @@ namespace Gizbox.Src.Backend
             }
 
             throw new GizboxException(ExceptioName.CodeGen, $"param cannot pass by register. idx:{paramIdx}");
+        }
+
+        public static bool IsConstAddrSemantic(SymbolRecord rec)// 地址即值的全局静态常量（目前只有字符串全局常量）（使用lea指令加载地址） 
+        {
+            if(rec.GetAdditionInf().isGlobal && GType.Parse(rec.typeExpression).Category == GType.Kind.String)
+                return true;
+            else
+                return false;
         }
     }
 }

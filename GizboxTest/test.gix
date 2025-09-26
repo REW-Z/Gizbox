@@ -127,48 +127,57 @@ using Collections;
 //	Console::PrintLn("num1 < num2");
 //}
 //
-//// ----------------- 数组测试 ------------------
+// ----------------- 数组测试 ------------------
 
-//Console::PrintLn("Array Test");
-//int[] arr = new int[3];
-//arr[0] = 22;
-//arr[1] = 33;
-//arr[2] = 44;
-//Console::PrintLn((string)arr[0]);
-//Console::PrintLn((string)arr[1]);
-//Console::PrintLn((string)arr[2]);
+Console::PrintLn("Array Test");
+int[] arr = new int[3];
+arr[0] = 22;
+arr[1] = 33;
+arr[2] = 44;
+Console::PrintLn((string)arr[0]);
+Console::PrintLn((string)arr[1]);
+Console::PrintLn((string)arr[2]);
 
 
 // ----------------- 对象和虚函数测试 -----------------  
 Console::PrintLn("Class Object Test");
 class Human
 {
-	int score = 30;
+	int age = 20;
 	void Speak()
 	{
 		Console::PrintLn("I am a human.");
 	}
+	void Walk()
+	{
+		Console::PrintLn("human walk.");
+	}
 }
 class Student : Human
 {
-	int age = 20;
+	int score = 30;
 	void Speak()
 	{
 		Console::PrintLn("I am a student.");
 	}
 }
-Student sam = new Student();
+Human sam = (Human)(new Student());
 Console::PrintLn("age prev:" + (string)sam.age);
 sam.age = 21;
 Console::PrintLn("age now:" + (string)(sam.age));
+sam.Speak();
+sam.Walk();
+
+delete sam;
+Console::PrintLn("age latest:" + (string)(sam.age)); //UB
 
 // ----------------- 输入测试 ------------------
 
-Console::PrintLn("ReadLine Test");
-string input = Console::GetLine();
-Console::PrintLn(input);
-
-Console::PrintLn("All Test Finished!");
+//Console::PrintLn("ReadLine Test");
+//string input = Console::GetLine();
+//Console::PrintLn(input);
+//
+//Console::PrintLn("All Test Finished!");
 
 // IR输出结果：  
 
