@@ -410,6 +410,14 @@ namespace Gizbox.Src.Backend
                     int.TryParse(tac.arg1, out inf.CALL_paramCount);
                 }
 
+                //构造函数调用对象类型
+                if(tac.op == "CALL" && tac.arg0.EndsWith(".ctor"))
+                {
+                    var prev = ir.codes[line - 1];
+                    var prevInf = GetTacInfo(prev);
+                    inf.CTOR_CALL_TargetObject = prevInf.oprand0;
+                }
+
                 //MCALL对象类型
                 if(tac.op == "MCALL")
                 {
@@ -938,9 +946,15 @@ namespace Gizbox.Src.Backend
                             // 获取类的大小
                             long objectSize = classRec.size;
 
+                            int rspSub;
+                            List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs = new();
+                            List<(X64Operand srcOperand, int idx, GType type, bool isRefOfConst, string? rokey)> paramInfos = new() { (X64.imm(objectSize), 0, GType.Parse("int"), false, null) } ;
+                            BeforeCall(1, paramInfos, out rspSub, ref homedRegs);
+
                             // 调用malloc分配堆内存（参数是字节数）
-                            Emit(X64.mov(X64.rcx, X64.imm(objectSize), X64Size.qword));
                             Emit(X64.call("malloc"));
+
+                            AfterCall(rspSub, homedRegs);
 
                             // 分配的内存地址存储到目标变量  
                             var targetVar = ParseOperand(tacInf.oprand0);
@@ -2354,7 +2368,7 @@ namespace Gizbox.Src.Backend
                             throw new GizboxException(ExceptioName.CodeGen, $"array not found for element access \"{arrayName}[{indexExpr}]\" at line {irOperand.owner.line}");
 
                         // 元素大小
-                        var elemType = GType.Parse(arrayRec.typeExpression);
+                        var elemType = GType.Parse(arrayRec.typeExpression).ArrayElementType;
                         int elemSize = elemType.Size;
 
                         var baseV = GetRecVReg(arrayRec);
@@ -2547,7 +2561,26 @@ namespace Gizbox.Src.Backend
         #region PASS3
 
         // Call调用前  
-        private void BeforeCall(TACInfo tacInf, List<TACInfo> tempParamList, out int rspSub, ref List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs)
+        private void BeforeCall(TACInfo tacInfo, List<TACInfo> tempParamList, out int rspSub, ref List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs)
+        {
+            int paramCount = tacInfo.CALL_paramCount;
+            List<(X64Operand srcOperand, int idx, GType type, bool isRefOfConst, string rokey)> paraminfos = new();
+            foreach(var p in tempParamList )
+            {
+                var tSrcOperand = ParseOperand(p.oprand0);
+                int tIdx = p.PARAM_paramidx;
+                GType tType = p.oprand0.typeExpr;
+                bool tIsRefOfConst = p.oprand0.IsRefOfConst();
+                string tRokey = p.oprand0.expr.roDataKey;
+
+                paraminfos.Add((tSrcOperand, tIdx, tType, tIsRefOfConst, tRokey));
+            }
+
+            BeforeCall(paramCount, paraminfos, out rspSub, ref homedRegs);
+
+            tempParamList.Clear();
+        }
+        private void BeforeCall(int paramCount, List<(X64Operand srcOperand, int idx, GType type, bool isRefOfConst, string? rokey)> tempParamInfos, out int rspSub, ref List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs)
         {
             rspSub = 0;
             homedRegs ??= new();
@@ -2564,15 +2597,15 @@ namespace Gizbox.Src.Backend
 
                 // 栈帧16字节对齐 (如果是奇数个参数 -> 需要8字节对齐栈指针)
                 // (寄存器保存区自己确保16字节对齐)
-                if(tacInf.CALL_paramCount % 2 != 0)
+                if(paramCount % 2 != 0)
                 {
                     // 如果是奇数个参数，先将rsp对齐到16字节
                     rspSub += 8;
                 }
                 // 其他栈参数空间
-                if(tacInf.CALL_paramCount > 4)
+                if(paramCount > 4)
                 {
-                    int onStackParamLen = (tacInf.CALL_paramCount - 4) * 8;
+                    int onStackParamLen = (paramCount - 4) * 8;
                     rspSub += onStackParamLen;
                 }
                 // 影子空间(32字节)
@@ -2645,42 +2678,55 @@ namespace Gizbox.Src.Backend
 
 
                 // 参数赋值(IR中PARAM指令已经是倒序)  
-                foreach(var paraminfo in tempParamList)
+                foreach(var paraminfo in tempParamInfos)
                 {
-                    var srcOp = ParseOperand(paraminfo.oprand0);
-                    bool isRefOfConst = paraminfo.oprand0.IsRefOfConst();
-                    
-                    //正序的参数idx  
-                    int trueParamIndex = (tempParamList.Count - 1) - paraminfo.PARAM_paramidx;
+                    //var srcOp = ParseOperand(paraminfo.oprand0);
+                    //bool isRefOfConst = paraminfo.oprand0.IsRefOfConst();
+
+                    ////正序的参数idx  
+                    //int trueParamIndex = (tempParamList.Count - 1) - paraminfo.PARAM_paramidx;
+
+                    var srcOperand = paraminfo.srcOperand;
+                    bool isRefOfConst = paraminfo.isRefOfConst;
+
+                    int trueParamIndex = (tempParamInfos.Count - 1) - paraminfo.idx;
 
                     //寄存器传参  
                     if(trueParamIndex < 4)
                     {
-                        var isSse = paraminfo.oprand0.IsSSEType();
-                        var size = paraminfo.oprand0.typeExpr.Size;
+                        //var isSse = paraminfo.oprand0.IsSSEType();
+                        //var size = paraminfo.oprand0.typeExpr.Size;
+                        //var ssereg = UtilsW64.GetParamReg(trueParamIndex, true);
+                        //var intreg = UtilsW64.GetParamReg(trueParamIndex, false);
+
+
+                        var isSse = paraminfo.type.IsSSE;
+                        var size = paraminfo.type.Size;
                         var ssereg = UtilsW64.GetParamReg(trueParamIndex, true);
                         var intreg = UtilsW64.GetParamReg(trueParamIndex, false);
+
                         //浮点参数  
                         if(isSse)
                         {
-                            if(paraminfo.oprand0.typeExpr.Size == 4)
-                                Emit(X64.movss(ssereg, srcOp));
+                            if(size == 4)
+                                Emit(X64.movss(ssereg, srcOperand));
                             else
-                                Emit(X64.movsd(ssereg, srcOp));
+                                Emit(X64.movsd(ssereg, srcOperand));
 
                             //浮点参数也需要在整数寄存器rcx,rdx,r8,r9中，以支持可变参数  
-                            Emit(X64.mov(intreg, srcOp, (X64Size)size));
+                            Emit(X64.mov(intreg, srcOperand, (X64Size)size));
                         }
                         //整型参数  
                         else
                         {
                             if(isRefOfConst)
                             {
-                                Emit(X64.lea(intreg, X64.rel(paraminfo.oprand0.expr.roDataKey)));
+                                //Emit(X64.lea(intreg, X64.rel(paraminfo.oprand0.expr.roDataKey)));
+                                Emit(X64.lea(intreg, X64.rel(paraminfo.rokey)));
                             }
                             else
                             {
-                                Emit(X64.mov(intreg, srcOp, (X64Size)size));
+                                Emit(X64.mov(intreg, srcOperand, (X64Size)size));
 
                             }
                         }
@@ -2693,16 +2739,15 @@ namespace Gizbox.Src.Backend
                     {
                         using(new RegUsageRange(this, RegisterEnum.R11))
                         {
-                            Emit(X64.lea(X64.r11, X64.rel(paraminfo.oprand0.expr.roDataKey)));
-                            EmitMov(X64.mem(X64.rsp, disp: offset), X64.r11, paraminfo.oprand0.typeExpr);
+                            Emit(X64.lea(X64.r11, X64.rel(paraminfo.rokey)));
+                            EmitMov(X64.mem(X64.rsp, disp: offset), X64.r11, paraminfo.type);
                         }
                     }
                     else
                     {
-                        EmitMov(X64.mem(X64.rsp, disp: offset), srcOp, paraminfo.oprand0.typeExpr);
+                        EmitMov(X64.mem(X64.rsp, disp: offset), srcOperand, paraminfo.type);
                     }
                 }
-                tempParamList.Clear();
             }
         }
 
@@ -3815,6 +3860,7 @@ namespace Gizbox.Src.Backend
 
         public int PARAM_paramidx;//参数索引（如果是PARAM指令）
         public int CALL_paramCount;//参数个数（如果是CALL指令）
+        public IROperand CTOR_CALL_TargetObject;//对象参数（如果是构造函数调用指令）
         public IROperand MCALL_methodTargetObject;//this参数（如果是MCALL指令）
 
         public TACInfo(Win64CodeGenContext context, TAC tac, int line)
@@ -3907,9 +3953,18 @@ namespace Gizbox.Src.Backend
                 {
                     if(segments[0].EndsWith(".ctor"))
                     {
+                        //var objClass = owner.MCALL_methodTargetObject.typeExpr;
+                        //rec = context.QueryMember(objClass.ToString(), segments[0]);
+                        //segmentRecs[0] = rec;
+                        //typeExpr = GType.Parse(rec.typeExpression);
+                        //if(rec == null)
+                        //    throw new GizboxException(ExceptioName.Undefine, "未找到构造函数");
+                        //else
+                        //    GixConsole.WriteLine("构造函数：" + rec.name);
+
                         string className = segments[0].Substring(0, segments[0].Length - 5);
                         var classRec = context.Query(className, owner.line);
-                        segmentRecs[0] = null;
+                        segmentRecs[0] = classRec.envPtr.GetRecord(segments[0]);
                         typeExpr = Utils.CtorType(classRec);
                     }
                     else

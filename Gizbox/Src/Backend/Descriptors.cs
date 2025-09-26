@@ -199,17 +199,27 @@ namespace Gizbox.Src.Backend
                     int line = -1;
                     bool isDef = false;
                     bool isUse = false;
-                    if(useidx >= 0)
+
+                    var nextuseline = useidx >= 0 ? useLines[useidx] : -1;
+                    var nextdefline = defidx >= 0 ? defLines[defidx] : -1;
+
+                    if(nextdefline == nextuseline)
                     {
-                        line = useLines[useidx];
-                        isUse = true;
-                    }
-                    if(defidx >= 0 && defLines[defidx] > line)
-                    {
-                        line = defLines[defidx];
                         isDef = true;
+                        isUse = true;
+                        line = nextdefline;
                     }
-                    
+                    else if(nextdefline > nextuseline)
+                    {
+                        isDef = true;
+                        line = nextdefline;
+                    }
+                    else
+                    {
+                        isUse = true;
+                        line = nextuseline;
+                    }
+
                     //是DEF行（1行只能有一个DEF）  
                     if(isDef)
                     {
@@ -221,7 +231,11 @@ namespace Gizbox.Src.Backend
 
                         //一行可能有多个def  
                         while(defidx >= 0 && defLines[defidx] == line)
+                        {
                             defidx--;
+                        }
+                            
+
                     }
 
                     //是USE行
@@ -234,7 +248,9 @@ namespace Gizbox.Src.Backend
                         }
                         //一行可能有多个use   
                         while(useidx >= 0 && useLines[useidx] == line)
+                        {
                             useidx--;
+                        }
                     }
                 }
                 //依然活跃  

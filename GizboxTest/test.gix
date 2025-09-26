@@ -5,142 +5,164 @@ using Core;
 using Console;
 using Collections;
 
-int globalVar1 = 1;
-float globalVar2 = 1.0f;
-
-extern void print(string str);
-
-void test()
-{
-	//int result = globalVar1 + (int)globalVar2;
-	//
-	//int v1 = 1;
-	//int v2 = 1;
-	//int v3 = 1;
-	//int v4 = 1;
-	//int v5 = 1;
-	//int v6 = 1;
-	//int v7 = 1;
-	//int v8 = 1;
-	//
-	//Console::Log("result:" + (string)result);
-	//
-	//int rs = v1 + v8;
-	//rs += v2 + v7;
-	//rs += v3 + v6;
-	//rs += v4 + v5;
-
-
-	for(int i = 0 ; i < 99; ++i)
-	{
-		int ass = 1;
-	}
-	for(int i = 0 ; i < 99; ++i)
-	{
-		int ass2 = 1;
-	}
-
-	Console::PrintLn("test!");
-}
-
-void printStrings(string pStr1, string pStr2, string pStr3)
-{
-	Console::PrintLn("printstr1 :");
-	Console::PrintLn(pStr1);
-	Console::PrintLn("printstr2 :");
-	Console::PrintLn(pStr2);
-	Console::PrintLn("printstr3 :");
-	Console::PrintLn(pStr3);
-}
-
-int sum(int x, int y, int z)
-{
-	return x + y - z;
-}
-
+//int globalVar1 = 444;
+//float globalVar2 = 444.0f;
+//
+//int result = globalVar1 + (int)globalVar2;
+//Console::PrintLn("result:" + (string)result);
+//
+//// ----------------- 寄存器溢出测试 ------------------
+//
+//void test()
+//{
+//	int v1 = 2;
+//	int v2 = 2;
+//	int v3 = 2;
+//	int v4 = 2;
+//	int v5 = 2;
+//	int v6 = 2;
+//	int v7 = 2;
+//	int v8 = 2;
+//	
+//	
+//	int rs = v1 + v8;
+//	rs += v2 + v7;
+//	rs += v3 + v6;
+//	rs += v4 + v5;
+//	Console::PrintLn("test!" + (string)rs);
+//}
+//
 //test();
+//
+//void printStrings(string pStr1, string pStr2, string pStr3)
+//{
+//	Console::PrintLn("printstr1 :");
+//	Console::PrintLn(pStr1);
+//	Console::PrintLn("printstr2 :");
+//	Console::PrintLn(pStr2);
+//	Console::PrintLn("printstr3 :");
+//	Console::PrintLn(pStr3);
+//}
+//
+//int sum(int x, int y, int z)
+//{
+//	return x + y - z;
+//}
+//
+//
+//// ----------------- 调用测试 ------------------
+//int num1 = 1000;
+//int num2 = 200;
+//int num3 = 100;
+//int num4 = sum(num1, num2, num3);
+//Console::PrintLn("Calc:");
+//Console::PrintLn((string)num4);
+//
+//// ----------------- 变量字符串打印 ------------------
+//
+//Console::PrintLn("Print Str Var:");
+//string strvar = "ZQJ";
+//Console::PrintLn(strvar);
+//
+//// ----------------- 转换字符串打印 ------------------
+//
+//Console::PrintLn("Print CastToStr:");
+//Console::PrintLn((string)233);
+//
+//// ----------------- 字符串拼接 ------------------
+//
+//Console::Print("PrintStrings Call:");
+//printStrings("XXX", "YYY", "ZZZ");
+//
+//// ----------------- 字符串拼接操作符重载 ------------------
+//
+//Console::PrintLn("TryConcat: (Operator)");
+//Console::PrintLn("Hello " + "Gizbox AOT!");
+//
+//// ----------------- 数值类型转换 ------------------
+//
+//Console::PrintLn("CastConcat: (Operator)");
+//long longNum = (long)1234;
+//Console::PrintLn("int32->int64 " + (string)longNum);
+//float floatNum = (float)2345;
+//Console::PrintLn("int32->float32 " + (string)floatNum);
+//double doubleNum = (double)3456;
+//Console::PrintLn("int32->float64 " + (string)floatNum);
+//int intNum = (int)4567.5d;
+//Console::PrintLn("float64->int32 " + (string)intNum);
+//
+//
+//// ----------------- For循环测试 ------------------
+//
+//Console::PrintLn("ForLoop Test");
+//for(int i = 0; i < 3; i++)
+//{
+//	Console::PrintLn((string)i);
+//}
+//Console::PrintLn("ForLoop Test End");
+//
+//// ----------------- While循环测试 ------------------
+//
+//Console::PrintLn("WhileLoop Test");
+//int itor = 0;
+//while(itor < 5)
+//{
+//	Console::PrintLn((string)(itor++));
+//}
+//Console::PrintLn("WhileLoop Test End");
+//
+//// ----------------- IfElse测试 ------------------
+//
+//Console::PrintLn("If-Else Test");
+//if(num1 > num2)
+//{
+//	Console::PrintLn("num1 > num2");
+//}
+//else if(num1 == num2)
+//{
+//	Console::PrintLn("num1 == num2");
+//}
+//else
+//{
+//	Console::PrintLn("num1 < num2");
+//}
+//
+//// ----------------- 数组测试 ------------------
+
+//Console::PrintLn("Array Test");
+//int[] arr = new int[3];
+//arr[0] = 22;
+//arr[1] = 33;
+//arr[2] = 44;
+//Console::PrintLn((string)arr[0]);
+//Console::PrintLn((string)arr[1]);
+//Console::PrintLn((string)arr[2]);
 
 
-int num1 = 1000;
-int num2 = 200;
-int num3 = 100;
-int num4 = sum(num1, num2, num3);
-Console::PrintLn("Calc:");
-Console::PrintLn((string)num4);
-
-
-Console::PrintLn("Print StrConst:");
-Console::PrintLn("Hello!");
-
-
-Console::PrintLn("Print Str Var:");
-string strvar = "ZQJ";
-Console::PrintLn(strvar);
-
-Console::PrintLn("Print CastToStr:");
-Console::PrintLn((string)233);
-
-Console::Print("PrintStrings Call:");
-printStrings("XXX", "YYY", "ZZZ");
-
-Console::PrintLn("TryConcat: (Call)");
-Console::PrintLn(Core::IntrinsicOperatorOverloads::add("AAA", "BBB"));
-
-Console::PrintLn("TryConcat: (Operator)");
-Console::PrintLn("Hello " + "Gizbox AOT!");
-
-
-Console::PrintLn("CastConcat: (Operator)");
-long longNum = (long)1234;
-Console::PrintLn("int32->int64 " + (string)longNum);
-float floatNum = (float)2345;
-Console::PrintLn("int32->float32 " + (string)floatNum);
-double doubleNum = (double)3456;
-Console::PrintLn("int32->float64 " + (string)floatNum);
-int intNum = (int)4567.5d;
-Console::PrintLn("float64->int32 " + (string)intNum);
-
-
-
-Console::PrintLn("ForLoop Test");
-for(int i = 0; i < 3; i++)
+// ----------------- 对象和虚函数测试 -----------------  
+Console::PrintLn("Class Object Test");
+class Human
 {
-	Console::PrintLn((string)i);
+	int score = 30;
+	void Speak()
+	{
+		Console::PrintLn("I am a human.");
+	}
 }
-Console::PrintLn("ForLoop Test End");
-
-
-Console::PrintLn("WhileLoop Test");
-int itor = 0;
-while(itor < 5)
+class Student : Human
 {
-	Console::PrintLn((string)(itor++));
+	int age = 20;
+	void Speak()
+	{
+		Console::PrintLn("I am a student.");
+	}
 }
-Console::PrintLn("WhileLoop Test End");
+Student sam = new Student();
+Console::PrintLn("age prev:" + (string)sam.age);
+sam.age = 21;
+Console::PrintLn("age now:" + (string)(sam.age));
 
-
-Console::PrintLn("If-Else Test");
-if(num1 > num2)
-{
-	Console::PrintLn("num1 > num2");
-}
-else if(num1 == num2)
-{
-	Console::PrintLn("num1 == num2");
-}
-else
-{
-	Console::PrintLn("num1 < num2");
-}
-
-Console::PrintLn("Array Test");
-int[] arr = new int[3];
-arr[0] = 11;
-arr[1] = 22;
-arr[2] = 33;
-Console::PrintLn((string)arr[0]);
-Console::PrintLn((string)arr[1]);
-Console::PrintLn((string)arr[2]);
+// ----------------- 输入测试 ------------------
 
 Console::PrintLn("ReadLine Test");
 string input = Console::GetLine();
