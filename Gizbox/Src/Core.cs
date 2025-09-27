@@ -818,7 +818,7 @@ namespace Gizbox
     /// </summary>
     [Serializable]
     [DataContract(IsReference = true)]
-    public class VTable
+    public class VTable : IEnumerable<VTable.Record>
     {
         [Serializable]
         [DataContract]
@@ -836,30 +836,63 @@ namespace Gizbox
         public string name;
 
         [DataMember]
-        public Dictionary<string, Record> data;
+        public List<Record> data;
+
+        [DataMember]
+        public Dictionary<string, int> dataIndexDict;
 
         public VTable(string name)
         {
             this.name = name;
-            this.data = new Dictionary<string, Record>();
+            this.data = new List<Record>();
+            this.dataIndexDict = new Dictionary<string, int>();
         }
 
-        public Record Query(string funcName)
+        public (int, Record) Query(string funcName)
         {
-            return data[funcName];
+            if(dataIndexDict.TryGetValue(funcName, out var index))
+            {
+                return (index, data[index]);
+            }
+            return default;
         }
 
         public void NewRecord(string fname, string cname)
         {
-            data[fname] = new Record() { funcName = fname, className = cname, funcfullname = cname + "." + fname };
+            if(dataIndexDict.TryGetValue(fname, out var index))
+            {
+                data[index].className = cname;
+                data[index].funcfullname = $"{cname}.{fname}";
+            }
+            else
+            {
+                var newfuncRec = new Record() { funcName = fname, className = cname, funcfullname = $"{cname}.{fname}" };
+
+                data.Add(newfuncRec);
+                int newindex = data.Count - 1;
+                dataIndexDict[fname] = newindex;
+            }
         }
 
-        public void CloneDataTo(VTable table)
+        public void CloneDataTo(VTable targetTable)
         {
-            foreach(var kv in this.data)
+            foreach(var rec in this.data)
             {
-                table.data[kv.Key] = new Record() { funcName = kv.Key, className = kv.Value.className, funcfullname = kv.Value.className + "." + kv.Key };
+                var newrec = new Record() { funcName = rec.funcName, className = rec.className, funcfullname = rec.className + "." + rec.funcName };
+                targetTable.data.Add(newrec);
+                int index = targetTable.data.Count - 1;
+                targetTable.dataIndexDict[rec.funcName] = index;
             }
+        }
+
+        public IEnumerator<Record> GetEnumerator()
+        {
+            return data.GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return data.GetEnumerator();
         }
     }
 

@@ -479,7 +479,7 @@ namespace Gizbox.ScriptEngine
 
 
                         //新方法：虚函数表vtable    
-                        var vrec = (this.DeReference(arg_this.AsPtr) as GizObject).vtable.Query(funcMangledName);
+                        var (vidx, vrec) = (this.DeReference(arg_this.AsPtr) as GizObject).vtable.Query(funcMangledName);
                         string funcFinalName = vrec.funcfullname;
 
 

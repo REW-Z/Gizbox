@@ -138,6 +138,8 @@ namespace Gizbox.Src.Backend
         public Compiler compiler;
         public IRUnit ir;
         private bool isMainUnit;
+        public List<IRUnit> allunits;
+
 
         public Gizbox.CompileOptions options;
 
@@ -166,18 +168,18 @@ namespace Gizbox.Src.Backend
 
 
         // 本单元全局变量表  
-        public Dictionary<string, SymbolTable.Record> globalVarInfos = new();
+        public HashSet<string> globalVarInfos = new();
         // 本单元全局函数表  
-        public Dictionary<string, SymbolTable.Record> globalFuncsInfos = new();
+        public HashSet<string> globalFuncsInfos = new();
         // 外部变量表  
-        public Dictionary<string, SymbolTable.Record> externVars = new();
+        public HashSet<string> externVars = new();
         // 外部函数表  
-        public Dictionary<string, SymbolTable.Record> externFuncs = new();//value可以为空
+        public HashSet<string> externFuncs = new();//value可以为空
 
 
-        // 类表
+        // 类表（所有单元）
         public Dictionary<string, SymbolTable.Record> classDict = new();
-        // 函数表  
+        // 函数表（所有单元）  
         public Dictionary<string, SymbolTable.Record> funcDict = new();
 
         // 类名-虚函数表roKey
@@ -213,7 +215,22 @@ namespace Gizbox.Src.Backend
             this.compiler = compiler;
             this.ir = ir;
             this.isMainUnit = isMainUnit;
+            this.allunits = new();
             this.options = options;
+
+
+            //所有关联的编译单元  
+            void VisitUnit(IRUnit unit)
+            {
+                if(allunits.Contains(unit) == false)
+                    allunits.Add(unit);
+                foreach(var dep in unit.dependencyLibs)
+                {
+                    VisitUnit(dep);
+                }
+            }
+            VisitUnit(ir);
+
 
             //本单元
             {
@@ -234,10 +251,14 @@ namespace Gizbox.Src.Backend
                         inf.table = lEnv;
                     }
                 }
+
             }
             //依赖单元
-            foreach(var dep in ir.dependencyLibs)
+            foreach(var dep in allunits)
             {
+                if(dep == ir)
+                    continue;
+
                 var gEnv = dep.globalScope.env;
                 foreach(var (_, gRec) in gEnv.records)
                 {
@@ -277,9 +298,10 @@ namespace Gizbox.Src.Backend
         {
             this.globalEnv = ir.globalScope.env;
 
+
             //常用C外部调用  
-            externFuncs.Add("malloc", null);
-            externFuncs.Add("free", null);
+            externFuncs.Add("malloc");
+            externFuncs.Add("free");
 
             //常用常量  
             if(!section_rdata.ContainsKey("__const_neg_one_f32"))
@@ -287,75 +309,83 @@ namespace Gizbox.Src.Backend
             if(!section_rdata.ContainsKey("__const_neg_one_f64"))
                 section_rdata["__const_neg_one_f64"] = new() { (GType.Parse("double"), "-1.0") };
 
-            //收集全局和外部信息    
-            var envs = ir.GetAllGlobalEnvs();
-            foreach(var env in envs)
+
+            //所有单元：所有类/虚函数表信息/函数记录    
+            foreach(var unit in allunits)
             {
-                //本编译单元  
-                if(env == ir.globalScope.env)
+                var ge = unit.globalScope.env;
+                foreach(var (k, r) in ge.records)
                 {
-                    foreach(var (_, rec) in env.records)
+                    switch(r.category)
                     {
-                        //全局变量  
-                        if(rec.category == SymbolTable.RecordCatagory.Variable)
-                        {
-                            rec.GetAdditionInf().isGlobal = true;
-                            string key = rec.name;
-                            string initval = rec.initValue;
-
-                            var type = GType.Parse(rec.typeExpression);
-                            if(type.IsPointerType == false)
+                        case SymbolTable.RecordCatagory.Class:
+                            classDict.Add(k, r);
+                            foreach(var methodrec in r.envPtr.GetByCategory(SymbolTable.RecordCatagory.Function))
                             {
-                                section_data.Add(key, new() { GetStaticInitValue(rec) });
+                                funcDict.Add(methodrec.envPtr.name, methodrec);
                             }
+                            string rokey = $"vtable_{r.name}";
+                            vtableRoKeys.Add(r.name, rokey);
+
+                            if(unit == ir)
+                            {
+                                globalVarInfos.Add(rokey);
+                            }
+                            //是其他单元的类
                             else
                             {
-                                section_bss.Add(key, new() { GType.Parse(rec.typeExpression) });
+                                externVars.Add(rokey);
                             }
-                            
-                            globalVarInfos.Add(rec.name, rec);
-                        }    
-                        //全局函数  
-                        else if(rec.category == SymbolTable.RecordCatagory.Function)
-                        {
-                            rec.GetAdditionInf().isGlobal = true;
-                            
-                            if((rec.flags.HasFlag(SymbolTable.RecordFlag.ExternFunc)))
-                            {
-                                externFuncs.Add(rec.name, rec);
-                            }
-                            else
-                            {
-                                globalFuncsInfos.Add(rec.name, rec);
-                            }
-                            
-                        }
-                    }
-                }
-                //依赖单元  
-                else
-                {
-                    foreach(var (_, rec) in env.records)
-                    {
-                        if(rec.category == SymbolTable.RecordCatagory.Variable)
-                        {
-                            ////外部变量  (只需要导入必须的外部变量)
-                            //externVars.Add(rec.name, rec);
-                        }
-                        else if(rec.category == SymbolTable.RecordCatagory.Function)
-                        {
-                            ////外部函数  （只需要导入必须的外部函数）
-                            //if(rec.name != "Main")
-                            //{
-                            //    externFuncs.Add(rec.name, rec);
-                            //}
-                        }
-
+                            break;
+                        case SymbolTable.RecordCatagory.Function:
+                            funcDict.Add(k, r);
+                            break;
                     }
                 }
             }
 
-            //类布局/虚函数表布局/函数布局  
+
+            //本编译单元：收集全局函数和全局变量信息    
+            var genv = ir.globalScope.env;
+            foreach(var (_, rec) in genv.records)
+            {
+                //全局变量  
+                if(rec.category == SymbolTable.RecordCatagory.Variable)
+                {
+                    rec.GetAdditionInf().isGlobal = true;
+                    string key = rec.name;
+                    string initval = rec.initValue;
+
+                    var type = GType.Parse(rec.typeExpression);
+                    if(type.IsPointerType == false)
+                    {
+                        section_data.Add(key, new() { GetStaticInitValue(rec) });
+                    }
+                    else
+                    {
+                        section_bss.Add(key, new() { GType.Parse(rec.typeExpression) });
+                    }
+
+                    globalVarInfos.Add(rec.name);
+                }
+                //全局函数  
+                else if(rec.category == SymbolTable.RecordCatagory.Function)
+                {
+                    rec.GetAdditionInf().isGlobal = true;
+
+                    if((rec.flags.HasFlag(SymbolTable.RecordFlag.ExternFunc)))
+                    {
+                        externFuncs.Add(rec.name);
+                    }
+                    else
+                    {
+                        globalFuncsInfos.Add(rec.name);
+                    }
+
+                }
+            }
+
+            //本单元：类布局/虚函数表布局/函数布局  
             var globalEnv = ir.globalScope.env;
             foreach(var (k, r) in globalEnv.records)
             {
@@ -363,8 +393,6 @@ namespace Gizbox.Src.Backend
                 {
                     case SymbolTable.RecordCatagory.Class:
                         {
-                            classDict.Add(k, r);
-
                             //类对象布局（Vptr在对象头占8字节）  
                             GenClassLayoutInfo(r);
 
@@ -856,7 +884,10 @@ namespace Gizbox.Src.Backend
                                     // 整数/指针返回值 -> rax
                                     using(new RegUsageRange(this, RegisterEnum.RAX))
                                     {
-                                        Emit(X64.mov(X64.rax, returnValue, size));
+                                        if(tacinfo.oprand0.IsConstAddrSemantic())
+                                            Emit(X64.lea(X64.rax, returnValue));
+                                        else
+                                            Emit(X64.mov(X64.rax, returnValue, size));
                                     }
                                 }
                             }
@@ -913,10 +944,11 @@ namespace Gizbox.Src.Backend
                             Emit(X64.mov(X64.rcx, x64obj, X64Size.qword));//指针
 
                             //取Vptr  
-                            var methodRec = QueryMember(codeParamObj.oprand0.typeExpr.ToString(), methodName);
+                            string className = codeParamObj.oprand0.typeExpr.ToString();
+                            var (index, vrec) = QueryVTable(className, methodName);
                             Emit(X64.mov(X64.rax, X64.mem(X64.rcx, disp: 0), X64Size.qword));
                             //函数地址（addr表示在虚函数表中的偏移(Index*8)）  
-                            Emit(X64.mov(X64.rax, X64.mem(X64.rax, disp: methodRec.addr), X64Size.qword));
+                            Emit(X64.mov(X64.rax, X64.mem(X64.rax, disp: index * 8), X64Size.qword));
 
 
                             //调用前准备(和CALL指令一致)  
@@ -1279,19 +1311,13 @@ namespace Gizbox.Src.Backend
                             // 浮点 -> 整数 (截断)
                             else if(srcType.IsSSE && targetType.IsInteger)
                             {
-                                if(srcType.Size == 4) 
+                                if(srcType.Size == 4)
                                 {
-                                    if(targetType.Size == 8)
-                                        Emit(X64.cvttss2siq(castDst, castSrc));
-                                    else
-                                        Emit(X64.cvttss2si(castDst, castSrc));
+                                    Emit(X64.cvttss2si(castDst, castSrc, dstInstSize: (X64Size)targetType.Size));
                                 }
                                 else
                                 {
-                                    if(targetType.Size == 8)
-                                        Emit(X64.cvttsd2siq(castDst, castSrc));
-                                    else
-                                        Emit(X64.cvttsd2si(castDst, castSrc));
+                                    Emit(X64.cvttsd2si(castDst, castSrc, dstInstSize: (X64Size)targetType.Size));
                                 }
                             }
                             else
@@ -1932,6 +1958,10 @@ namespace Gizbox.Src.Backend
         {
             var classTable = classRec.envPtr;
 
+
+            //构造函数加入globalFuncs  
+            globalFuncsInfos.Add(classTable.name + ".ctor");
+
             //方法信息(包含构造函数)  
             foreach(var (memName, memRec) in classTable.records)
             {
@@ -1944,30 +1974,26 @@ namespace Gizbox.Src.Backend
             //虚函数表和函数指针索引  
             {
                 List<X64Label> vtableData = new();
-                List<SymbolTable.Record> methodRecords = new ();
-                foreach(var (key, rec) in classTable.records)
-                {
-                    if(rec.category != SymbolTable.RecordCatagory.Function)
-                        continue;
-                    if((rec.flags & SymbolTable.RecordFlag.Ctor) != 0)
-                        continue;
 
-                    int index = rec.index;
-                    rec.addr = index * 8;
-
-                    methodRecords.Add(rec);
-                }
-                methodRecords.Sort((x, y) => x.index.CompareTo(y.index));
-                foreach(var methodRec in methodRecords)
+                foreach(var frec in ir.QueryVTable(classTable.name))
                 {
-                    var targetMethod = ir.vtables[classRec.name].Query(methodRec.name);
-                    vtableData.Add(X64.label(targetMethod.funcfullname));
+                    vtableData.Add(X64.label(frec.funcfullname));
+
+                    if(ir.globalScope.env.ContainRecordName(frec.className))
+                    {
+                        if(globalFuncsInfos.Contains(frec.funcfullname) == false)
+                            globalFuncsInfos.Add(frec.funcfullname);
+                    }
+                    else
+                    {
+                        if(externFuncs.Contains(frec.funcfullname) == false)
+                            externFuncs.Add(frec.funcfullname);
+                    }
                 }
 
                 //填充rodata  
                 string rokey = $"vtable_{classRec.name}";
                 section_rdata.Add(rokey, vtableData.Select(v => (GType.Parse("(FuncPtr)"), v.name)).ToList());
-                vtableRoKeys.Add(classRec.name, rokey);
             }
         }
 
@@ -1979,8 +2005,6 @@ namespace Gizbox.Src.Backend
             if(funcTable == null)
                 throw new GizboxException(ExceptioName.CodeGen, $"null func table of {(funcRec?.name ?? "?")}.");
 
-            //添加进函数表    
-            funcDict.Add(funcTable.name, funcRec);
             //参数偏移  
             {
                 foreach(var (key, rec) in funcTable.records)
@@ -2285,7 +2309,7 @@ namespace Gizbox.Src.Backend
                         {
                             case "%LITBOOL":
                                 {
-                                    var value = iroperandExpr.segments[1] == "True" ? 1L : 0L;
+                                    var value = (iroperandExpr.segments[1] == "true" || iroperandExpr.segments[1] == "True") ? 1 : 0;
                                     return X64.imm(value);
                                 }
                                 break;
@@ -2629,37 +2653,6 @@ namespace Gizbox.Src.Backend
                 instructions.Last.value.comment += $"    (shadow space and stack-params)";
 
 
-
-                //保存寄存器参数   
-                //(寄存器参数需要homing到栈帧(影子空间))
-                //(可能的寄存器rcx, rdx, r8, r9、xmmo、xmm1、xmm2, xmm3)  
-                //foreach(var paraminfo in tempParamList)
-                //{
-                //    var srcOp = ParseOperand(paraminfo.oprand0);
-                //    bool isRefOfConst = paraminfo.oprand0.IsRefOfConst();
-
-                //    //正序的参数idx  
-                //    int trueParamIndex = (tempParamList.Count - 1) - paraminfo.PARAM_paramidx;
-                    
-                //    if(trueParamIndex < 4)
-                //    {
-                //        var isSse = paraminfo.oprand0.IsSSEType();
-                //        //var size = paraminfo.oprand0.typeExpr.Size;
-                //        var ssereg = UtilsW64.GetParamReg(trueParamIndex, true);
-                //        var intreg = UtilsW64.GetParamReg(trueParamIndex, false);
-                //        if(isSse)
-                //        {
-                //            EmitMov(X64.mem(X64.rbp, disp:16 + (8 * trueParamIndex)), ssereg, X64Size.qword, true);
-                //            homedRegs.Add((paramIdx: trueParamIndex, reg: ssereg, isSse: true));
-                //        }
-                //        else
-                //        {
-                //            EmitMov(X64.mem(X64.rbp, disp: 16 + (8 * trueParamIndex)), intreg, X64Size.qword, false);
-                //            homedRegs.Add((paramIdx: trueParamIndex, reg: intreg, isSse: false));
-                //        }
-                //    }
-                //}
-
                 var callerParams = currFuncEnv.GetByCategory(SymbolTable.RecordCatagory.Param);
                 if(callerParams != null)
                 {
@@ -2692,12 +2685,6 @@ namespace Gizbox.Src.Backend
                 // 参数赋值(IR中PARAM指令已经是倒序)  
                 foreach(var paraminfo in tempParamInfos)
                 {
-                    //var srcOp = ParseOperand(paraminfo.oprand0);
-                    //bool isRefOfConst = paraminfo.oprand0.IsRefOfConst();
-
-                    ////正序的参数idx  
-                    //int trueParamIndex = (tempParamList.Count - 1) - paraminfo.PARAM_paramidx;
-
                     var srcOperand = paraminfo.srcOperand;
                     bool isConstAddrSemantic = paraminfo.isConstAddrSemantic;
 
@@ -2706,12 +2693,6 @@ namespace Gizbox.Src.Backend
                     //寄存器传参  
                     if(trueParamIndex < 4)
                     {
-                        //var isSse = paraminfo.oprand0.IsSSEType();
-                        //var size = paraminfo.oprand0.typeExpr.Size;
-                        //var ssereg = UtilsW64.GetParamReg(trueParamIndex, true);
-                        //var intreg = UtilsW64.GetParamReg(trueParamIndex, false);
-
-
                         var isSse = paraminfo.type.IsSSE;
                         var size = paraminfo.type.Size;
                         var ssereg = UtilsW64.GetParamReg(trueParamIndex, true);
@@ -2738,8 +2719,26 @@ namespace Gizbox.Src.Backend
                             }
                             else
                             {
-                                Emit(X64.mov(intreg, srcOperand, (X64Size)size));
+                                //Emit(X64.xor(intreg, intreg));
 
+                                if(size >= 4)
+                                {
+                                    Emit(X64.mov(intreg, srcOperand, (X64Size)size));
+                                }
+                                else
+                                {
+                                    if(srcOperand is X64Immediate imm)
+                                    {
+                                        Emit(X64.mov(intreg, imm, X64Size.dword));
+                                    }
+                                    else
+                                    {
+                                        if(paraminfo.type.IsSigned)
+                                            Emit(X64.movsx(intreg, srcOperand, X64Size.dword, (X64Size)size));
+                                        else
+                                            Emit(X64.movzx(intreg, srcOperand, X64Size.dword, (X64Size)size));
+                                    }
+                                }
                             }
                         }
                     }
@@ -3651,18 +3650,12 @@ namespace Gizbox.Src.Backend
 
                     // 浮点->整数：目的必须 GP
                     case InstructionKind.cvttss2si:
-                    case InstructionKind.cvttss2siq:
                     case InstructionKind.cvttsd2si:
-                    case InstructionKind.cvttsd2siq:
                         if(UtilsW64.IsMemOperand(instr.operand0))
                         {
                             var t = instr.type;
                             var scratch = TryGetIdleScratchReg(node.Prev, node, isSSE:true);
-                            var newinsn = InsertBefore(node,
-                                t == InstructionKind.cvttss2si ? X64.cvttss2si(new X64Reg(scratch), instr.operand1) :
-                                t == InstructionKind.cvttss2siq ? X64.cvttss2siq(new X64Reg(scratch), instr.operand1) :
-                                t == InstructionKind.cvttsd2si ? X64.cvttsd2si(new X64Reg(scratch), instr.operand1) :
-                                                                 X64.cvttsd2siq(new X64Reg(scratch), instr.operand1));
+                            var newinsn = InsertBefore(node, X64.cvttss2si(new X64Reg(scratch), instr.operand1, instr.sizeMark));
                             instr.type = InstructionKind.mov;
                             instr.operand1 = new X64Reg(scratch);
 
@@ -3783,6 +3776,18 @@ namespace Gizbox.Src.Backend
 
         }
         
+
+        public (int index, VTable.Record rec) QueryVTable(string cname, string fname)
+        {
+            foreach(var unit in allunits)
+            {
+                if(unit.vtables.TryGetValue(cname, out var table))
+                {
+                    return table.Query(fname);
+                }
+            }
+            return default;
+        }
         public SymbolTable.Record QueryMember(string objDefineType, string memberName)
         {
             if(classDict.Count == 0)
@@ -3940,10 +3945,15 @@ namespace Gizbox.Src.Backend
                 if(funcRec.category != SymbolTable.RecordCatagory.Function)
                     throw new GizboxException(ExceptioName.Undefine, "func rec invalid.");
                 
+                if(funcRec.name.EndsWith(".ctor"))
+                {
+                    if(context.externFuncs.Contains(funcRec.name) == false)
+                        context.externFuncs.Add(funcRec.name);
+                }
                 if(funcRec.GetAdditionInf().table != context.ir.globalScope.env)
                 {
-                    if(context.externFuncs.ContainsKey(funcRec.name) == false)
-                        context.externFuncs.Add(funcRec.name, funcRec);
+                    if(context.externFuncs.Contains(funcRec.name) == false)
+                        context.externFuncs.Add(funcRec.name);
                 }
             }
             //是否有外部变量  
@@ -3957,7 +3967,7 @@ namespace Gizbox.Src.Backend
                         && rec.category == SymbolTable.RecordCatagory.Variable 
                         && rec.GetAdditionInf().table != context.ir.globalScope.env)
                     {
-                        context.externVars.Add(rec.name, rec);
+                        context.externVars.Add(rec.name);
                     }
                 }
             }

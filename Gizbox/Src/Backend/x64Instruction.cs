@@ -208,9 +208,7 @@ namespace Gizbox.Src.Backend
         cvtsi2ss,         // 整数(GPR 32/64) -> 标量单精度（写 XMM）
         cvtsi2sd,         // 整数(GPR 32/64) -> 标量双精度（写 XMM）
         cvttss2si,        // 标量单精度 -> 32位整数（截断，写GPR）
-        cvttss2siq,       // 标量单精度 -> 64位整数（截断，写GPR）
         cvttsd2si,        // 标量双精度 -> 32位整数（截断，写GPR）
-        cvttsd2siq,       // 标量双精度 -> 64位整数（截断，写GPR）
         cvtss2sd,         // 单精度 -> 双精度（XMM -> XMM）
         cvtsd2ss,         // 双精度 -> 单精度（XMM -> XMM）
     }
@@ -245,21 +243,21 @@ namespace Gizbox.Src.Backend
             strb.AppendLine("\n");
             foreach(var g in context.globalVarInfos)
             {
-                strb.AppendLine($"global  {UtilsW64.LegalizeName(g.Key)}");
+                strb.AppendLine($"global  {UtilsW64.LegalizeName(g)}");
             }
             foreach(var g in context.globalFuncsInfos)
             {
-                strb.AppendLine($"global  {UtilsW64.LegalizeName(g.Key)}");
+                strb.AppendLine($"global  {UtilsW64.LegalizeName(g)}");
             }
             foreach(var g in context.externVars)
             {
-                strb.AppendLine($"extern  {UtilsW64.LegalizeName(g.Key)}");
+                strb.AppendLine($"extern  {UtilsW64.LegalizeName(g)}");
             }
             foreach(var g in context.externFuncs)
             {
-                if(g.Key == "Main")
+                if(g == "Main" || g == "main")
                     continue;
-                strb.AppendLine($"extern  {UtilsW64.LegalizeName(g.Key)}");
+                strb.AppendLine($"extern  {UtilsW64.LegalizeName(g)}");
             }
 
             //.rdata
@@ -704,10 +702,8 @@ namespace Gizbox.Src.Backend
         public static X64Instruction cvtsi2ss(X64Operand dest, X64Operand src, X64Size srcIntSize) => new() { type = InstructionKind.cvtsi2ss, operand0 = dest, operand1 = src, sizeMark = X64Size.dword, sizeMarkSrc = srcIntSize };
         public static X64Instruction cvtsi2sd(X64Operand dest, X64Operand src, X64Size srcIntSize) => new() { type = InstructionKind.cvtsi2sd, operand0 = dest, operand1 = src, sizeMark = X64Size.qword, sizeMarkSrc = srcIntSize };
         // 浮点 -> 整数  
-        public static X64Instruction cvttss2si(X64Operand dest, X64Operand src) => new() { type = InstructionKind.cvttss2si, operand0 = dest, operand1 = src, sizeMark = X64Size.dword, sizeMarkSrc = X64Size.dword };
-        public static X64Instruction cvttss2siq(X64Operand dest, X64Operand src) => new() { type = InstructionKind.cvttss2siq, operand0 = dest, operand1 = src, sizeMark = X64Size.qword, sizeMarkSrc = X64Size.dword };
-        public static X64Instruction cvttsd2si(X64Operand dest, X64Operand src) => new() { type = InstructionKind.cvttsd2si, operand0 = dest, operand1 = src, sizeMark = X64Size.dword, sizeMarkSrc = X64Size.qword };
-        public static X64Instruction cvttsd2siq(X64Operand dest, X64Operand src) => new() { type = InstructionKind.cvttsd2siq, operand0 = dest, operand1 = src, sizeMark = X64Size.qword, sizeMarkSrc = X64Size.qword };
+        public static X64Instruction cvttss2si(X64Operand dest, X64Operand src, X64Size dstInstSize) => new() { type = InstructionKind.cvttss2si, operand0 = dest, operand1 = src, sizeMark = dstInstSize, sizeMarkSrc = X64Size.dword };
+        public static X64Instruction cvttsd2si(X64Operand dest, X64Operand src, X64Size dstInstSize) => new() { type = InstructionKind.cvttsd2si, operand0 = dest, operand1 = src, sizeMark = dstInstSize, sizeMarkSrc = X64Size.qword };
         // float <-> double
         public static X64Instruction cvtss2sd(X64Operand dest, X64Operand src) => new() { type = InstructionKind.cvtss2sd, operand0 = dest, operand1 = src };
         public static X64Instruction cvtsd2ss(X64Operand dest, X64Operand src) => new() { type = InstructionKind.cvtsd2ss, operand0 = dest, operand1 = src };

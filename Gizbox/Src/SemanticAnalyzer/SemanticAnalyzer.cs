@@ -121,10 +121,10 @@ namespace Gizbox.SemanticRule
         public Dictionary<Production, List<SemanticAction>> translateScheme = new Dictionary<Production, List<SemanticAction>>();
 
 
-        //语法分析树构造    
+        // 语法分析树构造    
         public BottomUpParseTreeBuilder parseTreeBuilder;
 
-        //抽象语法树构造    
+        // 抽象语法树构造    
         public SyntaxTree.ProgramNode syntaxRootNode;
 
         // 构造  
@@ -1392,6 +1392,9 @@ namespace Gizbox.SemanticRule
                             if (isTopLevelAtNamespace)
                                 varDeclNode.identifierNode.SetPrefix(currentNamespace);
 
+                            //补全类型名  
+                            TryCompleteType(varDeclNode.typeNode);
+
                             //是否初始值是常量
                             string initVal = string.Empty;
                             if(varDeclNode.initializerNode is LiteralNode lit)
@@ -1647,6 +1650,7 @@ namespace Gizbox.SemanticRule
                         //（非全局变量）成员字段或者局部变量  
                         if (isGlobalOrTopAtNamespace == false)
                         {
+                            //使用原名  
                             varDeclNode.identifierNode.SetPrefix(null);
 
                             //补全类型  
@@ -2032,7 +2036,12 @@ namespace Gizbox.SemanticRule
                         {
                             bool valid = CheckType_Equal(varDeclNode.typeNode.TypeExpression(), varDeclNode.initializerNode);
                             if(!valid)
+                            {
+                                var a = varDeclNode.typeNode.TypeExpression();
+                                var b = AnalyzeTypeExpression(varDeclNode.initializerNode);
                                 throw new SemanticException(ExceptioName.VariableTypeDeclarationError, varDeclNode, "type:" + varDeclNode.typeNode.TypeExpression() + "  intializer type:" + AnalyzeTypeExpression(varDeclNode.initializerNode));
+                            }
+                                
                         }
                     }
                     break;
@@ -3062,6 +3071,9 @@ namespace Gizbox.SemanticRule
 
         private void TryCompleteType(SyntaxTree.TypeNode typeNode)
         {
+            if(typeNode.attributes.ContainsKey("name_completed"))
+                return;
+
             switch (typeNode)
             {
                 case SyntaxTree.PrimitiveTypeNode primitiveTypeNode:
@@ -3077,6 +3089,7 @@ namespace Gizbox.SemanticRule
                     }
                     break;
             }
+            typeNode.attributes["name_completed"] = true;
         }
 
         private bool TryQueryAndMatchFunction(string funcRawName, string[] argTypes, string[] outParamTypes, bool isMethod = false, SymbolTable classEnvOfMethod = null)
