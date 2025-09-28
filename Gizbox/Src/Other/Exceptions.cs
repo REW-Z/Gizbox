@@ -76,6 +76,7 @@ namespace Gizbox
 
         //4.
         ScriptRuntimeError,
+        ScriptRuntimeUndefineBehaviour,
         StackOverflow,
         OnlyHeapObjectsCanBeFreed,
         AccessedObjectNotFound,

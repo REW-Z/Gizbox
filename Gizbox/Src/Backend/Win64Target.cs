@@ -19,49 +19,6 @@ using SymbolRecord = Gizbox.SymbolTable.Record;
 
 
 
-/*
- 虚函数表定义：
- section .data
-align 8
-vtable_example:
-    dq FuncA         ; 虚函数1的地址
-    dq FuncB         ; 虚函数2的地址
-
-section .text
-global FuncA
-global FuncB
-
-FuncA:
-    ; 函数实现
-    ret
-
-FuncB:
-    ; 函数实现
-    ret
-
-
-示例2：
-section .data align=8
-extern Foo_Virtual0
-extern Foo_Virtual1
-
-; vtable（函数指针数组）
-Foo_vtable:
-    dq Foo_Virtual0
-    dq Foo_Virtual1
-
-; 一个对象实例：vptr + 一个数据字段
-; 这里用静态初始化把 vptr 指向 Foo_vtable
-Foo_instance:
-    dq Foo_vtable       ; vptr
-    dq 42               ; data 成员示意
-
-section .text align=16
-global main
- */
-
-
-
 namespace Gizbox.Src.Backend
 {
     public static class Win64Target

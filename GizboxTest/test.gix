@@ -186,7 +186,7 @@ sam.Speak();
 sam.Walk();
 
 delete sam;
-Console::PrintLn("age latest:" + (string)(sam.age));
+//Console::PrintLn("age latest:" + (string)(sam.age));
 
 
 // ----------------- 输入测试 ------------------

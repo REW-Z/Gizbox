@@ -424,7 +424,7 @@ namespace Gizbox.ScriptEngine
                     {
                         var globalfuncRec = (code.arg0 as OperandSingleIdentifier).record;
 
-                        if(globalfuncRec.flags.HasFlag(SymbolTable.RecordFlag.ExternFunc))
+                        if(globalfuncRec != null && globalfuncRec.flags.HasFlag(SymbolTable.RecordFlag.ExternFunc))
                         {
                             string externFuncName = globalfuncRec.name;
 
@@ -441,7 +441,9 @@ namespace Gizbox.ScriptEngine
                         }
                         else
                         {
-                            string funcMangledName = globalfuncRec.name;
+                            string funcMangledName = globalfuncRec != null 
+                                ? globalfuncRec.name 
+                                : code.arg0.str;
 
                             if(GetValue(code.arg1).Type != GizType.Int)
                                 throw new GizboxException(ExceptioName.Undefine, "arg count not integer");
@@ -754,6 +756,9 @@ namespace Gizbox.ScriptEngine
                         if (objptr.Type != GizType.ObjectRef) throw new RuntimeException(ExceptioName.ObjectTypeError, GetCurrentCode(), "not gizbox object");
 
                         var obj = this.DeReference(objptr.AsPtr);
+                        if(obj == null)
+                            throw new GizboxException(ExceptioName.ScriptRuntimeUndefineBehaviour, "undefined behaviour.");
+
                         var gobj = (obj as GizObject);
                         var fields = gobj.fields;
                         if (fields.ContainsKey(fieldName) == false) throw new RuntimeException(ExceptioName.ObjectFieldNotInitialized,GetCurrentCode(), fieldName);
@@ -834,10 +839,11 @@ namespace Gizbox.ScriptEngine
             switch(o)
             {
                 case Boolean b: return b;
+                case Char c: return c;
                 case Int32 i: return i;
+                case Int64 l:return l;
                 case Single f: return f;
                 case Double d: return d;
-                case Char c: return c;
                 default:
                     {
                         if(o is String)
@@ -864,18 +870,23 @@ namespace Gizbox.ScriptEngine
             switch (v.Type)
             {
                 case GizType.Bool: return v.AsBool;
+                case GizType.Char: return v.AsChar;
                 case GizType.Int: return v.AsInt;
+                case GizType.Long: return v.AsLong;
                 case GizType.Float: return v.AsFloat;
                 case GizType.Double: return v.AsDouble;
-                case GizType.Char: return v.AsChar;
 
                 case GizType.StringRef:
                     {
                         return this.DeReference(v.AsPtr);
                     }
-                default:
+                case GizType.ObjectRef:
                     {
                         return this.DeReference(v.AsPtr);
+                    }
+                default:
+                    {
+                        throw new GizboxException(ExceptioName.ScriptRuntimeError, "undefined marshal type:" + v.Type);
                     }
 
             }

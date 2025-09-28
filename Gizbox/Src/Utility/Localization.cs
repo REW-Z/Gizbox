@@ -84,6 +84,7 @@ namespace Gizbox
 
 
             HardCodeKeyValue(ExceptioName.ScriptRuntimeError.ToString(), null, "脚本运行时错误");
+            HardCodeKeyValue(ExceptioName.ScriptRuntimeUndefineBehaviour.ToString(), null, "未定义行为");
             HardCodeKeyValue(ExceptioName.StackOverflow.ToString(), null, "堆栈溢出");
             HardCodeKeyValue(ExceptioName.StackOverflow.ToString(), null, "脚本运行时错误");
             HardCodeKeyValue(ExceptioName.OnlyHeapObjectsCanBeFreed.ToString(), null, "只能对堆中的对象进行释放");
