@@ -125,6 +125,7 @@ namespace Gizbox
             "stmt -> if ( expr ) stmt elifclauselist elseclause",
 
             "declstmt -> type ID = expr ;",
+            "declstmt -> own type ID = expr ;",
             "declstmt -> const type ID = lit ;",
             "declstmt -> type ID ( params ) { statements }",
             "declstmt -> type operator ID ( params ) { statements }",
@@ -243,7 +244,9 @@ namespace Gizbox
 
             "params -> ε",
             "params -> type ID",
+            "params -> own type ID",
             "params -> params , type ID",
+            "params -> params , own type ID",
 
             "args -> ε",
             "args -> expr",

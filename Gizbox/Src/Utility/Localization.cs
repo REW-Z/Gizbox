@@ -81,6 +81,7 @@ namespace Gizbox
             HardCodeKeyValue(ExceptioName.BinaryOperationTypeMismatch.ToString(), null, "二元运算两边类型不一致");
             HardCodeKeyValue(ExceptioName.CannotAnalyzeExpressionNodeType.ToString(), null, "无法分析表达式节点类型");
             HardCodeKeyValue(ExceptioName.MemberFieldNotFound.ToString(), null, "成员字段不存在");
+            HardCodeKeyValue(ExceptioName.OwnershipError.ToString(), null, "所有权错误");
 
 
             HardCodeKeyValue(ExceptioName.ScriptRuntimeError.ToString(), null, "脚本运行时错误");

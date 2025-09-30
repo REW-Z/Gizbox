@@ -418,6 +418,26 @@ namespace Gizbox.SemanticRule
                 };
             });
 
+            AddActionAtTail("declstmt -> own type ID = expr ;", (psr, production) => {
+
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.VarDeclareNode()
+                {
+                    flags = VarModifiers.Own,
+
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 4].attributes["ast_node"],
+                    identifierNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = psr.stack[psr.stack.Top - 3].attributes,
+                        token = psr.stack[psr.stack.Top - 3].attributes["token"] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField,
+                    },
+                    initializerNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"],
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
+
+
             AddActionAtTail("declstmt -> const type ID = lit ;", (psr, production) => {
 
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.ConstantDeclareNode()
@@ -1099,12 +1119,52 @@ namespace Gizbox.SemanticRule
                 };
             });
 
+            AddActionAtTail("params -> own type ID", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.ParameterListNode()
+                {
+                    parameterNodes = new List<SyntaxTree.ParameterNode>() {
+                        new SyntaxTree.ParameterNode(){
+                            flags = VarModifiers.Own,
+                            typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"],
+                            identifierNode = new SyntaxTree.IdentityNode(){
+                                attributes = psr.stack[psr.stack.Top].attributes,
+                                token = psr.stack[psr.stack.Top].attributes["token"] as Token,
+                                identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
+                            },
+                        }
+                    },
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
+
+
+
+
             AddActionAtTail("params -> params , type ID", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 3].attributes["ast_node"];
 
                 ((SyntaxTree.ParameterListNode)psr.newElement.attributes["ast_node"]).parameterNodes.Add(
                     new SyntaxTree.ParameterNode()
                     {
+                        typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"],
+                        identifierNode = new SyntaxTree.IdentityNode()
+                        {
+                            attributes = psr.stack[psr.stack.Top].attributes,
+                            token = psr.stack[psr.stack.Top].attributes["token"] as Token,
+                            identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
+                        },
+                    }
+                );
+            });
+
+            AddActionAtTail("params -> params , own type ID", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 3].attributes["ast_node"];
+
+                ((SyntaxTree.ParameterListNode)psr.newElement.attributes["ast_node"]).parameterNodes.Add(
+                    new SyntaxTree.ParameterNode()
+                    {
+                        flags = VarModifiers.Own,
                         typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"],
                         identifierNode = new SyntaxTree.IdentityNode()
                         {
@@ -1388,6 +1448,9 @@ namespace Gizbox.SemanticRule
                     {
                         if (isGlobalOrTopNamespace)
                         {
+                            if(varDeclNode.flags.HasFlag(VarModifiers.Own))
+                                throw new SemanticException(ExceptioName.OwnershipError, varDeclNode, "Can not declare own var at global scope.");
+
                             //附加命名空间名  
                             if (isTopLevelAtNamespace)
                                 varDeclNode.identifierNode.SetPrefix(currentNamespace);
@@ -1409,6 +1472,7 @@ namespace Gizbox.SemanticRule
                                 varDeclNode.typeNode.TypeExpression(),
                                 initValue:initVal
                                 );
+                            newRec.flags |= SymbolTable.RecordFlag.ManualVar;
                         }
                     }
                     break;
@@ -1662,6 +1726,38 @@ namespace Gizbox.SemanticRule
                                 SymbolTable.RecordCatagory.Variable,
                                 varDeclNode.typeNode.TypeExpression()
                                 );
+
+
+                            //所有权语义分析  
+                            GType type = GType.Parse(varDeclNode.typeNode.TypeExpression());
+                            if(type.IsReferenceType)
+                            {
+                                /*
+                                    - `own T x = new T();`：x 为所有权管理对象，作用域结束自动释放；重绑定前自动释放旧值。  
+                                    - `own T owned2 = owned1;`所有权转移（move），`owned1`变为“已移动”不可再用。 
+                                    - `T brw = owned1;`：借用（borrow），`brw`不可逃逸`owned1`的作用域，且不能作为返回值。   
+                                    - `T brw2 = brw1;`：赋值借用（borrow）。      
+                                    - `T x = new T();`：x 为手动管理对象，需要显式 `delete x;`。  
+                                 */
+                                if(varDeclNode.flags.HasFlag(VarModifiers.Own))
+                                {
+                                    if(varDeclNode.initializerNode is NewObjectNode newNode)
+                                    {
+                                        newRec.flags |= SymbolTable.RecordFlag.OwnerVar;
+                                    }
+                                    else if(varDeclNode.initializerNode is IdentityNode idNode)
+                                    {
+
+                                    }
+                                    
+                                }
+                                    
+                                else
+                                {
+                                    newRec.flags |= SymbolTable.RecordFlag.ManualVar;
+                                }
+                                    
+                            }
                         }
                     }
                     break;
@@ -2772,11 +2868,11 @@ namespace Gizbox.SemanticRule
         }
         private bool CheckType_Equal(string typeExpr1, string typeExpr2)
         {
-            if (typeExpr1 == "null" && GType.Parse(typeExpr2).IsPointerType)
+            if (typeExpr1 == "null" && GType.Parse(typeExpr2).IsReferenceType)
             {
                 return true;
             }
-            else if (typeExpr2 == "null" && GType.Parse(typeExpr1).IsPointerType)
+            else if (typeExpr2 == "null" && GType.Parse(typeExpr1).IsReferenceType)
             {
                 return true;
             }

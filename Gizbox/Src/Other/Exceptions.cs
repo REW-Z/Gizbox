@@ -72,6 +72,7 @@ namespace Gizbox
         CannotAnalyzeExpressionNodeType,
         IdentifierAmbiguousBetweenNamespaces,
         MemberFieldNotFound,
+        OwnershipError,
 
 
         //4.

@@ -104,6 +104,10 @@ namespace Gizbox
             OperatorOverloadFunc = 1,
             ExternFunc = 2,
             Ctor = 4,
+            
+            ManualVar = 8,
+            OwnerVar = 16,
+            BorrowVar = 32,
         }
 
         [DataContract(IsReference = true)]
@@ -691,7 +695,7 @@ namespace Gizbox
         }
 
 
-        public bool IsPointerType
+        public bool IsReferenceType
         {
             get
             {

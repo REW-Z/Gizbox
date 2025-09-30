@@ -188,6 +188,13 @@ sam.Walk();
 delete sam;
 //Console::PrintLn("age latest:" + (string)(sam.age));
 
+// ----------------- 所有权测试 ------------------
+
+void OwnTest()
+{
+	own Int numO = new Int();
+}
+
 
 // ----------------- 输入测试 ------------------
 

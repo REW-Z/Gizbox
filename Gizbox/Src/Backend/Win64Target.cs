@@ -314,7 +314,7 @@ namespace Gizbox.Src.Backend
                     string initval = rec.initValue;
 
                     var type = GType.Parse(rec.typeExpression);
-                    if(type.IsPointerType == false)
+                    if(type.IsReferenceType == false)
                     {
                         section_data.Add(key, new() { GetStaticInitValue(rec) });
                     }
@@ -1201,7 +1201,7 @@ namespace Gizbox.Src.Backend
                                 break;
                             }
                             //指针类型转换 -> 指针直接赋值  
-                            else if(srcType.IsPointerType && targetType.IsPointerType)
+                            else if(srcType.IsReferenceType && targetType.IsReferenceType)
                             {
                                 Emit(X64.mov(castDst, castSrc, X64Size.qword));
                             }

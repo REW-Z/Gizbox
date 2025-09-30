@@ -272,8 +272,15 @@ namespace Gizbox
             public LiteralNode litValNode;
         }
 
+        public enum VarModifiers
+        {
+            Own = 2,
+            //Ref = 4,
+        }
         public class VarDeclareNode : DeclareNode
         {
+
+            public VarModifiers flags;
             public TypeNode typeNode;
             public IdentityNode identifierNode;
             public ExprNode initializerNode;
@@ -596,6 +603,7 @@ namespace Gizbox
 
         public class ParameterNode : Node
         {
+            public VarModifiers flags;
             public TypeNode typeNode;
             public IdentityNode identifierNode;
         }
