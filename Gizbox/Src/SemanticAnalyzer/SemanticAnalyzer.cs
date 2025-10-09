@@ -2744,7 +2744,6 @@ namespace Gizbox.SemanticRule
             if(node == null)
                 return;
 
-            // 递归体
             switch(node)
             {
                 case SyntaxTree.ProgramNode programNode:
@@ -2765,18 +2764,23 @@ namespace Gizbox.SemanticRule
                     }
                 case SyntaxTree.StatementBlockNode blockNode:
                     {
-                        // 入作用域（与 Pass2/3 对齐）
+                        // 进入block作用域  
                         envStack.Push(blockNode.attributes["env"] as SymbolTable);
                         pass4ScopeStack.Push(new Pass4ScopeInfo());
 
                         foreach(var s in blockNode.statements)
+                        {
                             Pass4_OwnershipLifetime(s);
+                        }
 
-                        // 作用域退出需要删除的 Owner 变量
+                        // 作用域退出需要删除的Owner变量
                         var toDelete = new List<string>();
                         foreach(var kv in pass4ScopeStack.Peek().localVariableStatusDict)
+                        {
                             if(kv.Value == 1)
                                 toDelete.Add(kv.Key);
+                        }
+
                         if(toDelete.Count > 0)
                             blockNode.attributes["pass4_delete_on_exit"] = toDelete;
 
@@ -2798,8 +2802,11 @@ namespace Gizbox.SemanticRule
 
                         var toDelete = new List<string>();
                         foreach(var kv in pass4ScopeStack.Peek().localVariableStatusDict)
+                        {
                             if(kv.Value == 1)
                                 toDelete.Add(kv.Key);
+                        }
+
                         if(toDelete.Count > 0)
                             forNode.attributes["pass4_delete_on_exit"] = toDelete;
 
@@ -2811,6 +2818,7 @@ namespace Gizbox.SemanticRule
                     {
                         Pass4_OwnershipLifetime(whileNode.conditionNode);
                         Pass4_OwnershipLifetime(whileNode.stmtNode);
+
                         break;
                     }
                 case SyntaxTree.IfStmtNode ifNode:
@@ -2821,16 +2829,23 @@ namespace Gizbox.SemanticRule
                             Pass4_OwnershipLifetime(c.thenNode);
                         }
                         if(ifNode.elseClause != null)
+                        {
                             Pass4_OwnershipLifetime(ifNode.elseClause.stmt);
+                        }
                         break;
                     }
                 case SyntaxTree.ClassDeclareNode classDecl:
                     {
-                        // 进入类作用域，仅递归成员（不做类级删除）
-                        envStack.Push(classDecl.attributes["env"] as SymbolTable);
-                        foreach(var m in classDecl.memberDelareNodes)
-                            Pass4_OwnershipLifetime(m);
-                        envStack.Pop();
+                        //// 进入类作用域  
+                        //envStack.Push(classDecl.attributes["env"] as SymbolTable);
+                        //foreach(var m in classDecl.memberDelareNodes)
+                        //{
+                        //    Pass4_OwnershipLifetime(m);
+                        //}
+                        //envStack.Pop();
+                        //break;
+
+                        //类作用域暂时不处理（成员函数默认是Manual类型）  
                         break;
                     }
                 case SyntaxTree.FuncDeclareNode funcDecl:
@@ -2839,7 +2854,7 @@ namespace Gizbox.SemanticRule
                         envStack.Push(funcDecl.attributes["env"] as SymbolTable);
                         pass4ScopeStack.Push(new Pass4ScopeInfo());
 
-                        // 函数返回所有权（在 Pass2 已写入 func_rec.flags）
+                        // 函数返回所有权（在Pass2已写入func_rec.flags）
                         pass4CurrentFuncReturnFlag = SymbolTable.RecordFlag.None;
                         pass4CurrentFuncParams = null;
                         if(funcDecl.attributes.ContainsKey("func_rec"))
@@ -2849,7 +2864,7 @@ namespace Gizbox.SemanticRule
                                 pass4CurrentFuncReturnFlag = frec.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.ManualVar | SymbolTable.RecordFlag.BorrowVar);
                         }
 
-                        // 将形参加入当前作用域跟踪（仅 Owner 需要释放）
+                        // 将形参加入当前作用域跟踪（仅Owner需要释放）
                         var funcEnv = envStack.Peek();
                         var paramRecs = funcEnv.GetByCategory(SymbolTable.RecordCatagory.Param);
                         pass4CurrentFuncParams = paramRecs;
@@ -2866,13 +2881,18 @@ namespace Gizbox.SemanticRule
 
                         // 递归语句体
                         foreach(var s in funcDecl.statementsNode.statements)
+                        {
                             Pass4_OwnershipLifetime(s);
+                        }
 
                         // 函数正常退出需要回收的 Owner
                         var exitDel = new List<string>();
                         foreach(var kv in pass4ScopeStack.Peek().localVariableStatusDict)
+                        {
                             if(kv.Value == 1)
                                 exitDel.Add(kv.Key);
+                        }
+
                         if(exitDel.Count > 0)
                             funcDecl.attributes["pass4_delete_on_exit"] = exitDel;
 
@@ -2881,14 +2901,12 @@ namespace Gizbox.SemanticRule
                         break;
                     }
                 case SyntaxTree.ExternFuncDeclareNode _:
-                    // 无函数体，无需处理
+                    // 无需处理
                     break;
-
-                // -------------------- 语句与表达式节点规则 --------------------
 
                 case SyntaxTree.VarDeclareNode varDecl:
                     {
-                        // 先处理右值中的调用/参数（可能触发 move）
+                        // 先处理右值中的调用/参数（可能触发move）
                         Pass4_OwnershipLifetime(varDecl.initializerNode);
 
                         var rec = Query(varDecl.identifierNode.FullName);
@@ -2896,8 +2914,9 @@ namespace Gizbox.SemanticRule
                             break;
 
                         var model = rec.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.BorrowVar | SymbolTable.RecordFlag.ManualVar);
+                        
 
-                        // 记录 owner 局部
+                        // 记录owner局部
                         if(model.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             pass4ScopeStack.Peek().localVariableStatusDict[rec.name] = 1;
 
@@ -2912,10 +2931,14 @@ namespace Gizbox.SemanticRule
                             if(rrec != null)
                                 rvalModel = rrec.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.BorrowVar | SymbolTable.RecordFlag.ManualVar);
                         }
-                        else if(init is SyntaxTree.NewObjectNode)
+                        else if(init is SyntaxTree.NewObjectNode newobjnode)
                         {
-                            // new 统一视为可用于 owner/manual 目标；borrow 禁止
-                            rvalModel = SymbolTable.RecordFlag.OwnerVar;
+                            var classRec = Query(newobjnode.className.FullName);
+                            bool isownershipClass = classRec.flags.HasFlag(SymbolTable.RecordFlag.OwnershipClass);
+                            if(isownershipClass)
+                                rvalModel = SymbolTable.RecordFlag.OwnerVar;
+                            else
+                                rvalModel = SymbolTable.RecordFlag.ManualVar;
                         }
                         else if(init is SyntaxTree.CallNode callN)
                         {
@@ -2935,7 +2958,7 @@ namespace Gizbox.SemanticRule
                         // 规则检查
                         if(model.HasFlag(SymbolTable.RecordFlag.BorrowVar))
                         {
-                            // borrow 不能来自 manual，也不能来自临时（非 Identity）
+                            // borrow不能来自manual，也不能来自临时（非Identity）
                             if(init is SyntaxTree.IdentityNode)
                             {
                                 if(rvalModel.HasFlag(SymbolTable.RecordFlag.ManualVar))
@@ -2948,15 +2971,20 @@ namespace Gizbox.SemanticRule
                         }
                         else if(model.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                         {
-                            // 来自 manual/borrow 均非法；来自 owner 触发 move；来自 new/call(owner) OK
+                            // 来自manual/borrow均非法；来自owner触发move；来自new/call(owner)OK
                             if(init is SyntaxTree.IdentityNode)
                             {
                                 if(rvalModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                                 {
-                                    // move 源
+                                    // move源
                                     for(int i = pass4ScopeStack.Count - 1; i >= 0; --i)
+                                    {
                                         if(pass4ScopeStack.ElementAt(i).localVariableStatusDict.ContainsKey(rrec.name))
-                                        { pass4ScopeStack.ElementAt(i).localVariableStatusDict[rrec.name] = -1; break; }
+                                        {
+                                            pass4ScopeStack.ElementAt(i).localVariableStatusDict[rrec.name] = -1;
+                                            break; 
+                                        }
+                                    }
                                 }
                                 else
                                 {
@@ -2973,10 +3001,10 @@ namespace Gizbox.SemanticRule
                     }
                 case SyntaxTree.AssignNode asn:
                     {
-                        // 先处理右值中的调用/参数（可能触发 move）
+                        // 先处理右值中的调用/参数（可能触发move）
                         Pass4_OwnershipLifetime(asn.rvalueNode);
 
-                        // 仅处理 lvalue=ID 的情况；成员/索引跳过（由显式 delete 管理）
+                        // 仅处理lvalue=ID的情况；成员/索引跳过（由显式delete管理）
                         if(asn.lvalueNode is SyntaxTree.IdentityNode lid)
                         {
                             var lrec = Query(lid.FullName);
@@ -2984,7 +3012,7 @@ namespace Gizbox.SemanticRule
                             {
                                 var lmodel = lrec.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.BorrowVar | SymbolTable.RecordFlag.ManualVar);
 
-                                // 如果目标是 owner 且已有未释放，则先删
+                                // 如果目标是owner且已有未释放，则先删
                                 if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                                 {
                                     bool alive = false;
@@ -3036,10 +3064,15 @@ namespace Gizbox.SemanticRule
                                     {
                                         if(rvalModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                                         {
-                                            // move 源
+                                            // move源
                                             for(int i = pass4ScopeStack.Count - 1; i >= 0; --i)
+                                            {
                                                 if(pass4ScopeStack.ElementAt(i).localVariableStatusDict.ContainsKey(rrec.name))
-                                                { pass4ScopeStack.ElementAt(i).localVariableStatusDict[rrec.name] = -1; break; }
+                                                { 
+                                                    pass4ScopeStack.ElementAt(i).localVariableStatusDict[rrec.name] = -1; 
+                                                    break; 
+                                                }
+                                            }
 
                                             pass4ScopeStack.Peek().localVariableStatusDict[lrec.name] = 1;
                                         }
@@ -3048,7 +3081,7 @@ namespace Gizbox.SemanticRule
                                     }
                                     else
                                     {
-                                        // new 或返回 owner
+                                        // new或返回owner
                                         if(rvalModel.HasFlag(SymbolTable.RecordFlag.OwnerVar) || asn.rvalueNode is SyntaxTree.NewObjectNode)
                                             pass4ScopeStack.Peek().localVariableStatusDict[lrec.name] = 1;
                                         else
@@ -3057,7 +3090,7 @@ namespace Gizbox.SemanticRule
                                 }
                                 else if(lmodel.HasFlag(SymbolTable.RecordFlag.BorrowVar))
                                 {
-                                    // borrow 只能从变量借用，且不能来自 manual
+                                    // borrow 只能从变量借用，且不能来自manual
                                     if(asn.rvalueNode is SyntaxTree.IdentityNode)
                                     {
                                         if(rvalModel.HasFlag(SymbolTable.RecordFlag.ManualVar))
@@ -3084,7 +3117,7 @@ namespace Gizbox.SemanticRule
                     }
                 case SyntaxTree.DeleteStmtNode del:
                     {
-                        // 标记立即删除点；禁止删除 borrow
+                        // 标记立即删除点；禁止删除borrow
                         var list = new List<SyntaxTree.ExprNode>();
                         if(del.objToDelete != null)
                         {
@@ -3100,22 +3133,30 @@ namespace Gizbox.SemanticRule
 
                                     // 标记为已释放，避免作用域退出再次删除
                                     for(int i = pass4ScopeStack.Count - 1; i >= 0; --i)
+                                    {
                                         if(pass4ScopeStack.ElementAt(i).localVariableStatusDict.ContainsKey(drec.name))
-                                        { pass4ScopeStack.ElementAt(i).localVariableStatusDict[drec.name] = 0; break; }
+                                        {
+                                            pass4ScopeStack.ElementAt(i).localVariableStatusDict[drec.name] = 0; 
+                                            break; 
+                                        }
+                                    }
                                 }
                             }
                             list.Add(del.objToDelete);
                         }
                         if(list.Count > 0)
+                        {
                             del.attributes["pass4_delete_now_exprs"] = list;
+                        }
+                            
                         break;
                     }
                 case SyntaxTree.ReturnStmtNode ret:
                     {
-                        // 先递归，确保内层调用的 move 已处理
+                        // 先递归，确保内层调用的move已处理
                         Pass4_OwnershipLifetime(ret.returnExprNode);
 
-                        // 如果返回的是 owner，且返回变量是 Identity，则将其标记为 moved，避免被删除
+                        // 如果返回的是owner，且返回变量是Identity，则将其标记为moved，避免被删除
                         string returnedName = null;
                         if(pass4CurrentFuncReturnFlag.HasFlag(SymbolTable.RecordFlag.OwnerVar) && ret.returnExprNode is SyntaxTree.IdentityNode rid)
                         {
@@ -3129,21 +3170,26 @@ namespace Gizbox.SemanticRule
                             }
                         }
 
-                        // 汇总当前所有活跃 Owner（所有栈帧），return 前删除（排除被返回者）
+                        // 汇总当前所有活跃Owner（所有栈帧），return前删除（排除被返回者）
                         var delList = new List<string>();
                         foreach(var scope in pass4ScopeStack)
+                        {
                             foreach(var kv in scope.localVariableStatusDict)
+                            {
                                 if(kv.Value == 1 && kv.Key != returnedName)
                                     if(delList.Contains(kv.Key) == false)
                                         delList.Add(kv.Key);
+                            }
+                        }
 
                         if(delList.Count > 0)
                             ret.attributes["pass4_delete_before_return"] = delList;
+
                         break;
                     }
                 case SyntaxTree.SingleExprStmtNode sstmt:
                     {
-                        // 表达式作为语句：若 new 或 call 返回 owner，语句末删除
+                        // 表达式作为语句：若new或call返回owner，语句末删除
                         Pass4_OwnershipLifetime(sstmt.exprNode);
 
                         var dels = new List<SyntaxTree.ExprNode>();
@@ -3168,6 +3214,7 @@ namespace Gizbox.SemanticRule
 
                         if(dels.Count > 0)
                             sstmt.attributes["pass4_delete_after_stmt_exprs"] = dels;
+
                         break;
                     }
                 case SyntaxTree.CallNode call:
@@ -3176,7 +3223,7 @@ namespace Gizbox.SemanticRule
                         foreach(var a in call.argumantsNode.arguments)
                             Pass4_OwnershipLifetime(a);
 
-                        // 根据被调函数签名对实参做 move/校验
+                        // 根据被调函数签名对实参做move/校验
                         SymbolTable.Record funcRec = null;
                         if(call.attributes.ContainsKey("mangled_name"))
                             funcRec = Query((string)call.attributes["mangled_name"]);
@@ -3186,7 +3233,7 @@ namespace Gizbox.SemanticRule
                         if(funcRec != null && funcRec.envPtr != null)
                         {
                             var allParams = funcRec.envPtr.GetByCategory(SymbolTable.RecordCatagory.Param) ?? new List<SymbolTable.Record>();
-                            // 成员函数形参表含 this，非成员不含
+                            // 成员函数形参表含this，非成员不含
                             int offset = 0;
                             if(call.isMemberAccessFunction && allParams.Count > 0 && allParams[0].name == "this")
                                 offset = 1;
@@ -3199,7 +3246,7 @@ namespace Gizbox.SemanticRule
                                 var pflag = pr.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.BorrowVar | SymbolTable.RecordFlag.ManualVar);
                                 var arg = call.argumantsNode.arguments[i];
 
-                                // 分类 arg
+                                // 分类arg
                                 SymbolTable.Record argrec = null;
                                 var argModel = SymbolTable.RecordFlag.None;
                                 if(arg is SyntaxTree.IdentityNode aid)
@@ -3225,14 +3272,19 @@ namespace Gizbox.SemanticRule
 
                                 if(pflag.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                                 {
-                                    // 需要 move 的仅限变量实参为 owner；其它（new/call-owner）临时 OK；manual/borrow 非法
+                                    // 需要move的仅限变量实参为owner；其它（new/call-owner）临时OK；manual/borrow非法
                                     if(arg is SyntaxTree.IdentityNode)
                                     {
                                         if(argModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                                         {
                                             for(int si = pass4ScopeStack.Count - 1; si >= 0; --si)
+                                            {
                                                 if(pass4ScopeStack.ElementAt(si).localVariableStatusDict.ContainsKey(argrec.name))
-                                                { pass4ScopeStack.ElementAt(si).localVariableStatusDict[argrec.name] = -1; break; }
+                                                { 
+                                                    pass4ScopeStack.ElementAt(si).localVariableStatusDict[argrec.name] = -1; 
+                                                    break;
+                                                }
+                                            }
                                         }
                                         else
                                             throw new SemanticException(ExceptioName.OwnershipError, call, "owner parameter requires own argument");
@@ -3245,7 +3297,7 @@ namespace Gizbox.SemanticRule
                                 }
                                 else if(pflag.HasFlag(SymbolTable.RecordFlag.BorrowVar))
                                 {
-                                    // borrow 不允许 manual；借用临时将悬垂，这里禁止非 Identity
+                                    // borrow不允许manual；借用临时将悬垂，这里禁止非Identity
                                     if(!(arg is SyntaxTree.IdentityNode))
                                         throw new SemanticException(ExceptioName.OwnershipError, call, "borrow parameter cannot bind to temporary");
                                     if(argModel.HasFlag(SymbolTable.RecordFlag.ManualVar))
@@ -3262,7 +3314,7 @@ namespace Gizbox.SemanticRule
                     }
                 case SyntaxTree.IdentityNode id:
                     {
-                        // 一般作为 rvalue 使用：禁止使用已 move 的 owner 变量
+                        // 一般作为rvalue使用：禁止使用已move的owner变量
                         var rec = Query(id.FullName);
                         if(rec != null && rec.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                         {
@@ -3307,7 +3359,9 @@ namespace Gizbox.SemanticRule
                     if(ch != null)
                     {
                         foreach(var n in ch)
+                        {
                             Pass4_OwnershipLifetime(n);
+                        }
                     }
                     break;
             }
