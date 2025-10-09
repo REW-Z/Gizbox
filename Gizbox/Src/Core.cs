@@ -98,16 +98,18 @@ namespace Gizbox
             LoopScope,
             FuncScope,
         }
-        public enum RecordFlag
+        public enum RecordFlag : ulong
         {
             None = 0,
-            OperatorOverloadFunc = 1,
-            ExternFunc = 2,
-            Ctor = 4,
-            
-            ManualVar = 8,
-            OwnerVar = 16,
-            BorrowVar = 32,
+            OperatorOverloadFunc = 1 << 0,
+            ExternFunc = 1 << 1,
+            Ctor = 1 << 2,
+
+            ManualClass = 1 << 10,
+            OwnershipClass = 1 << 11,
+            ManualVar = 1 << 12,
+            OwnerVar = 1 << 13,
+            BorrowVar = 1 << 14,
         }
 
         [DataContract(IsReference = true)]
@@ -132,7 +134,13 @@ namespace Gizbox
             [DataMember]
             public SymbolTable envPtr;
             [DataMember]
-            public RecordFlag flags;
+            public ulong flagsSerialized;
+
+            public RecordFlag flags
+            {
+                get => (RecordFlag)flagsSerialized;
+                set => flagsSerialized = (ulong)value;
+            }
 
             public object runtimeAdditionalInfo;
         }

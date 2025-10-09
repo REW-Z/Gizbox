@@ -274,8 +274,14 @@ namespace Gizbox
 
         public enum VarModifiers
         {
+            None = 0,
             Own = 2,
-            //Ref = 4,
+            Bor = 4,
+        }
+        public enum TypeModifiers
+        {
+            None = 0,
+            Own = 2,
         }
         public class VarDeclareNode : DeclareNode
         {
@@ -293,15 +299,17 @@ namespace Gizbox
             public IdentityNode identifierNode;
             public ParameterListNode parametersNode;
         }
+
+        public enum FunctionKind
+        {
+            Normal,
+            OperatorOverload,
+        }
         public class FuncDeclareNode : DeclareNode
         {
-            public enum Type
-            {
-                Normal,
-                OperatorOverload,
-            }
+            public FunctionKind funcType;
+            public VarModifiers returnFlags;
 
-            public Type funcType;
             public TypeNode returnTypeNode;
             public IdentityNode identifierNode;
             public ParameterListNode parametersNode;
@@ -310,6 +318,8 @@ namespace Gizbox
 
         public class ClassDeclareNode : DeclareNode
         {
+            public TypeModifiers flags;
+
             public IdentityNode classNameNode;
             public IdentityNode baseClassNameNode;
             public List<DeclareNode> memberDelareNodes;

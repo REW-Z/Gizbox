@@ -72,7 +72,15 @@ namespace Gizbox
         CannotAnalyzeExpressionNodeType,
         IdentifierAmbiguousBetweenNamespaces,
         MemberFieldNotFound,
+
         OwnershipError,
+        OwnershipError_CanNotAssignBorrowToOwn,
+        OwnershipError_CanNotAssignManualToOwn,
+        OwnershipError_CanNotAssignOwnToManual,
+        OwnershipError_CanNotAssignBorrwToManual,
+        OwnershipError_CanNotAssignManualToBorrow,
+        OwnershipError_BorrowCanNotNew,
+        OwnershipError_ReturnBorrowValueNotSupport,
 
 
         //4.

@@ -405,6 +405,7 @@ namespace Gizbox.SemanticRule
 
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.VarDeclareNode()
                 {
+                    flags = (VarModifiers.None),
                     typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 4].attributes["ast_node"],
                     identifierNode = new SyntaxTree.IdentityNode()
                     {
@@ -417,13 +418,11 @@ namespace Gizbox.SemanticRule
                     attributes = psr.newElement.attributes,
                 };
             });
-
-            AddActionAtTail("declstmt -> own type ID = expr ;", (psr, production) => {
+            AddActionAtTail("declstmt -> tmodf type ID = expr ;", (psr, production) => {
 
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.VarDeclareNode()
                 {
-                    flags = VarModifiers.Own,
-
+                    flags = (VarModifiers)psr.stack[psr.stack.Top - 5].attributes["tmodf"],
                     typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 4].attributes["ast_node"],
                     identifierNode = new SyntaxTree.IdentityNode()
                     {
@@ -459,7 +458,27 @@ namespace Gizbox.SemanticRule
             AddActionAtTail("declstmt -> type ID ( params ) { statements }", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.FuncDeclareNode()
                 {
-                    funcType = FuncDeclareNode.Type.Normal,
+                    funcType = FunctionKind.Normal,
+                    returnFlags = VarModifiers.None,
+
+                    returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 7].attributes["ast_node"],
+                    identifierNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = psr.stack[psr.stack.Top - 6].attributes,
+                        token = psr.stack[psr.stack.Top - 6].attributes["token"] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
+                    },
+                    parametersNode = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes["ast_node"],
+                    statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"],
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
+            AddActionAtTail("declstmt -> tmodf type ID ( params ) { statements }", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.FuncDeclareNode()
+                {
+                    funcType = FunctionKind.Normal,
+                    returnFlags = (VarModifiers)psr.stack[psr.stack.Top - 8].attributes["tmodf"],
 
                     returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 7].attributes["ast_node"],
                     identifierNode = new SyntaxTree.IdentityNode()
@@ -478,7 +497,27 @@ namespace Gizbox.SemanticRule
             AddActionAtTail("declstmt -> type operator ID ( params ) { statements }", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.FuncDeclareNode()
                 {
-                    funcType = FuncDeclareNode.Type.OperatorOverload,
+                    funcType = FunctionKind.OperatorOverload,
+                    returnFlags = VarModifiers.None,
+
+                    returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 8].attributes["ast_node"],
+                    identifierNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = psr.stack[psr.stack.Top - 6].attributes,
+                        token = psr.stack[psr.stack.Top - 6].attributes["token"] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
+                    },
+                    parametersNode = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes["ast_node"],
+                    statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"],
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
+            AddActionAtTail("declstmt -> tmodf type operator ID ( params ) { statements }", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.FuncDeclareNode()
+                {
+                    funcType = FunctionKind.OperatorOverload,
+                    returnFlags = (VarModifiers)psr.stack[psr.stack.Top - 9].attributes["tmodf"],
 
                     returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 8].attributes["ast_node"],
                     identifierNode = new SyntaxTree.IdentityNode()
@@ -514,6 +553,7 @@ namespace Gizbox.SemanticRule
             AddActionAtTail("declstmt -> class ID inherit { declstatements }", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.ClassDeclareNode()
                 {
+                    flags = TypeModifiers.None,
 
                     classNameNode = new SyntaxTree.IdentityNode()
                     {
@@ -542,8 +582,46 @@ namespace Gizbox.SemanticRule
                 );
             });
 
+            AddActionAtTail("declstmt -> class own ID inherit { declstatements }", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = new SyntaxTree.ClassDeclareNode()
+                {
+                    flags = TypeModifiers.Own,
+
+                    classNameNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = psr.stack[psr.stack.Top - 4].attributes,
+                        token = psr.stack[psr.stack.Top - 4].attributes["token"] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.Class,
+                    },
+
+                    memberDelareNodes = new List<SyntaxTree.DeclareNode>(),
+
+                    attributes = psr.newElement.attributes,
+                };
 
 
+                if(psr.stack[psr.stack.Top - 3].attributes.ContainsKey("ast_node"))
+                {
+                    ((SyntaxTree.ClassDeclareNode)psr.newElement.attributes["ast_node"]).baseClassNameNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top - 3].attributes["ast_node"];
+                }
+                else
+                {
+                    ((SyntaxTree.ClassDeclareNode)psr.newElement.attributes["ast_node"]).baseClassNameNode = null;
+                }
+
+                ((SyntaxTree.ClassDeclareNode)psr.newElement.attributes["ast_node"]).memberDelareNodes.AddRange(
+                    (List<SyntaxTree.DeclareNode>)psr.stack[psr.stack.Top - 1].attributes["decl_stmts"]
+                );
+            });
+
+            AddActionAtTail("tmodf -> own", (psr, production) =>
+            {
+                psr.newElement.attributes["tmodf"] = VarModifiers.Own;
+            });
+            AddActionAtTail("tmodf -> bor", (psr, production) =>
+            {
+                psr.newElement.attributes["tmodf"] = VarModifiers.Bor;
+            });
 
 
 
@@ -1106,6 +1184,7 @@ namespace Gizbox.SemanticRule
                 {
                     parameterNodes = new List<SyntaxTree.ParameterNode>() {
                         new SyntaxTree.ParameterNode(){
+                            flags = VarModifiers.None,
                             typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"],
                             identifierNode = new SyntaxTree.IdentityNode(){
                                 attributes = psr.stack[psr.stack.Top].attributes,
@@ -1118,13 +1197,12 @@ namespace Gizbox.SemanticRule
                     attributes = psr.newElement.attributes,
                 };
             });
-
-            AddActionAtTail("params -> own type ID", (psr, production) => {
+            AddActionAtTail("params -> tmodf type ID", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = new SyntaxTree.ParameterListNode()
                 {
                     parameterNodes = new List<SyntaxTree.ParameterNode>() {
                         new SyntaxTree.ParameterNode(){
-                            flags = VarModifiers.Own,
+                            flags = (VarModifiers)psr.stack[psr.stack.Top - 2].attributes["tmodf"],
                             typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"],
                             identifierNode = new SyntaxTree.IdentityNode(){
                                 attributes = psr.stack[psr.stack.Top].attributes,
@@ -1137,9 +1215,6 @@ namespace Gizbox.SemanticRule
                     attributes = psr.newElement.attributes,
                 };
             });
-
-
-
 
             AddActionAtTail("params -> params , type ID", (psr, production) => {
                 psr.newElement.attributes["ast_node"] = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 3].attributes["ast_node"];
@@ -1147,6 +1222,7 @@ namespace Gizbox.SemanticRule
                 ((SyntaxTree.ParameterListNode)psr.newElement.attributes["ast_node"]).parameterNodes.Add(
                     new SyntaxTree.ParameterNode()
                     {
+                        flags = VarModifiers.None,
                         typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"],
                         identifierNode = new SyntaxTree.IdentityNode()
                         {
@@ -1157,14 +1233,13 @@ namespace Gizbox.SemanticRule
                     }
                 );
             });
-
-            AddActionAtTail("params -> params , own type ID", (psr, production) => {
-                psr.newElement.attributes["ast_node"] = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 3].attributes["ast_node"];
+            AddActionAtTail("params -> params , tmodf type ID", (psr, production) => {
+                psr.newElement.attributes["ast_node"] = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes["ast_node"];
 
                 ((SyntaxTree.ParameterListNode)psr.newElement.attributes["ast_node"]).parameterNodes.Add(
                     new SyntaxTree.ParameterNode()
                     {
-                        flags = VarModifiers.Own,
+                        flags = (VarModifiers)psr.stack[psr.stack.Top - 2].attributes["tmodf"],
                         typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes["ast_node"],
                         identifierNode = new SyntaxTree.IdentityNode()
                         {
@@ -1175,6 +1250,7 @@ namespace Gizbox.SemanticRule
                     }
                 );
             });
+
 
             AddActionAtTail("args -> ε", (psr, production) =>
             {
@@ -1289,6 +1365,26 @@ namespace Gizbox.SemanticRule
         }
     }
 
+    /// <summary>
+    /// 函数语义信息  
+    /// </summary>
+    public class FunctionSemanticInfo
+    {
+        public enum VarStatus
+        {
+            Owning,
+            Moved,
+            Borrowing,
+        }
+        public FuncDeclareNode currFuncDeclNode = null;
+        public Dictionary<string, VarStatus> localVariableStatusDict = new();
+
+        public void Clear()
+        {
+            currFuncDeclNode = null;
+            localVariableStatusDict.Clear();
+        }
+    }
 
 
     /// <summary>
@@ -1314,6 +1410,8 @@ namespace Gizbox.SemanticRule
         //temp  
         private string currentNamespace = "";
         private List<string> namespaceUsings = new List<string>();
+
+
 
 
         /// <summary>
@@ -1378,6 +1476,11 @@ namespace Gizbox.SemanticRule
             envStack.Clear();
             envStack.Push(ilUnit.globalScope.env);
             Pass3_AnalysisNode(ast.rootNode);
+
+            //Pass4
+            envStack.Clear();
+            envStack.Push(ilUnit.globalScope.env);
+            Pass4_OwnershipLifetime(ast.rootNode);
         }
 
         /// <summary>
@@ -1448,8 +1551,9 @@ namespace Gizbox.SemanticRule
                     {
                         if (isGlobalOrTopNamespace)
                         {
-                            if(varDeclNode.flags.HasFlag(VarModifiers.Own))
-                                throw new SemanticException(ExceptioName.OwnershipError, varDeclNode, "Can not declare own var at global scope.");
+                            //全局变量不允许有所有权修饰符
+                            if(varDeclNode.flags.HasFlag(VarModifiers.Own) || varDeclNode.flags.HasFlag(VarModifiers.Bor))
+                                throw new SemanticException(ExceptioName.OwnershipError, varDeclNode, "global variable can not have ownership modifiers");
 
                             //附加命名空间名  
                             if (isTopLevelAtNamespace)
@@ -1529,8 +1633,10 @@ namespace Gizbox.SemanticRule
                                 );
                             newRec.rawname = funcDeclNode.identifierNode.FullName;
 
+                            funcDeclNode.attributes["func_rec"] = newRec;
+
                             //重载函数  
-                            if(funcDeclNode.funcType == FuncDeclareNode.Type.OperatorOverload)
+                            if(funcDeclNode.funcType == FunctionKind.OperatorOverload)
                             {
                                 newRec.flags |= SymbolTable.RecordFlag.OperatorOverloadFunc;
                             }
@@ -1621,6 +1727,13 @@ namespace Gizbox.SemanticRule
                                 "",
                                 newEnv
                                 );
+
+
+                            //所有权模型  
+                            if(classDeclNode.flags.HasFlag(TypeModifiers.Own))
+                                newRec.flags |= SymbolTable.RecordFlag.OwnershipClass;
+                            else
+                                newRec.flags |= SymbolTable.RecordFlag.ManualClass;
                         }
                         else
                         {
@@ -1728,36 +1841,9 @@ namespace Gizbox.SemanticRule
                                 );
 
 
-                            //所有权语义分析  
-                            GType type = GType.Parse(varDeclNode.typeNode.TypeExpression());
-                            if(type.IsReferenceType)
-                            {
-                                /*
-                                    - `own T x = new T();`：x 为所有权管理对象，作用域结束自动释放；重绑定前自动释放旧值。  
-                                    - `own T owned2 = owned1;`所有权转移（move），`owned1`变为“已移动”不可再用。 
-                                    - `T brw = owned1;`：借用（borrow），`brw`不可逃逸`owned1`的作用域，且不能作为返回值。   
-                                    - `T brw2 = brw1;`：赋值借用（borrow）。      
-                                    - `T x = new T();`：x 为手动管理对象，需要显式 `delete x;`。  
-                                 */
-                                if(varDeclNode.flags.HasFlag(VarModifiers.Own))
-                                {
-                                    if(varDeclNode.initializerNode is NewObjectNode newNode)
-                                    {
-                                        newRec.flags |= SymbolTable.RecordFlag.OwnerVar;
-                                    }
-                                    else if(varDeclNode.initializerNode is IdentityNode idNode)
-                                    {
-
-                                    }
-                                    
-                                }
-                                    
-                                else
-                                {
-                                    newRec.flags |= SymbolTable.RecordFlag.ManualVar;
-                                }
-                                    
-                            }
+                            //对象所有权模型    
+                            var ownermodel = AnalyzeOwnership(varDeclNode.flags, varDeclNode.typeNode);
+                            newRec.flags |= ownermodel;
                         }
                     }
                     break;
@@ -1765,7 +1851,6 @@ namespace Gizbox.SemanticRule
                     {
                         //Id at env
                         funcDeclNode.identifierNode.attributes["def_at_env"] = envStack.Peek();
-
 
 
                         //是否是实例成员函数  
@@ -1831,7 +1916,11 @@ namespace Gizbox.SemanticRule
                                 );
                             newRec.rawname = funcDeclNode.identifierNode.FullName;
 
+                            funcDeclNode.attributes["func_rec"] = newRec;
                         }
+
+
+
 
 
                         {
@@ -1844,8 +1933,21 @@ namespace Gizbox.SemanticRule
                             TryCompleteType(funcDeclNode.returnTypeNode);
 
 
+                            //返回值分析  
+                            var funcRec = (funcDeclNode.attributes["func_rec"] as SymbolTable.Record);
+                            if(funcRec != null)
+                            {
+                                var returnOwnership = AnalyzeOwnership(funcDeclNode.returnFlags, funcDeclNode.returnTypeNode);
+                                if(returnOwnership == SymbolTable.RecordFlag.BorrowVar)
+                                    throw new SemanticException(ExceptioName.OwnershipError_ReturnBorrowValueNotSupport, funcDeclNode, string.Empty);
+
+                                funcRec.flags |= returnOwnership;
+                            }
+
+
+
                             //隐藏的this参数加入符号表    
-                            if (isMethod)
+                            if(isMethod)
                             {
                                 funcEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, className);
                             }
@@ -1908,6 +2010,10 @@ namespace Gizbox.SemanticRule
                             SymbolTable.RecordCatagory.Param,
                             paramNode.typeNode.TypeExpression()
                             );
+
+                        //所有权模型  
+                        var ownermodel = AnalyzeOwnership(paramNode.flags, paramNode.typeNode);
+                        newRec.flags |= ownermodel;
                     }
                     break;
                 case SyntaxTree.ClassDeclareNode classDeclNode:
@@ -2616,6 +2722,649 @@ namespace Gizbox.SemanticRule
             }
         }
 
+        // Pass4 作用域内新声明 Owner 变量名单栈    
+        private Stack<Pass4ScopeInfo> pass4ScopeStack = new ();
+        private class Pass4ScopeInfo
+        {
+            //1-未释放，0-已释放，-1:已move所有权
+            public Dictionary<string, int> localVariableStatusDict = new();
+
+            //其他需要记录的信息
+            //...
+        }
+        private SymbolTable.RecordFlag pass4CurrentFuncReturnFlag = SymbolTable.RecordFlag.None;
+        private List<SymbolTable.Record> pass4CurrentFuncParams = null;
+
+
+        /// <summary>
+        /// PASS4:所有权与生命周期分析  
+        /// </summary>
+        private void Pass4_OwnershipLifetime(SyntaxTree.Node node)
+        {
+            if(node == null)
+                return;
+
+            // 递归体
+            switch(node)
+            {
+                case SyntaxTree.ProgramNode programNode:
+                    {
+                        Pass4_OwnershipLifetime(programNode.statementsNode);
+                        break;
+                    }
+                case SyntaxTree.NamespaceNode nsNode:
+                    {
+                        Pass4_OwnershipLifetime(nsNode.stmtsNode);
+                        break;
+                    }
+                case SyntaxTree.StatementsNode stmtsNode:
+                    {
+                        foreach(var s in stmtsNode.statements)
+                            Pass4_OwnershipLifetime(s);
+                        break;
+                    }
+                case SyntaxTree.StatementBlockNode blockNode:
+                    {
+                        // 入作用域（与 Pass2/3 对齐）
+                        envStack.Push(blockNode.attributes["env"] as SymbolTable);
+                        pass4ScopeStack.Push(new Pass4ScopeInfo());
+
+                        foreach(var s in blockNode.statements)
+                            Pass4_OwnershipLifetime(s);
+
+                        // 作用域退出需要删除的 Owner 变量
+                        var toDelete = new List<string>();
+                        foreach(var kv in pass4ScopeStack.Peek().localVariableStatusDict)
+                            if(kv.Value == 1)
+                                toDelete.Add(kv.Key);
+                        if(toDelete.Count > 0)
+                            blockNode.attributes["pass4_delete_on_exit"] = toDelete;
+
+                        pass4ScopeStack.Pop();
+                        envStack.Pop();
+                        break;
+                    }
+                case SyntaxTree.ForStmtNode forNode:
+                    {
+                        // 入循环作用域
+                        envStack.Push(forNode.attributes["env"] as SymbolTable);
+                        pass4ScopeStack.Push(new Pass4ScopeInfo());
+
+                        // initializer/condition/iterator/body
+                        Pass4_OwnershipLifetime(forNode.initializerNode);
+                        Pass4_OwnershipLifetime(forNode.conditionNode);
+                        Pass4_OwnershipLifetime(forNode.iteratorNode);
+                        Pass4_OwnershipLifetime(forNode.stmtNode);
+
+                        var toDelete = new List<string>();
+                        foreach(var kv in pass4ScopeStack.Peek().localVariableStatusDict)
+                            if(kv.Value == 1)
+                                toDelete.Add(kv.Key);
+                        if(toDelete.Count > 0)
+                            forNode.attributes["pass4_delete_on_exit"] = toDelete;
+
+                        pass4ScopeStack.Pop();
+                        envStack.Pop();
+                        break;
+                    }
+                case SyntaxTree.WhileStmtNode whileNode:
+                    {
+                        Pass4_OwnershipLifetime(whileNode.conditionNode);
+                        Pass4_OwnershipLifetime(whileNode.stmtNode);
+                        break;
+                    }
+                case SyntaxTree.IfStmtNode ifNode:
+                    {
+                        foreach(var c in ifNode.conditionClauseList)
+                        {
+                            Pass4_OwnershipLifetime(c.conditionNode);
+                            Pass4_OwnershipLifetime(c.thenNode);
+                        }
+                        if(ifNode.elseClause != null)
+                            Pass4_OwnershipLifetime(ifNode.elseClause.stmt);
+                        break;
+                    }
+                case SyntaxTree.ClassDeclareNode classDecl:
+                    {
+                        // 进入类作用域，仅递归成员（不做类级删除）
+                        envStack.Push(classDecl.attributes["env"] as SymbolTable);
+                        foreach(var m in classDecl.memberDelareNodes)
+                            Pass4_OwnershipLifetime(m);
+                        envStack.Pop();
+                        break;
+                    }
+                case SyntaxTree.FuncDeclareNode funcDecl:
+                    {
+                        // 进入函数作用域
+                        envStack.Push(funcDecl.attributes["env"] as SymbolTable);
+                        pass4ScopeStack.Push(new Pass4ScopeInfo());
+
+                        // 函数返回所有权（在 Pass2 已写入 func_rec.flags）
+                        pass4CurrentFuncReturnFlag = SymbolTable.RecordFlag.None;
+                        pass4CurrentFuncParams = null;
+                        if(funcDecl.attributes.ContainsKey("func_rec"))
+                        {
+                            var frec = funcDecl.attributes["func_rec"] as SymbolTable.Record;
+                            if(frec != null)
+                                pass4CurrentFuncReturnFlag = frec.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.ManualVar | SymbolTable.RecordFlag.BorrowVar);
+                        }
+
+                        // 将形参加入当前作用域跟踪（仅 Owner 需要释放）
+                        var funcEnv = envStack.Peek();
+                        var paramRecs = funcEnv.GetByCategory(SymbolTable.RecordCatagory.Param);
+                        pass4CurrentFuncParams = paramRecs;
+                        if(paramRecs != null)
+                        {
+                            foreach(var p in paramRecs)
+                            {
+                                if(p.name == "this")
+                                    continue; // this 不托管
+                                if(p.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                                    pass4ScopeStack.Peek().localVariableStatusDict[p.name] = 1;
+                            }
+                        }
+
+                        // 递归语句体
+                        foreach(var s in funcDecl.statementsNode.statements)
+                            Pass4_OwnershipLifetime(s);
+
+                        // 函数正常退出需要回收的 Owner
+                        var exitDel = new List<string>();
+                        foreach(var kv in pass4ScopeStack.Peek().localVariableStatusDict)
+                            if(kv.Value == 1)
+                                exitDel.Add(kv.Key);
+                        if(exitDel.Count > 0)
+                            funcDecl.attributes["pass4_delete_on_exit"] = exitDel;
+
+                        pass4ScopeStack.Pop();
+                        envStack.Pop();
+                        break;
+                    }
+                case SyntaxTree.ExternFuncDeclareNode _:
+                    // 无函数体，无需处理
+                    break;
+
+                // -------------------- 语句与表达式节点规则 --------------------
+
+                case SyntaxTree.VarDeclareNode varDecl:
+                    {
+                        // 先处理右值中的调用/参数（可能触发 move）
+                        Pass4_OwnershipLifetime(varDecl.initializerNode);
+
+                        var rec = Query(varDecl.identifierNode.FullName);
+                        if(rec == null)
+                            break;
+
+                        var model = rec.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.BorrowVar | SymbolTable.RecordFlag.ManualVar);
+
+                        // 记录 owner 局部
+                        if(model.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                            pass4ScopeStack.Peek().localVariableStatusDict[rec.name] = 1;
+
+                        // 初值所有权检查/移动
+                        var init = varDecl.initializerNode;
+                        SymbolTable.Record rrec = null;
+                        SymbolTable.RecordFlag rvalModel = SymbolTable.RecordFlag.None;
+
+                        if(init is SyntaxTree.IdentityNode rid)
+                        {
+                            rrec = Query(rid.FullName);
+                            if(rrec != null)
+                                rvalModel = rrec.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.BorrowVar | SymbolTable.RecordFlag.ManualVar);
+                        }
+                        else if(init is SyntaxTree.NewObjectNode)
+                        {
+                            // new 统一视为可用于 owner/manual 目标；borrow 禁止
+                            rvalModel = SymbolTable.RecordFlag.OwnerVar;
+                        }
+                        else if(init is SyntaxTree.CallNode callN)
+                        {
+                            // 根据被调函数返回标记
+                            SymbolTable.Record f;
+                            if(callN.attributes.ContainsKey("mangled_name"))
+                                f = Query((string)callN.attributes["mangled_name"]);
+                            else if(callN.attributes.ContainsKey("extern_name"))
+                                f = Query((string)callN.attributes["extern_name"]);
+                            else
+                                f = null;
+
+                            if(f != null && f.typeExpression.Contains("=>"))
+                                rvalModel = f.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.ManualVar | SymbolTable.RecordFlag.BorrowVar);
+                        }
+
+                        // 规则检查
+                        if(model.HasFlag(SymbolTable.RecordFlag.BorrowVar))
+                        {
+                            // borrow 不能来自 manual，也不能来自临时（非 Identity）
+                            if(init is SyntaxTree.IdentityNode)
+                            {
+                                if(rvalModel.HasFlag(SymbolTable.RecordFlag.ManualVar))
+                                    throw new SemanticException(ExceptioName.OwnershipError, varDecl, "borrow cannot bind to manual-managed value");
+                            }
+                            else
+                            {
+                                throw new SemanticException(ExceptioName.OwnershipError, varDecl, "borrow cannot bind to temporary");
+                            }
+                        }
+                        else if(model.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                        {
+                            // 来自 manual/borrow 均非法；来自 owner 触发 move；来自 new/call(owner) OK
+                            if(init is SyntaxTree.IdentityNode)
+                            {
+                                if(rvalModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                                {
+                                    // move 源
+                                    for(int i = pass4ScopeStack.Count - 1; i >= 0; --i)
+                                        if(pass4ScopeStack.ElementAt(i).localVariableStatusDict.ContainsKey(rrec.name))
+                                        { pass4ScopeStack.ElementAt(i).localVariableStatusDict[rrec.name] = -1; break; }
+                                }
+                                else
+                                {
+                                    throw new SemanticException(ExceptioName.OwnershipError, varDecl, "owner cannot init from manual/borrow");
+                                }
+                            }
+                        }
+                        else if(model.HasFlag(SymbolTable.RecordFlag.ManualVar))
+                        {
+                            if(rvalModel.HasFlag(SymbolTable.RecordFlag.OwnerVar) || rvalModel.HasFlag(SymbolTable.RecordFlag.BorrowVar))
+                                throw new SemanticException(ExceptioName.OwnershipError, varDecl, "manual cannot init from own/borrow");
+                        }
+                        break;
+                    }
+                case SyntaxTree.AssignNode asn:
+                    {
+                        // 先处理右值中的调用/参数（可能触发 move）
+                        Pass4_OwnershipLifetime(asn.rvalueNode);
+
+                        // 仅处理 lvalue=ID 的情况；成员/索引跳过（由显式 delete 管理）
+                        if(asn.lvalueNode is SyntaxTree.IdentityNode lid)
+                        {
+                            var lrec = Query(lid.FullName);
+                            if(lrec != null)
+                            {
+                                var lmodel = lrec.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.BorrowVar | SymbolTable.RecordFlag.ManualVar);
+
+                                // 如果目标是 owner 且已有未释放，则先删
+                                if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                                {
+                                    bool alive = false;
+                                    if(pass4ScopeStack.Any() && pass4ScopeStack.Peek().localVariableStatusDict.TryGetValue(lrec.name, out var st))
+                                        alive = (st == 1);
+
+                                    if(alive)
+                                    {
+                                        var lst = new List<string>();
+                                        if(asn.attributes.ContainsKey("pass4_delete_before"))
+                                            lst = (List<string>)asn.attributes["pass4_delete_before"];
+                                        lst.Add(lrec.name);
+                                        asn.attributes["pass4_delete_before"] = lst;
+                                        pass4ScopeStack.Peek().localVariableStatusDict[lrec.name] = 0;
+                                    }
+                                }
+
+                                // 右值分类
+                                SymbolTable.Record rrec = null;
+                                var rvalModel = SymbolTable.RecordFlag.None;
+                                if(asn.rvalueNode is SyntaxTree.IdentityNode rid)
+                                {
+                                    rrec = Query(rid.FullName);
+                                    if(rrec != null)
+                                        rvalModel = rrec.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.BorrowVar | SymbolTable.RecordFlag.ManualVar);
+                                }
+                                else if(asn.rvalueNode is SyntaxTree.NewObjectNode)
+                                {
+                                    rvalModel = SymbolTable.RecordFlag.OwnerVar;
+                                }
+                                else if(asn.rvalueNode is SyntaxTree.CallNode callN)
+                                {
+                                    SymbolTable.Record f;
+                                    if(callN.attributes.ContainsKey("mangled_name"))
+                                        f = Query((string)callN.attributes["mangled_name"]);
+                                    else if(callN.attributes.ContainsKey("extern_name"))
+                                        f = Query((string)callN.attributes["extern_name"]);
+                                    else
+                                        f = null;
+
+                                    if(f != null && f.typeExpression.Contains("=>"))
+                                        rvalModel = f.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.ManualVar | SymbolTable.RecordFlag.BorrowVar);
+                                }
+
+                                // 赋值规则
+                                if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                                {
+                                    if(asn.rvalueNode is SyntaxTree.IdentityNode)
+                                    {
+                                        if(rvalModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                                        {
+                                            // move 源
+                                            for(int i = pass4ScopeStack.Count - 1; i >= 0; --i)
+                                                if(pass4ScopeStack.ElementAt(i).localVariableStatusDict.ContainsKey(rrec.name))
+                                                { pass4ScopeStack.ElementAt(i).localVariableStatusDict[rrec.name] = -1; break; }
+
+                                            pass4ScopeStack.Peek().localVariableStatusDict[lrec.name] = 1;
+                                        }
+                                        else
+                                            throw new SemanticException(ExceptioName.OwnershipError, asn, "owner cannot assign from manual/borrow");
+                                    }
+                                    else
+                                    {
+                                        // new 或返回 owner
+                                        if(rvalModel.HasFlag(SymbolTable.RecordFlag.OwnerVar) || asn.rvalueNode is SyntaxTree.NewObjectNode)
+                                            pass4ScopeStack.Peek().localVariableStatusDict[lrec.name] = 1;
+                                        else
+                                            throw new SemanticException(ExceptioName.OwnershipError, asn, "owner cannot assign from manual value");
+                                    }
+                                }
+                                else if(lmodel.HasFlag(SymbolTable.RecordFlag.BorrowVar))
+                                {
+                                    // borrow 只能从变量借用，且不能来自 manual
+                                    if(asn.rvalueNode is SyntaxTree.IdentityNode)
+                                    {
+                                        if(rvalModel.HasFlag(SymbolTable.RecordFlag.ManualVar))
+                                            throw new SemanticException(ExceptioName.OwnershipError, asn, "borrow cannot bind to manual-managed value");
+                                    }
+                                    else
+                                    {
+                                        throw new SemanticException(ExceptioName.OwnershipError, asn, "borrow cannot bind to temporary");
+                                    }
+                                }
+                                else if(lmodel.HasFlag(SymbolTable.RecordFlag.ManualVar))
+                                {
+                                    if(rvalModel.HasFlag(SymbolTable.RecordFlag.OwnerVar) || rvalModel.HasFlag(SymbolTable.RecordFlag.BorrowVar))
+                                        throw new SemanticException(ExceptioName.OwnershipError, asn, "manual cannot assign from own/borrow");
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // 继续递归子节点，避免遗漏
+                            Pass4_OwnershipLifetime(asn.lvalueNode);
+                        }
+                        break;
+                    }
+                case SyntaxTree.DeleteStmtNode del:
+                    {
+                        // 标记立即删除点；禁止删除 borrow
+                        var list = new List<SyntaxTree.ExprNode>();
+                        if(del.objToDelete != null)
+                        {
+                            // 若是变量，校验模型
+                            if(del.objToDelete is SyntaxTree.IdentityNode did)
+                            {
+                                var drec = Query(did.FullName);
+                                if(drec != null)
+                                {
+                                    var dmodel = drec.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.BorrowVar | SymbolTable.RecordFlag.ManualVar);
+                                    if(dmodel.HasFlag(SymbolTable.RecordFlag.BorrowVar))
+                                        throw new SemanticException(ExceptioName.OwnershipError, del, "borrow cannot be deleted");
+
+                                    // 标记为已释放，避免作用域退出再次删除
+                                    for(int i = pass4ScopeStack.Count - 1; i >= 0; --i)
+                                        if(pass4ScopeStack.ElementAt(i).localVariableStatusDict.ContainsKey(drec.name))
+                                        { pass4ScopeStack.ElementAt(i).localVariableStatusDict[drec.name] = 0; break; }
+                                }
+                            }
+                            list.Add(del.objToDelete);
+                        }
+                        if(list.Count > 0)
+                            del.attributes["pass4_delete_now_exprs"] = list;
+                        break;
+                    }
+                case SyntaxTree.ReturnStmtNode ret:
+                    {
+                        // 先递归，确保内层调用的 move 已处理
+                        Pass4_OwnershipLifetime(ret.returnExprNode);
+
+                        // 如果返回的是 owner，且返回变量是 Identity，则将其标记为 moved，避免被删除
+                        string returnedName = null;
+                        if(pass4CurrentFuncReturnFlag.HasFlag(SymbolTable.RecordFlag.OwnerVar) && ret.returnExprNode is SyntaxTree.IdentityNode rid)
+                        {
+                            var rrec = Query(rid.FullName);
+                            if(rrec != null && rrec.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                            {
+                                returnedName = rrec.name;
+                                for(int i = pass4ScopeStack.Count - 1; i >= 0; --i)
+                                    if(pass4ScopeStack.ElementAt(i).localVariableStatusDict.ContainsKey(rrec.name))
+                                    { pass4ScopeStack.ElementAt(i).localVariableStatusDict[rrec.name] = -1; break; }
+                            }
+                        }
+
+                        // 汇总当前所有活跃 Owner（所有栈帧），return 前删除（排除被返回者）
+                        var delList = new List<string>();
+                        foreach(var scope in pass4ScopeStack)
+                            foreach(var kv in scope.localVariableStatusDict)
+                                if(kv.Value == 1 && kv.Key != returnedName)
+                                    if(delList.Contains(kv.Key) == false)
+                                        delList.Add(kv.Key);
+
+                        if(delList.Count > 0)
+                            ret.attributes["pass4_delete_before_return"] = delList;
+                        break;
+                    }
+                case SyntaxTree.SingleExprStmtNode sstmt:
+                    {
+                        // 表达式作为语句：若 new 或 call 返回 owner，语句末删除
+                        Pass4_OwnershipLifetime(sstmt.exprNode);
+
+                        var dels = new List<SyntaxTree.ExprNode>();
+                        if(sstmt.exprNode is SyntaxTree.NewObjectNode)
+                        {
+                            // 视为临时所有权，需删除
+                            dels.Add(sstmt.exprNode);
+                        }
+                        else if(sstmt.exprNode is SyntaxTree.CallNode cnode)
+                        {
+                            SymbolTable.Record f;
+                            if(cnode.attributes.ContainsKey("mangled_name"))
+                                f = Query((string)cnode.attributes["mangled_name"]);
+                            else if(cnode.attributes.ContainsKey("extern_name"))
+                                f = Query((string)cnode.attributes["extern_name"]);
+                            else
+                                f = null;
+
+                            if(f != null && (f.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar)))
+                                dels.Add(sstmt.exprNode);
+                        }
+
+                        if(dels.Count > 0)
+                            sstmt.attributes["pass4_delete_after_stmt_exprs"] = dels;
+                        break;
+                    }
+                case SyntaxTree.CallNode call:
+                    {
+                        // 先处理所有实参（递归）
+                        foreach(var a in call.argumantsNode.arguments)
+                            Pass4_OwnershipLifetime(a);
+
+                        // 根据被调函数签名对实参做 move/校验
+                        SymbolTable.Record funcRec = null;
+                        if(call.attributes.ContainsKey("mangled_name"))
+                            funcRec = Query((string)call.attributes["mangled_name"]);
+                        else if(call.attributes.ContainsKey("extern_name"))
+                            funcRec = Query((string)call.attributes["extern_name"]);
+
+                        if(funcRec != null && funcRec.envPtr != null)
+                        {
+                            var allParams = funcRec.envPtr.GetByCategory(SymbolTable.RecordCatagory.Param) ?? new List<SymbolTable.Record>();
+                            // 成员函数形参表含 this，非成员不含
+                            int offset = 0;
+                            if(call.isMemberAccessFunction && allParams.Count > 0 && allParams[0].name == "this")
+                                offset = 1;
+
+                            for(int i = 0; i < call.argumantsNode.arguments.Count; ++i)
+                            {
+                                if(i + offset >= allParams.Count)
+                                    break;
+                                var pr = allParams[i + offset];
+                                var pflag = pr.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.BorrowVar | SymbolTable.RecordFlag.ManualVar);
+                                var arg = call.argumantsNode.arguments[i];
+
+                                // 分类 arg
+                                SymbolTable.Record argrec = null;
+                                var argModel = SymbolTable.RecordFlag.None;
+                                if(arg is SyntaxTree.IdentityNode aid)
+                                {
+                                    argrec = Query(aid.FullName);
+                                    if(argrec != null)
+                                        argModel = argrec.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.BorrowVar | SymbolTable.RecordFlag.ManualVar);
+                                }
+                                else if(arg is SyntaxTree.NewObjectNode)
+                                {
+                                    argModel = SymbolTable.RecordFlag.OwnerVar;
+                                }
+                                else if(arg is SyntaxTree.CallNode ac)
+                                {
+                                    SymbolTable.Record rf = null;
+                                    if(ac.attributes.ContainsKey("mangled_name"))
+                                        rf = Query((string)ac.attributes["mangled_name"]);
+                                    else if(ac.attributes.ContainsKey("extern_name"))
+                                        rf = Query((string)ac.attributes["extern_name"]);
+                                    if(rf != null)
+                                        argModel = rf.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.ManualVar | SymbolTable.RecordFlag.BorrowVar);
+                                }
+
+                                if(pflag.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                                {
+                                    // 需要 move 的仅限变量实参为 owner；其它（new/call-owner）临时 OK；manual/borrow 非法
+                                    if(arg is SyntaxTree.IdentityNode)
+                                    {
+                                        if(argModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                                        {
+                                            for(int si = pass4ScopeStack.Count - 1; si >= 0; --si)
+                                                if(pass4ScopeStack.ElementAt(si).localVariableStatusDict.ContainsKey(argrec.name))
+                                                { pass4ScopeStack.ElementAt(si).localVariableStatusDict[argrec.name] = -1; break; }
+                                        }
+                                        else
+                                            throw new SemanticException(ExceptioName.OwnershipError, call, "owner parameter requires own argument");
+                                    }
+                                    else
+                                    {
+                                        if(!argModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                                            throw new SemanticException(ExceptioName.OwnershipError, call, "owner parameter requires own argument");
+                                    }
+                                }
+                                else if(pflag.HasFlag(SymbolTable.RecordFlag.BorrowVar))
+                                {
+                                    // borrow 不允许 manual；借用临时将悬垂，这里禁止非 Identity
+                                    if(!(arg is SyntaxTree.IdentityNode))
+                                        throw new SemanticException(ExceptioName.OwnershipError, call, "borrow parameter cannot bind to temporary");
+                                    if(argModel.HasFlag(SymbolTable.RecordFlag.ManualVar))
+                                        throw new SemanticException(ExceptioName.OwnershipError, call, "borrow parameter cannot bind to manual value");
+                                }
+                                else if(pflag.HasFlag(SymbolTable.RecordFlag.ManualVar))
+                                {
+                                    if(argModel.HasFlag(SymbolTable.RecordFlag.OwnerVar) || argModel.HasFlag(SymbolTable.RecordFlag.BorrowVar))
+                                        throw new SemanticException(ExceptioName.OwnershipError, call, "manual parameter cannot accept own/borrow");
+                                }
+                            }
+                        }
+                        break;
+                    }
+                case SyntaxTree.IdentityNode id:
+                    {
+                        // 一般作为 rvalue 使用：禁止使用已 move 的 owner 变量
+                        var rec = Query(id.FullName);
+                        if(rec != null && rec.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                        {
+                            for(int i = pass4ScopeStack.Count - 1; i >= 0; --i)
+                            {
+                                var dict = pass4ScopeStack.ElementAt(i).localVariableStatusDict;
+                                if(dict.TryGetValue(rec.name, out var st) && st == -1)
+                                    throw new SemanticException(ExceptioName.OwnershipError, id, "use after move");
+                            }
+                        }
+                        break;
+                    }
+
+                // 其他表达式仅递归其子节点，避免遗漏
+                case SyntaxTree.BinaryOpNode b:
+                    Pass4_OwnershipLifetime(b.leftNode);
+                    Pass4_OwnershipLifetime(b.rightNode);
+                    break;
+                case SyntaxTree.UnaryOpNode u:
+                    Pass4_OwnershipLifetime(u.exprNode);
+                    break;
+                case SyntaxTree.CastNode c:
+                    Pass4_OwnershipLifetime(c.factorNode);
+                    break;
+                case SyntaxTree.ObjectMemberAccessNode ma:
+                    Pass4_OwnershipLifetime(ma.objectNode);
+                    break;
+                case SyntaxTree.ElementAccessNode ea:
+                    Pass4_OwnershipLifetime(ea.containerNode);
+                    Pass4_OwnershipLifetime(ea.indexNode);
+                    break;
+                case SyntaxTree.NewObjectNode _:
+                case SyntaxTree.NewArrayNode _:
+                case SyntaxTree.LiteralNode _:
+                case SyntaxTree.ThisNode _:
+                    // 无需处理
+                    break;
+
+                default:
+                    // 类型/参数/实参与其它节点，对子树递归
+                    var ch = node.Children;
+                    if(ch != null)
+                    {
+                        foreach(var n in ch)
+                            Pass4_OwnershipLifetime(n);
+                    }
+                    break;
+            }
+        }
+
+        [System.Obsolete]
+        private void CheckVarDecl(VarDeclareNode varDeclNode, SymbolTable.Record newRec)
+        {
+            SymbolTable.RecordFlag ownerModel = SymbolTable.RecordFlag.None;
+
+            //右值检查  
+            if(varDeclNode.initializerNode is IdentityNode rvalueVarNode)
+            {
+                var rvalueVarRec = Query(rvalueVarNode.FullName);
+
+                //不能把own和borrow模型的对象赋值给manual模型
+                if(ownerModel == SymbolTable.RecordFlag.ManualVar
+                    && rvalueVarRec.flags.HasFlag(SymbolTable.RecordFlag.ManualVar) == false)
+                {
+                    if(rvalueVarRec.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                        throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignOwnToManual, varDeclNode, newRec.name);
+                    if(rvalueVarRec.flags.HasFlag(SymbolTable.RecordFlag.BorrowVar))
+                        throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignBorrwToManual, varDeclNode, newRec.name);
+                }
+
+                //不能把manual和borrow模型的对象赋值给own模型    
+                if(ownerModel == SymbolTable.RecordFlag.OwnerVar
+                    && rvalueVarRec.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar) == false)
+                {
+                    if(rvalueVarRec.flags.HasFlag(SymbolTable.RecordFlag.ManualVar))
+                        throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignManualToOwn, varDeclNode, newRec.name);
+                    if(rvalueVarRec.flags.HasFlag(SymbolTable.RecordFlag.BorrowVar))
+                        throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignBorrowToOwn, varDeclNode, newRec.name);
+                }
+
+                //不能把manual类型的变量赋值给borrow模型
+                if(ownerModel == SymbolTable.RecordFlag.BorrowVar
+                    && rvalueVarRec.flags.HasFlag(SymbolTable.RecordFlag.ManualVar) == true)
+                {
+                    throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignManualToBorrow, varDeclNode, newRec.name);
+                }
+
+            }
+            else if(varDeclNode.initializerNode is NewObjectNode ctorNode)
+            {
+                //Borrow类型不能用new创建  
+                if(ownerModel == SymbolTable.RecordFlag.BorrowVar)
+                {
+                    throw new SemanticException(ExceptioName.OwnershipError_BorrowCanNotNew, varDeclNode, newRec.name);
+                }
+
+            }
+            else if(varDeclNode.initializerNode is CallNode callNode)
+            {
+            }
+        }
+
 
         /// <summary>
         /// 获取表达式的类型表达式  
@@ -2839,6 +3588,47 @@ namespace Gizbox.SemanticRule
             exprNode.attributes["type"] = nodeTypeExprssion;
 
             return nodeTypeExprssion;
+        }
+
+        /// <summary>
+        /// 分析变量/参数/返回值的所有权模型  
+        /// </summary>
+        private SymbolTable.RecordFlag AnalyzeOwnership(VarModifiers explicitModifier, SyntaxTree.TypeNode typeNode)
+        {
+            string typeExpr = typeNode.TypeExpression();
+
+            GType type = GType.Parse(typeExpr);
+            if(type.IsReferenceType)
+            {
+                SymbolTable.RecordFlag ownerModel = SymbolTable.RecordFlag.None;
+
+                if(explicitModifier.HasFlag(VarModifiers.Own))
+                {
+                    ownerModel = SymbolTable.RecordFlag.OwnerVar;//显式own
+                }
+                else if(explicitModifier.HasFlag(VarModifiers.Bor))
+                {
+                    ownerModel = SymbolTable.RecordFlag.BorrowVar;//显式借用
+                }
+                else
+                {
+                    bool isOwnershipClass = false;
+                    if(typeNode is ClassTypeNode classTypeNode)
+                    {
+                        var classRec = Query(classTypeNode.classname.FullName);
+                        if(classRec.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                            isOwnershipClass = true;
+                    }
+
+                    if(isOwnershipClass)
+                        ownerModel = SymbolTable.RecordFlag.OwnerVar;//own class 类型
+                    else
+                        ownerModel = SymbolTable.RecordFlag.ManualVar;//手动释放类型
+                }
+                return ownerModel;
+            }
+
+            return SymbolTable.RecordFlag.None;
         }
 
         /// <summary>

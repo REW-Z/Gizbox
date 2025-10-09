@@ -93,7 +93,7 @@ switch(cmdIdx)
             Gizbox.Compiler compilerTest = new Compiler();
             compilerTest.ConfigParserDataSource(hardcode: false);
             compilerTest.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
-            compilerTest.InsertParserHardcodeToSourceFile("F:\\ZQJ\\GizboxAndTools\\Gizbox\\Gizbox\\Src\\Parser\\ParserHardcoder.cs");
+            compilerTest.InsertParserHardcodeToSourceFile("F:\\Legacy\\MyProjects\\Gizbox\\Gizbox\\Src\\Parser\\ParserHardcoder.cs");
             Console.WriteLine("生成硬编码完成");
             return;
         }

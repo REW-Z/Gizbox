@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Gizbox.Src.Backend
 {
-    public enum RegisterEnum
+    public enum RegisterEnum : int
     {
         Undefined = -1,
 

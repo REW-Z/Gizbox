@@ -55,6 +55,7 @@ namespace Gizbox
             keywords.Add(new TokenPattern("operator", "operator\\W", 1));
 
             keywords.Add(new TokenPattern("own", "own\\W", 1));
+            keywords.Add(new TokenPattern("bor", "bor\\W", 1));
             keywords.Add(new TokenPattern("var", "var\\W", 1));
             keywords.Add(new TokenPattern("class", "class\\W", 1));
             keywords.Add(new TokenPattern("void", "void\\W", 1));

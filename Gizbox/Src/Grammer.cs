@@ -35,6 +35,9 @@ namespace Gizbox
             "stmt",
             "declstmt",
 
+            //类型修饰符  
+            "tmodf",
+
             //子句  
             "elifclauselist",
             "elifclause",
@@ -125,12 +128,20 @@ namespace Gizbox
             "stmt -> if ( expr ) stmt elifclauselist elseclause",
 
             "declstmt -> type ID = expr ;",
-            "declstmt -> own type ID = expr ;",
+            "declstmt -> tmodf type ID = expr ;",
             "declstmt -> const type ID = lit ;",
+
             "declstmt -> type ID ( params ) { statements }",
+            "declstmt -> tmodf type ID ( params ) { statements }",
             "declstmt -> type operator ID ( params ) { statements }",
+            "declstmt -> tmodf type operator ID ( params ) { statements }",
             "declstmt -> extern type ID ( params ) ;",
+
             "declstmt -> class ID inherit { declstatements }",
+            "declstmt -> class own ID inherit { declstatements }",
+
+            "tmodf -> own",
+            "tmodf -> bor",
 
             "elifclauselist -> ε",
             "elifclauselist -> elifclauselist elifclause",
@@ -244,9 +255,9 @@ namespace Gizbox
 
             "params -> ε",
             "params -> type ID",
-            "params -> own type ID",
+            "params -> tmodf type ID",
             "params -> params , type ID",
-            "params -> params , own type ID",
+            "params -> params , tmodf type ID",
 
             "args -> ε",
             "args -> expr",
@@ -275,6 +286,8 @@ namespace Gizbox
 ///  （如果当前状态有两个规约项，它们lookahead是一样的，就会发生归约冲突）    
 ///  （REW：所以应该尽量减少同一终结符在多个产生式的出现）    
 ///  （REW：例如如果不加限制，数组访问在分析到“id [”状态时，“id“可能被提前归约类名，就错误变成了类数组定义的前半部分）    
+///  （REW：语句前面最好不要有可以为ε的非终结符，容易和现有语法冲突）      
+
 
 ///2. 添加语法  
 ///  （添加终结符和非终结符）
