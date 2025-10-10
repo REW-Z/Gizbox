@@ -115,7 +115,7 @@ namespace Gizbox
 
             public int depth = -1;
 
-            public Dictionary<string, object> attributes;
+            public Dictionary<eAttr, object> attributes;
 
 
 
@@ -181,7 +181,7 @@ namespace Gizbox
             {
                 if(this.attributes != null)
                 {
-                    this.attributes.TryGetValue("start", out object startTokenObj);
+                    this.attributes.TryGetValue(eAttr.start, out object startTokenObj);
                     this.startToken = startTokenObj as Token;
                 }
                 else
@@ -198,7 +198,7 @@ namespace Gizbox
             {
                 if(this.attributes != null)
                 {
-                    this.attributes.TryGetValue("end", out object endTokenObj);
+                    this.attributes.TryGetValue(eAttr.end, out object endTokenObj);
                     this.endToken = endTokenObj as Token;
                 }
                 else

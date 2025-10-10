@@ -117,8 +117,8 @@ namespace Gizbox.IR
                         {
                             Log("KEY:" + key);
                         }
-                        envStackTemp.Push(blockNode.attributes["env"] as SymbolTable);
-                        EnvBegin(blockNode.attributes["env"] as SymbolTable);
+                        envStackTemp.Push(blockNode.attributes[eAttr.env] as SymbolTable);
+                        EnvBegin(blockNode.attributes[eAttr.env] as SymbolTable);
 
 
                         foreach (var stmt in blockNode.statements)
@@ -127,7 +127,7 @@ namespace Gizbox.IR
                         }
 
                         envStackTemp.Pop();
-                        EnvEnd(blockNode.attributes["env"] as SymbolTable);
+                        EnvEnd(blockNode.attributes[eAttr.env] as SymbolTable);
                     }
                     break;
 
@@ -140,8 +140,8 @@ namespace Gizbox.IR
                         string className = classDeclNode.classNameNode.FullName;
                         //GenerateCode("JUMP", "%LABEL:class_end:" + className);//顶级语句重排之后不再需要跳过
 
-                        envStackTemp.Push(classDeclNode.attributes["env"] as SymbolTable);
-                        EnvBegin(classDeclNode.attributes["env"] as SymbolTable);
+                        envStackTemp.Push(classDeclNode.attributes[eAttr.env] as SymbolTable);
+                        EnvBegin(classDeclNode.attributes[eAttr.env] as SymbolTable);
 
                         GenerateCode("").label = "class_begin:" + className;
 
@@ -212,7 +212,7 @@ namespace Gizbox.IR
 
                         GenerateCode("").label = "class_end:" + className;
 
-                        EnvEnd(classDeclNode.attributes["env"] as SymbolTable);
+                        EnvEnd(classDeclNode.attributes[eAttr.env] as SymbolTable);
                         envStackTemp.Pop();
                     }
                     break;
@@ -225,15 +225,15 @@ namespace Gizbox.IR
                         //函数全名(修饰)    
                         string funcFinalName;
                         if (isMethod)
-                            funcFinalName = envStackTemp.Peek().name + "." + (string)funcDeclNode.attributes["mangled_name"];
+                            funcFinalName = envStackTemp.Peek().name + "." + (string)funcDeclNode.attributes[eAttr.mangled_name];
                         else
-                            funcFinalName = (string)funcDeclNode.attributes["mangled_name"];
+                            funcFinalName = (string)funcDeclNode.attributes[eAttr.mangled_name];
 
 
                         //函数开始    
                         
-                        envStackTemp.Push(funcDeclNode.attributes["env"] as SymbolTable);
-                        EnvBegin(funcDeclNode.attributes["env"] as SymbolTable);
+                        envStackTemp.Push(funcDeclNode.attributes[eAttr.env] as SymbolTable);
+                        EnvBegin(funcDeclNode.attributes[eAttr.env] as SymbolTable);
 
                         GenerateCode("").label = "entry:" + funcFinalName;
 
@@ -266,7 +266,7 @@ namespace Gizbox.IR
 
                         GenerateCode("").label = "exit:" + funcFinalName;
 
-                        EnvEnd(funcDeclNode.attributes["env"] as SymbolTable);
+                        EnvEnd(funcDeclNode.attributes[eAttr.env] as SymbolTable);
                         envStackTemp.Pop();
                     }
                     break;
@@ -276,13 +276,13 @@ namespace Gizbox.IR
                         //外部函数声明不再生成中间代码  
 
                         ////函数全名 (外部函数不Mangle函数名)    
-                        ////string funcFullName = (string)externFuncDeclNode.attributes["mangled_name"];
+                        ////string funcFullName = (string)externFuncDeclNode.attributes[eAttr.mangled_name];
                         //string funcFullName = Utils.ToExternFuncName(externFuncDeclNode.identifierNode.FullName);
 
                         ////函数开始    
 
-                        //envStackTemp.Push(externFuncDeclNode.attributes["env"] as SymbolTable);
-                        //EnvBegin(externFuncDeclNode.attributes["env"] as SymbolTable);
+                        //envStackTemp.Push(externFuncDeclNode.attributes[eAttr.env] as SymbolTable);
+                        //EnvBegin(externFuncDeclNode.attributes[eAttr.env] as SymbolTable);
 
                         //GenerateCode("").label = "entry:" + funcFullName;
 
@@ -297,7 +297,7 @@ namespace Gizbox.IR
 
                         //GenerateCode("").label = "exit:" + funcFullName;
 
-                        //EnvEnd(externFuncDeclNode.attributes["env"] as SymbolTable);
+                        //EnvEnd(externFuncDeclNode.attributes[eAttr.env] as SymbolTable);
                         //envStackTemp.Pop();
                     }
                     break;
@@ -345,7 +345,7 @@ namespace Gizbox.IR
 
                 case IfStmtNode ifNode:
                     {
-                        int ifCounter = (int)ifNode.attributes["uid"];
+                        int ifCounter = (int)ifNode.attributes[eAttr.uid];
 
                         GenerateCode("").label = "If_" + ifCounter;
 
@@ -396,7 +396,7 @@ namespace Gizbox.IR
                     break;
                 case WhileStmtNode whileNode:
                     {
-                        int whileCounter = (int)whileNode.attributes["uid"];
+                        int whileCounter = (int)whileNode.attributes[eAttr.uid];
 
                         GenerateCode("").label = "While_" + whileCounter;
 
@@ -417,10 +417,10 @@ namespace Gizbox.IR
                     break;
                 case ForStmtNode forNode:
                     {
-                        int forCounter = (int)forNode.attributes["uid"];
+                        int forCounter = (int)forNode.attributes[eAttr.uid];
 
-                        envStackTemp.Push(forNode.attributes["env"] as SymbolTable);
-                        EnvBegin(forNode.attributes["env"] as SymbolTable);
+                        envStackTemp.Push(forNode.attributes[eAttr.env] as SymbolTable);
+                        EnvBegin(forNode.attributes[eAttr.env] as SymbolTable);
 
                         //initializer  
                         GenNode(forNode.initializerNode);
@@ -446,7 +446,7 @@ namespace Gizbox.IR
 
                         GenerateCode("").label = "EndFor_" + forCounter;
 
-                        EnvEnd(forNode.attributes["env"] as SymbolTable);
+                        EnvEnd(forNode.attributes[eAttr.env] as SymbolTable);
                         envStackTemp.Pop();
                     }
                     break;
@@ -506,7 +506,7 @@ namespace Gizbox.IR
                         else
                         {
                             // 右值：读一次到临时变量，返回该临时
-                            string valueType = (string)objMemberAccess.attributes["type"];
+                            string valueType = (string)objMemberAccess.attributes[eAttr.type];
                             string tmp = NewTemp(valueType);
                             GenerateCode("=", tmp, objExpr + "->" + objMemberAccess.memberNode.FullName);
                             SetRet(objMemberAccess, tmp);
@@ -530,7 +530,7 @@ namespace Gizbox.IR
                         GenNode(binaryOp.leftNode);
                         GenNode(binaryOp.rightNode);
 
-                        if (binaryOp.leftNode.attributes.ContainsKey("type") == false)
+                        if (binaryOp.leftNode.attributes.ContainsKey(eAttr.type) == false)
                             throw new SemanticException(ExceptioName.TypeNotSet, binaryOp.leftNode, "");
 
                         //if (binaryOp.rightNode.attributes.ContainsKey("type") == false)
@@ -543,7 +543,7 @@ namespace Gizbox.IR
                         }
                         else
                         {
-                            SetRet(binaryOp, NewTemp((string)binaryOp.leftNode.attributes["type"]));
+                            SetRet(binaryOp, NewTemp((string)binaryOp.leftNode.attributes[eAttr.type]));
                         }
                         
 
@@ -555,7 +555,7 @@ namespace Gizbox.IR
                         GenNode(unaryOp.exprNode);
 
                         //表达式的返回变量  
-                        SetRet(unaryOp, NewTemp((string)unaryOp.exprNode.attributes["type"]));
+                        SetRet(unaryOp, NewTemp((string)unaryOp.exprNode.attributes[eAttr.type]));
 
                         GenerateCode(unaryOp.op, GetRet(unaryOp), GetRet(unaryOp));
                     }
@@ -574,11 +574,11 @@ namespace Gizbox.IR
                     {
                         //函数全名  
                         string fullName;
-                        if(callNode.attributes.TryGetValue("mangled_name", out object oMangleName))
+                        if(callNode.attributes.TryGetValue(eAttr.mangled_name, out object oMangleName))
                         {
                             fullName = (string)oMangleName;
                         }
-                        else if(callNode.attributes.TryGetValue("extern_name", out object oExternName))
+                        else if(callNode.attributes.TryGetValue(eAttr.extern_name, out object oExternName))
                         {
                             fullName= (string)oExternName;
                         }
@@ -589,7 +589,7 @@ namespace Gizbox.IR
 
 
                         //函数返回类型    
-                        string returnType = (string)callNode.attributes["type"];
+                        string returnType = (string)callNode.attributes[eAttr.type];
 
                         //是否有返回值且作为右值  
                         bool returnTypeNotVoid = GType.Parse(returnType).Category != GType.Kind.Void;
@@ -694,7 +694,7 @@ namespace Gizbox.IR
                         {
 
                             string accessExpr = container + "[" + index + "]";
-                            string elemType = (string)eleAccessNode.attributes["type"];
+                            string elemType = (string)eleAccessNode.attributes[eAttr.type];
                             string tmp = NewTemp(elemType);
                             GenerateCode("=", tmp, accessExpr); // tmp = [container[index]]
                             SetRet(eleAccessNode, tmp);
@@ -916,9 +916,9 @@ namespace Gizbox.IR
                 return GetRet(exprNode.overrideNode);
             }
 
-            if (exprNode.attributes.ContainsKey("ret"))
+            if (exprNode.attributes.ContainsKey(eAttr.ret))
             {
-                return (string)exprNode.attributes["ret"];
+                return (string)exprNode.attributes[eAttr.ret];
             }
             else
             {
@@ -927,7 +927,7 @@ namespace Gizbox.IR
         }
         private void SetRet(SyntaxTree.Node node, string val)
         {
-            node.attributes["ret"] = val;
+            node.attributes[eAttr.ret] = val;
         }
 
         public string NewTemp(string type)
@@ -946,9 +946,9 @@ namespace Gizbox.IR
             //表达式的返回变量  
             string operandStr;
 
-            if (literalNode.attributes.ContainsKey("type"))
+            if (literalNode.attributes.ContainsKey(eAttr.type))
             {
-                string typeName = (string)literalNode.attributes["type"];
+                string typeName = (string)literalNode.attributes[eAttr.type];
 
                 if (typeName != "null")
                 {

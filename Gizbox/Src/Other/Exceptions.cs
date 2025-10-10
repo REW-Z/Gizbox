@@ -79,8 +79,9 @@ namespace Gizbox
         OwnershipError_CanNotAssignOwnToManual,
         OwnershipError_CanNotAssignBorrwToManual,
         OwnershipError_CanNotAssignManualToBorrow,
-        OwnershipError_BorrowCanNotNew,
+        OwnershipError_BorrowCanNotFromTemp,
         OwnershipError_ReturnBorrowValueNotSupport,
+        OwnershipError_GlobalVarMustBeManual,
 
 
         //4.

@@ -62,13 +62,13 @@ namespace Gizbox.LRParse
     {
         public State state;
 
-        public Dictionary<string, object> attributes;
+        public Dictionary<eAttr, object> attributes;
 
         public ParseStackElement(State state)
         {
             this.state = state;
 
-            this.attributes = new Dictionary<string, object>();
+            this.attributes = new Dictionary<eAttr, object>();
         }
     }
 
@@ -114,28 +114,28 @@ namespace Gizbox.LRParse
             //记录到分析栈元素attribute
             for(int i = stack.Count - βLength; i <= stack.Count - 1; ++i)
             {
-                if(stack[i].attributes.ContainsKey("start") && stack[i].attributes["start"] != null)
+                if(stack[i].attributes.ContainsKey(eAttr.start) && stack[i].attributes[eAttr.start] != null)
                 {
-                    newelement.attributes["start"] = stack[i].attributes["start"];
+                    newelement.attributes[eAttr.start] = stack[i].attributes[eAttr.start];
                     break;
                 }
             }
             for(int i = stack.Count - 1; i >= stack.Count - βLength; --i)
             {
-                if(stack[i].attributes.ContainsKey("end") && stack[i].attributes["end"] != null)
+                if(stack[i].attributes.ContainsKey(eAttr.end) && stack[i].attributes[eAttr.end] != null)
                 {
-                    newelement.attributes["end"] = stack[i].attributes["end"];
+                    newelement.attributes[eAttr.end] = stack[i].attributes[eAttr.end];
                     break;
                 }
             }
 
             //记录到AST节点attribute    
-            if(newElement.attributes.ContainsKey("ast_node"))
+            if(newElement.attributes.ContainsKey(eAttr.ast_node))
             {
-                var astNode = ((SyntaxTree.Node)newElement.attributes["ast_node"]);
-                if(astNode.attributes == null) astNode.attributes = new Dictionary<string, object>();
-                astNode.attributes["start"] = newelement.attributes["start"];
-                astNode.attributes["end"] = newelement.attributes["end"];
+                var astNode = ((SyntaxTree.Node)newElement.attributes[eAttr.ast_node]);
+                if(astNode.attributes == null) astNode.attributes = new Dictionary<eAttr, object>();
+                astNode.attributes[eAttr.start] = newelement.attributes[eAttr.start];
+                astNode.attributes[eAttr.end] = newelement.attributes[eAttr.end];
             }
         }
 
@@ -198,9 +198,9 @@ namespace Gizbox.LRParse
 
 
                             // *** 记录Token信息 ***  
-                            newEle.attributes["token"] = token;
-                            newEle.attributes["start"] = token;
-                            newEle.attributes["end"] = token;
+                            newEle.attributes[eAttr.token] = token;
+                            newEle.attributes[eAttr.start] = token;
+                            newEle.attributes[eAttr.end] = token;
 
                             stack.Push(newEle);
                             // ************  

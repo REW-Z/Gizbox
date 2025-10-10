@@ -806,9 +806,9 @@ namespace Gizbox.LanguageServices
                     if (loop++ > 99) throw new Exception("Infinite Loop!");
 
                     chain += ("-" + currNode.GetType().Name);
-                    if(currNode.attributes.ContainsKey("env"))
+                    if(currNode.attributes.ContainsKey(eAttr.env))
                     {
-                        env = (SymbolTable)currNode.attributes["env"];
+                        env = (SymbolTable)currNode.attributes[eAttr.env];
                         break;
                     }
 
