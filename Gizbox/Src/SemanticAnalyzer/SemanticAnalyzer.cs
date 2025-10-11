@@ -2971,9 +2971,9 @@ namespace Gizbox.SemanticRule
                         if(rec == null)
                             throw new GizboxException(ExceptioName.Undefine, "var record not found.");
 
-                        // 检查：变量左值和初始值的所有权模型对比  
-                        CheckOwershipCompare(varDecl, rec);
-
+                        // 值类型不用处理所有权
+                        if(GType.Parse(rec.typeExpression).IsReferenceType == false)
+                            break;
 
                         // 对象所有权模型  
                         var model = GetOwnershipModel(varDecl.flags, varDecl.typeNode);
@@ -2984,83 +2984,61 @@ namespace Gizbox.SemanticRule
                         if(isGlobalOrTopAtNamespace && model != SymbolTable.RecordFlag.ManualVar)
                             throw new SemanticException(ExceptioName.OwnershipError_GlobalVarMustBeManual, varDecl, string.Empty);
 
+                        // 检查：变量左值和初始值的所有权模型对比  
+                        CheckOwershipCompare(varDecl, rec, out var lmodel, out var rmodel);
+
 
                         // 记录owner模型的局部变量  
                         if(model.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             lifeTimeInfo.scopeStack.Peek().localVariableStatusDict[rec.name] = LifetimeInfo.VarStatus.Alive;
 
-                        // 初值所有权检查/移动
-                        var init = varDecl.initializerNode;
-                        SymbolTable.Record rrec = null;
-                        SymbolTable.RecordFlag rvalModel = SymbolTable.RecordFlag.None;
 
-                        if(init is SyntaxTree.IdentityNode rid)
+                        // 所有权own类型初始化处理  
+                        if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                         {
-                            rrec = Query(rid.FullName);
-                            if(rrec != null)
-                                rvalModel = rrec.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.BorrowVar | SymbolTable.RecordFlag.ManualVar);
-                        }
-                        else if(init is SyntaxTree.NewObjectNode newobjnode)
-                        {
-                            var classRec = Query(newobjnode.className.FullName);
-                            bool isownershipClass = classRec.flags.HasFlag(SymbolTable.RecordFlag.OwnershipClass);
-                            if(isownershipClass)
-                                rvalModel = SymbolTable.RecordFlag.OwnerVar;
-                            else
-                                rvalModel = SymbolTable.RecordFlag.ManualVar;
-                        }
-                        else if(init is SyntaxTree.CallNode callN)
-                        {
-                            // 根据被调函数返回标记
-                            SymbolTable.Record f;
-                            if(callN.attributes.ContainsKey(eAttr.mangled_name))
-                                f = Query((string)callN.attributes[eAttr.mangled_name]);
-                            else if(callN.attributes.ContainsKey(eAttr.extern_name))
-                                f = Query((string)callN.attributes[eAttr.extern_name]);
-                            else
-                                f = null;
-
-                            if(f != null && f.typeExpression.Contains("=>"))
-                                rvalModel = f.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.ManualVar | SymbolTable.RecordFlag.BorrowVar);
-                        }
-
-                        // 检查：左边的所有权模型和右边所有权模型
-                        if(model.HasFlag(SymbolTable.RecordFlag.BorrowVar))
-                        {
-                            // borrow不能来自manual，也不能来自临时（非Identity）
-                            if(init is SyntaxTree.IdentityNode)
+                            //move源：临时对象 - New   
+                            if(varDecl.initializerNode is NewObjectNode newobjNode)
                             {
-                                if(rvalModel.HasFlag(SymbolTable.RecordFlag.ManualVar))
-                                    throw new SemanticException(ExceptioName.OwnershipError, varDecl, "borrow cannot bind to manual-managed value");
-                            }
-                            else
-                            {
-                                throw new SemanticException(ExceptioName.OwnershipError, varDecl, "borrow cannot bind to temporary");
-                            }
-                        }
-                        else if(model.HasFlag(SymbolTable.RecordFlag.OwnerVar))
-                        {
-                            // 来自manual/borrow均非法；来自owner触发move；来自new/call(owner)OK
-                            if(init is SyntaxTree.IdentityNode)
-                            {
-                                if(rvalModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                                //move源：new obj(manual)  
+                                if(rmodel.HasFlag(SymbolTable.RecordFlag.ManualVar))
                                 {
-                                    // move源
-                                    for(int i = lifeTimeInfo.scopeStack.Count - 1; i >= 0; --i)
+
+                                    //todo:
+                                }
+                                //move源：new obj(owner)
+                                else if(rmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                                {
+                                    //todo:
+                                }
+                            }
+                            //move源：临时对象 - 函数返回(owner)
+                            else if(varDecl.initializerNode is CallNode callnode)
+                            {
+
+                                //todo:
+                            }
+                            //move源：变量
+                            else if(varDecl.initializerNode is IdentityNode idrvalue)
+                            {
+                                var rrec = Query(idrvalue.FullName);
+                                for(int i = lifeTimeInfo.scopeStack.Count - 1; i >= 0; --i)
+                                {
+                                    if(lifeTimeInfo.scopeStack.ElementAt(i).localVariableStatusDict.ContainsKey(rrec.name))
                                     {
-                                        if(lifeTimeInfo.scopeStack.ElementAt(i).localVariableStatusDict.ContainsKey(rrec.name))
-                                        {
-                                            lifeTimeInfo.scopeStack.ElementAt(i).localVariableStatusDict[rrec.name] = LifetimeInfo.VarStatus.Moved;
-                                            break; 
-                                        }
+                                        lifeTimeInfo.scopeStack.ElementAt(i).localVariableStatusDict[rrec.name] = LifetimeInfo.VarStatus.Moved;
+                                        break;
                                     }
                                 }
-                                else
-                                {
-                                    throw new SemanticException(ExceptioName.OwnershipError, varDecl, "owner cannot init from manual/borrow");
-                                }
                             }
+
                         }
+
+                        // 所有权借用类型  
+                        if(lmodel.HasFlag(SymbolTable.RecordFlag.BorrowVar))
+                        {
+                            //无需处理  
+                        }
+
                         break;
                     }
                 case SyntaxTree.AssignNode asn:
@@ -3443,9 +3421,9 @@ namespace Gizbox.SemanticRule
         /// <summary>
         /// 变量定义节点 的 所有权和生命周期检查  
         /// </summary>
-        private void CheckOwershipCompare(VarDeclareNode varDeclNode, SymbolTable.Record varRec)
+        private void CheckOwershipCompare(VarDeclareNode varDeclNode, SymbolTable.Record varRec, out SymbolTable.RecordFlag lModel, out SymbolTable.RecordFlag rModel )
         {
-            SymbolTable.RecordFlag lModel = GetOwnershipModel(varDeclNode.flags, varDeclNode.typeNode);
+            lModel = GetOwnershipModel(varDeclNode.flags, varDeclNode.typeNode);
 
             var name = varDeclNode.identifierNode.FullName;
 
@@ -3453,7 +3431,7 @@ namespace Gizbox.SemanticRule
             if(varDeclNode.initializerNode is IdentityNode rvalueVarNode)
             {
                 var rvalueVarRec = Query(rvalueVarNode.FullName);
-                var rModel = rvalueVarRec.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.BorrowVar | SymbolTable.RecordFlag.ManualVar);
+                rModel = rvalueVarRec.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.BorrowVar | SymbolTable.RecordFlag.ManualVar);
 
                 //不能把own和borrow模型的对象赋值给manual模型
                 if(lModel == SymbolTable.RecordFlag.ManualVar
@@ -3483,7 +3461,7 @@ namespace Gizbox.SemanticRule
                 }
 
             }
-            else if(varDeclNode.initializerNode is NewObjectNode ctorNode)
+            else if(varDeclNode.initializerNode is NewObjectNode newobjNode)
             {
                 //Borrow类型不能用newobj创建  
                 if(lModel == SymbolTable.RecordFlag.BorrowVar)
@@ -3491,12 +3469,30 @@ namespace Gizbox.SemanticRule
                     throw new SemanticException(ExceptioName.OwnershipError_BorrowCanNotFromTemp, varDeclNode, name);
                 }
 
+                var classRec = Query(newobjNode.className.FullName);
+                bool isownershipClass = classRec.flags.HasFlag(SymbolTable.RecordFlag.OwnershipClass);
+                if(isownershipClass)
+                    rModel = SymbolTable.RecordFlag.OwnerVar;
+                else
+                    rModel = SymbolTable.RecordFlag.ManualVar;
             }
-            //调用  
+            //临时右值-调用返回值      
             else if(varDeclNode.initializerNode is CallNode callNode)
             {
                 var funcRec = callNode.attributes[eAttr.func_rec] as SymbolTable.Record;
-                todo;
+                rModel = funcRec.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.BorrowVar | SymbolTable.RecordFlag.ManualVar);
+
+
+                if(rModel.HasFlag(SymbolTable.RecordFlag.OwnerVar) == true
+                    && lModel.HasFlag(SymbolTable.RecordFlag.OwnerVar) == false)
+                {
+                    //调用返回值是own类型时，不能赋值给非own类型  
+                    if(lModel.HasFlag(SymbolTable.RecordFlag.ManualVar))
+                        throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignOwnToManual, varDeclNode, string.Empty);
+                    //调用返回值是own类型时，不能赋值给borrow类型（会悬垂引用）    
+                    else if(lModel.HasFlag(SymbolTable.RecordFlag.BorrowVar))
+                        throw new SemanticException(ExceptioName.OwnershipError, varDeclNode, "cant assign temp own value to borrow variable.");
+                }
             }
             //其他临时右值  
             else
@@ -3506,6 +3502,8 @@ namespace Gizbox.SemanticRule
                 {
                     throw new SemanticException(ExceptioName.OwnershipError_BorrowCanNotFromTemp, varDeclNode, name);
                 }
+                rModel = SymbolTable.RecordFlag.None;
+                throw new SemanticException(ExceptioName.OwnershipError, varDeclNode, "undefined rvalue:" + varDeclNode.initializerNode.GetType().Name);
             }
         }
 

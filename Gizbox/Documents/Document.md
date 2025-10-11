@@ -194,3 +194,7 @@ void foo()
 
 
 **Gizbox TODO**   
+
+编译期检查。  
+作用域drop、语句末drop。  
+临时借用-表达式中借用临时own类型（函数返回值）    
