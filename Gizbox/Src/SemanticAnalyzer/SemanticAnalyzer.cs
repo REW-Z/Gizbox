@@ -3758,7 +3758,7 @@ namespace Gizbox.SemanticRule
                     if(typeNode is ClassTypeNode classTypeNode)
                     {
                         var classRec = Query(classTypeNode.classname.FullName);
-                        if(classRec.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                        if(classRec.flags.HasFlag(SymbolTable.RecordFlag.OwnershipClass))
                             isOwnershipClass = true;
                     }
 
