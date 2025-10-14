@@ -190,27 +190,3 @@ void foo()
 3.作用域内存池。  
 4.编译器优化RVO。  
 5.所有权（目前最优解）。    
-
-
-
-**Gizbox TODO**   
-
-编译期检查。  
-作用域drop、语句末drop。  
-临时借用-表达式中借用临时own类型（函数返回值）    
-
-
-a.语义分析阶段进行所有权分析。IR代码生成阶段不分析所有权，而是仅仅负责分析结果生成delete语句。  
-
-b.临时对象怎么处理，单表达式语句(Call和New)怎么处理:    
-```
-own AAA Generete()
-{
-    own AAA ret = new AAA();
-    return ret;
-}
-
-new AAA();   //临时值没有名称，怎么指名delete它？    
-Generate();   //返回对象没有一个对象来承载，怎么指名delete它？    
-```
-
