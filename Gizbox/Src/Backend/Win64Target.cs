@@ -11,14 +11,6 @@ using InstructionNode = Gizbox.LList<Gizbox.Src.Backend.X64Instruction>.Node;
 using SymbolRecord = Gizbox.SymbolTable.Record;
 
 
-
-//      (RAX, RCX, RDX, R8, R9, R10, R11、 XMM0-XMM5 是调用者保存的寄存器)
-//      (RBX、RBP、RDI、RSI、RSP、R12、R13、R14、R15 和 XMM6 - XMM15 由使用它们的函数保存和还原，视为非易失性。)
-
-//   内存-内存形式  :  dst/src 同为内存时，必须插入中转寄存器（整数用 R11，SSE 用 XMM0）两步搬运。
-
-
-
 namespace Gizbox.Src.Backend
 {
     public static class Win64Target

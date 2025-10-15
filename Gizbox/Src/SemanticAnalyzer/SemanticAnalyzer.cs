@@ -1412,30 +1412,6 @@ namespace Gizbox.SemanticRule
         }
     }
 
-    /// <summary>
-    /// 生命周期语义信息  
-    /// </summary>
-    public class LifetimeInfo
-    {
-        public enum VarStatus
-        {
-            Alive = 1,
-            Released = 0,
-            Moved = -1
-        }
-
-        public class ScopeInfo
-        {
-            //1-未释放，0-已释放，-1:已move所有权
-            public Dictionary<string, VarStatus> localVariableStatusDict = new();
-        }
-
-
-        public Stack<ScopeInfo> scopeStack = new();
-
-        public SymbolTable.RecordFlag currentFuncReturnFlag = SymbolTable.RecordFlag.None;
-        public List<SymbolTable.Record> currentFuncParams = null;
-    }
 
     /// <summary>
     /// 语义分析器  
@@ -2788,6 +2764,8 @@ namespace Gizbox.SemanticRule
             {
                 case SyntaxTree.ProgramNode programNode:
                     {
+                        lifeTimeInfo.currBranch = lifeTimeInfo.mainBranch;
+
                         Pass4_OwnershipLifetime(programNode.statementsNode);
                         break;
                     }
@@ -2806,7 +2784,7 @@ namespace Gizbox.SemanticRule
                     {
                         // 进入block作用域  
                         envStack.Push(blockNode.attributes[eAttr.env] as SymbolTable);
-                        lifeTimeInfo.scopeStack.Push(new LifetimeInfo.ScopeInfo());
+                        lifeTimeInfo.currBranch.scopeStack.Push(new LifetimeInfo.ScopeInfo());
 
                         foreach(var s in blockNode.statements)
                         {
@@ -2815,7 +2793,7 @@ namespace Gizbox.SemanticRule
 
                         // 作用域退出需要删除的Owner变量
                         var toDelete = new List<string>();
-                        foreach(var (varname, varstatus) in lifeTimeInfo.scopeStack.Peek().localVariableStatusDict)
+                        foreach(var (varname, varstatus) in lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict)
                         {
                             if(varstatus == LifetimeInfo.VarStatus.Alive)
                                 toDelete.Add(varname);
@@ -2824,7 +2802,7 @@ namespace Gizbox.SemanticRule
                         if(toDelete.Count > 0)
                             blockNode.attributes[eAttr.drop_exit_env] = toDelete;
 
-                        lifeTimeInfo.scopeStack.Pop();
+                        lifeTimeInfo.currBranch.scopeStack.Pop();
                         envStack.Pop();
                         break;
                     }
@@ -2832,7 +2810,7 @@ namespace Gizbox.SemanticRule
                     {
                         // 入循环作用域
                         envStack.Push(forNode.attributes[eAttr.env] as SymbolTable);
-                        lifeTimeInfo.scopeStack.Push(new LifetimeInfo.ScopeInfo());
+                        lifeTimeInfo.currBranch.scopeStack.Push(new LifetimeInfo.ScopeInfo());
 
                         // initializer/condition/iterator/body
                         Pass4_OwnershipLifetime(forNode.initializerNode);
@@ -2841,7 +2819,7 @@ namespace Gizbox.SemanticRule
                         Pass4_OwnershipLifetime(forNode.stmtNode);
 
                         var toDelete = new List<string>();
-                        foreach(var (varname, varstatus) in lifeTimeInfo.scopeStack.Peek().localVariableStatusDict)
+                        foreach(var (varname, varstatus) in lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict)
                         {
                             if(varstatus ==  LifetimeInfo.VarStatus.Alive)
                                 toDelete.Add(varname);
@@ -2850,7 +2828,7 @@ namespace Gizbox.SemanticRule
                         if(toDelete.Count > 0)
                             forNode.attributes[eAttr.drop_exit_env] = toDelete;
 
-                        lifeTimeInfo.scopeStack.Pop();
+                        lifeTimeInfo.currBranch.scopeStack.Pop();
                         envStack.Pop();
                         break;
                     }
@@ -2863,15 +2841,35 @@ namespace Gizbox.SemanticRule
                     }
                 case SyntaxTree.IfStmtNode ifNode:
                     {
+                        var lastCurrTemp = lifeTimeInfo.currBranch;
+                        List<LifetimeInfo.Branch> branches = new();
+
+
                         foreach(var c in ifNode.conditionClauseList)
                         {
                             Pass4_OwnershipLifetime(c.conditionNode);
+
+                            //条件分支  
+                            var condBranch = lifeTimeInfo.NewBranch(lastCurrTemp);
+                            lifeTimeInfo.currBranch = condBranch;
                             Pass4_OwnershipLifetime(c.thenNode);
+
+                            branches.Add(condBranch);
                         }
                         if(ifNode.elseClause != null)
                         {
+                            //条件分支  
+                            var condBranch = lifeTimeInfo.NewBranch(lastCurrTemp);
+                            lifeTimeInfo.currBranch = condBranch;
                             Pass4_OwnershipLifetime(ifNode.elseClause.stmt);
+
+                            branches.Add(condBranch);
                         }
+
+                        //回归主分支  
+                        lifeTimeInfo.currBranch = lastCurrTemp;
+                        lifeTimeInfo.MergeBranchesTo(lastCurrTemp, branches);
+
                         break;
                     }
                 case SyntaxTree.ClassDeclareNode classDecl:
@@ -2883,7 +2881,7 @@ namespace Gizbox.SemanticRule
                     {
                         // 进入函数作用域
                         envStack.Push(funcDecl.attributes[eAttr.env] as SymbolTable);
-                        lifeTimeInfo.scopeStack.Push(new LifetimeInfo.ScopeInfo());
+                        lifeTimeInfo.currBranch.scopeStack.Push(new LifetimeInfo.ScopeInfo());
 
                         // 函数参数所有权模型  
                         foreach(var paramNode in funcDecl.parametersNode.parameterNodes)
@@ -2921,7 +2919,7 @@ namespace Gizbox.SemanticRule
                                 if(p.name == "this")
                                     continue; // this 不托管
                                 if(p.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar))
-                                    lifeTimeInfo.scopeStack.Peek().localVariableStatusDict[p.name] = LifetimeInfo.VarStatus.Alive;
+                                    lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict[p.name] = LifetimeInfo.VarStatus.Alive;
                             }
                         }
 
@@ -2933,7 +2931,7 @@ namespace Gizbox.SemanticRule
 
                         // 函数正常退出需要回收的 Owner
                         var exitDel = new List<string>();
-                        foreach(var (varname, varstatus) in lifeTimeInfo.scopeStack.Peek().localVariableStatusDict)
+                        foreach(var (varname, varstatus) in lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict)
                         {
                             if(varstatus == LifetimeInfo.VarStatus.Alive)
                                 exitDel.Add(varname);
@@ -2942,7 +2940,7 @@ namespace Gizbox.SemanticRule
                         if(exitDel.Count > 0)
                             funcDecl.attributes[eAttr.drop_exit_env] = exitDel;
 
-                        lifeTimeInfo.scopeStack.Pop();
+                        lifeTimeInfo.currBranch.scopeStack.Pop();
                         envStack.Pop();
                         break;
                     }
@@ -2987,7 +2985,7 @@ namespace Gizbox.SemanticRule
 
                         // 记录owner类型的局部变量  
                         if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
-                            lifeTimeInfo.scopeStack.Peek().localVariableStatusDict[rec.name] = LifetimeInfo.VarStatus.Alive;
+                            lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict[rec.name] = LifetimeInfo.VarStatus.Alive;
 
                         // todo:如果赋值为null?
 
@@ -3009,11 +3007,11 @@ namespace Gizbox.SemanticRule
                             {
                                 //加入moved  
                                 var rrec = Query(idrvalue.FullName);
-                                for(int i = lifeTimeInfo.scopeStack.Count - 1; i >= 0; --i)
+                                for(int i = lifeTimeInfo.currBranch.scopeStack.Count - 1; i >= 0; --i)
                                 {
-                                    if(lifeTimeInfo.scopeStack.ElementAt(i).localVariableStatusDict.ContainsKey(rrec.name))
+                                    if(lifeTimeInfo.currBranch.scopeStack.ElementAt(i).localVariableStatusDict.ContainsKey(rrec.name))
                                     {
-                                        lifeTimeInfo.scopeStack.ElementAt(i).localVariableStatusDict[rrec.name] = LifetimeInfo.VarStatus.Moved;
+                                        lifeTimeInfo.currBranch.scopeStack.ElementAt(i).localVariableStatusDict[rrec.name] = LifetimeInfo.VarStatus.Dead;
                                         break;
                                     }
                                 }
@@ -3054,7 +3052,7 @@ namespace Gizbox.SemanticRule
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
                                 bool alive = false;
-                                if(lifeTimeInfo.scopeStack.Any() && lifeTimeInfo.scopeStack.Peek().localVariableStatusDict.TryGetValue(lrec.name, out var st))
+                                if(lifeTimeInfo.currBranch.scopeStack.Any() && lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict.TryGetValue(lrec.name, out var st))
                                 {
                                     alive = (st == LifetimeInfo.VarStatus.Alive);
                                 }
@@ -3066,13 +3064,13 @@ namespace Gizbox.SemanticRule
                                         lst = (List<string>)asn.attributes[eAttr.drop_before_stmt];
                                     lst.Add(lrec.name);
                                     asn.attributes[eAttr.drop_before_stmt] = lst;
-                                    lifeTimeInfo.scopeStack.Peek().localVariableStatusDict[lrec.name] = LifetimeInfo.VarStatus.Released;
+                                    lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict[lrec.name] = LifetimeInfo.VarStatus.Dead;
                                 }
                             }
 
 
                             // todo:如果赋值为null?
-                            lifeTimeInfo.scopeStack.Peek().localVariableStatusDict[lrec.name] = LifetimeInfo.VarStatus.Alive;
+                            lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict[lrec.name] = LifetimeInfo.VarStatus.Alive;
 
                             // 所有权own类型赋值处理  
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
@@ -3092,11 +3090,11 @@ namespace Gizbox.SemanticRule
                                 {
                                     //加入moved  
                                     var rrec = Query(idrvalueNode.FullName);
-                                    for(int i = lifeTimeInfo.scopeStack.Count - 1; i >= 0; --i)
+                                    for(int i = lifeTimeInfo.currBranch.scopeStack.Count - 1; i >= 0; --i)
                                     {
-                                        if(lifeTimeInfo.scopeStack.ElementAt(i).localVariableStatusDict.ContainsKey(rrec.name))
+                                        if(lifeTimeInfo.currBranch.scopeStack.ElementAt(i).localVariableStatusDict.ContainsKey(rrec.name))
                                         {
-                                            lifeTimeInfo.scopeStack.ElementAt(i).localVariableStatusDict[rrec.name] = LifetimeInfo.VarStatus.Moved;
+                                            lifeTimeInfo.currBranch.scopeStack.ElementAt(i).localVariableStatusDict[rrec.name] = LifetimeInfo.VarStatus.Dead;
                                             break;
                                         }
                                     }
@@ -3128,18 +3126,8 @@ namespace Gizbox.SemanticRule
                                 if(drec != null)
                                 {
                                     var dmodel = drec.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.BorrowVar | SymbolTable.RecordFlag.ManualVar);
-                                    if(dmodel.HasFlag(SymbolTable.RecordFlag.BorrowVar))
-                                        throw new SemanticException(ExceptioName.OwnershipError, del, "borrow cannot be deleted");
-
-                                    // 标记为已释放，避免作用域退出再次删除
-                                    for(int i = lifeTimeInfo.scopeStack.Count - 1; i >= 0; --i)
-                                    {
-                                        if(lifeTimeInfo.scopeStack.ElementAt(i).localVariableStatusDict.ContainsKey(drec.name))
-                                        {
-                                            lifeTimeInfo.scopeStack.ElementAt(i).localVariableStatusDict[drec.name] = LifetimeInfo.VarStatus.Released; 
-                                            break; 
-                                        }
-                                    }
+                                    if(dmodel.HasFlag(SymbolTable.RecordFlag.BorrowVar) || dmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                                        throw new SemanticException(ExceptioName.OwnershipError, del, "own/borrow cannot be deleted");
                                 }
                             }
                         }
@@ -3159,11 +3147,11 @@ namespace Gizbox.SemanticRule
                             if(rrec != null && rrec.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
                                 returnedName = rrec.name;
-                                for(int i = lifeTimeInfo.scopeStack.Count - 1; i >= 0; --i)
+                                for(int i = lifeTimeInfo.currBranch.scopeStack.Count - 1; i >= 0; --i)
                                 {
-                                    if(lifeTimeInfo.scopeStack.ElementAt(i).localVariableStatusDict.ContainsKey(rrec.name))
+                                    if(lifeTimeInfo.currBranch.scopeStack.ElementAt(i).localVariableStatusDict.ContainsKey(rrec.name))
                                     { 
-                                        lifeTimeInfo.scopeStack.ElementAt(i).localVariableStatusDict[rrec.name] = LifetimeInfo.VarStatus.Moved; 
+                                        lifeTimeInfo.currBranch.scopeStack.ElementAt(i).localVariableStatusDict[rrec.name] = LifetimeInfo.VarStatus.Dead; 
                                         break; 
                                     }
                                 }
@@ -3172,7 +3160,7 @@ namespace Gizbox.SemanticRule
 
                         // 汇总当前所有活跃Owner（所有栈帧），return前删除（排除被返回者）
                         var delList = new List<string>();
-                        foreach(var scope in lifeTimeInfo.scopeStack)
+                        foreach(var scope in lifeTimeInfo.currBranch.scopeStack)
                         {
                             foreach(var (varname, varstatus) in scope.localVariableStatusDict)
                             {
@@ -3283,11 +3271,11 @@ namespace Gizbox.SemanticRule
                                     {
                                         if(argModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                                         {
-                                            for(int si = lifeTimeInfo.scopeStack.Count - 1; si >= 0; --si)
+                                            for(int si = lifeTimeInfo.currBranch.scopeStack.Count - 1; si >= 0; --si)
                                             {
-                                                if(lifeTimeInfo.scopeStack.ElementAt(si).localVariableStatusDict.ContainsKey(argrec.name))
+                                                if(lifeTimeInfo.currBranch.scopeStack.ElementAt(si).localVariableStatusDict.ContainsKey(argrec.name))
                                                 {
-                                                    lifeTimeInfo.scopeStack.ElementAt(si).localVariableStatusDict[argrec.name] = LifetimeInfo.VarStatus.Moved; 
+                                                    lifeTimeInfo.currBranch.scopeStack.ElementAt(si).localVariableStatusDict[argrec.name] = LifetimeInfo.VarStatus.Dead; 
                                                     break;
                                                 }
                                             }
@@ -3324,10 +3312,10 @@ namespace Gizbox.SemanticRule
                         var rec = Query(id.FullName);
                         if(rec != null && rec.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                         {
-                            for(int i = lifeTimeInfo.scopeStack.Count - 1; i >= 0; --i)
+                            for(int i = lifeTimeInfo.currBranch.scopeStack.Count - 1; i >= 0; --i)
                             {
-                                var dict = lifeTimeInfo.scopeStack.ElementAt(i).localVariableStatusDict;
-                                if(dict.TryGetValue(rec.name, out var st) && st == LifetimeInfo.VarStatus.Moved)
+                                var dict = lifeTimeInfo.currBranch.scopeStack.ElementAt(i).localVariableStatusDict;
+                                if(dict.TryGetValue(rec.name, out var st) && st == LifetimeInfo.VarStatus.Dead)
                                     throw new SemanticException(ExceptioName.OwnershipError, id, "use after move");
                             }
                         }
