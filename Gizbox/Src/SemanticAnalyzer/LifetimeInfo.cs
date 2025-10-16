@@ -21,6 +21,37 @@ public class LifetimeInfo
     public class Branch
     {
         public Stack<ScopeInfo> scopeStack = new();
+
+
+        public bool TryFindVariable(string varname, out (int stackEleIdx, VarStatus status) rs)
+        {
+            int idx = 0;
+            foreach(var scope in scopeStack)  //Stack的ElementAt接口和foreach迭代接口都是从栈顶开始  
+            {
+                if(scope.localVariableStatusDict.TryGetValue(varname, out VarStatus status))
+                {
+                    rs = new(idx, status);
+                    return true;
+                }
+                idx++;
+            }
+            rs = new(-1, default);
+            return false;
+        }
+
+        public void SetVarStatus(string varname, VarStatus status) 
+        {
+            foreach(var scope in scopeStack)
+            {
+                if(scope.localVariableStatusDict.ContainsKey(varname))
+                {
+                    scope.localVariableStatusDict[varname] = status;
+                    return;
+                }
+            }
+            throw new GizboxException(ExceptioName.OwnershipError, "variable not found in current scope.");
+        }
+
     }
 
     public class ScopeInfo
@@ -84,8 +115,11 @@ public class LifetimeInfo
         return newBranch;
     }
 
-    public void MergeBranchesTo(Branch mainBranch, IEnumerable<Branch> branches)
+    public bool MergeBranchesTo(Branch mainBranch, IEnumerable<Branch> branches)
     {
+        //是否收敛  
+        bool isConverged = true;
+
         //合并检查  
         int depth = -1;
         string name = null;
@@ -112,6 +146,12 @@ public class LifetimeInfo
                 finalStatus = Meet(finalStatus, s);
             }
             mainBranch.scopeStack.Peek().localVariableStatusDict[varname] = finalStatus;
+
+            if(finalStatus != varstatus)
+                isConverged = false;
         }
+
+
+        return isConverged;
     }
 }
