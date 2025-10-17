@@ -58,9 +58,9 @@ namespace Gizbox
         drop_exit_env,
         drop_before_return,
         drop_before_stmt,
-        drop_after_stmt,
+        drop_expr_result_after_stmt,
         set_null_after_stmt,
-
+        store_expr_result,
         __codegen_mark_max,
 
 
@@ -3208,23 +3208,25 @@ namespace Gizbox.SemanticRule
                         {
                             // 视为临时所有权，需删除
                             dels.Add(sstmt.exprNode);
+                            sstmt.exprNode.attributes[eAttr.store_expr_result] = true;
                         }
                         else if(sstmt.exprNode is SyntaxTree.CallNode cnode)
                         {
-                            SymbolTable.Record f;
-                            if(cnode.attributes.ContainsKey(eAttr.mangled_name))
-                                f = Query((string)cnode.attributes[eAttr.mangled_name]);
-                            else if(cnode.attributes.ContainsKey(eAttr.extern_name))
-                                f = Query((string)cnode.attributes[eAttr.extern_name]);
-                            else
-                                f = null;
+                            SymbolTable.Record f = cnode.attributes[eAttr.func_rec] as SymbolTable.Record;
 
-                            if(f != null && (f.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar)))
+                            if(f.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                            {
+                                // 视为临时所有权，需删除
                                 dels.Add(sstmt.exprNode);
+                                sstmt.exprNode.attributes[eAttr.store_expr_result] = true;
+                            }
+                                
                         }
 
                         if(dels.Count > 0)
-                            sstmt.attributes[eAttr.drop_after_stmt] = dels;
+                        {
+                            sstmt.attributes[eAttr.drop_expr_result_after_stmt] = dels;
+                        }
 
                         break;
                     }
@@ -3234,7 +3236,7 @@ namespace Gizbox.SemanticRule
                         foreach(var a in callNode.argumantsNode.arguments)
                             Pass4_OwnershipLifetime(a);
 
-                        // 根据被调函数签名对实参做move/校验
+                        // 获取函数的符号表记录  
                         SymbolTable.Record funcRec = null;
                         if(callNode.attributes.ContainsKey(eAttr.mangled_name))
                             funcRec = Query((string)callNode.attributes[eAttr.mangled_name]);
@@ -3245,6 +3247,7 @@ namespace Gizbox.SemanticRule
 
                         callNode.attributes[eAttr.func_rec] = funcRec;
 
+                        // 根据被调函数签名对实参做move/校验
                         if(funcRec != null && funcRec.envPtr != null)
                         {
                             var allParams = funcRec.envPtr.GetByCategory(SymbolTable.RecordCatagory.Param) ?? new List<SymbolTable.Record>();
@@ -3253,6 +3256,7 @@ namespace Gizbox.SemanticRule
                             if(callNode.isMemberAccessFunction && allParams.Count > 0 && allParams[0].name == "this")
                                 offset = 1;
 
+                            //实参分析  
                             for(int i = 0; i < callNode.argumantsNode.arguments.Count; ++i)
                             {
                                 if(i + offset >= allParams.Count)
@@ -3276,11 +3280,8 @@ namespace Gizbox.SemanticRule
                                 }
                                 else if(arg is SyntaxTree.CallNode ac)
                                 {
-                                    SymbolTable.Record rf = null;
-                                    if(ac.attributes.ContainsKey(eAttr.mangled_name))
-                                        rf = Query((string)ac.attributes[eAttr.mangled_name]);
-                                    else if(ac.attributes.ContainsKey(eAttr.extern_name))
-                                        rf = Query((string)ac.attributes[eAttr.extern_name]);
+                                    SymbolTable.Record rf = ac.attributes[eAttr.func_rec] as SymbolTable.Record;
+
                                     if(rf != null)
                                         argModel = rf.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.ManualVar | SymbolTable.RecordFlag.BorrowVar);
                                 }
@@ -3292,14 +3293,7 @@ namespace Gizbox.SemanticRule
                                     {
                                         if(argModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                                         {
-                                            for(int si = lifeTimeInfo.currBranch.scopeStack.Count - 1; si >= 0; --si)
-                                            {
-                                                if(lifeTimeInfo.currBranch.scopeStack.ElementAt(si).localVariableStatusDict.ContainsKey(argrec.name))
-                                                {
-                                                    lifeTimeInfo.currBranch.scopeStack.ElementAt(si).localVariableStatusDict[argrec.name] = LifetimeInfo.VarStatus.Dead; 
-                                                    break;
-                                                }
-                                            }
+                                            lifeTimeInfo.currBranch.SetVarStatus(argrec.name, LifetimeInfo.VarStatus.Dead);
                                         }
                                         else
                                             throw new SemanticException(ExceptioName.OwnershipError, callNode, "owner parameter requires own argument");
