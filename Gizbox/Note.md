@@ -72,6 +72,6 @@ AI：
 
 替代drop-flag的方法：所有权移动后，右值变量置null。用null作为drop-flag。    
 
-doing:在Pass4处理CallNode。    
+树节点重写。  
 
 IR生成器插入语句。    
