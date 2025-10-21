@@ -743,7 +743,7 @@ namespace Gizbox.LanguageServices
                 SyntaxTree.Node currNode = this.persistentAST.rootNode;
 
                 int loop = 0;
-                while(currNode.Children.Length > 0)//非叶子节点  
+                while(currNode.ChildCount > 0)//非叶子节点  
                 {
                     if (loop++ > 99) throw new Exception("Infinite Loop!"); 
 
@@ -754,7 +754,7 @@ namespace Gizbox.LanguageServices
                     //Is in currNode  
                     if(Utils_InRange(startToken, endToken, line, character))
                     {
-                        foreach(var child in currNode.Children)
+                        foreach(var child in currNode.Children())
                         {
                             var childstartToken = child.StartToken();
                             var childendToken = child.EndToken();

@@ -199,15 +199,16 @@ namespace Gizbox.SemanticRule
             //构建抽象语法树(AST)的语义动作   
             AddActionAtTail("S -> importations namespaceusings statements", (psr, production) =>
             {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ProgramNode()
+                var n = new SyntaxTree.ProgramNode()
                 {
-                    importNodes = (List<SyntaxTree.ImportNode>)psr.stack[psr.stack.Top - 2].attributes[eAttr.import_list],
-                    usingNamespaceNodes = (List<SyntaxTree.UsingNode>)psr.stack[psr.stack.Top - 1].attributes[eAttr.using_list],
-                    statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node],
-
-
                     attributes = psr.newElement.attributes,
                 };
+
+                n.importNodes.AddRange((List<SyntaxTree.ImportNode>)psr.stack[psr.stack.Top - 2].attributes[eAttr.import_list]);
+                n.usingNamespaceNodes.AddRange((List<SyntaxTree.UsingNode>)psr.stack[psr.stack.Top - 1].attributes[eAttr.using_list]);
+                n.statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+
+                psr.newElement.attributes[eAttr.ast_node] = n;
 
                 this.syntaxRootNode = (SyntaxTree.ProgramNode)psr.newElement.attributes[eAttr.ast_node];
             });
@@ -320,13 +321,14 @@ namespace Gizbox.SemanticRule
             });
 
             AddActionAtTail("statementblock -> { statements }", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.StatementBlockNode()
+                var node = new SyntaxTree.StatementBlockNode()
                 {
-
-                    statements = ((SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node]).statements,
-
                     attributes = psr.newElement.attributes,
                 };
+
+                node.statements.AddRange(((SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node]).statements.ToList());
+
+                psr.newElement.attributes[eAttr.ast_node] = node;
             });
 
 
@@ -434,19 +436,22 @@ namespace Gizbox.SemanticRule
 
 
             AddActionAtTail("stmt -> if ( expr ) stmt elifclauselist elseclause", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.IfStmtNode()
+                var n = new SyntaxTree.IfStmtNode()
                 {
-                    conditionClauseList = new List<SyntaxTree.ConditionClauseNode>() {
-                        new SyntaxTree.ConditionClauseNode(){
-                            conditionNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 4].attributes[eAttr.ast_node],
-                            thenNode = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node],
-                        },
-                    },
-
                     elseClause = (SyntaxTree.ElseClauseNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node],
 
                     attributes = psr.newElement.attributes,
                 };
+
+                n.conditionClauseList.AddRange(
+                    new List<SyntaxTree.ConditionClauseNode>() {
+                        new SyntaxTree.ConditionClauseNode(){
+                            conditionNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 4].attributes[eAttr.ast_node],
+                            thenNode = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node],
+                        },
+                    });
+                
+                psr.newElement.attributes[eAttr.ast_node] = n;
 
                 ((SyntaxTree.IfStmtNode)psr.newElement.attributes[eAttr.ast_node]).conditionClauseList.AddRange(
                         (List<SyntaxTree.ConditionClauseNode>)psr.stack[psr.stack.Top - 1].attributes[eAttr.condition_clause_list]
@@ -615,8 +620,6 @@ namespace Gizbox.SemanticRule
                         identiferType = SyntaxTree.IdentityNode.IdType.Class,
                     },
 
-                    memberDelareNodes = new List<SyntaxTree.DeclareNode>(),
-
                     attributes = psr.newElement.attributes,
                 };
 
@@ -647,7 +650,6 @@ namespace Gizbox.SemanticRule
                         identiferType = SyntaxTree.IdentityNode.IdType.Class,
                     },
 
-                    memberDelareNodes = new List<SyntaxTree.DeclareNode>(),
 
                     attributes = psr.newElement.attributes,
                 };
@@ -1226,49 +1228,52 @@ namespace Gizbox.SemanticRule
             {
                 psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ParameterListNode()
                 {
-                    parameterNodes = new List<SyntaxTree.ParameterNode>(), //空的子节点  
-
                     attributes = psr.newElement.attributes,
                 };
             });
 
             AddActionAtTail("params -> type ID", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ParameterListNode()
+                var node = new SyntaxTree.ParameterListNode()
                 {
-                    parameterNodes = new List<SyntaxTree.ParameterNode>() {
-                        new SyntaxTree.ParameterNode(){
-                            flags = VarModifiers.None,
-                            typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
-                            identifierNode = new SyntaxTree.IdentityNode(){
-                                attributes = psr.stack[psr.stack.Top].attributes,
-                                token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
-                                identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
-                            },
-                            attributes = new(),
-                        }
-                    },
-
                     attributes = psr.newElement.attributes,
                 };
+
+                node.parameterNodes.Add(new SyntaxTree.ParameterNode()
+                {
+                    flags = VarModifiers.None,
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+                    identifierNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = psr.stack[psr.stack.Top].attributes,
+                        token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
+                    },
+                    attributes = new(),
+                });
+
+                psr.newElement.attributes[eAttr.ast_node] = node;
+
             });
             AddActionAtTail("params -> tmodf type ID", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ParameterListNode()
+                var node = new SyntaxTree.ParameterListNode()
                 {
-                    parameterNodes = new List<SyntaxTree.ParameterNode>() {
-                        new SyntaxTree.ParameterNode(){
-                            flags = (VarModifiers)psr.stack[psr.stack.Top - 2].attributes[eAttr.tmodf],
-                            typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
-                            identifierNode = new SyntaxTree.IdentityNode(){
-                                attributes = psr.stack[psr.stack.Top].attributes,
-                                token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
-                                identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
-                            },
-                            attributes = new(),
-                        }
-                    },
-
                     attributes = psr.newElement.attributes,
                 };
+
+                node.parameterNodes.Add(new SyntaxTree.ParameterNode()
+                {
+                    flags = (VarModifiers)psr.stack[psr.stack.Top - 2].attributes[eAttr.tmodf],
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+                    identifierNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = psr.stack[psr.stack.Top].attributes,
+                        token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
+                    },
+                    attributes = new(),
+                });
+
+                psr.newElement.attributes[eAttr.ast_node] = node;
             });
 
             AddActionAtTail("params -> params , type ID", (psr, production) => {
@@ -1312,18 +1317,17 @@ namespace Gizbox.SemanticRule
             AddActionAtTail("args -> ε", (psr, production) =>
             {
                 psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ArgumentListNode()
-                {
-                    arguments = new List<SyntaxTree.ExprNode>()//空的子节点  
-                };
+                {};
             });
 
             AddActionAtTail("args -> expr", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ArgumentListNode()
-                {
-                    arguments = new List<SyntaxTree.ExprNode>() {
-                        (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node]
-                    }
-                };
+
+                var node = new SyntaxTree.ArgumentListNode()
+                {};
+
+                node.arguments.Add((SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node]);
+
+                psr.newElement.attributes[eAttr.ast_node] = node;
             });
 
             AddActionAtTail("args -> args , expr", (psr, production) => {
@@ -1515,9 +1519,13 @@ namespace Gizbox.SemanticRule
             envStack.Push(ilUnit.globalScope.env);
             Pass3_AnalysisNode(ast.rootNode);
 
+            //应用所有树节点重写  
+            ast.ApplyAllOverrides();
+
             //Pass4
             envStack.Clear();
             envStack.Push(ilUnit.globalScope.env);
+            lifeTimeInfo.mainBranch.scopeStack.Push(new LifetimeInfo.ScopeInfo());
             Pass4_OwnershipLifetime(ast.rootNode);
         }
 
@@ -2477,7 +2485,7 @@ namespace Gizbox.SemanticRule
                             if(operatorRec == null)
                                 throw new SemanticException(ExceptioName.SemanticAnalysysError, binaryNode, $"operator overload not exist:{Utils.Mangle(binaryNode.GetOpName(), typeExprL, typeExprR)}");
 
-                            binaryNode.overrideNode = new SyntaxTree.CallNode()
+                            var overrideNode = new SyntaxTree.CallNode()
                             {
                                 isMemberAccessFunction = false,
                                 funcNode = new SyntaxTree.IdentityNode()
@@ -2488,13 +2496,12 @@ namespace Gizbox.SemanticRule
                                 },
                                 argumantsNode = new SyntaxTree.ArgumentListNode()
                                 {
-                                    arguments = new List<SyntaxTree.ExprNode>() {
-                                                binaryNode.leftNode,
-                                                binaryNode.rightNode,
-                                            },
                                 },
                                 attributes = new(),
                             };
+                            overrideNode.argumantsNode.arguments.AddRange(new List<SyntaxTree.ExprNode>() { binaryNode.leftNode, binaryNode.rightNode, });
+                            binaryNode.overrideNode = overrideNode;
+                            binaryNode.overrideNode.Parent = binaryNode.Parent;
 
                             Pass3_AnalysisNode(binaryNode.overrideNode);
                             Console.WriteLine(binaryNode.overrideNode.attributes.Count);
@@ -2522,7 +2529,7 @@ namespace Gizbox.SemanticRule
 
                         if(targetType.Category == GType.Kind.String)
                         {
-                            castNode.overrideNode = new SyntaxTree.CallNode()
+                            var overrideNode = new SyntaxTree.CallNode()
                             {
                                 isMemberAccessFunction = false,
                                 funcNode = new SyntaxTree.IdentityNode() 
@@ -2532,13 +2539,12 @@ namespace Gizbox.SemanticRule
                                     identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
                                 },
                                 argumantsNode = new SyntaxTree.ArgumentListNode()
-                                {
-                                    arguments = new List<SyntaxTree.ExprNode>() {
-                                                castNode.factorNode
-                                            },
-                                },
+                                { },
                                 attributes = new(),
                             };
+                            overrideNode.argumantsNode.arguments.Add(castNode.factorNode);
+                            castNode.overrideNode = overrideNode;
+                            castNode.overrideNode.Parent = castNode.Parent;
 
                             Pass3_AnalysisNode(castNode.overrideNode);
 
@@ -2615,20 +2621,19 @@ namespace Gizbox.SemanticRule
                                 if (setterMethod != null)//存在setter函数  
                                 {
                                     //替换节点  
-                                    assignNode.overrideNode = new SyntaxTree.CallNode()
+                                    var overrideNode = new SyntaxTree.CallNode()
                                     {
 
                                         isMemberAccessFunction = true,
                                         funcNode = memberAccess,
                                         argumantsNode = new SyntaxTree.ArgumentListNode()
-                                        {
-                                            arguments = new List<SyntaxTree.ExprNode>() {
-                                                assignNode.rvalueNode
-                                            },
-                                        },
+                                        {},
 
                                         attributes = new(),
                                     };
+                                    overrideNode.argumantsNode.arguments.Add(assignNode.rvalueNode);
+                                    assignNode.overrideNode = overrideNode;
+                                    assignNode.overrideNode.Parent = assignNode.Parent;
 
                                     Pass3_AnalysisNode(assignNode.overrideNode);
 
@@ -2677,14 +2682,12 @@ namespace Gizbox.SemanticRule
                                         funcNode = objMemberAccessNode,
                                         argumantsNode = new SyntaxTree.ArgumentListNode()
                                         {
-                                            arguments = new List<SyntaxTree.ExprNode>()
-                                            {
-                                            },
                                         },
 
                                         attributes = objMemberAccessNode.attributes,
                                     };
 
+                                    objMemberAccessNode.overrideNode.Parent = objMemberAccessNode.Parent;
                                     Pass3_AnalysisNode(objMemberAccessNode.overrideNode);
 
                                     break;
@@ -2747,14 +2750,12 @@ namespace Gizbox.SemanticRule
         /// </summary>
         private void Pass4_OwnershipLifetime(SyntaxTree.Node node)
         {
-
             if(node == null)
                 return;
 
             if(node.overrideNode != null)
             {
-                Pass4_OwnershipLifetime(node.overrideNode);
-                return;
+                throw new SemanticException(ExceptioName.Undefine, node, $"apply override error:{node.GetType().Name} still has override:{node.overrideNode.GetType().Name}!  rawNode??:{(node.rawNode != null ? node.rawNode.GetType().Name : "null")}   parent:{(node.Parent != null ? node.Parent.GetType().Name : "null")}   isOverrideReplaced:{node.isOverrideReplaced}");
             }
 
             bool isTopLevelAtNamespace = false;
@@ -2864,6 +2865,9 @@ namespace Gizbox.SemanticRule
                         // 保存入口状态（会在合并中被就地更新）  
                         var saved = lifeTimeInfo.currBranch;
 
+                        if(saved.scopeStack.Count == 0)
+                            throw new SemanticException(ExceptioName.OwnershipError, whileNode, "");
+
                         int itCount = 0;
                         while(true)
                         {
@@ -2871,7 +2875,7 @@ namespace Gizbox.SemanticRule
                                 throw new GizboxException(ExceptioName.OwnershipError, "lifetime analysis not converge.");
 
                             // 跑一轮循环体  
-                            var loopBranch = lifeTimeInfo.NewBranch(saved);
+                            var loopBranch = lifeTimeInfo.NewBranch(saved);//bug
                             lifeTimeInfo.currBranch = loopBranch;
                             Pass4_OwnershipLifetime(whileNode.stmtNode);
 
@@ -3240,18 +3244,50 @@ namespace Gizbox.SemanticRule
                     {
                         // 先处理所有实参（递归）
                         foreach(var a in callNode.argumantsNode.arguments)
+                        {
+
+                            if(a.overrideNode != null)
+                            {
+                                Console.WriteLine("----------测试----------");
+                                foreach(var c in callNode.argumantsNode.Children())
+                                {
+                                    Console.WriteLine($"node: {c.GetType().Name}  override:  {c.overrideNode != null}");
+                                }
+                                Console.WriteLine("----------测试----------");
+                            }
+
+
+
                             Pass4_OwnershipLifetime(a);
+                        }
+                            
 
                         // 获取函数的符号表记录  
                         SymbolTable.Record funcRec = null;
-                        if(callNode.attributes.ContainsKey(eAttr.mangled_name))
-                            funcRec = Query((string)callNode.attributes[eAttr.mangled_name]);
-                        else if(callNode.attributes.ContainsKey(eAttr.extern_name))
-                            funcRec = Query((string)callNode.attributes[eAttr.extern_name]);
+                        if(callNode.isMemberAccessFunction == false)
+                        {
+                            if(callNode.attributes.ContainsKey(eAttr.mangled_name))
+                                funcRec = Query((string)callNode.attributes[eAttr.mangled_name]);
+                            else if(callNode.attributes.ContainsKey(eAttr.extern_name))
+                                funcRec = Query((string)callNode.attributes[eAttr.extern_name]);
+                        }
                         else
+                        {
+                            if(callNode.funcNode is ObjectMemberAccessNode memberAccNode)
+                            {
+                                var objtype = (string)memberAccNode.objectNode.attributes[eAttr.type];
+                                var classRec = Query(objtype);
+                                var memfuncRec = classRec.envPtr.GetRecord((string)callNode.attributes[eAttr.mangled_name]);
+                                funcRec = memfuncRec;
+                            }
+                        }
+                        
+                        if(funcRec == null)
                             throw new GizboxException(ExceptioName.Undefine, $"funcrec not found.");
 
                         callNode.attributes[eAttr.func_rec] = funcRec;
+
+
 
                         // 根据被调函数签名对实参做move/校验
                         if(funcRec != null && funcRec.envPtr != null)
@@ -3337,13 +3373,9 @@ namespace Gizbox.SemanticRule
 
                 default:
                     // 类型/参数/实参与其它节点，对子树递归
-                    var ch = node.Children;
-                    if(ch != null)
+                    foreach(var n in node.Children())
                     {
-                        foreach(var n in ch)
-                        {
-                            Pass4_OwnershipLifetime(n);
-                        }
+                        Pass4_OwnershipLifetime(n);
                     }
                     break;
             }
@@ -3424,6 +3456,20 @@ namespace Gizbox.SemanticRule
                 rModel = isownershipClass ? SymbolTable.RecordFlag.OwnerVar : SymbolTable.RecordFlag.ManualVar;
                 return;
             }
+
+            // 临时右值 - new[]
+            else if(rNode is NewArrayNode newarrNode)
+            {
+                if(lModel == SymbolTable.RecordFlag.BorrowVar )
+                    throw new SemanticException(ExceptioName.OwnershipError_BorrowCanNotFromTemp, errorNode, lname);
+
+                if(lModel == SymbolTable.RecordFlag.OwnerVar)
+                    throw new SemanticException(ExceptioName.OwnershipError, errorNode, "array type cant be owner.");//数组类型暂时不能是own类型  
+
+                rModel = SymbolTable.RecordFlag.ManualVar;
+                return;
+            }
+
 
             // 临时右值 - 调用返回
             else if(rNode is CallNode callNode)
