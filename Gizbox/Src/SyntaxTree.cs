@@ -387,8 +387,8 @@ namespace Gizbox
 
         public class ProgramNode : Node
         {
-            public ChildList<ImportNode> importNodes;
-            public ChildList<UsingNode> usingNamespaceNodes;
+            public readonly ChildList<ImportNode> importNodes;
+            public readonly ChildList<UsingNode> usingNamespaceNodes;
             public StatementsNode statementsNode { get => (StatementsNode)children_group_2[0]; set => children_group_2[0] = value; }
 
             public ProgramNode()
@@ -416,7 +416,7 @@ namespace Gizbox
 
         public class StatementsNode : Node
         {
-            public ChildList<StmtNode> statements;
+            public readonly ChildList<StmtNode> statements;
 
             public StatementsNode()
             {
@@ -427,7 +427,7 @@ namespace Gizbox
 
         public class StatementBlockNode : StmtNode
         {
-            public ChildList<StmtNode> statements;
+            public readonly ChildList<StmtNode> statements;
 
             public StatementBlockNode()
             {
@@ -553,7 +553,7 @@ namespace Gizbox
 
             public IdentityNode classNameNode { get => (IdentityNode)children_group_0[0]; set => children_group_0[0] = value; }
             public IdentityNode baseClassNameNode { get => (IdentityNode)children_group_0[1]; set => children_group_0[1] = value; }
-            public ChildList<DeclareNode> memberDelareNodes;
+            public readonly ChildList<DeclareNode> memberDelareNodes;
 
             public ClassDeclareNode()
             {
@@ -632,7 +632,7 @@ namespace Gizbox
 
         public class IfStmtNode : StmtNode
         {
-            public ChildList<ConditionClauseNode> conditionClauseList;
+            public readonly ChildList<ConditionClauseNode> conditionClauseList;
 
             public ElseClauseNode elseClause { get => (ElseClauseNode)children_group_1[0]; set => children_group_1[0] = value; }
 
@@ -948,7 +948,7 @@ namespace Gizbox
         // ******************** OTHER NODES ******************************
         public class ArgumentListNode : Node
         {
-            public ChildList<ExprNode> arguments;
+            public readonly ChildList<ExprNode> arguments;
 
             public ArgumentListNode()
             {
@@ -959,7 +959,7 @@ namespace Gizbox
 
         public class ParameterListNode : Node
         {
-            public ChildList<ParameterNode> parameterNodes;
+            public readonly ChildList<ParameterNode> parameterNodes;
 
             public ParameterListNode()
             {
