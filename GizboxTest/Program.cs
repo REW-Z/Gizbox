@@ -122,7 +122,7 @@ switch(cmdIdx)
             Compiler.Pause("Execute End");
         }
         break;
-    case 4:
+        case 4:
         {
             //测试脚本Test  
             Console.WriteLine("测试杂项");
@@ -131,7 +131,7 @@ switch(cmdIdx)
             break;  
         }
         break;
-    case 5:
+        case 5:
         {
             Console.WriteLine("测试x64目标代码生成");
 
@@ -159,6 +159,31 @@ switch(cmdIdx)
             {
             }
             
+        }
+        break;
+        case 9:
+        {
+            //测试脚本Test  
+            Console.WriteLine("测试");
+            string source = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\tmp_test.gix");
+            Gizbox.Compiler compiler = new Compiler();
+            compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
+            compiler.ConfigParserDataSource(hardcode: true);
+            //compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
+            var il = compiler.CompileToIR(source, isMainUnit: true, "tmp_test");
+            Compiler.Pause("Compile End");
+
+            il.Print();
+
+            ScriptEngine engine = new ScriptEngine(compiler);
+            engine.AddLibSearchDirectory(AppDomain.CurrentDomain.BaseDirectory);
+            engine.csharpInteropContext.ConfigExternCallClasses(new Type[] {
+                typeof(TestExternCalls),
+            });
+            engine.Execute(il);
+
+            Compiler.Pause("Execute End");
+
         }
         break;
 }

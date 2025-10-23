@@ -575,6 +575,11 @@ namespace Gizbox.ScriptEngine
         }
 
 
+        //包含标号  
+        public bool ContainsLabelInMainUnit(string labelp0, string labelp1)
+        {
+            return (this.specialLabels.TryGetValue(labelp0, out var rs) && rs.ContainsKey(labelp1));
+        }
         //查询标号  
         public Tuple<int, int> QueryLabel(string labelp0, string labelp1, int priorityUnit)
         {

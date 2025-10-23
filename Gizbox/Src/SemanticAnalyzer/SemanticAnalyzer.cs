@@ -55,12 +55,12 @@ namespace Gizbox
 
         __codegen_mark_min,
 
-        drop_exit_env,
-        drop_before_return,
-        drop_before_stmt,
+        drop_var_exit_env,
+        drop_var_before_return,
+        drop_var_before_stmt,
         drop_expr_result_after_stmt,
-        set_null_after_stmt,
         store_expr_result,
+        set_null_after_stmt,
 
         __codegen_mark_max,
 
@@ -1225,6 +1225,61 @@ namespace Gizbox.SemanticRule
             }
 
 
+            AddActionAtTail("param -> type ID", (psr, production) => {
+                var node = new SyntaxTree.ParameterNode()
+                {
+                    flags = VarModifiers.None,
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+                    identifierNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = psr.stack[psr.stack.Top].attributes,
+                        token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField,
+                    },
+                    attributes = new(),
+                };
+
+                psr.newElement.attributes[eAttr.ast_node] = node;
+            });
+
+            AddActionAtTail("param -> tmodf type ID", (psr, production) => {
+                var node = new SyntaxTree.ParameterNode()
+                {
+                    flags = (VarModifiers)psr.stack[psr.stack.Top - 2].attributes[eAttr.tmodf],
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+                    identifierNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = psr.stack[psr.stack.Top].attributes,
+                        token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField,
+                    },
+                    attributes = new(),
+                };
+
+                psr.newElement.attributes[eAttr.ast_node] = node;
+            });
+
+            AddActionAtTail("params -> param", (psr, production) => {
+                var list = new SyntaxTree.ParameterListNode()
+                {
+                    attributes = psr.newElement.attributes,
+                };
+                list.parameterNodes.Add(
+                    (SyntaxTree.ParameterNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node]
+                );
+
+                psr.newElement.attributes[eAttr.ast_node] = list;
+            });
+
+            AddActionAtTail("params -> params , param", (psr, production) => {
+                psr.newElement.attributes[eAttr.ast_node] =
+                    (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node];
+
+                ((SyntaxTree.ParameterListNode)psr.newElement.attributes[eAttr.ast_node]).parameterNodes.Add(
+                    (SyntaxTree.ParameterNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node]
+                );
+            });
+
             AddActionAtTail("params -> ε", (psr, production) =>
             {
                 psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ParameterListNode()
@@ -1233,86 +1288,86 @@ namespace Gizbox.SemanticRule
                 };
             });
 
-            AddActionAtTail("params -> type ID", (psr, production) => {
-                var node = new SyntaxTree.ParameterListNode()
-                {
-                    attributes = psr.newElement.attributes,
-                };
+            //AddActionAtTail("params -> type ID", (psr, production) => {
+            //    var node = new SyntaxTree.ParameterListNode()
+            //    {
+            //        attributes = psr.newElement.attributes,
+            //    };
 
-                node.parameterNodes.Add(new SyntaxTree.ParameterNode()
-                {
-                    flags = VarModifiers.None,
-                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
-                    identifierNode = new SyntaxTree.IdentityNode()
-                    {
-                        attributes = psr.stack[psr.stack.Top].attributes,
-                        token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
-                        identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
-                    },
-                    attributes = new(),
-                });
+            //    node.parameterNodes.Add(new SyntaxTree.ParameterNode()
+            //    {
+            //        flags = VarModifiers.None,
+            //        typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+            //        identifierNode = new SyntaxTree.IdentityNode()
+            //        {
+            //            attributes = psr.stack[psr.stack.Top].attributes,
+            //            token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+            //            identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
+            //        },
+            //        attributes = new(),
+            //    });
 
-                psr.newElement.attributes[eAttr.ast_node] = node;
+            //    psr.newElement.attributes[eAttr.ast_node] = node;
 
-            });
-            AddActionAtTail("params -> tmodf type ID", (psr, production) => {
-                var node = new SyntaxTree.ParameterListNode()
-                {
-                    attributes = psr.newElement.attributes,
-                };
+            //});
+            //AddActionAtTail("params -> tmodf type ID", (psr, production) => {
+            //    var node = new SyntaxTree.ParameterListNode()
+            //    {
+            //        attributes = psr.newElement.attributes,
+            //    };
 
-                node.parameterNodes.Add(new SyntaxTree.ParameterNode()
-                {
-                    flags = (VarModifiers)psr.stack[psr.stack.Top - 2].attributes[eAttr.tmodf],
-                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
-                    identifierNode = new SyntaxTree.IdentityNode()
-                    {
-                        attributes = psr.stack[psr.stack.Top].attributes,
-                        token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
-                        identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
-                    },
-                    attributes = new(),
-                });
+            //    node.parameterNodes.Add(new SyntaxTree.ParameterNode()
+            //    {
+            //        flags = (VarModifiers)psr.stack[psr.stack.Top - 2].attributes[eAttr.tmodf],
+            //        typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+            //        identifierNode = new SyntaxTree.IdentityNode()
+            //        {
+            //            attributes = psr.stack[psr.stack.Top].attributes,
+            //            token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+            //            identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
+            //        },
+            //        attributes = new(),
+            //    });
 
-                psr.newElement.attributes[eAttr.ast_node] = node;
-            });
+            //    psr.newElement.attributes[eAttr.ast_node] = node;
+            //});
 
-            AddActionAtTail("params -> params , type ID", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 3].attributes[eAttr.ast_node];
+            //AddActionAtTail("params -> params , type ID", (psr, production) => {
+            //    psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 3].attributes[eAttr.ast_node];
 
-                ((SyntaxTree.ParameterListNode)psr.newElement.attributes[eAttr.ast_node]).parameterNodes.Add(
-                    new SyntaxTree.ParameterNode()
-                    {
-                        flags = VarModifiers.None,
-                        typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
-                        identifierNode = new SyntaxTree.IdentityNode()
-                        {
-                            attributes = psr.stack[psr.stack.Top].attributes,
-                            token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
-                            identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
-                        },
-                        attributes = new(),
-                    }
-                );
-            });
-            AddActionAtTail("params -> params , tmodf type ID", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes[eAttr.ast_node];
+            //    ((SyntaxTree.ParameterListNode)psr.newElement.attributes[eAttr.ast_node]).parameterNodes.Add(
+            //        new SyntaxTree.ParameterNode()
+            //        {
+            //            flags = VarModifiers.None,
+            //            typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+            //            identifierNode = new SyntaxTree.IdentityNode()
+            //            {
+            //                attributes = psr.stack[psr.stack.Top].attributes,
+            //                token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+            //                identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
+            //            },
+            //            attributes = new(),
+            //        }
+            //    );
+            //});
+            //AddActionAtTail("params -> params , tmodf type ID", (psr, production) => {
+            //    psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes[eAttr.ast_node];
 
-                ((SyntaxTree.ParameterListNode)psr.newElement.attributes[eAttr.ast_node]).parameterNodes.Add(
-                    new SyntaxTree.ParameterNode()
-                    {
-                        flags = (VarModifiers)psr.stack[psr.stack.Top - 2].attributes[eAttr.tmodf],
-                        typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
-                        identifierNode = new SyntaxTree.IdentityNode()
-                        {
-                            attributes = psr.stack[psr.stack.Top].attributes,
-                            token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
-                            identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
-                        },
-                        attributes = new(),
-                    }
-                );
-            });
+            //    ((SyntaxTree.ParameterListNode)psr.newElement.attributes[eAttr.ast_node]).parameterNodes.Add(
+            //        new SyntaxTree.ParameterNode()
+            //        {
+            //            flags = (VarModifiers)psr.stack[psr.stack.Top - 2].attributes[eAttr.tmodf],
+            //            typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+            //            identifierNode = new SyntaxTree.IdentityNode()
+            //            {
+            //                attributes = psr.stack[psr.stack.Top].attributes,
+            //                token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+            //                identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
+            //            },
+            //            attributes = new(),
+            //        }
+            //    );
+            //});
 
 
             AddActionAtTail("args -> ε", (psr, production) =>
@@ -1648,6 +1703,8 @@ namespace Gizbox.SemanticRule
                             {
                                 TryCompleteType(p.typeNode);
                             }
+                            //返回类型补全
+                            TryCompleteType(funcDeclNode.returnTypeNode);
 
                             //符号的类型表达式  
                             string typeExpr = "";
@@ -1662,7 +1719,13 @@ namespace Gizbox.SemanticRule
 
                             //函数修饰名称  
                             var paramTypeArr = funcDeclNode.parametersNode.parameterNodes.Select(n => n.typeNode.TypeExpression()).ToArray();
-                            var funcMangledName = Utils.Mangle(funcDeclNode.identifierNode.FullName, paramTypeArr);
+                            var funcMangledName = funcDeclNode.identifierNode.FullName;
+                            if(funcMangledName != "main")
+                            {
+                                Utils.Mangle(funcDeclNode.identifierNode.FullName, paramTypeArr);
+                            }
+                            
+
                             funcDeclNode.attributes[eAttr.mangled_name] = funcMangledName;
 
                             //新的作用域  
@@ -1707,6 +1770,8 @@ namespace Gizbox.SemanticRule
                             {
                                 TryCompleteType(p.typeNode);
                             }
+                            //返回类型补全  
+                            TryCompleteType(externFuncDeclNode.returnTypeNode);
 
                             //符号的类型表达式  
                             string typeExpr = "";
@@ -1917,6 +1982,8 @@ namespace Gizbox.SemanticRule
                             {
                                 TryCompleteType(p.typeNode);
                             }
+                            //返回值类型补全    
+                            TryCompleteType(funcDeclNode.returnTypeNode);
 
                             //形参列表 （成员函数）(不包含this类型)  
                             var paramTypeArr = funcDeclNode.parametersNode.parameterNodes.Select(n => n.typeNode.TypeExpression()).ToArray();
@@ -1974,8 +2041,6 @@ namespace Gizbox.SemanticRule
                             //进入函数作用域  
                             envStack.Push(funcEnv);
 
-                            //返回值类型补全    
-                            TryCompleteType(funcDeclNode.returnTypeNode);
 
 
                             //隐藏的this参数加入符号表    
@@ -2016,9 +2081,6 @@ namespace Gizbox.SemanticRule
                         //进入函数作用域  
                         envStack.Push(funcEnv);
 
-                        //返回值类型补全    
-                        TryCompleteType(externFuncDeclNode.returnTypeNode);
-
 
                         //形参加入符号表    
                         foreach (var paramNode in externFuncDeclNode.parametersNode.parameterNodes)
@@ -2035,6 +2097,8 @@ namespace Gizbox.SemanticRule
                         //Id at env
                         paramNode.identifierNode.attributes[eAttr.def_at_env] = envStack.Peek();
 
+                        //参数类型补全    
+                        TryCompleteType(paramNode.typeNode);
 
                         //形参加入函数作用域的符号表  
                         var newRec = envStack.Peek().NewRecord(
@@ -2812,7 +2876,7 @@ namespace Gizbox.SemanticRule
                         }
 
                         if(toDelete.Count > 0)
-                            blockNode.attributes[eAttr.drop_exit_env] = toDelete;
+                            blockNode.attributes[eAttr.drop_var_exit_env] = toDelete;
 
                         lifeTimeInfo.currBranch.scopeStack.Pop();
                         envStack.Pop();
@@ -2990,7 +3054,7 @@ namespace Gizbox.SemanticRule
                         }
 
                         if(exitDel.Count > 0)
-                            funcDecl.attributes[eAttr.drop_exit_env] = exitDel;
+                            funcDecl.attributes[eAttr.drop_var_exit_env] = exitDel;
 
                         lifeTimeInfo.currBranch.scopeStack.Pop();
                         envStack.Pop();
@@ -3106,10 +3170,10 @@ namespace Gizbox.SemanticRule
                                 if(alive)
                                 {
                                     var lst = new List<string>();
-                                    if(asn.attributes.ContainsKey(eAttr.drop_before_stmt))
-                                        lst = (List<string>)asn.attributes[eAttr.drop_before_stmt];
+                                    if(asn.attributes.ContainsKey(eAttr.drop_var_before_stmt))
+                                        lst = (List<string>)asn.attributes[eAttr.drop_var_before_stmt];
                                     lst.Add(lrec.name);
-                                    asn.attributes[eAttr.drop_before_stmt] = lst;
+                                    asn.attributes[eAttr.drop_var_before_stmt] = lst;
 
                                     lifeTimeInfo.currBranch.SetVarStatus(lrec.name, LifetimeInfo.VarStatus.Dead);
                                 }
@@ -3202,7 +3266,7 @@ namespace Gizbox.SemanticRule
                             }
                         }
                         if(delList.Count > 0)
-                            ret.attributes[eAttr.drop_before_return] = delList;
+                            ret.attributes[eAttr.drop_var_before_return] = delList;
 
 
                         break;

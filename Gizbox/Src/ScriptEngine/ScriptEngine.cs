@@ -268,9 +268,20 @@ namespace Gizbox.ScriptEngine
 
 
             //entry  
-            var entryAddr = mainUnit.QueryLabel("entry", "main", currUnit);
-            var exitAddr = mainUnit.QueryLabel("exit", "main", currUnit);
-            this.curr = entryAddr.Item2;
+            if(mainUnit.ContainsLabelInMainUnit("entry", "main"))
+            {
+                var entryMainAddr = mainUnit.QueryLabel("entry", "main", currUnit);
+                this.curr = entryMainAddr.Item2;
+            }
+            else if(mainUnit.ContainsLabelInMainUnit("entry", "__top__"))
+            {
+                var entryTopAddr = mainUnit.QueryLabel("entry", "__top__", currUnit);
+                this.curr = entryTopAddr.Item2;
+            }
+            else
+            {
+                throw new GizboxException(ExceptioName.ScriptRuntimeError, "no entry found!");
+            }
             this.callStack[this.callStack.Top + 1].returnPtr = new Tuple<int, int>(-1, mainUnit.codes.Count - 1);//返回到最后  
 
 

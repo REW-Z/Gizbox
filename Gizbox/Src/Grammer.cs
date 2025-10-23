@@ -71,7 +71,8 @@ namespace Gizbox
             "lvalue",
             "memberaccess",
 
-            //函数过程  
+            //函数过程
+            "param", //new
             "params",
             "args",
 
@@ -253,12 +254,12 @@ namespace Gizbox
             "lit -> null",
 
 
+            "param -> tmodf type ID",
+            "param -> type ID",
+            "params -> params , param",
+            "params -> param",
             "params -> ε",
-            "params -> type ID",
-            "params -> tmodf type ID",
-            "params -> params , type ID",
-            "params -> params , tmodf type ID",
-
+            
             "args -> ε",
             "args -> expr",
             "args -> args , expr",
@@ -286,7 +287,11 @@ namespace Gizbox
 ///  （如果当前状态有两个规约项，它们lookahead是一样的，就会发生归约冲突）    
 ///  （REW：所以应该尽量减少同一终结符在多个产生式的出现）    
 ///  （REW：例如如果不加限制，数组访问在分析到“id [”状态时，“id“可能被提前归约类名，就错误变成了类数组定义的前半部分）    
-///  （REW：语句前面最好不要有可以为ε的非终结符，容易和现有语法冲突）      
+///  （REW：ε最好只用在明确的终结符之前(;、}、)等)）      
+///  （REW：左因子化，有公共前缀时，把后缀分歧部分用一个非终结符替代，延迟分支选择）  
+///  （REW：右因子化，提取公共后缀在LALR(1)语法中，可以避免reduce/reduce 冲突、以及大量规则共享相同“尾巴”导致项集膨胀。  
+
+///  （AI： LALR 的状态合并会丢失“前缀上下文”。即便 FIRST(tmodf) 与 FIRST(type) 完全不相交，合并后仍可能在同一状态里同时出现两条可归约项，从而在同一前瞻上触发 r/r。）  
 
 
 ///2. 添加语法  

@@ -32,22 +32,11 @@ namespace Gizbox.IR
         private GStack<string> loopExitStack = new GStack<string>();
 
 
-        public IRGenerator(SyntaxTree ast, IRUnit ir, bool isMainUnit, string entryNameOfMainUnit = null)
+        public IRGenerator(SyntaxTree ast, IRUnit ir, bool isMainUnit)
         {
             this.ilUnit = ir;
             this.ast = ast;
-
-            if(isMainUnit)
-            {
-                if(string.IsNullOrEmpty(entryNameOfMainUnit))
-                    this.topFunc = "main";
-                else
-                    this.topFunc = entryNameOfMainUnit;
-            }
-            else
-            {
-                this.topFunc = $"libtop_{ir.name}";
-            }
+            this.topFunc = $"__top__";
         }
 
         public IRUnit Generate()
@@ -127,9 +116,9 @@ namespace Gizbox.IR
 
 
                         // 作用域退出 -> 删除存活的Owner类型  
-                        if(blockNode.attributes.ContainsKey(eAttr.drop_exit_env))
+                        if(blockNode.attributes.ContainsKey(eAttr.drop_var_exit_env))
                         {
-                            var toDelete = blockNode.attributes[eAttr.drop_exit_env] as List<string>;
+                            var toDelete = blockNode.attributes[eAttr.drop_var_exit_env] as List<string>;
                             if(toDelete != null)
                             {
                                 foreach(var v in toDelete)
@@ -137,7 +126,7 @@ namespace Gizbox.IR
                                     GenerateCode("DEL", v);
                                 }
                             }
-                            blockNode.attributes.Remove(eAttr.drop_exit_env);
+                            blockNode.attributes.Remove(eAttr.drop_var_exit_env);
                         }
 
                         envStackTemp.Pop();
@@ -267,9 +256,9 @@ namespace Gizbox.IR
                         }
 
                         // 函数正常退出需要回收的 Owner
-                        if(funcDeclNode.attributes.ContainsKey(eAttr.drop_exit_env))
+                        if(funcDeclNode.attributes.ContainsKey(eAttr.drop_var_exit_env))
                         {
-                            var toDelete = funcDeclNode.attributes[eAttr.drop_exit_env] as List<string>;
+                            var toDelete = funcDeclNode.attributes[eAttr.drop_var_exit_env] as List<string>;
                             if(toDelete != null)
                             {
                                 foreach(var v in toDelete)
@@ -277,7 +266,7 @@ namespace Gizbox.IR
                                     GenerateCode("DEL", v);
                                 }
                             }
-                            funcDeclNode.attributes.Remove(eAttr.drop_exit_env);
+                            funcDeclNode.attributes.Remove(eAttr.drop_var_exit_env);
                         }
 
 
@@ -343,9 +332,9 @@ namespace Gizbox.IR
                         }
 
                         // return之前先回收需要回收的Owner类型  
-                        if(returnNode.attributes.ContainsKey(eAttr.drop_before_return))
+                        if(returnNode.attributes.ContainsKey(eAttr.drop_var_before_return))
                         {
-                            var toDelete = returnNode.attributes[eAttr.drop_before_return] as List<string>;
+                            var toDelete = returnNode.attributes[eAttr.drop_var_before_return] as List<string>;
                             if(toDelete != null)
                             {
                                 foreach(var v in toDelete)
@@ -353,7 +342,7 @@ namespace Gizbox.IR
                                     GenerateCode("DEL", v);
                                 }
                             }
-                            returnNode.attributes.Remove(eAttr.drop_before_return);
+                            returnNode.attributes.Remove(eAttr.drop_var_before_return);
                         }
 
                         if(returnNode.returnExprNode != null)
@@ -617,9 +606,9 @@ namespace Gizbox.IR
 
 
                         // 赋值前先删除之前的Owner
-                        if(assignNode.attributes.ContainsKey(eAttr.drop_before_stmt))
+                        if(assignNode.attributes.ContainsKey(eAttr.drop_var_before_stmt))
                         {
-                            var toDelete = assignNode.attributes[eAttr.drop_before_stmt] as List<string>;
+                            var toDelete = assignNode.attributes[eAttr.drop_var_before_stmt] as List<string>;
                             if(toDelete != null)
                             {
                                 foreach(var v in toDelete)
@@ -627,7 +616,7 @@ namespace Gizbox.IR
                                     GenerateCode("DEL", v);
                                 }
                             }
-                            assignNode.attributes.Remove(eAttr.drop_before_stmt);
+                            assignNode.attributes.Remove(eAttr.drop_var_before_stmt);
                         }
 
                         // 复合赋值表达式的返回变量为左值    
