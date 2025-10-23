@@ -93,7 +93,7 @@ switch(cmdIdx)
             Gizbox.Compiler compilerTest = new Compiler();
             compilerTest.ConfigParserDataSource(hardcode: false);
             compilerTest.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
-            compilerTest.InsertParserHardcodeToSourceFile("F:\\Legacy\\MyProjects\\Gizbox\\Gizbox\\Src\\Parser\\ParserHardcoder.cs");
+            compilerTest.InsertParserHardcodeToSourceFile(Path.Combine(Utility.RepoPath, "Src\\Parser\\ParserHardcoder.cs"));
             Console.WriteLine("生成硬编码完成");
             return;
         }
@@ -169,7 +169,39 @@ Console.ReadKey();
 
 namespace GizboxTest
 {
+    public static class Utility
+    {
+        private static string repoPath = null;
+        public static string RepoPath
+        {
+            get
+            {
+                if(repoPath == null)
+                {
+                    repoPath = GetRepoPath();
+                }
+                return repoPath;
+            }
+        }
+        private static string GetRepoPath()
+        {
+            DirectoryInfo dir = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+            while(dir != null)
+            {
+                if(dir.Name == "Gizbox")
+                {
+                    break;
+                }
+                dir = dir.Parent;
+            }
 
+            var subDirs = dir.GetDirectories();
+            var targetDir = subDirs.FirstOrDefault(d => d.Name == "Gizbox");
+
+            Console.WriteLine(targetDir.FullName);
+            return targetDir.FullName;
+        }
+    }
     public class TestExternCalls
     {
         public static void Console__Print(string text)
