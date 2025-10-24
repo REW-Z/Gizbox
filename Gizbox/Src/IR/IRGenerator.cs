@@ -118,12 +118,12 @@ namespace Gizbox.IR
                         // 作用域退出 -> 删除存活的Owner类型  
                         if(blockNode.attributes.ContainsKey(eAttr.drop_var_exit_env))
                         {
-                            var toDelete = blockNode.attributes[eAttr.drop_var_exit_env] as List<string>;
+                            var toDelete = blockNode.attributes[eAttr.drop_var_exit_env] as List<(LifetimeInfo.VarStatus status, string varname)>;
                             if(toDelete != null)
                             {
-                                foreach(var v in toDelete)
+                                foreach(var (s, v) in toDelete)
                                 {
-                                    GenerateCode("DEL", v);
+                                    GenerateDelCode(s, v);
                                 }
                             }
                             blockNode.attributes.Remove(eAttr.drop_var_exit_env);
@@ -258,12 +258,12 @@ namespace Gizbox.IR
                         // 函数正常退出需要回收的 Owner
                         if(funcDeclNode.attributes.ContainsKey(eAttr.drop_var_exit_env))
                         {
-                            var toDelete = funcDeclNode.attributes[eAttr.drop_var_exit_env] as List<string>;
+                            var toDelete = funcDeclNode.attributes[eAttr.drop_var_exit_env] as List<(LifetimeInfo.VarStatus, string)>;
                             if(toDelete != null)
                             {
-                                foreach(var v in toDelete)
+                                foreach(var (s, v) in toDelete)
                                 {
-                                    GenerateCode("DEL", v);
+                                    GenerateDelCode(s, v);
                                 }
                             }
                             funcDeclNode.attributes.Remove(eAttr.drop_var_exit_env);
@@ -334,12 +334,12 @@ namespace Gizbox.IR
                         // return之前先回收需要回收的Owner类型  
                         if(returnNode.attributes.ContainsKey(eAttr.drop_var_before_return))
                         {
-                            var toDelete = returnNode.attributes[eAttr.drop_var_before_return] as List<string>;
+                            var toDelete = returnNode.attributes[eAttr.drop_var_before_return] as List<(LifetimeInfo.VarStatus, string)>;
                             if(toDelete != null)
                             {
-                                foreach(var v in toDelete)
+                                foreach(var (s, v) in toDelete)
                                 {
-                                    GenerateCode("DEL", v);
+                                    GenerateDelCode(s, v);
                                 }
                             }
                             returnNode.attributes.Remove(eAttr.drop_var_before_return);
@@ -608,12 +608,12 @@ namespace Gizbox.IR
                         // 赋值前先删除之前的Owner
                         if(assignNode.attributes.ContainsKey(eAttr.drop_var_before_stmt))
                         {
-                            var toDelete = assignNode.attributes[eAttr.drop_var_before_stmt] as List<string>;
+                            var toDelete = assignNode.attributes[eAttr.drop_var_before_stmt] as List<(LifetimeInfo.VarStatus, string)>;
                             if(toDelete != null)
                             {
-                                foreach(var v in toDelete)
+                                foreach(var (s, v) in toDelete)
                                 {
-                                    GenerateCode("DEL", v);
+                                    GenerateDelCode(s, v);
                                 }
                             }
                             assignNode.attributes.Remove(eAttr.drop_var_before_stmt);
@@ -851,6 +851,28 @@ namespace Gizbox.IR
             return newCode;
         }
 
+        public void GenerateDelCode(LifetimeInfo.VarStatus status, string varname)
+        {
+            if(status == LifetimeInfo.VarStatus.Alive) //// 无条件删除：delete aaa;
+            {
+                GenerateCode("DEL", varname);
+            }
+            else if(status == LifetimeInfo.VarStatus.PossiblyDead)  //// 条件删除：if (aaa != null) delete aaa;  
+            {
+                string tmp = RentTemp("bool", "drop_flag");
+                GenerateCode("!=", tmp, varname, "%LITNULL:");
+                string label = $"_owner_skip_drop_{varname}_{envStackTemp.Count}"; //用变量名和作用域深度避免重名  
+                GenerateCode("IF_FALSE_JUMP", tmp, "%LABEL:" + label);
+                GenerateCode("DEL", varname);
+                GenerateCode("").label = label;
+            }
+            else
+            {
+                throw new GizboxException(ExceptioName.Undefine, "Cannot generate DEL code for dead owner variable.");
+            }
+        }
+
+
 
         private void ResortCodes()
         {
@@ -1028,6 +1050,20 @@ namespace Gizbox.IR
             var env = envStackTemp.Peek();
 
             env.NewRecord(tempVarName, SymbolTable.RecordCatagory.Variable, type);
+
+            return tempVarName;
+        }
+
+        public string RentTemp(string type, string name)
+        {
+            string tempVarName = "tmp@" + name;
+
+            var env = envStackTemp.Peek();
+
+            if(env.ContainRecordName(tempVarName) == false)
+            {
+                env.NewRecord(tempVarName, SymbolTable.RecordCatagory.Variable, type);
+            }
 
             return tempVarName;
         }

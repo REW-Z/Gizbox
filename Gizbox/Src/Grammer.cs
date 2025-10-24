@@ -72,7 +72,7 @@ namespace Gizbox
             "memberaccess",
 
             //函数过程
-            "param", //new
+            "param",
             "params",
             "args",
 

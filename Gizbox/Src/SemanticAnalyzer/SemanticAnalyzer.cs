@@ -1722,7 +1722,7 @@ namespace Gizbox.SemanticRule
                             var funcMangledName = funcDeclNode.identifierNode.FullName;
                             if(funcMangledName != "main")
                             {
-                                Utils.Mangle(funcDeclNode.identifierNode.FullName, paramTypeArr);
+                                funcMangledName = Utils.Mangle(funcDeclNode.identifierNode.FullName, paramTypeArr);
                             }
                             
 
@@ -2868,11 +2868,13 @@ namespace Gizbox.SemanticRule
                         }
 
                         // 作用域退出需要删除的Owner变量
-                        var toDelete = new List<string>();
+                        var toDelete = new List<(LifetimeInfo.VarStatus status, string varname)>();
                         foreach(var (varname, varstatus) in lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict)
                         {
                             if(varstatus == LifetimeInfo.VarStatus.Alive)
-                                toDelete.Add(varname);
+                                toDelete.Add((LifetimeInfo.VarStatus.Alive, varname));
+                            if(varstatus == LifetimeInfo.VarStatus.PossiblyDead)
+                                toDelete.Add((LifetimeInfo.VarStatus.PossiblyDead, varname));
                         }
 
                         if(toDelete.Count > 0)
@@ -3046,11 +3048,13 @@ namespace Gizbox.SemanticRule
                         }
 
                         // 函数正常退出需要回收的 Owner
-                        var exitDel = new List<string>();
+                        var exitDel = new List<(LifetimeInfo.VarStatus status, string varname)>();
                         foreach(var (varname, varstatus) in lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict)
                         {
                             if(varstatus == LifetimeInfo.VarStatus.Alive)
-                                exitDel.Add(varname);
+                                exitDel.Add((LifetimeInfo.VarStatus.Alive, varname));
+                            if(varstatus == LifetimeInfo.VarStatus.PossiblyDead)
+                                exitDel.Add((LifetimeInfo.VarStatus.PossiblyDead, varname));
                         }
 
                         if(exitDel.Count > 0)
@@ -3137,13 +3141,13 @@ namespace Gizbox.SemanticRule
 
                         break;
                     }
-                case SyntaxTree.AssignNode asn:
+                case SyntaxTree.AssignNode assignNode:
                     {
                         // 先处理右值中的调用/参数（可能触发move）
-                        Pass4_OwnershipLifetime(asn.rvalueNode);
+                        Pass4_OwnershipLifetime(assignNode.rvalueNode);
 
                         // 仅处理lvalue=ID的情况
-                        if(asn.lvalueNode is SyntaxTree.IdentityNode lid)
+                        if(assignNode.lvalueNode is SyntaxTree.IdentityNode lid)
                         {
                             var lrec = Query(lid.FullName);
 
@@ -3155,25 +3159,27 @@ namespace Gizbox.SemanticRule
                                 break;
 
                             // 检查：变量左值和初始值的所有权模型对比  
-                            CheckOwnershipCompare_Assign(asn, lrec, out var lmodel, out var rmodel);
+                            CheckOwnershipCompare_Assign(assignNode, lrec, out var lmodel, out var rmodel);
 
 
                             // 如果目标是owner且已有未释放，则先删
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
-                                bool alive = false;
+                                LifetimeInfo.VarStatus alive = LifetimeInfo.VarStatus.Dead;
                                 if(lifeTimeInfo.currBranch.scopeStack.Any() && lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict.TryGetValue(lrec.name, out var st))
                                 {
-                                    alive = (st == LifetimeInfo.VarStatus.Alive);
+                                    alive = st;
                                 }
 
-                                if(alive)
+                                if(alive != LifetimeInfo.VarStatus.Dead)
                                 {
-                                    var lst = new List<string>();
-                                    if(asn.attributes.ContainsKey(eAttr.drop_var_before_stmt))
-                                        lst = (List<string>)asn.attributes[eAttr.drop_var_before_stmt];
-                                    lst.Add(lrec.name);
-                                    asn.attributes[eAttr.drop_var_before_stmt] = lst;
+                                    var delList = new List<(LifetimeInfo.VarStatus, string)>();
+                                    if(assignNode.attributes.ContainsKey(eAttr.drop_var_before_stmt))
+                                    {
+                                        delList = (List<(LifetimeInfo.VarStatus, string)>)assignNode.attributes[eAttr.drop_var_before_stmt];
+                                    }
+                                    delList.Add((alive, lrec.name));
+                                    assignNode.attributes[eAttr.drop_var_before_stmt] = delList;
 
                                     lifeTimeInfo.currBranch.SetVarStatus(lrec.name, LifetimeInfo.VarStatus.Dead);
                                 }
@@ -3185,24 +3191,24 @@ namespace Gizbox.SemanticRule
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
                                 //move源：临时对象 - New  
-                                if(asn.rvalueNode is SyntaxTree.NewObjectNode newobjNode)
+                                if(assignNode.rvalueNode is SyntaxTree.NewObjectNode newobjNode)
                                 {
                                     //无需处理  
                                 }
                                 //move源：临时对象 - 函数返回(owner)
-                                else if(asn.rvalueNode is SyntaxTree.CallNode callnode)
+                                else if(assignNode.rvalueNode is SyntaxTree.CallNode callnode)
                                 {
                                     //无需处理  
                                 }
                                 //move源：变量  
-                                else if(asn.rvalueNode is SyntaxTree.IdentityNode idrvalueNode)
+                                else if(assignNode.rvalueNode is SyntaxTree.IdentityNode idrvalueNode)
                                 {
                                     //加入moved  
                                     var rrec = Query(idrvalueNode.FullName);
                                     lifeTimeInfo.currBranch.SetVarStatus(rrec.name, LifetimeInfo.VarStatus.Dead);
 
                                     //需要插入Null语句
-                                    asn.attributes[eAttr.set_null_after_stmt] = new List<string> { rrec.name };
+                                    assignNode.attributes[eAttr.set_null_after_stmt] = new List<string> { rrec.name };
                                 }
                             }
 
@@ -3215,7 +3221,7 @@ namespace Gizbox.SemanticRule
                         else
                         {
                             // 继续递归子节点，避免遗漏
-                            Pass4_OwnershipLifetime(asn.lvalueNode);
+                            Pass4_OwnershipLifetime(assignNode.lvalueNode);
                         }
                         break;
                     }
@@ -3253,15 +3259,21 @@ namespace Gizbox.SemanticRule
                         }
 
                         // 汇总当前所有活跃Owner（所有栈帧），return前删除（排除被返回者）
-                        var delList = new List<string>();
+                        var delList = new List<(LifetimeInfo.VarStatus status, string varname)>();
+                        HashSet<string> varnameSet = new();
                         foreach(var scope in lifeTimeInfo.currBranch.scopeStack)
                         {
                             foreach(var (varname, varstatus) in scope.localVariableStatusDict)
                             {
-                                if(varstatus == LifetimeInfo.VarStatus.Alive && varname != returnedName)
+                                if(varname == returnedName)
+                                    continue;
+                                if(varnameSet.Contains(varname))
+                                    continue;
+
+                                if(varstatus == LifetimeInfo.VarStatus.Alive)
                                 {
-                                    if(delList.Contains(varname) == false)
-                                        delList.Add(varname);
+                                    delList.Add((varstatus, varname));
+                                    varnameSet.Add(varname);
                                 }
                             }
                         }
@@ -3276,11 +3288,11 @@ namespace Gizbox.SemanticRule
                         // 表达式作为语句：若new或call返回owner，语句末删除
                         Pass4_OwnershipLifetime(sstmt.exprNode);
 
-                        var dels = new List<SyntaxTree.ExprNode>();
+                        var delExprs = new List<SyntaxTree.ExprNode>();
                         if(sstmt.exprNode is SyntaxTree.NewObjectNode)
                         {
                             // 视为临时所有权，需删除
-                            dels.Add(sstmt.exprNode);
+                            delExprs.Add(sstmt.exprNode);
                             sstmt.exprNode.attributes[eAttr.store_expr_result] = true;
                         }
                         else if(sstmt.exprNode is SyntaxTree.CallNode cnode)
@@ -3290,15 +3302,15 @@ namespace Gizbox.SemanticRule
                             if(f.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
                                 // 视为临时所有权，需删除
-                                dels.Add(sstmt.exprNode);
+                                delExprs.Add(sstmt.exprNode);
                                 sstmt.exprNode.attributes[eAttr.store_expr_result] = true;
                             }
                                 
                         }
 
-                        if(dels.Count > 0)
+                        if(delExprs.Count > 0)
                         {
-                            sstmt.attributes[eAttr.drop_expr_result_after_stmt] = dels;
+                            sstmt.attributes[eAttr.drop_expr_result_after_stmt] = delExprs;
                         }
 
                         break;
@@ -3798,7 +3810,8 @@ namespace Gizbox.SemanticRule
                                     isExternFunc = true;
                             }
 
-                            if (idRec == null) throw new SemanticException(ExceptioName.FunctionNotFound, callNode, funcId.FullName);
+                            if (idRec == null) 
+                                throw new SemanticException(ExceptioName.FunctionNotFound, callNode, funcId.FullName);
 
                             string typeExpr = idRec.typeExpression.Split(' ').LastOrDefault();
 
