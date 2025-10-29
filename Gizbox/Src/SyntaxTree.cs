@@ -83,6 +83,7 @@ namespace Gizbox
                 }
             });
         }
+
         public void Traversal(Action<Node> operation)
         {
             TraversalNode(root, operation);
