@@ -124,6 +124,7 @@ namespace Gizbox
             "stmt -> return expr ;",
             "stmt -> return ;",
             "stmt -> delete expr ;",
+            "stmt -> delete [ ] expr ;",
             "stmt -> while ( expr ) stmt",
             "stmt -> for ( stmt bexpr ; stmtexpr ) stmt",
             "stmt -> if ( expr ) stmt elifclauselist elseclause",

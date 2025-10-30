@@ -405,11 +405,26 @@ namespace Gizbox.SemanticRule
             AddActionAtTail("stmt -> delete expr ;", (psr, production) => {
                 psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.DeleteStmtNode()
                 {
+                    isArrayDelete = false,
+
                     objToDelete = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
 
                     attributes = psr.newElement.attributes,
                 };
             });
+
+
+            AddActionAtTail("stmt -> delete [ ] expr ;", (psr, production) => {
+                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.DeleteStmtNode()
+                {
+                    isArrayDelete = true,
+
+                    objToDelete = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
+
             AddActionAtTail("stmt -> while ( expr ) stmt", (psr, production) => {
                 psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.WhileStmtNode()
                 {
@@ -2479,7 +2494,15 @@ namespace Gizbox.SemanticRule
                     {
                         //检查要删除的对象    
                         Pass3_AnalysisNode(delNode.objToDelete);
+
                         string objTypeExpr = (string)delNode.objToDelete.attributes[eAttr.type];
+
+                        var type = GType.Parse(objTypeExpr);
+                        if(type.IsArray == true && delNode.isArrayDelete == false)
+                            throw new SemanticException(ExceptioName.InvalidDeleteStatement, delNode, "delete array must use delete[]");
+                        else if(type.IsArray == false && delNode.isArrayDelete == true)
+                            throw new SemanticException(ExceptioName.InvalidDeleteStatement, delNode, "delete non-array cannot use delete[]");
+
 
                         if (GType.Parse(objTypeExpr).Category != GType.Kind.Array)
                         {
@@ -3228,7 +3251,7 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.DeleteStmtNode del:
                     {
                         // 检查：禁止删除非Manual类型    
-                        if(del.objToDelete != null && del.objToDelete is SyntaxTree.IdentityNode did)
+                        if(del.isArrayDelete == false && del.objToDelete != null && del.objToDelete is SyntaxTree.IdentityNode did)
                         {
                             var drec = Query(did.FullName);
                             if(drec != null)

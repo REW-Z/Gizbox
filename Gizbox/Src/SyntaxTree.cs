@@ -595,6 +595,8 @@ namespace Gizbox
 
         public class DeleteStmtNode : StmtNode
         {
+            public bool isArrayDelete;
+
             public ExprNode objToDelete { get => (ExprNode)children_group_0[0]; set => children_group_0[0] = value; }
             public DeleteStmtNode()
             {

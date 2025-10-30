@@ -142,6 +142,8 @@ Console::PrintLn((string)arr[0]);
 Console::PrintLn((string)arr[1]);
 Console::PrintLn((string)arr[2]);
 
+delete[] arr;
+
 // ----------------- 外部类测试 -----------------  
 
 Console::PrintLn("Extern Class Test");
