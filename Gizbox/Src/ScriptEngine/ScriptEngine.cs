@@ -547,6 +547,19 @@ namespace Gizbox.ScriptEngine
                         SetValue(code.arg0, Value.FromArrayPtr(ptr));
                     }
                     break;
+                case "DEL_ARRAY":
+                    {
+                        var objPtr = GetValue(code.arg0);
+                        if(objPtr.IsRefType && objPtr.AsPtr >= 0)
+                        {
+                            this.heap.Write(objPtr.AsPtr, null);
+                        }
+                        else
+                        {
+                            throw new RuntimeException(ExceptioName.OnlyHeapObjectsCanBeFreed, GetCurrentCode(), "");
+                        }
+                    }
+                    break;
                 case "IF_FALSE_JUMP":
                     {
                         bool conditionTrue = GetValue(code.arg0).AsBool;

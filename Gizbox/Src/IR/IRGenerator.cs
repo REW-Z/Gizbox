@@ -358,7 +358,15 @@ namespace Gizbox.IR
                 case DeleteStmtNode deleteNode:
                     {
                         GenNode(deleteNode.objToDelete);
-                        GenerateCode("DEL", GetRet(deleteNode.objToDelete));
+
+                        if(deleteNode.isArrayDelete == false)
+                        {
+                            GenerateCode("DEL", GetRet(deleteNode.objToDelete));
+                        }
+                        else
+                        {
+                            GenerateCode("DEL_ARRAY", GetRet(deleteNode.objToDelete));
+                        }
                     }
                     break;
 

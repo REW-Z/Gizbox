@@ -122,4 +122,4 @@ IR生成器插入语句。
 •	把 cookie 当成块头去解释，得到错误的大小/标志，合并相邻空闲块时写坏内存，进而崩溃或后续随机损坏。
 
 
-需要在IRGenerate处理Delete[]和Delete的区别。  
+重新定义Del和Alloc。Del语义不对应Alloc。  
