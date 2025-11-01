@@ -123,7 +123,7 @@ namespace Gizbox.IR
                             {
                                 foreach(var (s, v) in toDelete)
                                 {
-                                    GenerateDelCode(s, v);
+                                    GenerateDropCode(s, v);
                                 }
                             }
                             blockNode.attributes.Remove(eAttr.drop_var_exit_env);
@@ -263,7 +263,7 @@ namespace Gizbox.IR
                             {
                                 foreach(var (s, v) in toDelete)
                                 {
-                                    GenerateDelCode(s, v);
+                                    GenerateDropCode(s, v);
                                 }
                             }
                             funcDeclNode.attributes.Remove(eAttr.drop_var_exit_env);
@@ -339,7 +339,7 @@ namespace Gizbox.IR
                             {
                                 foreach(var (s, v) in toDelete)
                                 {
-                                    GenerateDelCode(s, v);
+                                    GenerateDropCode(s, v);
                                 }
                             }
                             returnNode.attributes.Remove(eAttr.drop_var_before_return);
@@ -361,11 +361,11 @@ namespace Gizbox.IR
 
                         if(deleteNode.isArrayDelete == false)
                         {
-                            GenerateCode("DEL", GetRet(deleteNode.objToDelete));
+                            GenerateCode("DEALLOC", GetRet(deleteNode.objToDelete));
                         }
                         else
                         {
-                            GenerateCode("DEL_ARRAY", GetRet(deleteNode.objToDelete));
+                            GenerateCode("DEALLOC_ARRAY", GetRet(deleteNode.objToDelete));
                         }
                     }
                     break;
@@ -382,7 +382,7 @@ namespace Gizbox.IR
                             {
                                 foreach(var e in exprs)
                                 {
-                                    GenerateCode("DEL", GetRet(e));
+                                    GenerateDropCode(GetRet(e));
                                 }
                             }
                             singleExprNode.attributes.Remove(eAttr.drop_expr_result_after_stmt);
@@ -621,7 +621,7 @@ namespace Gizbox.IR
                             {
                                 foreach(var (s, v) in toDelete)
                                 {
-                                    GenerateDelCode(s, v);
+                                    GenerateDropCode(s, v);
                                 }
                             }
                             assignNode.attributes.Remove(eAttr.drop_var_before_stmt);
@@ -859,11 +859,17 @@ namespace Gizbox.IR
             return newCode;
         }
 
-        public void GenerateDelCode(LifetimeInfo.VarStatus status, string varname)
+
+        public void GenerateDropCode(string varname)
+        {
+            //（暂无析构机制）
+            GenerateCode("DEALLOC", varname);
+        }
+        public void GenerateDropCode(LifetimeInfo.VarStatus status, string varname)
         {
             if(status == LifetimeInfo.VarStatus.Alive) //// 无条件删除：delete aaa;
             {
-                GenerateCode("DEL", varname);
+                GenerateDropCode(varname);
             }
             else if(status == LifetimeInfo.VarStatus.PossiblyDead)  //// 条件删除：if (aaa != null) delete aaa;  
             {
@@ -871,7 +877,8 @@ namespace Gizbox.IR
                 GenerateCode("!=", tmp, varname, "%LITNULL:");
                 string label = $"_owner_skip_drop_{varname}_{envStackTemp.Count}"; //用变量名和作用域深度避免重名  
                 GenerateCode("IF_FALSE_JUMP", tmp, "%LABEL:" + label);
-                GenerateCode("DEL", varname);
+                //（暂无析构机制）
+                GenerateCode("DEALLOC", varname);
                 GenerateCode("").label = label;
             }
             else

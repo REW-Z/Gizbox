@@ -514,8 +514,9 @@ namespace Gizbox.ScriptEngine
                         SetValue(code.arg0, Value.FromGizObjectPtr(ptr));
                     }
                     break;
-                case "DEL":
+                case "DEALLOC":
                     {
+                        //暂无析构机制
                         var objPtr = GetValue(code.arg0);
                         if(objPtr.IsRefType && objPtr.AsPtr >= 0)
                         {
@@ -547,8 +548,9 @@ namespace Gizbox.ScriptEngine
                         SetValue(code.arg0, Value.FromArrayPtr(ptr));
                     }
                     break;
-                case "DEL_ARRAY":
+                case "DEALLOC_ARRAY":
                     {
+                        //暂无析构机制
                         var objPtr = GetValue(code.arg0);
                         if(objPtr.IsRefType && objPtr.AsPtr >= 0)
                         {

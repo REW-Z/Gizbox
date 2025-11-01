@@ -944,19 +944,6 @@ namespace Gizbox.Src.Backend
                             Emit(X64.lea(X64.rdx, X64.rel(vtableRoKeys[typeName])));
                             Emit(X64.mov(X64.mem(X64.rax, disp: 0), X64.rdx, X64Size.qword));
                         }
-                        break; 
-                    case "DEL":
-                        {
-                            var objPtr = ParseOperand(tacInf.oprand0);
-
-                            int rspSub;
-                            List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs = new();
-                            List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey)> paramInfos
-                                = new() { (objPtr, 0, tacInf.oprand0.typeExpr, false, null) };
-                            BeforeCall(1, paramInfos, out rspSub, ref homedRegs);
-                            Emit(X64.call("free"));
-                            AfterCall(rspSub, homedRegs);
-                        }
                         break;
                     case "ALLOC_ARRAY":
                         {
@@ -981,6 +968,33 @@ namespace Gizbox.Src.Backend
 
                             //返回指针在RAX，写入目标变量  
                             Emit(X64.mov(target, X64.rax, X64Size.qword));
+                        }
+                        break;
+                    case "DEALLOC":
+                        {
+                            var objPtr = ParseOperand(tacInf.oprand0);
+
+                            int rspSub;
+                            List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs = new();
+                            List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey)> paramInfos
+                                = new() { (objPtr, 0, tacInf.oprand0.typeExpr, false, null) };
+                            BeforeCall(1, paramInfos, out rspSub, ref homedRegs);
+                            Emit(X64.call("free"));
+                            AfterCall(rspSub, homedRegs);
+                        }
+                        break;
+                    case "DEALLOC_ARRAY":
+                        {
+                            // 与DEALLOC一致
+                            var arrPtr = ParseOperand(tacInf.oprand0);
+
+                            int rspSub;
+                            List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs = new();
+                            List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey)> paramInfos
+                                = new() { (arrPtr, 0, tacInf.oprand0.typeExpr, false, null) };
+                            BeforeCall(1, paramInfos, out rspSub, ref homedRegs);
+                            Emit(X64.call("free"));
+                            AfterCall(rspSub, homedRegs);
                         }
                         break;
                     case "IF_FALSE_JUMP":
@@ -2099,7 +2113,12 @@ namespace Gizbox.Src.Backend
                         USE(tac.arg1, lineNum, block, envStack);
                     }
                     break;
-                case "DEL":
+                case "DEALLOC":
+                    {
+                        USE(tac.arg0, lineNum, block, envStack);
+                    }
+                    break;
+                case "DEALLOC_ARRAY":
                     {
                         USE(tac.arg0, lineNum, block, envStack);
                     }
