@@ -74,32 +74,6 @@ own类型的容器用类封装，实际存储用原始数组，需要加`adopt`�
 
 成员字段所有权处理？  
 
-### 分支和循环    
-
-循环处理：  
-
-已解决  
-
-分支处理：  
-
-AI：
-```
-不需要单独区分 Released；delete 后就是 Dead。
-分支合并的 join 规则：
-•	Alive + Alive = Alive
-•	Dead + Dead = Dead
-•	Alive + Dead = MaybeDead
-•	X + MaybeDead = MaybeDead (MaybeDead 与任何非同质状态合并继续保持 MaybeDead)
-
-需要设置一个drop flag，离开作用域时根据flag进行条件delete。    
-```
-
-替代drop-flag的方法：所有权移动后，右值变量置null。用null作为drop-flag。    
-
-树节点重写。  
-
-IR生成器插入语句。    
-
 
 ### Delete[] 数组释放  
 
@@ -120,3 +94,9 @@ IR生成器插入语句。
 •	直接把“用户指针（元素0地址）”传给 operator delete/free。
 •	分配器的 free 期望接收的是它当初返回的“用户区起点”（在 cookie 之前）。现在它拿到的是“块内的中间地址”，于是：
 •	把 cookie 当成块头去解释，得到错误的大小/标志，合并相邻空闲块时写坏内存，进而崩溃或后续随机损坏。
+
+
+
+### 泛型实现   
+
+。。。
