@@ -930,6 +930,15 @@ namespace Gizbox
         public Nonterminal head;
         public Symbol[] body;
 
+
+        public Production(GrammerSet container, Nonterminal head, Symbol[] body)
+        {
+            this.head = head;
+            this.body = body;
+
+            container.AddProduction(this);
+        }
+
         public bool IsεProduction()
         {
             if (body.Length == 0)
@@ -995,6 +1004,15 @@ namespace Gizbox
     {
         public List<Production> productions = null;
 
+
+        public Nonterminal(GrammerSet container, string name) 
+        {
+            this.name = name;
+            this.productions = new ();
+
+            container.AddNonterminal(this);
+        }
+
         //有ε产生式  
         public bool HasεProduction()
         {
@@ -1027,8 +1045,42 @@ namespace Gizbox
     /// 终结符  
     /// </summary>
     public class Terminal : Symbol
-    { }
+    {
+        public Terminal(GrammerSet container, string name) 
+        {
+            this.name = name;
 
+            container.AddTerminal(this);
+        }
+    }
+
+    public class GrammerSet
+    {
+        public Dictionary<string, Symbol> symbolDict = new();
+        public Dictionary<string, Terminal> terminalDict = new();
+        public Dictionary<string, Nonterminal> nonterminalDict = new();
+
+        public List<Production> productions = new();//索引代表编号
+        public Dictionary<string, Production> productionDict = new();
+
+        public void AddTerminal(Terminal terminal)
+        {
+            symbolDict[terminal.name] = terminal;
+            terminalDict[terminal.name] = terminal;
+        }
+        public void AddNonterminal(Nonterminal nonterminal)
+        {
+            symbolDict[nonterminal.name] = nonterminal;
+            nonterminalDict[nonterminal.name] = nonterminal;
+        }
+        public void AddProduction(Production production)
+        {
+            productions.Add(production);
+
+            //dict修改
+            //...
+        }
+    }
 
     /// <summary>
     /// 基于依赖的集合  

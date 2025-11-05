@@ -20,6 +20,32 @@ namespace Gizbox.LRParse
         public Production production;
         public int iDot;
         public Terminal lookahead;
+
+
+        public (Production prod, int idot) GetLeft()
+        {
+            return (this.production, this.iDot);
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (ReferenceEquals(this, obj)) return true;
+            var other = obj as LR1Item;
+            if (other == null) return false;
+            return (this.production == other.production) && (this.iDot == other.iDot) && (this.lookahead == other.lookahead);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 31 + (production != null ? production.GetHashCode() : 0);
+                hash = hash * 31 + iDot.GetHashCode();
+                hash = hash * 31 + (lookahead != null ? lookahead.GetHashCode() : 0);
+                return hash;
+            }
+        }
     }
 
     /// <summary>
@@ -30,8 +56,14 @@ namespace Gizbox.LRParse
         public int id;
 
         private List<LR1Item> items = new List<LR1Item>();
+        private HashSet<LR1Item> itemHashSet;//用于查重  
 
-        public int Count => this.items.Count;
+        public LR1ItemSet()
+        {
+            this.itemHashSet = new HashSet<LR1Item>();
+        }
+
+        public int Count => this.itemHashSet.Count;
 
         public IEnumerator<LR1Item> GetEnumerator()
         {
@@ -45,12 +77,18 @@ namespace Gizbox.LRParse
 
         public void AddImmediate(LR1Item item)//立即添加 - 反序列使用
         {
+            if (item == null) return;
+            // 反序列化时可能重复调用，确保不重复添加
+            if (this.itemHashSet.Add(item))
+            {
             items.Add(item);
+        }
         }
 
         public void AddDistinct(LR1Item item)
         {
-            if (this.AnyRepeat(item) == false)
+            if (item == null) return;
+            if (this.itemHashSet.Add(item))
             {
                 items.Add(item);
             }
@@ -58,25 +96,16 @@ namespace Gizbox.LRParse
 
         public bool AnyRepeat(LR1Item item)
         {
-            if (items.Any(i => i.production == item.production && i.iDot == item.iDot && i.lookahead == item.lookahead))
-            {
-                return true;
-            }
-            return false;
+            if (item == null) return false;
+            return this.itemHashSet.Contains(item);
         }
 
         public bool IsSameTo(LR1ItemSet another)
         {
+            if (another == null) return false;
             if (another.Count != this.Count) return false;
 
-            foreach (var itm in another.items)
-            {
-                if (this.items.Contains(itm) == false)
-                {
-                    return false;
-                }
-            }
-            return true;
+            return this.itemHashSet.SetEquals(another.itemHashSet);
         }
 
         public LR1ItemSet Clone()
@@ -92,24 +121,19 @@ namespace Gizbox.LRParse
 
 
     /// <summary>
-    /// 扩展方法    
+    /// 扩展方法(仅用于打印)    
     /// </summary>
     public static class LR1ItemExtensions
     {
-        public static string GetLeft(this LR1Item item)
-        {
-            return item.ToExpression().Split(',')[0];
-        }
-
         public static string ToExpression(this LR1Item item)
         {
             StringBuilder strb = new StringBuilder();
 
             strb.Append(item.production.head.name);
             strb.Append(" ->");
-            for (int i = 0; i < item.production.body.Length; ++i)
+            for(int i = 0; i < item.production.body.Length; ++i)
             {
-                if (i == item.iDot)
+                if(i == item.iDot)
                 {
                     strb.Append(' ');
                     strb.Append('·');
@@ -118,7 +142,7 @@ namespace Gizbox.LRParse
                 strb.Append(' ');
                 strb.Append(item.production.body[i] != null ? item.production.body[i].name : "ε");
             }
-            if (item.iDot == item.production.body.Length)
+            if(item.iDot == item.production.body.Length)
             {
                 strb.Append(' ');
                 strb.Append("·");
@@ -130,80 +154,78 @@ namespace Gizbox.LRParse
             return strb.ToString();
         }
 
-        public static string ToExpression(this CompressedItem item)
-        {
-            StringBuilder strb = new StringBuilder();
-
-            strb.Append(item.production.head.name);
-            strb.Append(" ->");
-            for (int i = 0; i < item.production.body.Length; ++i)
-            {
-                if (i == item.iDot)
-                {
-                    strb.Append(' ');
-                    strb.Append('·');
-                }
-
-                strb.Append(' ');
-                strb.Append(item.production.body[i] != null ? item.production.body[i].name : "ε");
-            }
-            if (item.iDot == item.production.body.Length)
-            {
-                strb.Append(' ');
-                strb.Append("·");
-            }
-
-            strb.Append(", ");
-
-            foreach(var lookahead in item.lookaheadList)
-            {
-                strb.Append("," + (lookahead != null ? lookahead.name : "ε"));
-            }
-
-            return strb.ToString();
-        }
-
-
-        public class CompressedItem
-        {
-            public Production production;
-            public int iDot;
-            public List<Terminal> lookaheadList = new List<Terminal>();
-        }
         public static string ToExpression(this LR1ItemSet set)
         {
-            List<CompressedItem> compressedItems = new List<CompressedItem>();
+            void AppendProductionWithDot(StringBuilder strb, Production production, int iDot)
+            {
+                strb.Append(production.head.name);
+                strb.Append(" ->");
+                for(int i = 0; i < production.body.Length; ++i)
+                {
+                    if(i == iDot)
+                    {
+                        strb.Append(' ');
+                        strb.Append('·');
+                    }
+
+                    strb.Append(' ');
+                    strb.Append(production.body[i] != null ? production.body[i].name : "ε");
+                }
+                if(iDot == production.body.Length)
+                {
+                    strb.Append(' ');
+                    strb.Append("·");
+                }
+            }
+
+
+
+            var order = new List<(Production production, int iDot)>();
+            var groups = new Dictionary<Production, Dictionary<int, List<Terminal>>>();
+
             foreach(var itm in set.ToArray())
             {
-                var citem = compressedItems.FirstOrDefault(citm => citm.production == itm.production && citm.iDot == itm.iDot);
-                if(citem == null)
+                var prod = itm.production;
+                var dot = itm.iDot;
+
+                if(!groups.TryGetValue(prod, out var byDot))
                 {
-                    var newCitem = new CompressedItem() { production = itm.production, iDot = itm.iDot };
-                    newCitem.lookaheadList.Add(itm.lookahead);
-                    compressedItems.Add(newCitem);
+                    byDot = new Dictionary<int, List<Terminal>>();
+                    groups[prod] = byDot;
                 }
-                else 
+
+                if(!byDot.TryGetValue(dot, out var lookaheads))
                 {
-                    if(citem.lookaheadList.Contains(itm.lookahead) == false)
-                    {
-                        citem.lookaheadList.Add(itm.lookahead);
-                    }
+                    lookaheads = new List<Terminal>();
+                    byDot[dot] = lookaheads;
+                    order.Add((prod, dot)); // 记录首次出现顺序
+                }
+
+                if(!lookaheads.Contains(itm.lookahead))
+                {
+                    lookaheads.Add(itm.lookahead);
                 }
             }
 
             StringBuilder strb = new StringBuilder();
             strb.AppendLine(" ----------------");
-            foreach (var citm in compressedItems.ToArray())
+            foreach(var (production, iDot) in order)
             {
                 strb.Append("| ");
-                strb.Append(citm.ToExpression());
+                AppendProductionWithDot(strb, production, iDot);
+
+                strb.Append(", ");
+                var lookaheadList = groups[production][iDot];
+                foreach(var la in lookaheadList)
+                {
+                    strb.Append("," + (la != null ? la.name : "ε"));
+                }
                 strb.Append('\n');
             }
             strb.AppendLine(" ----------------");
             return strb.ToString();
         }
     }
-
 
 
 
@@ -635,12 +657,8 @@ namespace Gizbox.LALRGenerator
         //基本信息（语法分析器用不到）      
         public Nonterminal startSymbol = null;//开始符号  
         public Nonterminal augmentedStartSymbol = null; //增广后的开始符号  
-        public List<Symbol> symbols = new List<Symbol>();//符号列表   
-        public List<Nonterminal> nonterminals = new List<Nonterminal>();//非终结符列表  
-        public List<Terminal> terminals = new List<Terminal>();//终结符列表
-                                                               
-        //产生式  
-        public List<Production> productions = new List<Production>();  //产生式列表（索引代表产生式编号）  
+
+        public GrammerSet grammerSet = new();
 
         //分析表  
         public ParseTable table;
@@ -657,7 +675,7 @@ namespace Gizbox.LALRGenerator
     {
         //项和产生式查询表  
         public Dictionary<string, Production> productionDic = new Dictionary<string, Production>();
-        public Dictionary<string, LR1Item> itemDic = new Dictionary<string, LR1Item>();
+        public Dictionary<(Production, int, Terminal), LR1Item> itemDic = new ();
         public Dictionary<Production, int> productionIdDic = new Dictionary<Production, int>();
 
         //项列表  
@@ -808,8 +826,8 @@ namespace Gizbox.LALRGenerator
                     NewProduction(line);
                 }
 
-                outputData.startSymbol = outputData.nonterminals.FirstOrDefault(nt => nt.name == "S");
-                outputData.augmentedStartSymbol = outputData.nonterminals.FirstOrDefault(nt => nt.name == @"S'");
+                outputData.startSymbol = outputData.grammerSet.nonterminalDict["S"];
+                outputData.augmentedStartSymbol = outputData.grammerSet.nonterminalDict[@"S'"];
 
 
                 outputData.lalrStates = new List<State>();
@@ -842,8 +860,8 @@ namespace Gizbox.LALRGenerator
 
                 outputData.table = new ParseTable();
                 outputData.table.stateCount = outputData.lalrStates.Count;
-                outputData.table.terminals = outputData.terminals.Select(t => t.name).ToList();
-                outputData.table.nonterminals = outputData.nonterminals.Select(nont => nont.name).ToList();
+                outputData.table.terminals = outputData.grammerSet.terminalDict.Select(t => t.Value.name).ToList();
+                outputData.table.nonterminals = outputData.grammerSet.nonterminalDict.Select(nont => nont.Value.name).ToList();
 
                 outputData.table.Deserialize(strTable);
             }
@@ -875,17 +893,17 @@ namespace Gizbox.LALRGenerator
 
 
             strb.AppendLine("***Terminals***");
-            foreach (var t in outputData.terminals)
+            foreach (var (name, t) in outputData.grammerSet.terminalDict)
             {
                 strb.AppendLine(t.name);
             }
             strb.AppendLine("***Nonterminals***");
-            foreach (var nt in outputData.nonterminals)
+            foreach (var (name, nt) in outputData.grammerSet.nonterminalDict)
             {
                 strb.AppendLine(nt.name);
             }
             strb.AppendLine("***Productions***");
-            foreach (var production in outputData.productions)
+            foreach (var (name, production) in outputData.grammerSet.productionDict)
             {
                 strb.AppendLine(production.ToExpression());
             }
@@ -934,7 +952,7 @@ namespace Gizbox.LALRGenerator
             {
                 NewNonterminal(nonterminalName);
             }
-            outputData.startSymbol = outputData.nonterminals[0];
+            outputData.startSymbol = outputData.grammerSet.nonterminalDict["S"];
 
             //产生式  
             foreach (var productionExpr in genratorInput.productionExpressions)
@@ -963,7 +981,7 @@ namespace Gizbox.LALRGenerator
             // DEBUG  
             {
                 GixConsole.WriteLine("\n\n\n***输出FIRST集计算结果*** ");
-                foreach (var nont in outputData.nonterminals)
+                foreach (var (_, nont) in outputData.grammerSet.nonterminalDict)
                 {
                     GixConsole.WriteLine("符号" + nont.name + "的FIRST集:");
                     GixConsole.WriteLine("{ " + string.Concat(nont.cachedFIRST.ToArray().Select(s => (s != null ? s.name : "ε") + ",")) + "}");
@@ -992,7 +1010,7 @@ namespace Gizbox.LALRGenerator
         private void InitFIRSTCollections()
         {
             FIRST(outputData.startSymbol);
-            foreach (var nt in outputData.nonterminals)
+            foreach (var (_, nt) in outputData.grammerSet.nonterminalDict)
             {
                 FIRST(nt);
             }
@@ -1036,7 +1054,7 @@ namespace Gizbox.LALRGenerator
                     GixConsole.WriteLine("遍历第" + i + "个项集族");
 
                     //for(每个文法符号X)
-                    foreach (var X in outputData.symbols)//文法符号X可以是终结符和非终结符  
+                    foreach (var (_, X) in outputData.grammerSet.symbolDict)//文法符号X可以是终结符和非终结符  
                     {
                         //if (GOTO(I, X)非空且不在C中)  
                         var gotoix = GOTO(I, X);
@@ -1089,7 +1107,7 @@ namespace Gizbox.LALRGenerator
             //剩余的规范GOTO缓存补全(必要的)    
             for (int i = 0; i < this.canonicalItemCollection.Count; ++i)
             {
-                foreach (var symbol in outputData.symbols)
+                foreach (var (_, symbol) in outputData.grammerSet.symbolDict)
                 {
                     if (cachedCanonicalGOTO.ContainsKey(i) && cachedCanonicalGOTO[i].ContainsKey(symbol)) continue;
 
@@ -1119,7 +1137,7 @@ namespace Gizbox.LALRGenerator
                 GixConsole.WriteLine("------------------------规范LR(1)项集族的GOTO表--------------------------");
                 GixConsole.WriteLine("-------------------------------------------------------------------------");
                 GixConsole.Write("状态\t|");
-                foreach (var X in outputData.symbols)
+                foreach (var (_, X) in outputData.grammerSet.symbolDict)
                 {
                     GixConsole.Write("\t" + X.name);
                 }
@@ -1130,7 +1148,7 @@ namespace Gizbox.LALRGenerator
                     if (cachedCanonicalGOTO.ContainsKey(i))
                     {
                         GixConsole.Write(i + "\t|");
-                        foreach (var X in outputData.symbols)
+                        foreach (var (_, X) in outputData.grammerSet.symbolDict)
                         {
                             if (cachedCanonicalGOTO[i].ContainsKey(X))
                             {
@@ -1254,8 +1272,8 @@ namespace Gizbox.LALRGenerator
 
             // *** LALR分析表的基本信息设置 ***   
             outputData.table.stateCount = outputData.lalrStates.Count;
-            outputData.table.terminals = outputData.terminals.Select(t => t.name).ToList();
-            outputData.table.nonterminals = outputData.nonterminals.Select(nont => nont.name).ToList();
+            outputData.table.terminals = outputData.grammerSet.terminalDict.Select(t => t.Value.name).ToList();
+            outputData.table.nonterminals = outputData.grammerSet.nonterminalDict.Select(nont => nont.Value.name).ToList();
 
             // *** LALR分析表的GOTO表构造 ***   
             foreach (var key in cachedCanonicalGOTO.Keys)
@@ -1350,20 +1368,14 @@ namespace Gizbox.LALRGenerator
         // ------------------------------------- NewElement ------------------------------------------
         private Terminal NewTerminal(string name)
         {
-            Terminal terminal = new Terminal() { name = name };
-
-            outputData.symbols.Add(terminal);
-            outputData.terminals.Add(terminal);
+            Terminal terminal = new Terminal(outputData.grammerSet, name);
 
             return terminal;
         }
 
         private Nonterminal NewNonterminal(string name)
         {
-            Nonterminal nonterminal = new Nonterminal() { name = name, productions = new List<Production>() };
-
-            outputData.symbols.Add(nonterminal);
-            outputData.nonterminals.Add(nonterminal);
+            Nonterminal nonterminal = new Nonterminal(outputData.grammerSet, name);
 
             return nonterminal;
         }
@@ -1376,7 +1388,7 @@ namespace Gizbox.LALRGenerator
 
             int bodyLength = segments.Length - 2;
 
-            Nonterminal head = outputData.nonterminals.FirstOrDefault(s => s.name == segments[0]);
+            Nonterminal head = outputData.grammerSet.nonterminalDict[segments[0]];
 
             if (head.productions == null) head.productions = new List<Production>();
 
@@ -1410,7 +1422,7 @@ namespace Gizbox.LALRGenerator
 
                 for (int i = 2; i < segments.Length; ++i)
                 {
-                    Symbol symbol = outputData.symbols.FirstOrDefault(s => s.name == segments[i]);
+                    Symbol symbol = outputData.grammerSet.symbolDict[segments[i]];
 
                     if (symbol == null) throw new Exception("不存在名称为" + segments[i] + "的符号！");
 
@@ -1421,26 +1433,41 @@ namespace Gizbox.LALRGenerator
 
         private void NewLR1Item(string expression) //形式: "A -> α · β, a"  
         {
-            int lastSpaceIdx = -1;
-            for (int i = expression.Length - 1; i > -1; --i)
+            var (production, idot, lookahead) = SplitItemExpression(expression);
+
+            //ADD  
+            CreateLR1Item(production, idot, lookahead);
+        }
+
+        private (Production prod, int idot, Terminal lookahead) SplitItemExpression(string expression)
+        {
+            if(string.IsNullOrWhiteSpace(expression))
             {
-                if (expression[i] == ' ')
+                throw new Exception("LR1项不合规，分量前加空格!:" + expression);
+            }
+
+            int lastSpaceIdx = -1;
+            for(int i = expression.Length - 1; i > -1; --i)
+            {
+                if(expression[i] == ' ')
                 {
                     lastSpaceIdx = i;
                     break;
                 }
             }
-            if (lastSpaceIdx == -1) throw new Exception("LR1项不合规，分量前加空格!:" + expression);
+            if(lastSpaceIdx == -1)
+                throw new Exception("LR1项不合规，分量前加空格!:" + expression);
 
             string lookaheadStr = expression.Substring(lastSpaceIdx).Trim();//a
             string itemNonLookahead = expression.Substring(0, lastSpaceIdx - 1).Trim();  //A -> α·β
 
             string[] segments = itemNonLookahead.Split(' ');
-            if (segments[1] != "->") { throw new Exception("LR1项格式错误"); }
+            if(segments.Length < 3 || segments[1] != "->")
+            { throw new Exception("LR1项格式错误"); }
 
-            //find production
+            // find production
             string productionExpression;
-            if (segments.Length == 3 && segments[2] == "·")
+            if(segments.Length == 3 && segments[2] == "·")
             {
                 productionExpression = segments[0] + " -> ε";
             }
@@ -1449,30 +1476,31 @@ namespace Gizbox.LALRGenerator
                 productionExpression = itemNonLookahead.Replace(" ·", "");
             }
 
-            if (productionDic.ContainsKey(productionExpression) == false) { throw new Exception("没找到产生式:" + productionExpression); }
+            if(productionDic.ContainsKey(productionExpression) == false)
+            { throw new Exception("没找到产生式:" + productionExpression); }
             Production production = productionDic[productionExpression];
 
-            //Find iDot  
+            // Find iDot
             int idot = -1;
-
-            for (int i = 0; i < segments.Length; ++i)
+            for(int i = 0; i < segments.Length; ++i)
             {
-                if (segments[i] == "·")
+                if(segments[i] == "·")
                 {
                     idot = i - 2;
-                        break;
+                    break;
                 }
             }
-            
-            if (idot == -1) throw new Exception(@"项 " + expression + " 不合规:没有'·'");
+            if(idot == -1)
+                throw new Exception(@"项 " + expression + " 不合规:没有'·'");
 
-            //lookahead  
-            Terminal lookahead = outputData.terminals.FirstOrDefault(t => t.name == lookaheadStr);
-            if (lookahead == null) { throw new Exception("没找到终结符: [" + lookaheadStr + "](" + lookaheadStr.Length + ")"); }
+            // lookahead
+            Terminal lookahead = outputData.grammerSet.terminalDict[lookaheadStr];
+            if(lookahead == null)
+            { throw new Exception("没找到终结符: [" + lookaheadStr + "](" + lookaheadStr.Length + ")"); }
 
-            //ADD  
-            CreateLR1Item(production, idot, lookahead);
+            return (production, idot, lookahead);
         }
+
 
         private LR1Item CreateLR1Item(Production production, int idot, Terminal lookahead)
         {
@@ -1493,7 +1521,7 @@ namespace Gizbox.LALRGenerator
             }
 
             this.items.Add(newItem);
-            this.itemDic.Add(newItem.ToExpression(), newItem);
+            this.itemDic.Add((production, idot, lookahead), newItem);
 
             return newItem;
         }
@@ -1514,15 +1542,17 @@ namespace Gizbox.LALRGenerator
 
         public LR1Item GetOrCreateLR1Item(string expression)
         {
-            if (itemDic.ContainsKey(expression))
+            var itemTuple = SplitItemExpression(expression);
+
+            if (itemDic.ContainsKey(itemTuple))
             {
-                return itemDic[expression];
+                return itemDic[itemTuple];
             }
             else
             {
                 NewLR1Item(expression);
-                if (itemDic.ContainsKey(expression) == false) throw new Exception("没有item: " + expression + "\n已有的项:" + string.Concat(itemDic.Keys.Select(k => k + "\n")));
-                return itemDic[expression];
+                if (itemDic.ContainsKey(itemTuple) == false) throw new Exception("没有item: " + expression + "\n已有的项:" + string.Concat(itemDic.Keys.Select(k => k + "\n")));
+                return itemDic[itemTuple];
             }
         }
 
@@ -1576,8 +1606,8 @@ namespace Gizbox.LALRGenerator
 
         private bool Utils_IsSameCore(LR1ItemSet set1, LR1ItemSet set2)
         {
-            //第二个核心  
-            List<string> core1 = new List<string>();
+            //第1个核心  
+            List<(Production prod, int idot)> core1 = new List<(Production prod, int idot)>();
             foreach (var itm1 in set1)
             {
                 var left = itm1.GetLeft();
@@ -1587,8 +1617,8 @@ namespace Gizbox.LALRGenerator
                 }
             }
 
-            //第二个核心  
-            List<string> core2 = new List<string>();
+            //第2个核心  
+            List<(Production prod, int idot)> core2 = new List<(Production prod, int idot)>();
             foreach (var itm2 in set2)
             {
                 var left = itm2.GetLeft();
@@ -1808,7 +1838,7 @@ namespace Gizbox.LALRGenerator
                     List<Symbol> βa = new List<Symbol>(); βa.AddRange(β); βa.Add(a);
 
                     //非终结符B的所有产生式  
-                    Production[] productionsOfB = outputData.productions.Where(p => p.head == B).ToArray();
+                    Production[] productionsOfB = outputData.grammerSet.productions.Where(p => p.head == B).ToArray();
                     foreach (var production in productionsOfB)
                     {
                         TerminalSet firstβa = FIRST(βa);
