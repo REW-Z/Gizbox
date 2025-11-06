@@ -26,17 +26,17 @@ namespace Gizbox.Utility
         {
             StringBuilder strb = new StringBuilder();
 
-            foreach(var t in data.terminals)
+            foreach(var (_, t) in data.grammerSet.terminalDict)
             {
                 string name = t.name;
                 strb.AppendLine("NewTerminal(\"" + name + "\");");
             }
-            foreach (var nt in data.nonterminals)
+            foreach (var (_, nt) in data.grammerSet.nonterminalDict)
             {
                 string name = nt.name;
                 strb.AppendLine("NewNonterminal(\"" + name + "\");");
             }
-            foreach (var p in data.productions)
+            foreach (var p in data.grammerSet.productions)
             {
                 string head = p.head.name;
                 string bodyStrArr = "";
@@ -137,43 +137,26 @@ namespace Gizbox.Utility
 
         private ParserData outputData = new ParserData();
 
-        private Dictionary<string, Terminal> terminalDic = new Dictionary<string, Terminal>();
-        private Dictionary<string, Nonterminal> nonterminalDic = new Dictionary<string, Nonterminal>();
-        private Dictionary<string, Symbol> symbolDic = new Dictionary<string, Symbol>();
+        private Dictionary<string, Terminal> terminalDic => outputData.grammerSet.terminalDict;
+        private Dictionary<string, Nonterminal> nonterminalDic => outputData.grammerSet.nonterminalDict;
+        private Dictionary<string, Symbol> symbolDic => outputData.grammerSet.symbolDict;
 
 
 
 
         private void NewTerminal(string t)
         {
-            Terminal terminal = new Terminal() { name = t };
-
-            outputData.symbols.Add(terminal);
-            outputData.terminals.Add(terminal);
-
-            terminalDic[t] = terminal;
-            symbolDic[t] = terminal;
+            Terminal terminal = new Terminal(outputData.grammerSet, t);
         }
 
         private void NewNonterminal(string nt)
         {
-            Nonterminal nonterminal = new Nonterminal() { name = nt, productions = new List<Production>() };
-
-            outputData.symbols.Add(nonterminal);
-            outputData.nonterminals.Add(nonterminal);
-
-            nonterminalDic[nt] = nonterminal;
-            symbolDic[nt] = nonterminal;
+            Nonterminal nonterminal = new Nonterminal(outputData.grammerSet, nt);
         }
 
         private void NewProduction(Nonterminal head, Symbol[] body)
         {
-            Production p = new Production()
-            {
-                head = head,
-                body = body,
-            };
-            outputData.productions.Add(p);
+            Production p = new Production(outputData.grammerSet, head, body);
         }
 
         private void NewState(int idx, string name)

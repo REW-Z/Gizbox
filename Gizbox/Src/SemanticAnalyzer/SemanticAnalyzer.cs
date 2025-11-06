@@ -190,7 +190,7 @@ namespace Gizbox.SemanticRule
             parseTreeBuilder = new BottomUpParseTreeBuilder();
 
             //构建语法分析树的语义动作    
-            foreach (var p in parserContext.data.productions)
+            foreach (var p in parserContext.data.grammerSet.productions)
             {
                 this.AddActionAtTail(p, parseTreeBuilder.BuildAction);
             }
@@ -1466,7 +1466,7 @@ namespace Gizbox.SemanticRule
         // 插入语义动作
         public void AddActionAtTail(string productionExpression, System.Action<LRParser, Production> act)
         {
-            Production production = parserContext.data.productions.FirstOrDefault(p => p.ToExpression() == productionExpression);
+            Production production = parserContext.data.grammerSet.productions.FirstOrDefault(p => p.ToExpression() == productionExpression);
 
             if (production == null) throw new GizboxException(ExceptioName.ProductionNotFound, productionExpression);
 

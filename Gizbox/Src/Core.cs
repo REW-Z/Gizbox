@@ -1062,6 +1062,7 @@ namespace Gizbox
 
         public List<Production> productions = new();//索引代表编号
         public Dictionary<string, Production> productionDict = new();
+        public Dictionary<Production, int> productionIdDict = new();
 
         public void AddTerminal(Terminal terminal)
         {
@@ -1077,8 +1078,12 @@ namespace Gizbox
         {
             productions.Add(production);
 
+            //head.productions添加  
+            production.head.productions.Add(production);
+
             //dict修改
-            //...
+            productionDict[production.ToExpression()] = production;
+            productionIdDict[production] = productions.Count - 1;
         }
     }
 

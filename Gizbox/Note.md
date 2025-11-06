@@ -100,3 +100,11 @@ own类型的容器用类封装，实际存储用原始数组，需要加`adopt`�
 ### 泛型实现   
 
 手动特化。  
+
+
+### 优化LALR  
+
+InitCanonicalItemsCollection (用Hash桶) 
+Utils_ExistSameSetInC
+FIRST  
+CLOSURE

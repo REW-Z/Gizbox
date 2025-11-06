@@ -211,10 +211,10 @@ namespace Gizbox.LRParse
                     //规约    
                     case ACTION_TYPE.Reduce:
                         {
-                            Log("按产生式：" + data.productions[action.num].ToExpression() + "规约");
+                            Log("按产生式：" + data.grammerSet.productions[action.num].ToExpression() + "规约");
 
                             // *** 确定产生式 ***  
-                            var production = data.productions[action.num];
+                            var production = data.grammerSet.productions[action.num];
                             // ******************
 
                             // *** 确定要出栈的状态数量 ***  

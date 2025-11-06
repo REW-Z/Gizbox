@@ -61,9 +61,7 @@ namespace Gizbox
 
         //文法信息  
         private Nonterminal startSymbol = null;//开始符号
-        private List<Symbol> symbols = new List<Symbol>();//符号列表   
-        private List<Nonterminal> nonterminals = new List<Nonterminal>();//非终结符列表  
-        private List<Production> productions = new List<Production>();//产生式列表  
+        private GrammerSet grammerSet = new GrammerSet();
 
 
 
@@ -161,7 +159,7 @@ namespace Gizbox
 
 
             //DEBUG  
-            foreach (var nont in nonterminals)
+            foreach (var (_, nont) in grammerSet.nonterminalDict)
             {
                 GixConsole.WriteLine("非终结符" + nont.name + "的FIRST集：" + string.Concat(FIRST(nont).ToArray().Select(symb => symb.name + ",")));
 
@@ -186,6 +184,7 @@ namespace Gizbox
         private void CheckLeftRecursion()
         {
             bool isLeftRecursive = false;
+            var nonterminals = this.grammerSet.nonterminalDict.Values.ToList();
             for (int i = 0; i < nonterminals.Count; ++i)
             {
                 var nt_i = nonterminals[i];
@@ -240,10 +239,7 @@ namespace Gizbox
                             var β = p.body.ToList();
                             var βA_quat = β; β.Add(A_quot);
 
-                            var newProduction = new Production() { head = nt_i, body = βA_quat.ToArray() };
-
-                            nt_i.productions.Add(newProduction);
-                            this.productions.Add(newProduction);
+                            var newProduction = new Production(grammerSet, nt_i, βA_quat.ToArray()) ;
                         }
 
                         A_quot.productions = new List<Production>();
@@ -252,15 +248,10 @@ namespace Gizbox
                             var α = p.body.Skip(1).ToList();
                             var αA_quat = α; αA_quat.Add(A_quot);
 
-                            var newProduction = new Production() { head = A_quot, body = αA_quat.ToArray() };
-
-                            A_quot.productions.Add(newProduction);
-                            this.productions.Add(newProduction);
+                            var newProduction = new Production(grammerSet, A_quot, αA_quat.ToArray());
                         }
                         //添加ε产生式  
-                        var newproduction = new Production() { head = A_quot, body = new Symbol[] { null } };
-                        A_quot.productions.Add(newproduction);
-                        this.productions.Add(newproduction);
+                        var newproduction = new Production(grammerSet, A_quot, new Symbol[] { null });
                     }
                 }
             }
@@ -286,7 +277,7 @@ namespace Gizbox
         private void InitFIRSTCollections()
         {
             FIRST(startSymbol);
-            foreach (var nt in nonterminals)
+            foreach (var (_, nt) in grammerSet.nonterminalDict)
             {
                 FIRST(nt);
             }
@@ -295,10 +286,10 @@ namespace Gizbox
         private void InitFOLLOWCollections()
         {
             //开始符号的FOLLOW先添加结束符号
-            FOLLOW(startSymbol).AddDistinct(new Terminal() { name = "$" });
+            FOLLOW(startSymbol).AddDistinct(new Terminal(grammerSet, "$"));
 
             //遍历产生式
-            foreach (var production in productions)
+            foreach (var production in grammerSet.productions)
             {
                 if (production.IsεProduction())
                 {
@@ -343,7 +334,7 @@ namespace Gizbox
         /// <returns></returns>
         private void ValidLL1()
         {
-            foreach (var nt in this.nonterminals)
+            foreach (var (_, nt) in grammerSet.nonterminalDict)
             {
                 if (nt.productions.Count < 2) continue;
 
@@ -389,20 +380,14 @@ namespace Gizbox
 
         private Terminal NewTerminal(string name)
         {
-            Terminal terminal = new Terminal() { name = name };
-
-            symbols.Add(terminal);
-
+            Terminal terminal = new Terminal(grammerSet, name);
 
             return terminal;
         }
 
         private Nonterminal NewNonterminal(string name)
         {
-            Nonterminal nonterminal = new Nonterminal() { name = name, productions = new List<Production>() };
-
-            symbols.Add(nonterminal);
-            nonterminals.Add(nonterminal);
+            Nonterminal nonterminal = new Nonterminal(grammerSet, name);
 
             return nonterminal;
         }
@@ -415,7 +400,7 @@ namespace Gizbox
 
             int bodyLength = segments.Length - 2;
 
-            Nonterminal head = nonterminals.FirstOrDefault(s => s.name == segments[0]);
+            Nonterminal head = grammerSet.nonterminalDict[segments[0]];
 
             if (head.productions == null) head.productions = new List<Production>();
 
@@ -423,29 +408,20 @@ namespace Gizbox
             //是ε产生式  
             if (segments.Length == 2)
             {
-                Production newProduction = new Production();
-                newProduction.head = head;
-                newProduction.body = new Symbol[1];
-                head.productions.Add(newProduction);
-                productions.Add(newProduction);
-
-                newProduction.body[0] = null;//ε  
+                Production newProduction = new Production(grammerSet, head, new Symbol[1] { null });//ε  
 
             }
             //不是ε产生式  
             else
             {
-                Production newProduction = new Production();
-                newProduction.head = head;
-                newProduction.body = new Symbol[bodyLength];
-                head.productions.Add(newProduction);
-                productions.Add(newProduction);
-
+                Symbol[] body = new Symbol[bodyLength];
                 for (int i = 2; i < segments.Length; ++i)
                 {
-                    Symbol symbol = symbols.FirstOrDefault(s => s.name == segments[i]);
-                    newProduction.body[i - 2] = symbol;
+                    Symbol symbol = grammerSet.symbolDict[segments[i]];
+                    body[i - 2] = symbol;
                 }
+
+                Production newProduction = new Production(grammerSet, head, body);
             }
         }
 

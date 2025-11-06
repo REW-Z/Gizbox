@@ -58,6 +58,10 @@ namespace Gizbox.LRParse
         private List<LR1Item> items = new List<LR1Item>();
         private HashSet<LR1Item> itemHashSet;//用于查重  
 
+
+        private HashSet<(Production prod, int idot)> coreCache;
+        private Nullable<int> coreHashCache;
+
         public LR1ItemSet()
         {
             this.itemHashSet = new HashSet<LR1Item>();
@@ -107,6 +111,27 @@ namespace Gizbox.LRParse
 
             return this.itemHashSet.SetEquals(another.itemHashSet);
         }
+
+        internal HashSet<(Production prod, int idot)> GetCoreCached(out int hash)
+        {
+            if(coreCache == null)
+            {
+                coreCache = new HashSet<(Production prod, int idot)>();
+                foreach(var itm in items)
+                {
+                    coreCache.Add(itm.GetLeft());
+                }
+                int h = 0;
+                // 顺序无关哈希  
+                foreach(var e in coreCache)
+                    h ^= e.GetHashCode();
+                h ^= (coreCache.Count * 397);
+                coreHashCache = h;
+            }
+            hash = coreHashCache.Value;
+            return coreCache;
+        }
+
 
         public LR1ItemSet Clone()
         {
@@ -375,7 +400,7 @@ namespace Gizbox.LRParse
                 }
             }
             //冲突  
-            else if (actions[i][a].type != act.type && actions[i][a].num != act.num)
+            else if (actions[i][a].type != act.type || actions[i][a].num != act.num)
             {
                 var prevAct = actions[i][a];
                 GixConsole.WriteLine("发生" + prevAct.type.ToString() + "-" + act.type.ToString() + "冲突！");
@@ -420,11 +445,11 @@ namespace Gizbox.LRParse
         //查询GOTO表  
         public GOTO GOTO(int i, string X)
         {
-            if (gotos.ContainsKey(i))
+            if(gotos.TryGetValue(i, out var dict))
             {
-                if (gotos[i].ContainsKey(X))
+                if(dict.TryGetValue(X, out var v))
                 {
-                    return gotos[i][X];
+                    return v;
                 }
             }
 
@@ -674,10 +699,7 @@ namespace Gizbox.LALRGenerator
     public class LALRGenerator
     {
         //项和产生式查询表  
-        public Dictionary<string, Production> productionDic = new Dictionary<string, Production>();
         public Dictionary<(Production, int, Terminal), LR1Item> itemDic = new ();
-        public Dictionary<Production, int> productionIdDic = new Dictionary<Production, int>();
-
         //项列表  
         public List<LR1Item> items = new List<LR1Item>();//Item列表  
 
@@ -1330,7 +1352,7 @@ namespace Gizbox.LALRGenerator
                     if (item.iDot == item.production.body.Length && item.production.head != outputData.augmentedStartSymbol)
                     {
                         var a = item.lookahead.name;
-                        int productionId = productionIdDic[item.production];
+                        int productionId = outputData.grammerSet.productionIdDict[item.production];
 
                         if (outputData.table.CheckACTION(i, a) == false)
                         {
@@ -1396,38 +1418,23 @@ namespace Gizbox.LALRGenerator
             //是ε产生式  
             if (segments.Length == 3 && segments[2] == "ε")
             {
-                Production newProduction = new Production();
-                newProduction.head = head;
-                newProduction.body = new Symbol[0];//body长度0  
-
-                //ADD
-                head.productions.Add(newProduction);
-                outputData.productions.Add(newProduction);
-                productionDic[expression] = newProduction;
-                productionIdDic[newProduction] = outputData.productions.Count - 1;
+                Production newProduction = new Production(outputData.grammerSet, head, new Symbol[0]);
 
             }
             //不是ε产生式  
             else
             {
-                Production newProduction = new Production();
-                newProduction.head = head;
-                newProduction.body = new Symbol[bodyLength];
-
-                //ADD
-                head.productions.Add(newProduction);
-                outputData.productions.Add(newProduction);
-                productionDic[expression] = newProduction;
-                productionIdDic[newProduction] = outputData.productions.Count - 1;
-
+                Symbol[] prodBody = new Symbol[bodyLength];
                 for (int i = 2; i < segments.Length; ++i)
                 {
                     Symbol symbol = outputData.grammerSet.symbolDict[segments[i]];
 
                     if (symbol == null) throw new Exception("不存在名称为" + segments[i] + "的符号！");
 
-                    newProduction.body[i - 2] = symbol;
+                    prodBody[i - 2] = symbol;
                 }
+
+                Production newProduction = new Production(outputData.grammerSet, head, prodBody);
             }
         }
 
@@ -1476,9 +1483,9 @@ namespace Gizbox.LALRGenerator
                 productionExpression = itemNonLookahead.Replace(" ·", "");
             }
 
-            if(productionDic.ContainsKey(productionExpression) == false)
+            if(outputData.grammerSet.productionDict.ContainsKey(productionExpression) == false)
             { throw new Exception("没找到产生式:" + productionExpression); }
-            Production production = productionDic[productionExpression];
+            Production production = outputData.grammerSet.productionDict[productionExpression];
 
             // Find iDot
             int idot = -1;
@@ -1530,9 +1537,9 @@ namespace Gizbox.LALRGenerator
 
         public Production GetProduction(string expression)
         {
-            if (productionDic.ContainsKey(expression))
+            if (outputData.grammerSet.productionDict.ContainsKey(expression))
             {
-                return productionDic[expression];
+                return outputData.grammerSet.productionDict[expression];
             }
             else
             {
@@ -1558,14 +1565,9 @@ namespace Gizbox.LALRGenerator
 
         public LR1Item GetOrCreateLR1Item(Production production, int idot, Terminal lookahead)
         {
-            foreach (var item in this.items)
-            {
-                if (item.production != production) continue;
-                if (item.iDot != idot) continue;
-                if (item.lookahead != lookahead) continue;
-
-                return item;
-            }
+            var key = (production, idot, lookahead);
+            if(itemDic.TryGetValue(key, out var exists))
+                return exists;
 
             return CreateLR1Item(production, idot, lookahead);
         }
@@ -1606,43 +1608,16 @@ namespace Gizbox.LALRGenerator
 
         private bool Utils_IsSameCore(LR1ItemSet set1, LR1ItemSet set2)
         {
-            //第1个核心  
-            List<(Production prod, int idot)> core1 = new List<(Production prod, int idot)>();
-            foreach (var itm1 in set1)
-            {
-                var left = itm1.GetLeft();
-                if (core1.Contains(left) == false)
-                {
-                    core1.Add(left);
-                }
-            }
+            var core1 = set1.GetCoreCached(out int h1);
+            var core2 = set2.GetCoreCached(out int h2);
 
-            //第2个核心  
-            List<(Production prod, int idot)> core2 = new List<(Production prod, int idot)>();
-            foreach (var itm2 in set2)
-            {
-                var left = itm2.GetLeft();
-                if (core2.Contains(left) == false)
-                {
-                    core2.Add(left);
-                }
-            }
+            if(h1 != h2)
+                return false; 
+            if(core1.Count != core2.Count)
+                return false;
 
-            //不重复第一分量的数量不一样  
-            if (core1.Count != core2.Count) return false;
-
-            //逐个比较  
-            bool allSame = true;
-            foreach (var left1 in core1)
-            {
-                if (core2.Contains(left1) == false)
-                {
-                    allSame = false;
-                    break;
-                }
-            }
-
-            return allSame;
+            // O(n) 
+            return core1.SetEquals(core2);
         }
 
         private LR1ItemSet Utils_UnionSet(IEnumerable<LR1ItemSet> setArr)
