@@ -4,6 +4,9 @@ using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Text;
 
+using System.Collections.Concurrent;
+using System.Threading;
+
 namespace Gizbox
 {
     [Serializable]
@@ -1013,3 +1016,153 @@ namespace Gizbox
             }
         }
     }
+
+
+
+
+
+
+
+#region 对象池  
+
+public sealed class GObjectPool
+{
+    private readonly ConcurrentDictionary<Type, ConcurrentStack<object>> _concurrentPools;
+    private readonly Dictionary<Type, Stack<object>> _pools;
+    private readonly object _lockObj = new object();
+
+    public GObjectPool()
+    {
+        _concurrentPools = new ConcurrentDictionary<Type, ConcurrentStack<object>>();
+    }
+
+    private ConcurrentStack<object> GetConcurrentStack(Type t)
+    {
+        return _concurrentPools.GetOrAdd(t, _ => new ConcurrentStack<object>());
+    }
+
+    public T Rent<T>() where T : class, new()
+    {
+        var bag = GetConcurrentStack(typeof(T));
+        if(bag.TryPop(out var obj))
+            return (T)obj;
+        return new T();
+    }
+
+    public void Return(object obj)
+    {
+        if(obj == null)
+            throw new ArgumentNullException(nameof(obj));
+
+        var t = obj.GetType();
+        GetConcurrentStack(t).Push(obj);
+    }
+}
+
+
+public sealed class GArrayPool<T>
+{
+    private readonly ConcurrentDictionary<int, ConcurrentStack<T[]>> buckets;
+    private readonly object lockobj = new object();
+
+    public GArrayPool()
+    {
+        buckets = new ConcurrentDictionary<int, ConcurrentStack<T[]>>();
+    }
+
+    public T[] Rent(int minLength)
+    {
+        if(minLength < 0)
+            throw new ArgumentOutOfRangeException(nameof(minLength));
+        int bucket = RoundUpPow2(Math.Max(1, minLength));
+
+        var stack = buckets.GetOrAdd(bucket, _ => new ConcurrentStack<T[]>());
+        if(stack.TryPop(out var arr))
+            return arr;
+        return new T[bucket];
+    }
+
+    public void Return(T[] array, bool clear = false)
+    {
+        if(array == null)
+            throw new ArgumentNullException(nameof(array));
+        if(clear && (array.Length > 0))
+            Array.Clear(array, 0, array.Length);
+
+        int bucket = RoundUpPow2(Math.Max(1, array.Length));
+        var stack = buckets.GetOrAdd(bucket, _ => new ConcurrentStack<T[]>());
+        stack.Push(array);
+    }
+
+    private static int RoundUpPow2(int n)
+    {
+        n--;
+        n |= n >> 1;
+        n |= n >> 2;
+        n |= n >> 4;
+        n |= n >> 8;
+        n |= n >> 16;
+        n++;
+        return n;
+    }
+}
+
+
+public sealed class GListPool<T>
+{
+    private readonly ConcurrentDictionary<int, ConcurrentStack<List<T>>> buckets;
+    private readonly object lockobj = new object();
+    private readonly bool trimOnReturn;
+
+    public GListPool(bool trimOnReturn = false)
+    {
+        this.trimOnReturn = trimOnReturn;
+        buckets = new ConcurrentDictionary<int, ConcurrentStack<List<T>>>();
+    }
+
+    public List<T> Rent(int minCapacity = 4)
+    {
+        if(minCapacity < 0)
+            throw new ArgumentOutOfRangeException(nameof(minCapacity));
+        int bucket = RoundUpPow2(Math.Max(1, minCapacity));
+
+        var stack = buckets.GetOrAdd(bucket, _ => new ConcurrentStack<List<T>>());
+        if(stack.TryPop(out var list))
+        {
+            list.Clear();
+            return list;
+        }
+        return new List<T>(bucket);
+    }
+
+    public void Return(List<T> list)
+    {
+        if(list == null)
+            throw new ArgumentNullException(nameof(list));
+
+        list.Clear();
+        if(trimOnReturn)
+            list.TrimExcess();
+
+        int cap = Math.Max(list.Capacity, 1);
+        int bucket = RoundUpPow2(cap);
+
+        var stack = buckets.GetOrAdd(bucket, _ => new ConcurrentStack<List<T>>());
+        stack.Push(list);
+    }
+
+    private static int RoundUpPow2(int n)
+    {
+        n--;
+        n |= n >> 1;
+        n |= n >> 2;
+        n |= n >> 4;
+        n |= n >> 8;
+        n |= n >> 16;
+        n++;
+        return n;
+    }
+}
+
+
+#endregion
