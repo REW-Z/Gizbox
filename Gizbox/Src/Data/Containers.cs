@@ -1058,6 +1058,23 @@ public sealed class GObjectPool
         GetConcurrentStack(t).Push(obj);
     }
 }
+public struct Temp<T> : IDisposable where T : class, new()
+{
+    public static GObjectPool gPool = new();
+
+    private T rawData = null;
+    public T Value => rawData;
+
+    public Temp()
+    {
+        rawData = gPool.Rent<T>();
+    }
+
+    public void Dispose()
+    {
+        gPool.Return(this.rawData);
+    }
+}
 
 
 public sealed class GArrayPool<T>
@@ -1163,6 +1180,44 @@ public sealed class GListPool<T>
         return n;
     }
 }
+public struct TempList<T> : IEnumerable<T>, IDisposable
+{
+    public static GListPool<T> gPool = new();
+    private List<T> rawData = null;
+    public List<T> Value => rawData;
+    public int Count => rawData.Count;
 
+    public TempList(int minCapacity)
+    {
+        rawData = gPool.Rent(minCapacity);
+    }
+    public TempList(IEnumerable<T> initElements)
+    {
+        rawData = gPool.Rent();
+        rawData.AddRange(initElements);
+    }
+    public void Add(T x)
+    {
+        rawData.Add(x);
+    }
+    public void AddRange(IEnumerable<T> xs)
+    {
+        rawData.AddRange(xs);
+    }
+
+    public IEnumerator<T> GetEnumerator()
+    {
+        return rawData.GetEnumerator();
+    }
+
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return rawData.GetEnumerator();
+    }
+    public void Dispose()
+    {
+        gPool.Return(this.rawData);
+    }
+}
 
 #endregion

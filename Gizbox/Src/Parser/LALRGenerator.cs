@@ -1584,18 +1584,7 @@ namespace Gizbox.LALRGenerator
             bool anySame = false;
             foreach (var set in C)
             {
-                bool allItemSame = true;
-
-                foreach (var itmNew in setNew)
-                {
-                    if (set.AnyRepeat(itmNew) == false)
-                    {
-                        allItemSame = false;
-                        break;
-                    }
-                }
-
-                if (allItemSame && setNew.Count == set.Count)
+                if (setNew.IsSameTo(set))  
                 {
                     anySame = true;
                     break;
@@ -1809,8 +1798,8 @@ namespace Gizbox.LALRGenerator
                     //非终结符B  
                     Nonterminal B = itm.production.body[itm.iDot] as Nonterminal;
                     Terminal a = itm.lookahead;
-                    List<Symbol> β = itm.production.body.Skip(itm.iDot + 1).ToList();
-                    List<Symbol> βa = new List<Symbol>(); βa.AddRange(β); βa.Add(a);
+                    using TempList<Symbol> β = new TempList<Symbol>(itm.production.body.Skip(itm.iDot + 1));
+                    using TempList<Symbol> βa = new TempList<Symbol>(); βa.AddRange(β.Value); βa.Add(a);
 
                     //非终结符B的所有产生式  
                     Production[] productionsOfB = outputData.grammerSet.productions.Where(p => p.head == B).ToArray();

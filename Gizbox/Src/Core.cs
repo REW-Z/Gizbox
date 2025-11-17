@@ -1095,8 +1095,8 @@ namespace Gizbox
         public class UpperCollectionInfo
         {
             public TerminalSet upperCollection;//关系的上层集合  
-            public List<Terminal> exceptedTerminals;//排除的终结符  
-            public UpperCollectionInfo(TerminalSet collection, List<Terminal> exceptedTerminals)
+            public HashSet<Terminal> exceptedTerminals;//排除的终结符  
+            public UpperCollectionInfo(TerminalSet collection, HashSet<Terminal> exceptedTerminals)
             {
                 this.upperCollection = collection;
                 this.exceptedTerminals = exceptedTerminals;
@@ -1104,6 +1104,8 @@ namespace Gizbox
         }
 
         private List<Terminal> terminals = new List<Terminal>();
+        private HashSet<Terminal> terminalSet = new HashSet<Terminal>();
+        private HashSet<string> terminalNameSet = new HashSet<string>();
 
         public List<UpperCollectionInfo> upperCollectionInfos = new List<UpperCollectionInfo>();//被哪些集合依赖  
 
@@ -1111,12 +1113,22 @@ namespace Gizbox
         {
             get { return terminals[i]; }
         }
+
+
+        private void AddInternal(Terminal terminal)
+        {
+            terminals.Add(terminal);
+            terminalSet.Add(terminal);
+            terminalNameSet.Add(terminal == null ? "ε" : terminal.name);
+        }
+
+
         public void AddDistinct(Terminal terminal)
         {
             bool anyChange = false;
-            if (this.terminals.Contains(terminal) == false)
+            if (this.terminalSet.Contains(terminal) == false)
             {
-                this.terminals.Add(terminal);
+                AddInternal(terminal);
                 anyChange = true;
             }
 
@@ -1125,23 +1137,32 @@ namespace Gizbox
                 OnChange();
             }
         }
-        public void UnionWith(TerminalSet collection, List<Terminal> exceptedTerminals = null)
+        public void UnionWith(TerminalSet collection, HashSet<Terminal> exceptedTerminals = null)
         {
             if (collection == null) return;
-            if (collection == this) return;//不能自我依赖    
-            if (collection.upperCollectionInfos.Any(inf => inf.upperCollection == this)) return;//不能重复添加    
+            if (collection == this) return;//不能自我依赖     
+
+            for(int i = 0; i < collection.upperCollectionInfos.Count; i++)
+            {
+                if(ReferenceEquals(collection.upperCollectionInfos[i].upperCollection, this))
+                    return;
+            }
 
             //建立联系  
             collection.upperCollectionInfos.Add(new UpperCollectionInfo(this, exceptedTerminals));
 
             //添加依赖集合的符号  
             bool anyChange = false;
-            foreach (var t in collection.ToArray())
+            for(int i= 0; i < collection.terminals.Count; i++)
             {
-                if (terminals.Contains(t)) continue;
-                if (exceptedTerminals != null && exceptedTerminals.Contains(t)) continue;
+                var t = collection.terminals[i];
 
-                terminals.Add(t);
+                if(exceptedTerminals != null && exceptedTerminals.Contains(t))
+                    continue;
+                if(terminalSet.Contains(t))
+                    continue;
+
+                AddInternal(t);
                 anyChange = true;
             }
 
@@ -1151,16 +1172,18 @@ namespace Gizbox
             }
         }
 
-        private void OnLowerCollectionChange(TerminalSet lowerCollection, List<Terminal> exceptedTerminals)
+        private void OnLowerCollectionChange(TerminalSet lowerCollection, HashSet<Terminal> exceptedTerminals)
         {
             bool anyChange = false;
             foreach (var t in lowerCollection.terminals)
             {
-                if (terminals.Contains(t)) continue;
-                if (exceptedTerminals != null && exceptedTerminals.Contains(t)) continue;
+                if (exceptedTerminals != null && exceptedTerminals.Contains(t)) 
+                    continue;
 
+                if(terminalSet.Contains(t))
+                    continue;
 
-                terminals.Add(t);
+                AddInternal(t);
                 anyChange = true;
             }
 
@@ -1180,45 +1203,26 @@ namespace Gizbox
 
         public bool Contains(Terminal terminal)
         {
-            foreach (var t in terminals)
-            {
-                if (t == terminal)
-                    return true;
-            }
-            return false;
+            return terminalSet.Contains(terminal);
         }
 
         public bool ContainsTerminal(string terminalname)
         {
             if (string.IsNullOrEmpty(terminalname))
             {
-                return terminals.Contains(null);
+                return terminalSet.Contains(null);
             }
 
 
-            foreach (var t in terminals)
-            {
-                if (t != null && t.name == terminalname)
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return terminalNameSet.Contains(terminalname);
         }
+
 
         public bool Intersect(TerminalSet another)
         {
-            foreach (var t in this.terminals)
-            {
-                if (another.terminals.Contains(t))
-                {
-                    return true;
-                }
-            }
-            return false;
+            return this.terminalSet.Overlaps(another.terminalSet);
         }
-        
+
         public Terminal[] ToArray()
         {
             return terminals.ToArray();

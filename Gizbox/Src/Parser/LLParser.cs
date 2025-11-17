@@ -307,7 +307,7 @@ namespace Gizbox
 
                         if (β.Count() > 0)
                         {
-                            FOLLOW(B).UnionWith(FIRST(β), exceptedTerminals: new List<Terminal> { null });//排除ε  
+                            FOLLOW(B).UnionWith(FIRST(β), new HashSet<Terminal> { null });//排除ε  
                         }
                     }
 
