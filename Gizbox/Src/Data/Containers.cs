@@ -1187,6 +1187,10 @@ public struct TempList<T> : IEnumerable<T>, IDisposable
     public List<T> Value => rawData;
     public int Count => rawData.Count;
 
+    public TempList()
+    {
+        rawData = gPool.Rent();
+    }
     public TempList(int minCapacity)
     {
         rawData = gPool.Rent(minCapacity);
