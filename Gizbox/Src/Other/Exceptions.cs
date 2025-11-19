@@ -83,6 +83,7 @@ namespace Gizbox
         OwnershipError_OwnAndBorrowTypeCantBeNull,
         OwnershipError_ReturnBorrowValueNotSupport,
         OwnershipError_GlobalVarMustBeManual,
+        OwnershipError_MemberVarCannotBeBorrow,
         OwnershipError_CanNotUseAfterMove,
 
 

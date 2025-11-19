@@ -61,6 +61,8 @@ namespace Gizbox
         drop_expr_result_after_stmt,
         store_expr_result,
         set_null_after_stmt,
+        //todo:drop所有权变量后同时drop其字段（用"."表示，CodeGen后端解析？）（所有的 drop_var）  
+
 
         __codegen_mark_max,
 
@@ -1969,6 +1971,16 @@ namespace Gizbox.SemanticRule
                                 varDeclNode.typeNode.TypeExpression()
                                 );
                             varDeclNode.attributes[eAttr.var_rec] = newRec;
+
+                            //成员字段的所有权模型  
+                            if(envStack.Peek().tableCatagory == SymbolTable.TableCatagory.ClassScope)
+                            {
+                                var ownershipModel = GetOwnershipModel(varDeclNode.flags, varDeclNode.typeNode);
+                                newRec.flags |= ownershipModel;
+
+                                if(ownershipModel.HasFlag(SymbolTable.RecordFlag.BorrowVar))//成员字段不能是借用类型  
+                                    throw new SemanticException(ExceptioName.OwnershipError_MemberVarCannotBeBorrow, varDeclNode, newRec.name);
+                            }
                         }
                     }
                     break;
@@ -3015,7 +3027,20 @@ namespace Gizbox.SemanticRule
                     }
                 case SyntaxTree.ClassDeclareNode classDecl:
                     {
-                        //类作用域暂时不处理（成员函数默认是Manual类型）  
+                        // 类作用域成员字段的初始化表达式做所有权合法性检查
+                        foreach(var decl in classDecl.memberDelareNodes)
+                        {
+                            if(decl is VarDeclareNode fvar)
+                            {
+                                // 成员字段初始化  
+                                var rec = fvar.attributes[eAttr.var_rec] as SymbolTable.Record;
+                                if(rec != null)
+                                {
+                                    SymbolTable.RecordFlag lModel = rec.flags & OwnershipModelMask;
+                                    CheckOwnershipCompare_Core(fvar, lModel, rec.name, fvar.initializerNode, out var rModel);
+                                }
+                            }
+                        }
                         break;
                     }
                 case SyntaxTree.FuncDeclareNode funcDecl:
@@ -3169,7 +3194,7 @@ namespace Gizbox.SemanticRule
                         // 先处理右值中的调用/参数（可能触发move）
                         Pass4_OwnershipLifetime(assignNode.rvalueNode);
 
-                        // 仅处理lvalue=ID的情况
+                        // 变量被赋值  
                         if(assignNode.lvalueNode is SyntaxTree.IdentityNode lid)
                         {
                             var lrec = Query(lid.FullName);
@@ -3240,6 +3265,11 @@ namespace Gizbox.SemanticRule
                             {
                                 //无需处理  
                             }
+                        }
+                        // 成员字段被赋值  
+                        else if(assignNode.lvalueNode is ObjectMemberAccessNode lfield)
+                        {
+                            //todo;
                         }
                         else
                         {

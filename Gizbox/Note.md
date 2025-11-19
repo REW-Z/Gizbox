@@ -68,7 +68,6 @@ void foo()
 ### 所有权-容器    
 
 原始数组只能存放manual类型的元素。  
-own类型的容器用类封装，实际存储用原始数组，需要加`adopt`操作符和`disown`操作符。定义get、set、add、remove等方法。      
 
 ### 所有权-成员字段    
 

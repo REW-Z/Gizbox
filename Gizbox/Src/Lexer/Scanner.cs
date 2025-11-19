@@ -68,6 +68,9 @@ namespace Gizbox
             keywords.Add(new TokenPattern("string", "string\\W", 1));
             keywords.Add(new TokenPattern("null", "null\\W", 1));
 
+            keywords.Add(new TokenPattern("makeown", "makeown\\W", 1));
+            keywords.Add(new TokenPattern("disown", "disown\\W", 1));
+
             keywords.Add(new TokenPattern(",", ",", 0));
             keywords.Add(new TokenPattern(";", ";", 0));
             keywords.Add(new TokenPattern("new", "new\\W", 1));
