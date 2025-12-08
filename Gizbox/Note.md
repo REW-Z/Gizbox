@@ -69,10 +69,6 @@ void foo()
 
 原始数组只能存放manual类型的元素。  
 
-### 所有权-成员字段    
-
-成员字段所有权处理？  
-
 
 ### Delete[] 数组释放  
 
@@ -101,9 +97,7 @@ void foo()
 手动特化。  
 
 
-### 优化LALR  
+### 所有权-成员字段    
 
-InitCanonicalItemsCollection (用Hash桶) 
-Utils_ExistSameSetInC
-FIRST  
-CLOSURE
+禁止Move-Out  
+隐含析构函数。析构时同时Drop所有成员字段  

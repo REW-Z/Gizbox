@@ -15,6 +15,7 @@ using Gizbox.IR;
 using System.Xml.Linq;
 
 
+
 namespace Gizbox
 {
     /// <summary>
@@ -3150,6 +3151,9 @@ namespace Gizbox.SemanticRule
                         if(isGlobalOrTopAtNamespace && lmodel != SymbolTable.RecordFlag.ManualVar)
                             throw new SemanticException(ExceptioName.OwnershipError_GlobalVarMustBeManual, varDecl, string.Empty);
 
+                        // 成员所有权不能被 moveout
+                        //todo;
+                        CheckOwnershipCanMoveOut(varDecl.initializerNode);
 
                         // 记录owner类型的局部变量  
                         if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
@@ -3209,6 +3213,8 @@ namespace Gizbox.SemanticRule
                             // 检查：变量左值和初始值的所有权模型对比  
                             CheckOwnershipCompare_Assign(assignNode, lrec, out var lmodel, out var rmodel);
 
+                            // 检查：成员所有权不能被 moveout
+                            //todo;
 
                             // 如果目标是owner且已有未释放，则先删
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
@@ -3269,7 +3275,6 @@ namespace Gizbox.SemanticRule
                         // 成员字段被赋值  
                         else if(assignNode.lvalueNode is ObjectMemberAccessNode lfield)
                         {
-                            //todo;
                         }
                         else
                         {
@@ -3670,6 +3675,23 @@ namespace Gizbox.SemanticRule
             CheckOwnershipCompare_Core(argNode, paramModel, lname, argNode, out argModel);
         }
 
+        /// <summary> 所有权可移出检查 </summary>
+        private void CheckOwnershipCanMoveOut(SyntaxTree.ExprNode rvalNode)
+        {
+            if(rvalNode is SyntaxTree.ObjectMemberAccessNode memAccess)
+            {
+                //bool isClassField = fieldRec.category == SymbolTable.RecordCatagory.Variable && defineEnv.tableCatagory == SymbolTable.TableCatagory.ClassScope;
+                //bool isOwnermModel = fieldRec.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar);
+                //if(isClassField && isOwnermModel)
+                //    throw new GizboxException(ExceptioName.OwnershipError_CanNotMoveOutClassField);
+
+                var fieldRec = (SymbolTable.Record)memAccess.memberNode.attributes[eAttr.var_rec];
+                if(fieldRec.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar) && fieldRec.envPtr.tableCatagory == SymbolTable.TableCatagory.ClassScope)
+                {
+                    throw new SemanticException(ExceptioName.OwnershipError_CanNotMoveOutClassField, rvalNode, string.Empty);
+                }
+            }
+        }
 
 
         /// <summary>

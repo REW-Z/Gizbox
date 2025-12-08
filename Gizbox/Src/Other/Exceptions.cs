@@ -85,6 +85,7 @@ namespace Gizbox
         OwnershipError_GlobalVarMustBeManual,
         OwnershipError_MemberVarCannotBeBorrow,
         OwnershipError_CanNotUseAfterMove,
+        OwnershipError_CanNotMoveOutClassField,
 
 
         //4.
