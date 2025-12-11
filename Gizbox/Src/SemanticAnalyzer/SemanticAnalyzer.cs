@@ -51,6 +51,7 @@ namespace Gizbox
         var_rec,
         const_rec,
         func_rec,
+        obj_class_rec,
         not_a_property,
         name_completed,
 
@@ -59,10 +60,10 @@ namespace Gizbox
         drop_var_exit_env,
         drop_var_before_return,
         drop_var_before_stmt,
+        drop_field_before_stmt,//todo
         drop_expr_result_after_stmt,
         store_expr_result,
         set_null_after_stmt,
-        //todo:drop所有权变量后同时drop其字段（用"."表示，CodeGen后端解析？）（所有的 drop_var）  
 
 
         __codegen_mark_max,
@@ -2690,7 +2691,6 @@ namespace Gizbox.SemanticRule
 
                         //Func分析  
                         AnalyzeTypeExpression(callNode);
-                        Console.WriteLine("分析函数：" + callNode);
 
                         //参数个数检查暂无...
 
@@ -2787,16 +2787,18 @@ namespace Gizbox.SemanticRule
 
                                         attributes = objMemberAccessNode.attributes,
                                     };
-
                                     objMemberAccessNode.overrideNode.Parent = objMemberAccessNode.Parent;
                                     Pass3_AnalysisNode(objMemberAccessNode.overrideNode);
-
                                     break;
                                 }
                             }
                         }
 
                         Pass3_AnalysisNode(objMemberAccessNode.objectNode);
+
+                        var objClassName = AnalyzeTypeExpression(objMemberAccessNode.objectNode);
+                        var objClassRec = Query(objClassName);
+                        objMemberAccessNode.attributes[eAttr.obj_class_rec] = objClassRec;
 
                         //不能分析成员名称，当前作用域会找不到标识符。      
                         //Debug.Log("分析：" + objMemberAccessNode.memberNode.FirstToken().ToString());
@@ -3151,9 +3153,9 @@ namespace Gizbox.SemanticRule
                         if(isGlobalOrTopAtNamespace && lmodel != SymbolTable.RecordFlag.ManualVar)
                             throw new SemanticException(ExceptioName.OwnershipError_GlobalVarMustBeManual, varDecl, string.Empty);
 
-                        // 成员所有权不能被 moveout
-                        //todo;
-                        CheckOwnershipCanMoveOut(varDecl.initializerNode);
+                        // 检查：等号右边能否moveout
+                        if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                            CheckOwnershipCanMoveOut(varDecl.initializerNode);
 
                         // 记录owner类型的局部变量  
                         if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
@@ -3202,7 +3204,6 @@ namespace Gizbox.SemanticRule
                         if(assignNode.lvalueNode is SyntaxTree.IdentityNode lid)
                         {
                             var lrec = Query(lid.FullName);
-
                             if(lrec == null)
                                 throw new GizboxException(ExceptioName.Undefine, "var record not found.");
 
@@ -3214,9 +3215,10 @@ namespace Gizbox.SemanticRule
                             CheckOwnershipCompare_Assign(assignNode, lrec, out var lmodel, out var rmodel);
 
                             // 检查：成员所有权不能被 moveout
-                            //todo;
+                            if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                                CheckOwnershipCanMoveOut(assignNode.rvalueNode);
 
-                            // 如果目标是owner且已有未释放，则先删
+                            // 如果目标是owner且不为Dead，则先删，然后设置为Alive  
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
                                 LifetimeInfo.VarStatus alive = LifetimeInfo.VarStatus.Dead;
@@ -3237,9 +3239,10 @@ namespace Gizbox.SemanticRule
 
                                     lifeTimeInfo.currBranch.SetVarStatus(lrec.name, LifetimeInfo.VarStatus.Dead);
                                 }
-                            }
 
-                            lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict[lrec.name] = LifetimeInfo.VarStatus.Alive;
+                                // 被赋值的own变量设置为Alive  
+                                lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict[lrec.name] = LifetimeInfo.VarStatus.Alive;
+                            }
 
                             // 所有权own类型赋值处理  
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
@@ -3273,8 +3276,65 @@ namespace Gizbox.SemanticRule
                             }
                         }
                         // 成员字段被赋值  
-                        else if(assignNode.lvalueNode is ObjectMemberAccessNode lfield)
+                        else if(assignNode.lvalueNode is ObjectMemberAccessNode laccess)
                         {
+                            var objClassRec = (SymbolTable.Record)laccess.attributes[eAttr.obj_class_rec];
+                            var lrec = objClassRec.envPtr.Class_GetMemberRecordInChain(laccess.memberNode.FullName); 
+                            if(lrec == null)
+                                throw new GizboxException(ExceptioName.Undefine, $"field record {laccess.memberNode.FullName} not found.");
+
+                            // 值类型不用处理所有权
+                            if(GType.Parse(lrec.typeExpression).IsReferenceType == false)
+                                break;
+                            // 检查：变量左值和初始值的所有权模型对比  
+                            CheckOwnershipCompare_Assign(assignNode, lrec, out var lmodel, out var rmodel);
+
+                            // 检查：成员所有权不能被 moveout
+                            if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                                CheckOwnershipCanMoveOut(assignNode.rvalueNode);
+
+                            // 如果字段是owner且不为null，则先删
+                            if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                            {
+                                if(assignNode.attributes.TryGetValue(eAttr.drop_field_before_stmt, out var lst) == false)
+                                {
+                                    lst = new List<ObjectMemberAccessNode>();
+                                    assignNode.attributes[eAttr.drop_field_before_stmt] = lst;
+                                }
+                                (lst as List<ObjectMemberAccessNode>).Add(laccess);
+                            }
+
+
+                            // 所有权own类型赋值处理  
+                            if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                            {
+                                //move源：临时对象 - New  
+                                if(assignNode.rvalueNode is SyntaxTree.NewObjectNode newobjNode)
+                                {
+                                    //无需处理  
+                                }
+                                //move源：临时对象 - 函数返回(owner)
+                                else if(assignNode.rvalueNode is SyntaxTree.CallNode callnode)
+                                {
+                                    //无需处理  
+                                }
+                                //move源：变量  
+                                else if(assignNode.rvalueNode is SyntaxTree.IdentityNode idrvalueNode)
+                                {
+                                    //加入moved  
+                                    var rrec = Query(idrvalueNode.FullName);
+                                    lifeTimeInfo.currBranch.SetVarStatus(rrec.name, LifetimeInfo.VarStatus.Dead);
+
+                                    //需要插入Null语句
+                                    assignNode.attributes[eAttr.set_null_after_stmt] = new List<string> { rrec.name };
+                                }
+                            }
+
+                            // 所有权借用类型      
+                            if(lmodel.HasFlag(SymbolTable.RecordFlag.BorrowVar))
+                            {
+                                //无需处理  
+                            }
                         }
                         else
                         {
@@ -3314,6 +3374,12 @@ namespace Gizbox.SemanticRule
                                 returnedName = rrec.name;
                                 lifeTimeInfo.currBranch.SetVarStatus(rrec.name, LifetimeInfo.VarStatus.Dead);
                             }
+                        }
+
+                        // 检查:对象成员不可以MoveOut  
+                        if(lifeTimeInfo.currentFuncReturnFlag.HasFlag(SymbolTable.RecordFlag.OwnerVar) && ret.returnExprNode is SyntaxTree.ObjectMemberAccessNode accessNode)
+                        {
+                            CheckOwnershipCanMoveOut(ret.returnExprNode);
                         }
 
                         // 汇总当前所有活跃Owner（所有栈帧），return前删除（排除被返回者）
@@ -3395,7 +3461,7 @@ namespace Gizbox.SemanticRule
 
                             Pass4_OwnershipLifetime(a);
                         }
-                            
+                     
 
                         // 获取函数的符号表记录  
                         SymbolTable.Record funcRec = null;
@@ -3449,6 +3515,13 @@ namespace Gizbox.SemanticRule
 
                                 // 所有权比较  
                                 CheckOwnershipCompare_Param(pr, arg, out var paramModel, out var argModel);
+
+                                // 检查own模型实参能否MoveOut
+                                if(paramModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                                {
+                                    CheckOwnershipCanMoveOut(arg);
+                                }
+
 
                                 // 所有权转移  
                                 if(pflag.HasFlag(SymbolTable.RecordFlag.OwnerVar))
@@ -3680,12 +3753,13 @@ namespace Gizbox.SemanticRule
         {
             if(rvalNode is SyntaxTree.ObjectMemberAccessNode memAccess)
             {
-                //bool isClassField = fieldRec.category == SymbolTable.RecordCatagory.Variable && defineEnv.tableCatagory == SymbolTable.TableCatagory.ClassScope;
-                //bool isOwnermModel = fieldRec.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar);
-                //if(isClassField && isOwnermModel)
-                //    throw new GizboxException(ExceptioName.OwnershipError_CanNotMoveOutClassField);
-
                 var fieldRec = (SymbolTable.Record)memAccess.memberNode.attributes[eAttr.var_rec];
+
+                if(fieldRec == null)
+                {
+                    throw new GizboxException(ExceptioName.Undefine, "field record not exist!");
+                }
+
                 if(fieldRec.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar) && fieldRec.envPtr.tableCatagory == SymbolTable.TableCatagory.ClassScope)
                 {
                     throw new SemanticException(ExceptioName.OwnershipError_CanNotMoveOutClassField, rvalNode, string.Empty);

@@ -99,5 +99,6 @@ void foo()
 
 ### 所有权-成员字段    
 
-禁止Move-Out  
+（DONE）禁止Move-Out  
+drop_field_before_stmt实现  
 隐含析构函数。析构时同时Drop所有成员字段  
