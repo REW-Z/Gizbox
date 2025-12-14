@@ -59,8 +59,8 @@ namespace Gizbox
 
         drop_var_exit_env,
         drop_var_before_return,
-        drop_var_before_stmt,
-        drop_field_before_stmt,//todo
+        drop_var_before_assign_stmt,
+        drop_field_before_assign_stmt,
         drop_expr_result_after_stmt,
         store_expr_result,
         set_null_after_stmt,
@@ -3230,12 +3230,12 @@ namespace Gizbox.SemanticRule
                                 if(alive != LifetimeInfo.VarStatus.Dead)
                                 {
                                     var delList = new List<(LifetimeInfo.VarStatus, string)>();
-                                    if(assignNode.attributes.ContainsKey(eAttr.drop_var_before_stmt))
+                                    if(assignNode.attributes.ContainsKey(eAttr.drop_var_before_assign_stmt))
                                     {
-                                        delList = (List<(LifetimeInfo.VarStatus, string)>)assignNode.attributes[eAttr.drop_var_before_stmt];
+                                        delList = (List<(LifetimeInfo.VarStatus, string)>)assignNode.attributes[eAttr.drop_var_before_assign_stmt];
                                     }
                                     delList.Add((alive, lrec.name));
-                                    assignNode.attributes[eAttr.drop_var_before_stmt] = delList;
+                                    assignNode.attributes[eAttr.drop_var_before_assign_stmt] = delList;
 
                                     lifeTimeInfo.currBranch.SetVarStatus(lrec.name, LifetimeInfo.VarStatus.Dead);
                                 }
@@ -3296,12 +3296,7 @@ namespace Gizbox.SemanticRule
                             // 如果字段是owner且不为null，则先删
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
-                                if(assignNode.attributes.TryGetValue(eAttr.drop_field_before_stmt, out var lst) == false)
-                                {
-                                    lst = new List<ObjectMemberAccessNode>();
-                                    assignNode.attributes[eAttr.drop_field_before_stmt] = lst;
-                                }
-                                (lst as List<ObjectMemberAccessNode>).Add(laccess);
+                                assignNode.attributes[eAttr.drop_field_before_assign_stmt] = null;
                             }
 
 
