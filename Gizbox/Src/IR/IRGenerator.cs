@@ -123,7 +123,7 @@ namespace Gizbox.IR
                             {
                                 foreach(var (s, v) in toDelete)
                                 {
-                                    EmitDropCode(s, v);
+                                    EmitOwnConditionalDropCode(s, v);
                                 }
                             }
                             blockNode.attributes.Remove(eAttr.drop_var_exit_env);
@@ -148,65 +148,16 @@ namespace Gizbox.IR
 
                         EmitCode("").label = "class_begin:" + className;
 
-                        //构造函数（默认）  
-                        {
-                            //构造函数全名    
-                            string funcFullName = classDeclNode.classNameNode.FullName + ".ctor";
-                            //string funcFullName = "ctor";
+                        //生成隐式构造函数  
+                        EmitCtor(classDeclNode);
 
-                            ////跳过声明  
-                            //GenerateCode("JUMP", "%LABEL:exit:" + funcFullName);
-
-                            //函数开始    
-                            var ctorEnv = envStackTemp.Peek().GetTableInChildren(classDeclNode.classNameNode.FullName + ".ctor");
-                            envStackTemp.Push(ctorEnv);
-                            EnvBegin(ctorEnv);
-
-                            EmitCode("").label = "entry:" + funcFullName;
-                            
-                            EmitCode("FUNC_BEGIN", funcFullName).label = "func_begin:" + funcFullName;
-                            
-
-                            //基类构造函数调用  
-                            if (classDeclNode.baseClassNameNode != null)
-                            {
-                                var baseClassName = classDeclNode.baseClassNameNode.FullName;
-                                var baseRec = Query(baseClassName);
-                                var baseEnv = baseRec.envPtr;
-
-                                EmitCode("PARAM", "this");
-                                EmitCode("CALL", baseClassName + ".ctor", "%LITINT:1");
-                            }
-
-                            //成员变量初始化
-                            foreach (var memberDecl in classDeclNode.memberDelareNodes)
-                            {
-                                if (memberDecl is VarDeclareNode)
-                                {
-                                    var fieldDecl = memberDecl as VarDeclareNode;
-
-                                    GenNode(fieldDecl.initializerNode);
-                                    EmitCode("=", "this->" + fieldDecl.identifierNode.FullName, GetRet(fieldDecl.initializerNode));
-                                }
-                            }
-
-                            //其他语句(Not Implement)  
-                            //...  
-
-                            EmitCode("RETURN");
-
-                            EmitCode("FUNC_END").label = "func_end:" + funcFullName;
-                            
-                            EmitCode("").label = "exit:" + funcFullName;
-
-                            EnvEnd(ctorEnv);
-                            envStackTemp.Pop();
-                        }
+                        //生成隐式析构函数  
+                        EmitDtor(classDeclNode);
 
                         //成员函数
-                        foreach (var memberDecl in classDeclNode.memberDelareNodes)
+                        foreach(var memberDecl in classDeclNode.memberDelareNodes)
                         {
-                            if (memberDecl is FuncDeclareNode)
+                            if(memberDecl is FuncDeclareNode)
                             {
                                 GenNode(memberDecl as FuncDeclareNode);
                             }
@@ -263,7 +214,7 @@ namespace Gizbox.IR
                             {
                                 foreach(var (s, v) in toDelete)
                                 {
-                                    EmitDropCode(s, v);
+                                    EmitOwnConditionalDropCode(s, v);
                                 }
                             }
                             funcDeclNode.attributes.Remove(eAttr.drop_var_exit_env);
@@ -339,7 +290,7 @@ namespace Gizbox.IR
                             {
                                 foreach(var (s, v) in toDelete)
                                 {
-                                    EmitDropCode(s, v);
+                                    EmitOwnConditionalDropCode(s, v);
                                 }
                             }
                             returnNode.attributes.Remove(eAttr.drop_var_before_return);
@@ -361,11 +312,11 @@ namespace Gizbox.IR
 
                         if(deleteNode.isArrayDelete == false)
                         {
-                            EmitCode("DEALLOC", GetRet(deleteNode.objToDelete));
+                            EmitDeleteCode(GetRet(deleteNode.objToDelete));
                         }
                         else
                         {
-                            EmitCode("DEALLOC_ARRAY", GetRet(deleteNode.objToDelete));
+                            EmitDeleteArrayCode(GetRet(deleteNode.objToDelete));
                         }
                     }
                     break;
@@ -382,7 +333,7 @@ namespace Gizbox.IR
                             {
                                 foreach(var e in exprs)
                                 {
-                                    EmitDropCode(GetRet(e));
+                                    EmitOwnDropCode(GetRet(e));
                                 }
                             }
                             singleExprNode.attributes.Remove(eAttr.drop_expr_result_after_stmt);
@@ -621,7 +572,7 @@ namespace Gizbox.IR
                             {
                                 foreach(var (s, v) in toDelete)
                                 {
-                                    EmitDropCode(s, v);
+                                    EmitOwnConditionalDropCode(s, v);
                                 }
                             }
                             assignNode.attributes.Remove(eAttr.drop_var_before_assign_stmt);
@@ -632,7 +583,7 @@ namespace Gizbox.IR
                             var accessNode = assignNode.lvalueNode as SyntaxTree.ObjectMemberAccessNode;
                             var obj = GetRet(accessNode.objectNode);
                             var field = accessNode.memberNode.FullName;
-                            EmitDropField(obj, field);
+                            EmitOwnDropField(obj, field);
 
                             assignNode.attributes.Remove(eAttr.drop_field_before_assign_stmt);
                         }
@@ -869,25 +820,33 @@ namespace Gizbox.IR
             return newCode;
         }
 
-        public void EmitDropCode(string varname)
+        public void EmitDeleteArrayCode(string expr)
         {
-            //（暂无析构机制）
-            EmitCode("DEALLOC", varname);
+            //todo: 如果是类对象数组，逐元素调用析构  
+            EmitCode("DEALLOC_ARRAY", expr);
         }
-        public void EmitDropCode(LifetimeInfo.VarStatus status, string varname)
+        public void EmitDeleteCode(string expr)
+        {
+            //todo:调用析构  
+            EmitCode("DEALLOC", expr);
+        }
+        public void EmitOwnDropCode(string varname)
+        {
+            EmitDeleteCode(varname);
+        }
+        public void EmitOwnConditionalDropCode(LifetimeInfo.VarStatus status, string varname)
         {
             if(status == LifetimeInfo.VarStatus.Alive) //// 无条件删除：delete aaa;
             {
-                EmitDropCode(varname);
+                EmitOwnDropCode(varname);
             }
             else if(status == LifetimeInfo.VarStatus.PossiblyDead)  //// 条件删除：if (aaa != null) delete aaa;  
             {
-                string tmp = RentTemp("bool", "drop_flag");
+                string tmp = RentTemp("bool", "drop_flag"); //借用共享的临时bool变量
                 EmitCode("!=", tmp, varname, "%LITNULL:");
                 string label = $"_owner_skip_drop_{varname}_{envStackTemp.Count}"; //用变量名和作用域深度避免重名  
                 EmitCode("IF_FALSE_JUMP", tmp, "%LABEL:" + label);
-                //（暂无析构机制）
-                EmitCode("DEALLOC", varname);
+                EmitOwnDropCode(varname);
                 EmitCode("").label = label;
             }
             else
@@ -896,9 +855,78 @@ namespace Gizbox.IR
             }
         }
 
-        public void EmitDropField(string varname, string fieldName)
+        public void EmitOwnDropField(string varname, string fieldName)
         {
-            //todo;
+            string accessExpr = varname + "->" + fieldName;
+
+            string tempFlag = RentTemp("bool", "drop_field");
+            EmitCode("!=", tempFlag, accessExpr, "%LITNULL:");
+            string label = $"_owner_field_skip_{fieldName}_{envStackTemp.Count}_{tmpCounter}";
+            EmitCode("IF_FALSE_JUMP", tempFlag, "%LABEL:" + label);
+
+            EmitOwnDropCode(accessExpr);
+            //EmitCode("=", accessExpr, "%LITNULL:"); //是否必要？  
+            EmitCode("").label = label;
+        }
+
+        public void EmitCtor(ClassDeclareNode classDeclNode)
+        {
+            //隐式构造函数 
+            //全名    
+            string funcFullName = classDeclNode.classNameNode.FullName + ".ctor";
+
+            ////跳过声明  
+            //GenerateCode("JUMP", "%LABEL:exit:" + funcFullName);
+
+            //函数开始    
+            var ctorEnv = envStackTemp.Peek().GetTableInChildren(classDeclNode.classNameNode.FullName + ".ctor");
+            envStackTemp.Push(ctorEnv);
+            EnvBegin(ctorEnv);
+
+            EmitCode("").label = "entry:" + funcFullName;
+
+            EmitCode("FUNC_BEGIN", funcFullName).label = "func_begin:" + funcFullName;
+
+
+            //基类构造函数调用  
+            if(classDeclNode.baseClassNameNode != null)
+            {
+                var baseClassName = classDeclNode.baseClassNameNode.FullName;
+                var baseRec = Query(baseClassName);
+                var baseEnv = baseRec.envPtr;
+
+                EmitCode("PARAM", "this");
+                EmitCode("CALL", baseClassName + ".ctor", "%LITINT:1");
+            }
+
+            //成员变量初始化
+            foreach(var memberDecl in classDeclNode.memberDelareNodes)
+            {
+                if(memberDecl is VarDeclareNode)
+                {
+                    var fieldDecl = memberDecl as VarDeclareNode;
+
+                    GenNode(fieldDecl.initializerNode);
+                    EmitCode("=", "this->" + fieldDecl.identifierNode.FullName, GetRet(fieldDecl.initializerNode));
+                }
+            }
+
+            //其他语句(Not Implement)  
+            //...  
+
+            EmitCode("RETURN");
+
+            EmitCode("FUNC_END").label = "func_end:" + funcFullName;
+
+            EmitCode("").label = "exit:" + funcFullName;
+
+            EnvEnd(ctorEnv);
+            envStackTemp.Pop();
+        }
+
+        public void EmitDtor(ClassDeclareNode classDeclNode)
+        {
+            //todo:析构函数  
         }
 
 

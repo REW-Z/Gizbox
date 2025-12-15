@@ -3389,7 +3389,7 @@ namespace Gizbox.SemanticRule
                                 if(varnameSet.Contains(varname))
                                     continue;
 
-                                if(varstatus == LifetimeInfo.VarStatus.Alive)
+                                if(varstatus != LifetimeInfo.VarStatus.Dead)
                                 {
                                     delList.Add((varstatus, varname));
                                     varnameSet.Add(varname);

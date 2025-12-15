@@ -102,3 +102,4 @@ void foo()
 （DONE）禁止Move-Out  
 drop_field_before_stmt实现  
 隐含析构函数。析构时同时Drop所有成员字段  
+Drop后置Null是否正确执行顺序，最好改为EmitDrop中间代码里置Null?
