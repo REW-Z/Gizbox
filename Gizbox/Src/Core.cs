@@ -104,6 +104,7 @@ namespace Gizbox
             OperatorOverloadFunc = 1 << 0,
             ExternFunc = 1 << 1,
             Ctor = 1 << 2,
+            Dtor = 1 << 3,
 
             ManualClass = 1 << 10,
             OwnershipClass = 1 << 11,

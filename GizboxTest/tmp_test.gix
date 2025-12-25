@@ -6,6 +6,16 @@ using Console;
 using Collections;
 
 
+class Stream
+{
+}
+
+class BinaryWriter
+{
+    own Stream stream = new();
+}
+
+
 own Int OAdd(own Int x, own Int y)
 {
     own Int rs = new Int();
@@ -48,6 +58,9 @@ void main()
         Console::PrintLn("eee:" + (string)eee.value);
     }
 
+    //字段测试  
+    BinaryWriter writer = new BinaryWriter();
+    delete writer.stream;
 
     Console::PrintLn("Test Finish.");
 }

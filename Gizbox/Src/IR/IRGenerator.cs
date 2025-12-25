@@ -858,8 +858,6 @@ namespace Gizbox.IR
         public void EmitOwnDropField(string varname, string fieldName)
         {
             string accessExpr = varname + "->" + fieldName;
-            
-            //todo:
         }
 
         public void EmitCtor(ClassDeclareNode classDeclNode)
@@ -919,57 +917,7 @@ namespace Gizbox.IR
 
         public void EmitDtor(ClassDeclareNode classDeclNode)
         {
-            // 隐式析构函数  
-            string className = classDeclNode.classNameNode.FullName;
-            string funcFullName = className + ".dtor";
-
-            // 使用类作用域作为析构函数“宿主作用域”，并创建临时函数作用域（不进符号表，仅用于临时变量）
-            var classEnv = envStackTemp.Peek();
-            var dtorEnv = new SymbolTable(funcFullName, SymbolTable.TableCatagory.FuncScope, classEnv);
-
-            dtorEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, className);
-
-            envStackTemp.Push(dtorEnv);
-            EnvBegin(dtorEnv);
-
-            EmitCode("").label = "entry:" + funcFullName;
-            EmitCode("FUNC_BEGIN", funcFullName).label = "func_begin:" + funcFullName;
-
-            // drop owner 成员字段  
-            foreach (var kv in classEnv.records)
-            {
-                var rec = kv.Value;
-                if (rec.category != SymbolTable.RecordCatagory.Variable)
-                    continue;
-
-                if (string.Equals(rec.name, "base", StringComparison.Ordinal))
-                    continue;
-
-                if ((rec.flags & SymbolTable.RecordFlag.OwnerVar) == 0)
-                    continue;
-
-                // 值类型不需要析构
-                if (GType.Parse(rec.typeExpression).IsReferenceType == false)
-                    continue;
-
-                EmitOwnDropField("this", rec.name);
-            }
-
-            // 调用基类析构
-            if (classDeclNode.baseClassNameNode != null)
-            {
-                var baseClassName = classDeclNode.baseClassNameNode.FullName;
-                EmitCode("PARAM", "this");
-                EmitCode("CALL", baseClassName + ".dtor", "%LITINT:1");
-            }
-
-            EmitCode("RETURN");
-            EmitCode("FUNC_END", funcFullName).label = "func_end:" + funcFullName;
-            EmitCode("").label = "exit:" + funcFullName;
-
-            // 离开作用域  
-            EnvEnd(dtorEnv);
-            envStackTemp.Pop();
+            //todo  
         }
 
 
