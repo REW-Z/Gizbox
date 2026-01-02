@@ -1,0 +1,7 @@
+问题 ID,说明,状态,严重性,故事点,项目路径,位置种类,路径,折线图,列,事件 ID,帮助链接,程序集名称,程序集版本,程序集公钥,片段
+NuGet.0002,建议升级 NuGet 包,Active,Potential,1,F:\Legacy\MyProjects\Gizbox\GizboxLSP\GizboxLSP.csproj,File,F:\Legacy\MyProjects\Gizbox\GizboxLSP\GizboxLSP.csproj,,,Newtonsoft.Json 13.0.3,,,,,"Newtonsoft.Json, 13.0.3  建议:  Remove Newtonsoft.Json, and replace with new package Newtonsoft.Json 13.0.4"
+Project.0002,需要更改项目的目标框架,Active,Mandatory,1,F:\Legacy\MyProjects\Gizbox\GizboxLSP\GizboxLSP.csproj,File,F:\Legacy\MyProjects\Gizbox\GizboxLSP\GizboxLSP.csproj,,,,,,,,当前目标框架: net8.0 建议的目标框架: net10.0
+Api.0003,Behavioral change in selected .NET version,Active,Potential,1,F:\Legacy\MyProjects\Gizbox\GizboxLSP\GizboxLSP.csproj,File,F:\Legacy\MyProjects\Gizbox\GizboxLSP\LSP.cs,313,24,T:System.Uri,,,,,Uri uriObj = new Uri(uri);
+Api.0003,Behavioral change in selected .NET version,Active,Potential,1,F:\Legacy\MyProjects\Gizbox\GizboxLSP\GizboxLSP.csproj,File,F:\Legacy\MyProjects\Gizbox\GizboxLSP\LSP.cs,313,24,M:System.Uri.#ctor(System.String),,,,,Uri uriObj = new Uri(uri);
+Api.0002,Source incompatible for selected .NET version,Active,Potential,1,F:\Legacy\MyProjects\Gizbox\GizboxLSP\GizboxLSP.csproj,File,F:\Legacy\MyProjects\Gizbox\GizboxLSP\LSP.cs,97,20,M:System.TimeSpan.FromSeconds(System.Double),,,,,timeTemp -= TimeSpan.FromSeconds(Program.heartbeatInterval);
+Project.0002,需要更改项目的目标框架,Active,Mandatory,1,F:\Legacy\MyProjects\Gizbox\GizboxTest\GizboxTest.csproj,File,F:\Legacy\MyProjects\Gizbox\GizboxTest\GizboxTest.csproj,,,,,,,,当前目标框架: net8.0 建议的目标框架: net10.0
