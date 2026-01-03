@@ -12,7 +12,7 @@ class Stream
 
 class BinaryWriter
 {
-    own Stream stream = new();
+    own Stream stream = new Stream();
 }
 
 

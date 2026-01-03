@@ -101,7 +101,7 @@ switch(cmdIdx)
         case 3:
         {
             //测试脚本Test  
-            Console.WriteLine("测试脚本Test");
+            Console.WriteLine("测试脚本test.gix");
             string source = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\test.gix");
             Gizbox.Compiler compiler = new Compiler();
             compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
@@ -164,13 +164,13 @@ switch(cmdIdx)
         case 9:
         {
             //测试脚本Test  
-            Console.WriteLine("测试");
-            string source = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\tmp_test.gix");
+            Console.WriteLine("测试-所有权");
+            string source = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\test_ownership.gix");
             Gizbox.Compiler compiler = new Compiler();
             compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
             compiler.ConfigParserDataSource(hardcode: true);
             //compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
-            var il = compiler.CompileToIR(source, isMainUnit: true, "tmp_test");
+            var il = compiler.CompileToIR(source, isMainUnit: true, "test");
             Compiler.Pause("Compile End");
 
             il.Print();

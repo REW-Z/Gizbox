@@ -22,7 +22,7 @@
     <None Update="stdlib.gix">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="tmp_test.gix">
+    <None Update="test_ownership.gix">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="test.gix">

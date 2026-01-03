@@ -822,13 +822,43 @@ namespace Gizbox.IR
 
         public void EmitDeleteArrayCode(string expr)
         {
-            //todo: 如果是类对象数组，逐元素调用析构  
+            //目前语言只支持原子类型和引用类型的元素，删除数组不需要调用析构函数。  
+            //以后支持结构体类型元素后，也不会支持结构体析构/构造行为。    
             EmitCode("DEALLOC_ARRAY", expr);
         }
-        public void EmitDeleteCode(string expr)
+        public void EmitDeleteCode(string varname)
         {
-            //todo:调用析构  
-            EmitCode("DEALLOC", expr);
+            //需要确保参数是变量名，而不是复杂表达式  
+            //delete复杂表达式时，确保表达式节点SetRet的返回是临时变量    
+
+            if(string.IsNullOrEmpty(varname))
+                throw new GizboxException(ExceptioName.Undefine, "delete expr is empty.");
+
+            if(varname == "%LITNULL:")
+                throw new GizboxException(ExceptioName.Undefine, "Cannot delete null literal.");
+
+            //推导要delete的对象类型  
+            var objRec = Query(varname);
+            string objType = objRec?.typeExpression;
+            if(string.IsNullOrEmpty(objType))
+                throw new GizboxException(ExceptioName.Undefine, "Cannot find the type of delete expr.");
+            GType gtype = GType.Parse(objType);
+
+            // 不能用delete删除数组类型 (应该放在语义分析阶段判断)
+            if(gtype.IsArray)
+                throw new GizboxException(ExceptioName.Undefine, "Cannot use delete to delete array type.");
+
+            // 字符串类型当前设计没有隐式dtor ->  直接释放
+            if(gtype.Category == GType.Kind.String)
+            {
+                EmitCode("DEALLOC", varname);
+                return;
+            }
+
+            //class对象 ->  先调用dtor再释放内存  
+            EmitCode("PARAM", varname);
+            EmitCode("CALL", gtype.ToString() + ".dtor", "%LITINT:1");
+            EmitCode("DEALLOC", varname);
         }
         public void EmitOwnDropCode(string varname)
         {
@@ -858,6 +888,18 @@ namespace Gizbox.IR
         public void EmitOwnDropField(string varname, string fieldName)
         {
             string accessExpr = varname + "->" + fieldName;
+
+            //if (obj->field != null) { delete obj->field; obj->field = null; }  //null作为dropflag  
+            string tmp = RentTemp("bool", "drop_field_flag");
+            EmitCode("!=", tmp, accessExpr, "%LITNULL:");
+
+            string label = $"_owner_skip_drop_field_{fieldName}_{envStackTemp.Count}";
+            EmitCode("IF_FALSE_JUMP", tmp, "%LABEL:" + label);
+
+            EmitDeleteCode(accessExpr);
+            EmitCode("=", accessExpr, "%LITNULL:");
+
+            EmitCode("").label = label;
         }
 
         public void EmitCtor(ClassDeclareNode classDeclNode)
@@ -865,9 +907,6 @@ namespace Gizbox.IR
             //隐式构造函数 
             //全名    
             string funcFullName = classDeclNode.classNameNode.FullName + ".ctor";
-
-            ////跳过声明  
-            //GenerateCode("JUMP", "%LABEL:exit:" + funcFullName);
 
             //函数开始    
             var ctorEnv = envStackTemp.Peek().GetTableInChildren(classDeclNode.classNameNode.FullName + ".ctor");
@@ -917,7 +956,54 @@ namespace Gizbox.IR
 
         public void EmitDtor(ClassDeclareNode classDeclNode)
         {
-            //todo  
+            //隐式析构函数
+            string funcFullName = classDeclNode.classNameNode.FullName + ".dtor";
+
+            //函数开始    
+            var dtorEnv = envStackTemp.Peek().GetTableInChildren(funcFullName);
+            envStackTemp.Push(dtorEnv);
+            EnvBegin(dtorEnv);
+
+            EmitCode("").label = "entry:" + funcFullName;
+            EmitCode("FUNC_BEGIN", funcFullName).label = "func_begin:" + funcFullName;
+
+            //先析构派生类的Owner字段（逆序）
+            //仅处理：变量声明节点 + 该字段是 OwnerVar（由语义分析标记）
+            for(int i = classDeclNode.memberDelareNodes.Count - 1; i >= 0; --i)
+            {
+                if(classDeclNode.memberDelareNodes[i] is not VarDeclareNode fieldDecl)
+                    continue;
+
+                var classEnv = envStackTemp[envStackTemp.Count - 2]; // 当前类的 env（dtor env 之下一级）
+                if(classEnv == null)
+                    continue;
+
+                if(classEnv.ContainRecordName(fieldDecl.identifierNode.FullName) == false)
+                    continue;
+
+                var fieldRec = classEnv.GetRecord(fieldDecl.identifierNode.FullName);
+                if(fieldRec.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar) == false)
+                    continue;
+
+                EmitOwnDropField("this", fieldDecl.identifierNode.FullName);
+            }
+
+            //再调用基类析构  
+            if(classDeclNode.baseClassNameNode != null)
+            {
+                var baseClassName = classDeclNode.baseClassNameNode.FullName;
+
+                EmitCode("PARAM", "this");
+                EmitCode("CALL", baseClassName + ".dtor", "%LITINT:1");
+            }
+
+            EmitCode("RETURN");
+
+            EmitCode("FUNC_END").label = "func_end:" + funcFullName;
+            EmitCode("").label = "exit:" + funcFullName;
+
+            EnvEnd(dtorEnv);
+            envStackTemp.Pop();
         }
 
 

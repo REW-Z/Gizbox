@@ -626,6 +626,11 @@ namespace Gizbox
             return _RawTypeExpression;
         }
 
+        public string ToExpression()
+        {
+            return _RawTypeExpression;
+        }
+
         public Kind Category => _Kind;
 
         public int Size
