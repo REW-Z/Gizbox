@@ -108,7 +108,8 @@ delete[]目前不会逐个调用元素的析构函数。因为Gizbox没有结构
 ### 所有权-成员字段    
 
 （DONE）禁止Move-Out  
-drop_field_before_stmt实现  
-隐含析构函数。析构时同时Drop所有成员字段  
-Drop后置Null是否正确执行顺序，最好改为EmitDrop中间代码里置Null?
-test  
+（DONE）drop_field_before_stmt实现  
+（DONE）隐含析构函数。析构时同时Drop所有成员字段  
+
+makeown和disown的实现。  
+数组own的实现。  
