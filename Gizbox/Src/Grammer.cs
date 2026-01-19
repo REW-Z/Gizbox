@@ -70,6 +70,8 @@ namespace Gizbox
             "cast",
             "lvalue",
             "memberaccess",
+            "kwexpr",
+            "ownop",//所有权操作
 
             //函数过程
             "param",
@@ -78,9 +80,9 @@ namespace Gizbox
 
             
             //其他辅助符号
-            "stypeBracket",
-            "idBracket",
-            "primitiveBracket",
+            "stypesb",
+            "idsb",
+            "primitivesb",
             "optidx",
 
             "inherit",
@@ -130,7 +132,9 @@ namespace Gizbox
             "stmt -> if ( expr ) stmt elifclauselist elseclause",
 
             "declstmt -> type ID = expr ;",
+            "declstmt -> type ID = ownop ;",//new
             "declstmt -> tmodf type ID = expr ;",
+            "declstmt -> tmodf type ID = ownop ;",//new
             "declstmt -> const type ID = lit ;",
 
             "declstmt -> type ID ( params ) { statements }",
@@ -166,7 +170,7 @@ namespace Gizbox
             "type -> arrtype",
             "type -> stype",
             "type -> var",
-            "arrtype -> stypeBracket",
+            "arrtype -> stypesb",
             "stype -> primitive",
             "stype -> ID",
             "primitive -> void",
@@ -225,6 +229,7 @@ namespace Gizbox
             "primary -> call",
             "primary -> newobj",
             "primary -> newarr",
+            "primary -> kwexpr",//new
             "primary -> lit",
 
             "incdec -> ++ ID",
@@ -235,15 +240,21 @@ namespace Gizbox
             "call -> ID ( args )",
             "call -> memberaccess ( args )",
 
-            "indexaccess -> idBracket",
+            "indexaccess -> idsb",
             "indexaccess -> memberaccess [ aexpr ]",
 
             "newobj -> new ID ( )",
-            "newarr -> new stypeBracket",
+            "newarr -> new stypesb",
 
             "cast -> ( type ) factor",
 
             "memberaccess -> primary . ID",
+
+            "kwexpr -> typeof ( type )",//new
+            "kwexpr -> sizeof ( type )",//new
+
+            "ownop -> claim ( ID )",//new
+            "ownop -> leak ( ID )",//new
 
             "lit -> LITBOOL",
             "lit -> LITINT",
@@ -266,10 +277,10 @@ namespace Gizbox
             "args -> args , expr",
 
 
-            "stypeBracket -> idBracket",
-            "stypeBracket -> primitiveBracket",
-            "idBracket -> ID [ optidx ]",
-            "primitiveBracket -> primitive [ optidx ]",
+            "stypesb -> idsb",
+            "stypesb -> primitivesb",
+            "idsb -> ID [ optidx ]",
+            "primitivesb -> primitive [ optidx ]",
             "optidx -> aexpr",
             "optidx -> ε",
 

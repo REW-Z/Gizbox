@@ -798,7 +798,7 @@ namespace Gizbox.SemanticRule
                 };
             });
 
-            AddActionAtTail("arrtype -> stypeBracket", (psr, production) => {
+            AddActionAtTail("arrtype -> stypesb", (psr, production) => {
 
                 var node = psr.stack[psr.stack.Top].attributes[eAttr.stype];
 
@@ -1148,7 +1148,7 @@ namespace Gizbox.SemanticRule
             });
 
 
-            AddActionAtTail("indexaccess -> idBracket", (psr, production) => {
+            AddActionAtTail("indexaccess -> idsb", (psr, production) => {
 
                 ((SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[eAttr.id]).identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField;
 
@@ -1202,7 +1202,7 @@ namespace Gizbox.SemanticRule
                 };
             });
 
-            AddActionAtTail("newarr -> new stypeBracket", (psr, production) => {
+            AddActionAtTail("newarr -> new stypesb", (psr, production) => {
 
                 psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.NewArrayNode()
                 {
@@ -1414,7 +1414,7 @@ namespace Gizbox.SemanticRule
             });
 
 
-            AddActionAtTail("stypeBracket -> idBracket", (psr, production) => {
+            AddActionAtTail("stypesb -> idsb", (psr, production) => {
 
                 ((SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[eAttr.id]).identiferType = SyntaxTree.IdentityNode.IdType.Class;
 
@@ -1428,11 +1428,11 @@ namespace Gizbox.SemanticRule
                 psr.newElement.attributes[eAttr.optidx] = psr.stack[psr.stack.Top].attributes[eAttr.optidx];
             });
 
-            AddActionAtTail("stypeBracket -> primitiveBracket", (psr, production) => {
+            AddActionAtTail("stypesb -> primitivesb", (psr, production) => {
                 psr.newElement.attributes[eAttr.stype] = psr.stack[psr.stack.Top].attributes[eAttr.primitive];
                 psr.newElement.attributes[eAttr.optidx] = psr.stack[psr.stack.Top].attributes[eAttr.optidx];
             });
-            AddActionAtTail("idBracket -> ID [ optidx ]", (psr, production) => {
+            AddActionAtTail("idsb -> ID [ optidx ]", (psr, production) => {
 
                 psr.newElement.attributes[eAttr.id] = new SyntaxTree.IdentityNode()
                 {
@@ -1442,7 +1442,7 @@ namespace Gizbox.SemanticRule
                 };
                 psr.newElement.attributes[eAttr.optidx] = psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node];
             });
-            AddActionAtTail("primitiveBracket -> primitive [ optidx ]", (psr, production) => {
+            AddActionAtTail("primitivesb -> primitive [ optidx ]", (psr, production) => {
                 psr.newElement.attributes[eAttr.primitive] = psr.stack[psr.stack.Top - 3].attributes[eAttr.ast_node];
                 psr.newElement.attributes[eAttr.optidx] = psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node];
             });

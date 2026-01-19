@@ -111,5 +111,6 @@ delete[]目前不会逐个调用元素的析构函数。因为Gizbox没有结构
 （DONE）drop_field_before_stmt实现  
 （DONE）隐含析构函数。析构时同时Drop所有成员字段  
 
-makeown和disown的实现。  
+（DONE）claim和leak的产生式。    
+claim和leak的产语义分析。  
 数组own的实现。  
