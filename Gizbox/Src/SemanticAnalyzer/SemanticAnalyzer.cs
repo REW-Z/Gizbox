@@ -496,6 +496,12 @@ namespace Gizbox.SemanticRule
                     attributes = psr.newElement.attributes,
                 };
             });
+
+            AddActionAtTail("declstmt -> type ID = ownop ;", (psr, production) => {
+                //todo
+            });
+
+
             AddActionAtTail("declstmt -> tmodf type ID = expr ;", (psr, production) => {
 
                 psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.VarDeclareNode()
@@ -514,6 +520,9 @@ namespace Gizbox.SemanticRule
                 };
             });
 
+            AddActionAtTail("declstmt -> tmodf type ID = ownop ;", (psr, production) => {
+                //todo
+            });
 
             AddActionAtTail("declstmt -> const type ID = lit ;", (psr, production) => {
 

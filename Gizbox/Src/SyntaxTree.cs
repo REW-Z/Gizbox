@@ -894,6 +894,39 @@ namespace Gizbox
             public Token token;
         }
 
+        public class TypeOfNode : ExprNode
+        {
+            public TypeNode typeNode;
+
+            public TypeOfNode()
+            {
+                children_group_0 = new();
+                children_group_0.Add(null);
+            }
+        }
+        public class SizeOfNode : ExprNode
+        {
+            public TypeNode typeNode;
+
+            public SizeOfNode()
+            {
+                children_group_0 = new();
+                children_group_0.Add(null);
+            }
+        }
+
+        public class OwnershipOpNode : ExprNode
+        {
+            public string op;//claim/leak
+            public IdentityNode identifierNode;
+
+            public OwnershipOpNode()
+            {
+                children_group_0 = new();
+                children_group_0.Add(null);
+            }
+        }
+
         // ******************** TYPE NODES ******************************
 
         public abstract class TypeNode : Node { public abstract string TypeExpression(); }
