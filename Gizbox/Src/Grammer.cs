@@ -71,7 +71,6 @@ namespace Gizbox
             "lvalue",
             "memberaccess",
             "kwexpr",
-            "ownop",//所有权操作
 
             //函数过程
             "param",
@@ -132,10 +131,11 @@ namespace Gizbox
             "stmt -> if ( expr ) stmt elifclauselist elseclause",
 
             "declstmt -> type ID = expr ;",
-            "declstmt -> type ID = ownop ;",//new
             "declstmt -> tmodf type ID = expr ;",
-            "declstmt -> tmodf type ID = ownop ;",//new
             "declstmt -> const type ID = lit ;",
+
+            "declstmt -> own type ID = capture ( ID ) ;",
+            "declstmt -> type ID = leak ( ID ) ;",
 
             "declstmt -> type ID ( params ) { statements }",
             "declstmt -> tmodf type ID ( params ) { statements }",
@@ -229,7 +229,7 @@ namespace Gizbox
             "primary -> call",
             "primary -> newobj",
             "primary -> newarr",
-            "primary -> kwexpr",//new
+            "primary -> kwexpr",
             "primary -> lit",
 
             "incdec -> ++ ID",
@@ -250,11 +250,8 @@ namespace Gizbox
 
             "memberaccess -> primary . ID",
 
-            "kwexpr -> typeof ( type )",//new
-            "kwexpr -> sizeof ( type )",//new
-
-            "ownop -> claim ( ID )",//new
-            "ownop -> leak ( ID )",//new
+            "kwexpr -> typeof ( type )",
+            "kwexpr -> sizeof ( type )",
 
             "lit -> LITBOOL",
             "lit -> LITINT",

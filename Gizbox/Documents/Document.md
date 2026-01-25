@@ -49,7 +49,7 @@ class Human : Creature
 ## 所有权（Ownership）
 
 引用类型有三种所有权模型：  
-1. Manual:手动管理释放（默认模型）（手动delete释放）  
+1. Manual:非托管类型。手动管理释放（默认模型）（手动delete释放）  
 2. Own:所有权对象（自动释放）  
 3. Bor:借用对象（别名引用）   
 
@@ -61,6 +61,7 @@ class Human : Creature
 1.赋值  
 2.作为函数参数传递（参数类型是own的）  
 3.作为函数返回值传递（返回值类型是own的）  
+
 
 
 #### 所有权托管的class    

@@ -497,9 +497,6 @@ namespace Gizbox.SemanticRule
                 };
             });
 
-            AddActionAtTail("declstmt -> type ID = ownop ;", (psr, production) => {
-                //todo
-            });
 
 
             AddActionAtTail("declstmt -> tmodf type ID = expr ;", (psr, production) => {
@@ -520,10 +517,6 @@ namespace Gizbox.SemanticRule
                 };
             });
 
-            AddActionAtTail("declstmt -> tmodf type ID = ownop ;", (psr, production) => {
-                //todo
-            });
-
             AddActionAtTail("declstmt -> const type ID = lit ;", (psr, production) => {
 
                 psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ConstantDeclareNode()
@@ -541,6 +534,51 @@ namespace Gizbox.SemanticRule
                 };
 
             });
+
+
+            AddActionAtTail("declstmt -> own type ID = capture ( ID ) ;", (psr, production) => {
+                psr.newElement.attributes[eAttr.ast_node] = new OwnershipCaptureStmtNode()
+                {
+                    rIdentifier = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = psr.stack[psr.stack.Top - 2].attributes,
+                        token = psr.stack[psr.stack.Top - 2].attributes[eAttr.token] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField,
+                    },
+                    lIdentifier = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = psr.stack[psr.stack.Top - 6].attributes,
+                        token = psr.stack[psr.stack.Top - 6].attributes[eAttr.token] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField,
+                    },
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 7].attributes[eAttr.ast_node],
+                    attributes = psr.newElement.attributes,
+                };
+            });
+
+
+
+            AddActionAtTail("declstmt -> type ID = leak ( ID ) ;", (psr, production) => {
+                psr.newElement.attributes[eAttr.ast_node] = new OwnershipLeakStmtNode()
+                {
+                    rIdentifier = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = psr.stack[psr.stack.Top - 2].attributes,
+                        token = psr.stack[psr.stack.Top - 2].attributes[eAttr.token] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField,
+                    },
+                    lIdentifier = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = psr.stack[psr.stack.Top - 6].attributes,
+                        token = psr.stack[psr.stack.Top - 6].attributes[eAttr.token] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField,
+                    },
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 7].attributes[eAttr.ast_node],
+                    attributes = psr.newElement.attributes,
+                };
+            });
+
+
 
             AddActionAtTail("declstmt -> type ID ( params ) { statements }", (psr, production) => {
                 psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.FuncDeclareNode()
@@ -1043,6 +1081,10 @@ namespace Gizbox.SemanticRule
                 psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
             });
 
+            AddActionAtTail("primary -> kwexpr", (psr, production) => {
+                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+            });
+
             AddActionAtTail("primary -> indexaccess", (psr, production) => {
                 psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ElementAccessNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
             });
@@ -1238,6 +1280,26 @@ namespace Gizbox.SemanticRule
                     attributes = psr.newElement.attributes,
                 };
             });
+
+            AddActionAtTail("kwexpr -> typeof ( type )", (psr, production) => { 
+                
+                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.TypeOfNode()
+                {
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+                    attributes = psr.newElement.attributes,
+                };
+            });
+
+            AddActionAtTail("kwexpr -> sizeof ( type )", (psr, production) => {
+
+                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.SizeOfNode()
+                {
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+                    attributes = psr.newElement.attributes,
+                };
+            });
+
+
 
             string[] litTypes = new string[] { "null", "LITINT", "LITLONG", "LITFLOAT", "LITDOUBLE", "LITCHAR", "LITSTRING", "LITBOOL" };
             foreach (var litType in litTypes)
@@ -1708,6 +1770,24 @@ namespace Gizbox.SemanticRule
                                 initValue:initVal
                                 );
                             varDeclNode.attributes[eAttr.var_rec] = newRec;
+                        }
+                    }
+                    break;
+                //所有权Claim语句
+                case SyntaxTree.OwnershipCaptureStmtNode ownClaimNode:
+                    {
+                        if(isGlobalOrTopNamespace)
+                        {
+                            //所有权Claim语句不能在全局作用域使用。只能在局部作用域使用。  
+                        }
+                    }
+                    break;
+                //所有权Leak语句  
+                case SyntaxTree.OwnershipLeakStmtNode ownClaimNode:
+                    {
+                        if(isGlobalOrTopNamespace)
+                        {
+                            //所有权Leak语句不能在全局作用域使用。只能在局部作用域使用。
                         }
                     }
                     break;

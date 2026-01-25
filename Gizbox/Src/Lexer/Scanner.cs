@@ -68,7 +68,7 @@ namespace Gizbox
             keywords.Add(new TokenPattern("string", "string\\W", 1));
             keywords.Add(new TokenPattern("null", "null\\W", 1));
 
-            keywords.Add(new TokenPattern("claim", "claim\\W", 1));
+            keywords.Add(new TokenPattern("capture", "capture\\W", 1));
             keywords.Add(new TokenPattern("leak", "leak\\W", 1));
             keywords.Add(new TokenPattern("sizeof", "sizeof\\W", 1));
             keywords.Add(new TokenPattern("typeof", "typeof\\W", 1));

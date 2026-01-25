@@ -567,6 +567,34 @@ namespace Gizbox
 
         }
 
+        public class OwnershipLeakStmtNode : StmtNode
+        {
+            public TypeNode typeNode { get => (TypeNode)children_group_0[0]; set => children_group_0[0] = value; }
+            public IdentityNode lIdentifier { get => (IdentityNode)children_group_0[1]; set => children_group_0[1] = value; }
+            public IdentityNode rIdentifier { get => (IdentityNode)children_group_0[2]; set => children_group_0[2] = value; }
+
+            public OwnershipLeakStmtNode()
+            {
+                children_group_0 = new();
+                children_group_0.Add(null);
+                children_group_0.Add(null);
+                children_group_0.Add(null);
+            }
+        }
+        public class OwnershipCaptureStmtNode : StmtNode
+        {
+            public TypeNode typeNode { get => (TypeNode)children_group_0[0]; set => children_group_0[0] = value; }
+            public IdentityNode lIdentifier { get => (IdentityNode)children_group_0[1]; set => children_group_0[1] = value; }
+            public IdentityNode rIdentifier { get => (IdentityNode)children_group_0[2]; set => children_group_0[2] = value; }
+
+            public OwnershipCaptureStmtNode()
+            {
+                children_group_0 = new();
+                children_group_0.Add(null);
+                children_group_0.Add(null);
+                children_group_0.Add(null);
+            }
+        }
 
         public class SingleExprStmtNode : StmtNode//单个特殊表达式(new、assign、call、increase)的语句  
         {
@@ -896,7 +924,7 @@ namespace Gizbox
 
         public class TypeOfNode : ExprNode
         {
-            public TypeNode typeNode;
+            public TypeNode typeNode { get => (TypeNode)children_group_0[0]; set => children_group_0[0] = value; }
 
             public TypeOfNode()
             {
@@ -906,7 +934,7 @@ namespace Gizbox
         }
         public class SizeOfNode : ExprNode
         {
-            public TypeNode typeNode;
+            public TypeNode typeNode { get => (TypeNode)children_group_0[0]; set => children_group_0[0] = value; }
 
             public SizeOfNode()
             {
@@ -915,17 +943,7 @@ namespace Gizbox
             }
         }
 
-        public class OwnershipOpNode : ExprNode
-        {
-            public string op;//claim/leak
-            public IdentityNode identifierNode;
 
-            public OwnershipOpNode()
-            {
-                children_group_0 = new();
-                children_group_0.Add(null);
-            }
-        }
 
         // ******************** TYPE NODES ******************************
 
