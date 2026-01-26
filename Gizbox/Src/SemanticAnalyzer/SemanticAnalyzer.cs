@@ -1773,21 +1773,23 @@ namespace Gizbox.SemanticRule
                         }
                     }
                     break;
-                //所有权Claim语句
-                case SyntaxTree.OwnershipCaptureStmtNode ownClaimNode:
+                //所有权Capture语句
+                case SyntaxTree.OwnershipCaptureStmtNode captureNode:
                     {
                         if(isGlobalOrTopNamespace)
                         {
-                            //所有权Claim语句不能在全局作用域使用。只能在局部作用域使用。  
+                            //所有权capture语句不能在全局作用域使用。只能在局部作用域使用。  
+                            throw new SemanticException(ExceptioName.OwnershipError, captureNode, "ownership capture stmt can not be used in global scope");
                         }
                     }
                     break;
                 //所有权Leak语句  
-                case SyntaxTree.OwnershipLeakStmtNode ownClaimNode:
+                case SyntaxTree.OwnershipLeakStmtNode leakNode:
                     {
                         if(isGlobalOrTopNamespace)
                         {
-                            //所有权Leak语句不能在全局作用域使用。只能在局部作用域使用。
+                            //所有权leak语句不能在全局作用域使用。只能在局部作用域使用。
+                            throw new SemanticException(ExceptioName.OwnershipError, leakNode, "ownership leak stmt can not be used in global scope");
                         }
                     }
                     break;
