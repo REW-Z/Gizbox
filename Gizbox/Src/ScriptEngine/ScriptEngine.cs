@@ -273,9 +273,9 @@ namespace Gizbox.ScriptEngine
                 var entryMainAddr = mainUnit.QueryLabel("entry", "main", currUnit);
                 this.curr = entryMainAddr.Item2;
             }
-            else if(mainUnit.ContainsLabelInMainUnit("entry", "__top__"))
+            else if(mainUnit.ContainsLabelInMainUnit("entry", $"__top_{mainUnit.name}__"))
             {
-                var entryTopAddr = mainUnit.QueryLabel("entry", "__top__", currUnit);
+                var entryTopAddr = mainUnit.QueryLabel("entry", $"__top_{mainUnit.name}__", currUnit);
                 this.curr = entryTopAddr.Item2;
             }
             else

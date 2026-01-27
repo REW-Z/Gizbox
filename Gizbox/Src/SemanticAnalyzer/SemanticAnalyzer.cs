@@ -2350,32 +2350,32 @@ namespace Gizbox.SemanticRule
                         //构造函数  
                         {
                             //默认隐式构造函数的符号表  
-                            var ctorEnv = new SymbolTable(classDeclNode.classNameNode.FullName + ".ctor", SymbolTable.TableCatagory.FuncScope, newEnv);
+                            var ctorEnv = new SymbolTable(classDeclNode.classNameNode.FullName + "::ctor", SymbolTable.TableCatagory.FuncScope, newEnv);
                             ctorEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, classDeclNode.classNameNode.FullName);
                             //添加条目-构造函数    
                             var ctorRec = newEnv.NewRecord(
-                                classDeclNode.classNameNode.FullName + ".ctor",
+                                classDeclNode.classNameNode.FullName + "::ctor",
                                 SymbolTable.RecordCatagory.Function,
                                 GType.GenFuncType(GType.Parse("void"), GType.Parse(classDeclNode.classNameNode.FullName)).ToString(),
                                 ctorEnv
                             );
-                            ctorRec.rawname = classDeclNode.classNameNode.FullName + ".ctor";
+                            ctorRec.rawname = classDeclNode.classNameNode.FullName + "::ctor";
                             ctorRec.flags |= SymbolTable.RecordFlag.Ctor;
                         }
 
                         //析构函数  
                         {
                             //默认隐式析构函数的符号表  
-                            var dtorEnv = new SymbolTable(classDeclNode.classNameNode.FullName + ".dtor", SymbolTable.TableCatagory.FuncScope, newEnv);
+                            var dtorEnv = new SymbolTable(classDeclNode.classNameNode.FullName + "::dtor", SymbolTable.TableCatagory.FuncScope, newEnv);
                             dtorEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, classDeclNode.classNameNode.FullName);
                             //添加条目-析构函数
                             var dtorRec = newEnv.NewRecord(
-                                classDeclNode.classNameNode.FullName + ".dtor",
+                                classDeclNode.classNameNode.FullName + "::dtor",
                                 SymbolTable.RecordCatagory.Function,
                                 GType.GenFuncType(GType.Parse("void"), GType.Parse(classDeclNode.classNameNode.FullName)).ToString(),
                                 dtorEnv
                             );
-                            dtorRec.rawname = classDeclNode.classNameNode.FullName + ".dtor";
+                            dtorRec.rawname = classDeclNode.classNameNode.FullName + "::dtor";
                             dtorRec.flags |= SymbolTable.RecordFlag.Dtor;
                         }
 

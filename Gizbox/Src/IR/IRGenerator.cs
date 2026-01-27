@@ -36,7 +36,7 @@ namespace Gizbox.IR
         {
             this.ilUnit = ir;
             this.ast = ast;
-            this.topFunc = $"__top__";
+            this.topFunc = $"__top_{ir.name}__";
         }
 
         public IRUnit Generate()
@@ -800,7 +800,7 @@ namespace Gizbox.IR
 
                         EmitCode("ALLOC", GetRet(newObjNode), className);
                         EmitCode("PARAM", GetRet(newObjNode));
-                        EmitCode("CALL", className + ".ctor", "%LITINT:" + 1);
+                        EmitCode("CALL", className + "::ctor", "%LITINT:" + 1);
                     }
                     break;
                 case NewArrayNode newArrNode:
@@ -901,7 +901,7 @@ namespace Gizbox.IR
 
             //class对象 ->  先调用dtor再释放内存  
             EmitCode("PARAM", varname);
-            EmitCode("CALL", gtype.ToString() + ".dtor", "%LITINT:1");
+            EmitCode("CALL", gtype.ToString() + "::dtor", "%LITINT:1");
             EmitCode("DEALLOC", varname);
         }
 
@@ -976,7 +976,7 @@ namespace Gizbox.IR
 
                 //class对象 ->  先调用dtor再释放内存  
                 EmitCode("PARAM", accessExpr);
-                EmitCode("CALL", gtype.ToString() + ".dtor", "%LITINT:1");
+                EmitCode("CALL", gtype.ToString() + "::dtor", "%LITINT:1");
                 EmitCode("DEALLOC", accessExpr);
             }
 
@@ -991,10 +991,10 @@ namespace Gizbox.IR
         {
             //隐式构造函数 
             //全名    
-            string funcFullName = classDeclNode.classNameNode.FullName + ".ctor";
+            string funcFullName = classDeclNode.classNameNode.FullName + "::ctor";
 
             //函数开始    
-            var ctorEnv = envStackTemp.Peek().GetTableInChildren(classDeclNode.classNameNode.FullName + ".ctor");
+            var ctorEnv = envStackTemp.Peek().GetTableInChildren(classDeclNode.classNameNode.FullName + "::ctor");
             envStackTemp.Push(ctorEnv);
             EnvBegin(ctorEnv);
 
@@ -1011,7 +1011,7 @@ namespace Gizbox.IR
                 var baseEnv = baseRec.envPtr;
 
                 EmitCode("PARAM", "this");
-                EmitCode("CALL", baseClassName + ".ctor", "%LITINT:1");
+                EmitCode("CALL", baseClassName + "::ctor", "%LITINT:1");
             }
 
             //成员变量初始化
@@ -1042,7 +1042,7 @@ namespace Gizbox.IR
         public void EmitDtor(ClassDeclareNode classDeclNode)
         {
             //隐式析构函数
-            string funcFullName = classDeclNode.classNameNode.FullName + ".dtor";
+            string funcFullName = classDeclNode.classNameNode.FullName + "::dtor";
 
             //函数开始    
             var dtorEnv = envStackTemp.Peek().GetTableInChildren(funcFullName);
@@ -1079,7 +1079,7 @@ namespace Gizbox.IR
                 var baseClassName = classDeclNode.baseClassNameNode.FullName;
 
                 EmitCode("PARAM", "this");
-                EmitCode("CALL", baseClassName + ".dtor", "%LITINT:1");
+                EmitCode("CALL", baseClassName + "::dtor", "%LITINT:1");
             }
 
             EmitCode("RETURN");
