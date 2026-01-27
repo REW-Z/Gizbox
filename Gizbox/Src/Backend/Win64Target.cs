@@ -1009,8 +1009,9 @@ namespace Gizbox.Src.Backend
                                 using(new RegUsageRange(this, RegisterEnum.R11))
                                 {
                                     if(cond is X64Immediate imm)
-                                        Emit(X64.mov(X64.r11, imm, X64Size.@byte));
-                                    Emit(X64.movzx(X64.r11, cond, X64Size.qword, X64Size.@byte));
+                                        Emit(X64.mov(X64.r11, imm, X64Size.qword));
+                                    else
+                                        Emit(X64.movzx(X64.r11, cond, X64Size.qword, X64Size.@byte));
                                     Emit(X64.test(X64.r11, X64.r11));
                                 }
                             }
@@ -1923,7 +1924,9 @@ namespace Gizbox.Src.Backend
 
 
             //构造函数加入globalFuncs  
-            globalFuncsInfos.Add(classTable.name + ".ctor");
+            globalFuncsInfos.Add(classTable.name + "::ctor");
+            //析构函数加入globalFuncs
+            globalFuncsInfos.Add(classTable.name + "::dtor");
 
             //方法信息(包含构造函数)  
             foreach(var (memName, memRec) in classTable.records)
@@ -3972,34 +3975,38 @@ namespace Gizbox.Src.Backend
             {
                 SymbolTable.Record rec;
 
-                if(segments[0].Contains("."))
+                if(segments[0].EndsWith("::ctor"))
                 {
-                    if(segments[0].EndsWith(".ctor"))
-                    {
-                        //var objClass = owner.MCALL_methodTargetObject.typeExpr;
-                        //rec = context.QueryMember(objClass.ToString(), segments[0]);
-                        //segmentRecs[0] = rec;
-                        //typeExpr = GType.Parse(rec.typeExpression);
-                        //if(rec == null)
-                        //    throw new GizboxException(ExceptioName.Undefine, "未找到构造函数");
-                        //else
-                        //    GixConsole.WriteLine("构造函数：" + rec.name);
+                    //var objClass = owner.MCALL_methodTargetObject.typeExpr;
+                    //rec = context.QueryMember(objClass.ToString(), segments[0]);
+                    //segmentRecs[0] = rec;
+                    //typeExpr = GType.Parse(rec.typeExpression);
+                    //if(rec == null)
+                    //    throw new GizboxException(ExceptioName.Undefine, "未找到构造函数");
+                    //else
+                    //    GixConsole.WriteLine("构造函数：" + rec.name);
 
-                        string className = segments[0].Substring(0, segments[0].Length - 5);
-                        var classRec = context.Query(className, owner.line);
-                        segmentRecs[0] = classRec.envPtr.GetRecord(segments[0]);
-                        typeExpr = Utils.CtorType(classRec);
-                    }
-                    else
-                    {
-                        string[] parts = segments[0].Split('.');
-                        string className = parts[0];
-                        string memberName = parts[1];
-                        var (classRec, memberRec) = context.QueryClassAndMember(className, memberName);
-                        segmentRecs[0] = memberRec;
-                        typeExpr = GType.Parse(memberRec.typeExpression);
-                        Win64Target.Log("------- " + typeExpr.ToString());
-                    }
+                    string className = segments[0].Substring(0, segments[0].Length - ("::ctor").Length);
+                    var classRec = context.Query(className, owner.line);
+                    segmentRecs[0] = classRec.envPtr.GetRecord(segments[0]);
+                    typeExpr = Utils.CtorType(classRec);
+                }
+                else if(segments[0].EndsWith("::dtor"))
+                {
+                    string className = segments[0].Substring(0, segments[0].Length - ("::dtor").Length);
+                    var classRec = context.Query(className, owner.line);
+                    segmentRecs[0] = classRec.envPtr.GetRecord(segments[0]);
+                    typeExpr = Utils.DtorType(classRec);
+                }
+                else if(segments[0].Contains("."))
+                {
+                    string[] parts = segments[0].Split('.');
+                    string className = parts[0];
+                    string memberName = parts[1];
+                    var (classRec, memberRec) = context.QueryClassAndMember(className, memberName);
+                    segmentRecs[0] = memberRec;
+                    typeExpr = GType.Parse(memberRec.typeExpression);
+                    Win64Target.Log("------- " + typeExpr.ToString());
                 }
                 else
                 {

@@ -26,6 +26,11 @@ namespace Gizbox
         {
             return GType.Parse($"{classRec.name} => void");
         }
+
+        public static GType DtorType(SymbolTable.Record classRec)
+        {
+            return GType.Parse($"{classRec.name} => void");
+        }
     }
 
     public static class DictionaryExtensions
