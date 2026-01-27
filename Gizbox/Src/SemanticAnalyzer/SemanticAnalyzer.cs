@@ -536,9 +536,10 @@ namespace Gizbox.SemanticRule
             });
 
 
-            AddActionAtTail("declstmt -> own type ID = capture ( ID ) ;", (psr, production) => {
+            AddActionAtTail("declstmt -> tmodf type ID = capture ( ID ) ;", (psr, production) => {
                 psr.newElement.attributes[eAttr.ast_node] = new OwnershipCaptureStmtNode()
                 {
+                    flags = (VarModifiers)psr.stack[psr.stack.Top - 8].attributes[eAttr.tmodf],
                     rIdentifier = new SyntaxTree.IdentityNode()
                     {
                         attributes = psr.stack[psr.stack.Top - 2].attributes,
@@ -2065,7 +2066,7 @@ namespace Gizbox.SemanticRule
                                 );
                             varDeclNode.attributes[eAttr.var_rec] = newRec;
 
-                            //成员字段的所有权模型  
+                            //是成员字段定义 -> 预先读取所有权模型  
                             if(envStack.Peek().tableCatagory == SymbolTable.TableCatagory.ClassScope)
                             {
                                 var ownershipModel = GetOwnershipModel(varDeclNode.flags, varDeclNode.typeNode);
@@ -2074,6 +2075,56 @@ namespace Gizbox.SemanticRule
                                 if(ownershipModel.HasFlag(SymbolTable.RecordFlag.BorrowVar))//成员字段不能是借用类型  
                                     throw new SemanticException(ExceptioName.OwnershipError_MemberVarCannotBeBorrow, varDeclNode, newRec.name);
                             }
+                        }
+                    }
+                    break;
+                //所有权Capture语句
+                case SyntaxTree.OwnershipCaptureStmtNode captureNode:
+                    {
+                        //Id at env
+                        captureNode.lIdentifier.attributes[eAttr.def_at_env] = envStack.Peek();
+
+                        //（非全局变量）成员字段或者局部变量  
+                        if(isGlobalOrTopAtNamespace == false)
+                        {
+                            //使用原名  
+                            captureNode.lIdentifier.SetPrefix(null);
+
+                            //补全类型  
+                            TryCompleteType(captureNode.typeNode);
+
+                            //新建符号表条目  
+                            var newRec = envStack.Peek().NewRecord(
+                                captureNode.lIdentifier.FullName,
+                                SymbolTable.RecordCatagory.Variable,
+                                captureNode.typeNode.TypeExpression()
+                                );
+                            captureNode.attributes[eAttr.var_rec] = newRec;
+                        }
+                    }
+                    break;
+                //所有权Leak语句  
+                case SyntaxTree.OwnershipLeakStmtNode leakNode:
+                    {
+                        //Id at env
+                        leakNode.lIdentifier.attributes[eAttr.def_at_env] = envStack.Peek();
+
+                        //（非全局变量）成员字段或者局部变量  
+                        if(isGlobalOrTopAtNamespace == false)
+                        {
+                            //使用原名  
+                            leakNode.lIdentifier.SetPrefix(null);
+
+                            //补全类型  
+                            TryCompleteType(leakNode.typeNode);
+
+                            //新建符号表条目  
+                            var newRec = envStack.Peek().NewRecord(
+                                leakNode.lIdentifier.FullName,
+                                SymbolTable.RecordCatagory.Variable,
+                                leakNode.typeNode.TypeExpression()
+                                );
+                            leakNode.attributes[eAttr.var_rec] = newRec;
                         }
                     }
                     break;
@@ -2475,6 +2526,74 @@ namespace Gizbox.SemanticRule
                                 throw new SemanticException(ExceptioName.VariableTypeDeclarationError, varDeclNode, "type:" + varDeclNode.typeNode.TypeExpression() + "  intializer type:" + AnalyzeTypeExpression(varDeclNode.initializerNode));
                             }
                                 
+                        }
+                    }
+                    break;
+                case SyntaxTree.OwnershipCaptureStmtNode captureNode:
+                    {
+                        //分析右边变量 
+                        Pass3_AnalysisNode(captureNode.rIdentifier);
+
+                        //类型推断  
+                        if(captureNode.typeNode is InferTypeNode typeNode)
+                        {
+                            var typeExpr = InferType(typeNode, captureNode.rIdentifier);
+                            var record = envStack.Peek().GetRecord(captureNode.lIdentifier.FullName);
+                            record.typeExpression = typeExpr;
+                        }
+                        //类型检查（初始值）  
+                        else
+                        {
+                            bool valid = CheckType_Equal(captureNode.typeNode.TypeExpression(), captureNode.rIdentifier);
+                            if(!valid)
+                            {
+                                var a = captureNode.typeNode.TypeExpression();
+                                var b = AnalyzeTypeExpression(captureNode.rIdentifier);
+                                throw new SemanticException(ExceptioName.VariableTypeDeclarationError, captureNode, "type:" + captureNode.typeNode.TypeExpression() + "  r-idendifier type:" + AnalyzeTypeExpression(captureNode.rIdentifier));
+                            }
+
+                        }
+
+                        //capture左边必须是own声明  
+                        if(captureNode.flags.HasFlag(VarModifiers.Own) == false)
+                            throw new SemanticException(ExceptioName.OwnershipError, captureNode, "capture left identifier must be declared as own");
+
+                        //capture不能用于值类型  
+                        GType gtype = GType.Parse(captureNode.typeNode.TypeExpression());
+                        if(gtype.IsReferenceType == false)
+                        {
+                            throw new SemanticException(ExceptioName.OwnershipError, captureNode, "capture can not be used on value type");
+                        }
+                    }
+                    break;
+                case SyntaxTree.OwnershipLeakStmtNode leakNode:
+                    {
+                        //分析右边变量 
+                        Pass3_AnalysisNode(leakNode.rIdentifier);
+                        //类型推断  
+                        if(leakNode.typeNode is InferTypeNode typeNode)
+                        {
+                            var typeExpr = InferType(typeNode, leakNode.rIdentifier);
+                            var record = envStack.Peek().GetRecord(leakNode.lIdentifier.FullName);
+                            record.typeExpression = typeExpr;
+                        }
+                        //类型检查（初始值）  
+                        else
+                        {
+                            bool valid = CheckType_Equal(leakNode.typeNode.TypeExpression(), leakNode.rIdentifier);
+                            if(!valid)
+                            {
+                                var a = leakNode.typeNode.TypeExpression();
+                                var b = AnalyzeTypeExpression(leakNode.rIdentifier);
+                                throw new SemanticException(ExceptioName.VariableTypeDeclarationError, leakNode, "type:" + leakNode.typeNode.TypeExpression() + "  r-idendifier type:" + AnalyzeTypeExpression(leakNode.rIdentifier));
+                            }
+                        }
+
+                        //leak不能用于值类型  
+                        GType gtype = GType.Parse(leakNode.typeNode.TypeExpression());
+                        if(gtype.IsReferenceType == false)
+                        {
+                            throw new SemanticException(ExceptioName.OwnershipError, leakNode, "leak can not be used on value type");
                         }
                     }
                     break;
@@ -2921,6 +3040,16 @@ namespace Gizbox.SemanticRule
                         AnalyzeTypeExpression(thisObjNode);
                     }
                     break;
+                case SyntaxTree.SizeOfNode sizeofNode:
+                    {
+                        throw new SemanticException(ExceptioName.Undefine, sizeofNode, "sizeof operator is not supported yet.");
+                    }
+                    break;
+                case SyntaxTree.TypeOfNode typeofNode:
+                    {
+                        throw new SemanticException(ExceptioName.Undefine, typeofNode, "typeof operator is not supported yet.");
+                    }
+                    break;
                 case SyntaxTree.NewObjectNode newobjNode:
                     {
                         TryCompleteIdenfier(newobjNode.className);
@@ -3255,6 +3384,8 @@ namespace Gizbox.SemanticRule
 
                         // 检查：变量左值和初始值的所有权模型对比  
                         CheckOwnershipCompare_VarDecl(varDecl, rec, out var lmodel, out var rmodel);
+
+                        // 记录变量的所有权模型  
                         rec.flags |= lmodel;
 
 
@@ -3304,6 +3435,51 @@ namespace Gizbox.SemanticRule
 
                         break;
                     }
+                case SyntaxTree.OwnershipCaptureStmtNode captureNode:
+                    {
+                        //检查：变量左值和初始值的所有权模型对比（必须own <- manual） 
+                        var recL = captureNode.attributes[eAttr.var_rec] as SymbolTable.Record;
+                        var recR = Query(captureNode.rIdentifier.FullName);
+                        var lModel = GetOwnershipModel(VarModifiers.Own, captureNode.typeNode);
+                        var rModel = recR.flags & OwnershipModelMask;
+
+                        recL.flags |= lModel;
+
+                        if(lModel != SymbolTable.RecordFlag.OwnerVar)
+                            throw new SemanticException(ExceptioName.OwnershipError, captureNode, "capture left side must be own type.");
+                        if(rModel != SymbolTable.RecordFlag.ManualVar)
+                            throw new SemanticException(ExceptioName.OwnershipError, captureNode, "capture right side must be manual type.");
+
+
+                        //记录owner类型的局部变量   
+                        lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict[recL.name] = LifetimeInfo.VarStatus.Alive;
+
+                        //需要插入Null语句（原变量不可再用）  
+                        captureNode.attributes[eAttr.set_null_after_stmt] = new List<string> { recR.name };
+                    }
+                    break;
+                case SyntaxTree.OwnershipLeakStmtNode leakNode:
+                    {
+                        //所有权模型检查（必须是manual <- own）
+                        var recL = leakNode.attributes[eAttr.var_rec] as SymbolTable.Record;
+                        var recR = Query(leakNode.rIdentifier.FullName);
+                        var lModel = GetOwnershipModel(VarModifiers.None, leakNode.typeNode);
+                        var rModel = recR.flags & OwnershipModelMask;
+
+                        recL.flags |= lModel;
+
+                        if(lModel != SymbolTable.RecordFlag.ManualVar)
+                            throw new SemanticException(ExceptioName.OwnershipError, leakNode, "leak left side must be manual type.");
+                        if(rModel != SymbolTable.RecordFlag.OwnerVar)
+                            throw new SemanticException(ExceptioName.OwnershipError, leakNode, "leak right side must be own type.");
+
+                        //右边变量标记为Dead  
+                        lifeTimeInfo.currBranch.SetVarStatus(recR.name, LifetimeInfo.VarStatus.Dead);
+
+                        //需要插入Null语句（原变量不可再用）  
+                        leakNode.attributes[eAttr.set_null_after_stmt] = new List<string> { recR.name };
+                    }
+                    break;
                 case SyntaxTree.AssignNode assignNode:
                     {
                         // 先处理右值中的调用/参数（可能触发move）
@@ -3680,6 +3856,8 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.NewArrayNode _:
                 case SyntaxTree.LiteralNode _:
                 case SyntaxTree.ThisNode _:
+                case SyntaxTree.SizeOfNode _:
+                case SyntaxTree.TypeOfNode _:
                     // 无需处理
                     break;
 

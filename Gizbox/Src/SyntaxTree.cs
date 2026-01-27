@@ -583,6 +583,7 @@ namespace Gizbox
         }
         public class OwnershipCaptureStmtNode : StmtNode
         {
+            public VarModifiers flags;
             public TypeNode typeNode { get => (TypeNode)children_group_0[0]; set => children_group_0[0] = value; }
             public IdentityNode lIdentifier { get => (IdentityNode)children_group_0[1]; set => children_group_0[1] = value; }
             public IdentityNode rIdentifier { get => (IdentityNode)children_group_0[2]; set => children_group_0[2] = value; }

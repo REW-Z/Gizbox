@@ -134,7 +134,7 @@ namespace Gizbox
             "declstmt -> tmodf type ID = expr ;",
             "declstmt -> const type ID = lit ;",
 
-            "declstmt -> own type ID = capture ( ID ) ;",
+            "declstmt -> tmodf type ID = capture ( ID ) ;",
             "declstmt -> type ID = leak ( ID ) ;",
 
             "declstmt -> type ID ( params ) { statements }",

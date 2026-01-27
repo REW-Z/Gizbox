@@ -35,7 +35,6 @@ void main()
     //Console::PrintLn("aaa:" + (string)aaa.value); //已经被移动，不能再使用  
 
 
-
     //分支测试  
     if(true)
     {
@@ -60,7 +59,17 @@ void main()
 
     //字段测试  
     BinaryWriter writer = new BinaryWriter();
-    delete writer.stream;
+    //delete writer.stream;
+    delete writer;
+
+
+    //捕获和泄露测试  
+    own Int src1 = new Int();
+    Int dst1 = leak(src1);
+
+    Int src2 = new Int();
+    own Int dst2 = capture(src2);
+
 
     Console::PrintLn("Test Finish.");
 }

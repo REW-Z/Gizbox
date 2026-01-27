@@ -274,6 +274,50 @@ namespace Gizbox.IR
                         }
                     }
                     break;
+                case OwnershipCaptureStmtNode captureNode:
+                    {
+                        GenNode(captureNode.lIdentifier);
+                        GenNode(captureNode.rIdentifier);
+
+                        var tac = EmitCode("=", GetRet(captureNode.lIdentifier), GetRet(captureNode.rIdentifier));
+
+                        // 被捕获变量置NULL  
+                        if(captureNode.attributes.ContainsKey(eAttr.set_null_after_stmt))
+                        {
+                            var toNull = captureNode.attributes[eAttr.set_null_after_stmt] as List<string>;
+                            if(toNull != null)
+                            {
+                                foreach(var v in toNull)
+                                {
+                                    EmitCode("=", v, "%LITNULL:");
+                                }
+                            }
+                            captureNode.attributes.Remove(eAttr.set_null_after_stmt);
+                        }
+                    }
+                    break;
+                case OwnershipLeakStmtNode leakNode:
+                    {
+                        GenNode(leakNode.lIdentifier);
+                        GenNode(leakNode.rIdentifier);
+
+                        var tac = EmitCode("=", GetRet(leakNode.lIdentifier), GetRet(leakNode.rIdentifier));
+
+                        // 被泄露变量置NULL  
+                        if(leakNode.attributes.ContainsKey(eAttr.set_null_after_stmt))
+                        {
+                            var toNull = leakNode.attributes[eAttr.set_null_after_stmt] as List<string>;
+                            if(toNull != null)
+                            {
+                                foreach(var v in toNull)
+                                {
+                                    EmitCode("=", v, "%LITNULL:");
+                                }
+                            }
+                            leakNode.attributes.Remove(eAttr.set_null_after_stmt);
+                        }
+                    }
+                    break;
 
                 case ReturnStmtNode returnNode:
                     {
@@ -312,7 +356,7 @@ namespace Gizbox.IR
 
                         if(deleteNode.isArrayDelete == false)
                         {
-                            EmitDeleteCode(GetRet(deleteNode.objToDelete));
+                            EmitDeleteVarCode(GetRet(deleteNode.objToDelete));
                         }
                         else
                         {
@@ -826,7 +870,7 @@ namespace Gizbox.IR
             //以后支持结构体类型元素后，也不会支持结构体析构/构造行为。    
             EmitCode("DEALLOC_ARRAY", expr);
         }
-        public void EmitDeleteCode(string varname)
+        public void EmitDeleteVarCode(string varname)
         {
             //需要确保参数是变量名，而不是复杂表达式  
             //delete复杂表达式时，确保表达式节点SetRet的返回是临时变量    
@@ -860,9 +904,11 @@ namespace Gizbox.IR
             EmitCode("CALL", gtype.ToString() + ".dtor", "%LITINT:1");
             EmitCode("DEALLOC", varname);
         }
+
+
         public void EmitOwnDropCode(string varname)
         {
-            EmitDeleteCode(varname);
+            EmitDeleteVarCode(varname);
         }
         public void EmitOwnConditionalDropCode(LifetimeInfo.VarStatus status, string varname)
         {
@@ -896,7 +942,46 @@ namespace Gizbox.IR
             string label = $"_owner_skip_drop_field_{fieldName}_{envStackTemp.Count}";
             EmitCode("IF_FALSE_JUMP", tmp, "%LABEL:" + label);
 
-            EmitDeleteCode(accessExpr);
+            //赋值到共用临时变量再删除  
+            if(false)
+            {
+                var objRec = Query(varname);
+                var objType = objRec.typeExpression;
+                var classRec = Query(objType);
+                var fieldRec = classRec.envPtr.GetRecord(fieldName);
+                string tmp2 = RentTemp(fieldRec.typeExpression, "objfield_ptr");
+                EmitCode("=", tmp2, accessExpr);
+                EmitDeleteVarCode(tmp2);
+            }
+            //直接生成DEALLOC成员访问表达式的语句  
+            else
+            {
+                var objRec = Query(varname);
+                var objType = objRec.typeExpression;
+                var classRec = Query(objType);
+                var fieldRec = classRec.envPtr.GetRecord(fieldName);
+
+                GType gtype = GType.Parse(fieldRec.typeExpression);
+
+                // 不能用delete删除数组类型 (应该放在语义分析阶段判断)
+                if(gtype.IsArray)
+                    throw new GizboxException(ExceptioName.Undefine, "Cannot use delete to delete array type.");
+
+                // 字符串类型当前设计没有隐式dtor ->  直接释放
+                if(gtype.Category == GType.Kind.String)
+                {
+                    EmitCode("DEALLOC", accessExpr);
+                    return;
+                }
+
+                //class对象 ->  先调用dtor再释放内存  
+                EmitCode("PARAM", accessExpr);
+                EmitCode("CALL", gtype.ToString() + ".dtor", "%LITINT:1");
+                EmitCode("DEALLOC", accessExpr);
+            }
+
+
+
             EmitCode("=", accessExpr, "%LITNULL:");
 
             EmitCode("").label = label;

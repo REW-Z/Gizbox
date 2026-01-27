@@ -175,15 +175,21 @@ switch(cmdIdx)
 
             il.Print();
 
-            ScriptEngine engine = new ScriptEngine(compiler);
-            engine.AddLibSearchDirectory(AppDomain.CurrentDomain.BaseDirectory);
-            engine.csharpInteropContext.ConfigExternCallClasses(new Type[] {
-                typeof(TestExternCalls),
-            });
-            engine.Execute(il);
+            if(true)
+            {
+                compiler.CompileIRToExe(il, System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
+            }
+            else
+            {
+                ScriptEngine engine = new ScriptEngine(compiler);
+                engine.AddLibSearchDirectory(AppDomain.CurrentDomain.BaseDirectory);
+                engine.csharpInteropContext.ConfigExternCallClasses(new Type[] {
+                    typeof(TestExternCalls),
+                });
+                engine.Execute(il);
 
-            Compiler.Pause("Execute End");
-
+                Compiler.Pause("Execute End");
+            }
         }
         break;
 }
