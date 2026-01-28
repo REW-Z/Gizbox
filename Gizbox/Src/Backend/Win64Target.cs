@@ -941,8 +941,11 @@ namespace Gizbox.Src.Backend
                             Emit(X64.mov(targetVar, X64.rax, X64Size.qword));
 
                             // 将虚函数表地址写入对象的前8字节(地址)
-                            Emit(X64.lea(X64.rdx, X64.rel(vtableRoKeys[typeName])));
-                            Emit(X64.mov(X64.mem(X64.rax, disp: 0), X64.rdx, X64Size.qword));
+                            using(new RegUsageRange(this, RegisterEnum.R11))
+                            {
+                                Emit(X64.lea(X64.r11, X64.rel(vtableRoKeys[typeName])));
+                                Emit(X64.mov(X64.mem(X64.rax, disp: 0), X64.r11, X64Size.qword));
+                            }
                         }
                         break;
                     case "ALLOC_ARRAY":

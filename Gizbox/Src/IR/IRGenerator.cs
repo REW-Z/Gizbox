@@ -855,9 +855,10 @@ namespace Gizbox.IR
             }
         }
 
-        public TAC EmitCode(string op, object arg1 = null, object arg2 = null, object arg3 = null)
+        public TAC EmitCode(string op, object arg1 = null, object arg2 = null, object arg3 = null, string comment = null)
         {
             var newCode = new TAC() { op = op, arg0 = arg1?.ToString(), arg1 = arg2?.ToString(), arg2 = arg3?.ToString() };
+            newCode.comment = comment;
 
             ilUnit.codes.Add(newCode);
 
@@ -902,7 +903,7 @@ namespace Gizbox.IR
             //class对象 ->  先调用dtor再释放内存  
             EmitCode("PARAM", varname);
             EmitCode("CALL", gtype.ToString() + "::dtor", "%LITINT:1");
-            EmitCode("DEALLOC", varname);
+            EmitCode("DEALLOC", varname, comment: "//EmitDeleteVarCode");
         }
 
 

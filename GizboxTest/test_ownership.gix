@@ -23,53 +23,60 @@ own Int OAdd(own Int x, own Int y)
     return rs;
 }
 
+
 void main()
 {
     own Int aaa = new Int(); aaa.value = 1;
     own Int bbb = new Int(); bbb.value = 2;
-
+    
+    Console::PrintLn("Test0");
     Console::PrintLn("aaa:" + (string)aaa.value);
+    Console::PrintLn("Test1");
+
 
     own Int ccc  = OAdd(aaa, bbb);
     
+    Console::PrintLn("Test2");
+    Console::PrintLn((string)ccc.value);
+
     //Console::PrintLn("aaa:" + (string)aaa.value); //已经被移动，不能再使用  
+    
 
-
-    //分支测试  
-    if(true)
-    {
-        own Int ddd = ccc;
-    }
-    else if(true)
-    {
-        own Int fff = ccc;
-    }
-    else
-    {
-    }
-
-
-    //循环测试
-    for(int i = 0; i < 3; i++)
-    {
-        own Int eee = new Int();
-        eee.value = i;
-        Console::PrintLn("eee:" + (string)eee.value);
-    }
-
-    //字段测试  
-    BinaryWriter writer = new BinaryWriter();
-    //delete writer.stream;
-    delete writer;
-
-
-    //捕获和泄露测试  
-    own Int src1 = new Int();
-    Int dst1 = leak(src1);
-
-    Int src2 = new Int();
-    own Int dst2 = capture(src2);
-
-
-    Console::PrintLn("Test Finish.");
+    ////分支测试  
+    //if(true)
+    //{
+    //    own Int ddd = ccc;
+    //}
+    //else if(true)
+    //{
+    //    own Int fff = ccc;
+    //}
+    //else
+    //{
+    //}
+    //
+    //
+    ////循环测试
+    //for(int i = 0; i < 3; i++)
+    //{
+    //    own Int eee = new Int();
+    //    eee.value = i;
+    //    Console::PrintLn("eee:" + (string)eee.value);
+    //}
+    //
+    ////字段测试  
+    //BinaryWriter writer = new BinaryWriter();
+    ////delete writer.stream;
+    //delete writer;
+    //
+    //
+    ////捕获和泄露测试  
+    //own Int src1 = new Int();
+    //Int dst1 = leak(src1);
+    //
+    //Int src2 = new Int();
+    //own Int dst2 = capture(src2);
+    //
+    //
+    //Console::PrintLn("Test Finish.");
 }

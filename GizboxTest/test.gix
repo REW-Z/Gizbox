@@ -33,7 +33,6 @@ void test()
 	rs += v4 + v5;
 	Console::PrintLn("test!" + (string)rs);
 }
-test();
 
 // ----------------- 调用测试 ------------------
 
@@ -205,3 +204,9 @@ void OwnTest()
 //Console::PrintLn(input);
 //
 //Console::PrintLn("All Test Finished!");
+
+
+void main()
+{
+	test();
+}

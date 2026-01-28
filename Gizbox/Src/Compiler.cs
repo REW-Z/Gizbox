@@ -303,6 +303,7 @@ namespace Gizbox
         {
             var ir = this.CompileToIR(source, isMainUnit:false, libName);
             Gizbox.IR.ILSerializer.Serialize(savePath, ir);
+            ir.Print();
 
             Gizbox.GixConsole.WriteLine($"Lib {libName} Complete Finish!");
         }

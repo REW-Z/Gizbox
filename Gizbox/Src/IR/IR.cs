@@ -24,6 +24,9 @@ namespace Gizbox.IR
         [DataMember]
         public string arg2;
 
+        [DataMember]
+        public string comment;
+
         public string ToExpression(bool showlabel = true, bool indent = true)
         {
             string str = "";
@@ -57,6 +60,10 @@ namespace Gizbox.IR
             if (string.IsNullOrEmpty(arg2) == false)
             {
                 str += " " + arg2;
+            }
+            if (string.IsNullOrEmpty(comment) == false)
+            {
+                str += "    // " + comment;
             }
             return str;
         }
