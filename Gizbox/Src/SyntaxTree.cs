@@ -1156,7 +1156,7 @@ namespace Gizbox
                         throw new Exception("error.");
 
                     if(effectiveChild.rawNode != null)
-                        Console.WriteLine(effectiveChild.GetType().Name + " raw: " + effectiveChild.rawNode.GetType().Name);
+                        GixConsole.WriteLine(effectiveChild.GetType().Name + " raw: " + effectiveChild.rawNode.GetType().Name);
 
                     ReplacementTraversal(effectiveChild);
                 }
@@ -1164,8 +1164,7 @@ namespace Gizbox
 
             ReplacementTraversal(rootNode);
 
-            Console.WriteLine("Complete))))))))))))))))))");
-            Console.WriteLine(CompleteSerialize());
+            GixConsole.WriteLine(CompleteSerialize());
         }
 
         public string Serialize()

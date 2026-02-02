@@ -272,6 +272,20 @@ namespace Gizbox.IR
                             }
                             varDeclNode.attributes.Remove(eAttr.set_null_after_stmt);
                         }
+
+                        // 被移动字段置NULL（作为drop-flag）
+                        if(varDeclNode.attributes.ContainsKey(eAttr.set_null_field_after_stmt))
+                        {
+                            if(varDeclNode.attributes[eAttr.set_null_field_after_stmt] is SyntaxTree.ObjectMemberAccessNode fieldNode)
+                            {
+                                // ensure object expr ret exists
+                                GenNode(fieldNode.objectNode);
+                                string obj = TrimName(GetRet(fieldNode.objectNode));
+                                string field = fieldNode.memberNode.FullName;
+                                EmitCode("=", obj + "->" + field, "%LITNULL:");
+                            }
+                            varDeclNode.attributes.Remove(eAttr.set_null_field_after_stmt);
+                        }
                     }
                     break;
                 case OwnershipCaptureStmtNode captureNode:
@@ -324,6 +338,19 @@ namespace Gizbox.IR
                         if(returnNode.returnExprNode != null)
                         {
                             GenNode(returnNode.returnExprNode);
+                        }
+
+                        // owner-return 的字段 move-out：return 前把字段置NULL（drop-flag）
+                        if(returnNode.attributes.ContainsKey(eAttr.set_null_field_after_stmt))
+                        {
+                            if(returnNode.attributes[eAttr.set_null_field_after_stmt] is SyntaxTree.ObjectMemberAccessNode fieldNode)
+                            {
+                                GenNode(fieldNode.objectNode);
+                                string obj = TrimName(GetRet(fieldNode.objectNode));
+                                string field = fieldNode.memberNode.FullName;
+                                EmitCode("=", obj + "->" + field, "%LITNULL:");
+                            }
+                            returnNode.attributes.Remove(eAttr.set_null_field_after_stmt);
                         }
 
                         // return之前先回收需要回收的Owner类型  
@@ -649,6 +676,19 @@ namespace Gizbox.IR
                             }
                             assignNode.attributes.Remove(eAttr.set_null_after_stmt);
                         }
+
+                        // 被移动字段置NULL（作为drop-flag）
+                        if(assignNode.attributes.ContainsKey(eAttr.set_null_field_after_stmt))
+                        {
+                            if(assignNode.attributes[eAttr.set_null_field_after_stmt] is SyntaxTree.ObjectMemberAccessNode fieldNode)
+                            {
+                                GenNode(fieldNode.objectNode);
+                                string obj = TrimName(GetRet(fieldNode.objectNode));
+                                string field = fieldNode.memberNode.FullName;
+                                EmitCode("=", obj + "->" + field, "%LITNULL:");
+                            }
+                            assignNode.attributes.Remove(eAttr.set_null_field_after_stmt);
+                        }
                     }
                     break;
                 case CallNode callNode:
@@ -678,10 +718,11 @@ namespace Gizbox.IR
 
 
                         //表达式的返回变量  
-                        if(callNode.attributes.ContainsKey(eAttr.store_expr_result))
+                        bool store_result = callNode.attributes.ContainsKey(eAttr.store_expr_result);
+                        if(store_result)
                         {
-                            SetRet(callNode, NewTemp(returnType));
                             callNode.attributes.Remove(eAttr.store_expr_result);
+                            SetRet(callNode, NewTemp(returnType));
                         }
                         else if(returnTypeNotVoid == true && isSingleExprStmt == false)
                         {
@@ -742,20 +783,36 @@ namespace Gizbox.IR
                         if (callNode.isMemberAccessFunction == true)
                         {
                             EmitCode("MCALL", fullName, "%LITINT:" + argCount);
-
-                            if(returnTypeNotVoid == true && isSingleExprStmt == false)//返回值不为null且不是单表达式节点  
-                            {
-                                EmitCode("=", GetRet(callNode), "%RET");
-                            }
                         }
                         else
                         {
                             EmitCode("CALL", fullName, "%LITINT:" + argCount);
+                        }
 
-                            if(returnTypeNotVoid == true && isSingleExprStmt == false)//返回值不为null且不是单表达式节点  
+
+                        //返回非void
+                        if(returnTypeNotVoid == true)
+                        {
+                            // 不是单表达式节点 || 有store_expr_result属性    
+                            if(isSingleExprStmt == false || store_result)
                             {
                                 EmitCode("=", GetRet(callNode), "%RET");
                             }
+                        }
+
+
+                        //调用后把moved-from的实参变量置NULL(作为drop-flag)  
+                        if(callNode.attributes.ContainsKey(eAttr.set_null_after_call))
+                        {
+                            var toNull = callNode.attributes[eAttr.set_null_after_call] as List<string>;
+                            if(toNull != null)
+                            {
+                                foreach(var v in toNull)
+                                {
+                                    EmitCode("=", v, "%LITNULL:");
+                                }
+                            }
+                            callNode.attributes.Remove(eAttr.set_null_after_call);
                         }
                     }
                     break;
@@ -903,7 +960,7 @@ namespace Gizbox.IR
             //class对象 ->  先调用dtor再释放内存  
             EmitCode("PARAM", varname);
             EmitCode("CALL", gtype.ToString() + "::dtor", "%LITINT:1");
-            EmitCode("DEALLOC", varname, comment: "//EmitDeleteVarCode");
+            EmitCode("DEALLOC", varname);
         }
 
 

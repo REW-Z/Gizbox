@@ -5,17 +5,46 @@ using Core;
 using Console;
 using Collections;
 
-
-class Stream
+class own OInt
 {
+    int value = 0;
+}
+class ItemOInt
+{
+    OInt itemValue = new OInt();
+}
+class OIntList
+{
+    ItemOInt[] items = new ItemOInt[10];
+    int count = 0;
+
+    void Add(OInt v)
+    {
+        int idx = this.count;
+        this.items[idx] = new ItemOInt();
+        this.items[idx].itemValue = v;
+        this.count += 1;
+    }
+    OInt Get(int idx)
+    {
+        OInt t = this.items[idx].itemValue;
+        return t; //从字段中返回own类型，所有权转移
+    }
+    bor OInt GetBor(int idx)
+    {
+        bor OInt t = this.items[idx].itemValue;//从字段中返回bor类型，不转移所有权
+        return t;
+    }
 }
 
-class BinaryWriter
+
+//测试类，含有own字段
+class TestClass
 {
-    own Stream stream = new Stream();
+    own Int field1 = new Int();
 }
 
-
+//测试函数，参数和返回值均为own类型
 own Int OAdd(own Int x, own Int y)
 {
     own Int rs = new Int();
@@ -23,60 +52,136 @@ own Int OAdd(own Int x, own Int y)
     return rs;
 }
 
-
-void main()
+//测试参数和返回值的所有权传递  
+void test1()
 {
+    Console::PrintLn("Test1 : own param & own return.");
+    
     own Int aaa = new Int(); aaa.value = 1;
     own Int bbb = new Int(); bbb.value = 2;
     
-    Console::PrintLn("Test0");
     Console::PrintLn("aaa:" + (string)aaa.value);
-    Console::PrintLn("Test1");
-
-
-    own Int ccc  = OAdd(aaa, bbb);
     
-    Console::PrintLn("Test2");
+    //测试返回值的所有权传递
+    own Int ccc  = OAdd(aaa, bbb);
+
+
+    //测试返回值被抛弃    
+    own Int xxx = new Int(); xxx.value = 3;
+    own Int yyy = new Int(); yyy.value = 4;
+
+    OAdd(xxx, yyy);
+
+    
+    Console::PrintLn("value of ccc");
     Console::PrintLn((string)ccc.value);
 
     //Console::PrintLn("aaa:" + (string)aaa.value); //已经被移动，不能再使用  
-    
+}
 
-    ////分支测试  
-    //if(true)
-    //{
-    //    own Int ddd = ccc;
-    //}
-    //else if(true)
-    //{
-    //    own Int fff = ccc;
-    //}
-    //else
-    //{
-    //}
-    //
-    //
-    ////循环测试
-    //for(int i = 0; i < 3; i++)
-    //{
-    //    own Int eee = new Int();
-    //    eee.value = i;
-    //    Console::PrintLn("eee:" + (string)eee.value);
-    //}
-    //
-    ////字段测试  
-    //BinaryWriter writer = new BinaryWriter();
-    ////delete writer.stream;
-    //delete writer;
-    //
-    //
-    ////捕获和泄露测试  
-    //own Int src1 = new Int();
-    //Int dst1 = leak(src1);
-    //
-    //Int src2 = new Int();
-    //own Int dst2 = capture(src2);
-    //
-    //
-    //Console::PrintLn("Test Finish.");
+
+//分支测试  
+void test2()
+{
+    Console::PrintLn("Test2 : own in branches.");
+
+    own Int ccc = new Int();
+    if(true)
+    {
+        own Int ddd = ccc;
+        
+    }
+    else if(true)
+    {
+        own Int fff = ccc;
+    }
+    else
+    {
+    }
+
+    //IR中会条件删除ccc
+}
+
+
+//循环测试  
+void test3()
+{
+    Console::PrintLn("Test3 : own in loops.");
+
+    for(int i = 0; i < 3; i++)
+    {
+        own Int eee = new Int();
+        eee.value = i;
+        Console::PrintLn("eee:" + (string)eee.value);
+    }
+
+    own Int fff = new Int();
+    int counter = 0;
+    while(counter < 10)
+    {
+        //own Int ggg = fff; //报错: 不能多次移动同一个own对象  
+        counter++;
+    }
+}
+
+//字段测试  
+void test4()
+{
+    Console::PrintLn("Test4 : own fields.");
+
+    TestClass obj1 = new TestClass();
+    //delete obj1.field1; //编译错误：delete不能用于所有权类型  
+    delete obj1;                  //析构函数会自动释放own字段  
+}
+
+//捕获和泄露测试  
+void test5()
+{
+    Console::PrintLn("Test5 : own capture & leak.");
+
+    own Int src1 = new Int();
+    Int dst1 = leak(src1);
+    
+    Int src2 = new Int();
+    own Int dst2 = capture(src2);
+}
+
+//数组测试  
+void test6()
+{
+    ItemOInt[] arr = new ItemOInt[10];
+    arr[0] = new ItemOInt();
+    arr[0].itemValue.value = 123;
+
+    OIntList list = new OIntList();
+    list.Add(new OInt());
+    bor OInt vbor = list.GetBor(0);
+    vbor.value = 456;
+    OInt vown = list.Get(0);
+    bor OInt vbor2 = list.GetBor(0);
+    bor OInt vown2 = list.GetBor(0);
+
+
+
+    Console::PrintLn("value:" + (string)arr[0].itemValue.value);
+
+    Console::PrintLn("list-value:" + (string)vbor.value);
+    Console::PrintLn("list-value:" + (string)vown.value);
+    
+    Console::PrintLn("list-value:" + (string)vbor2.value);
+    Console::PrintLn("list-value:" + (string)vown2.value);
+}
+
+
+
+void main()
+{
+    test1();
+    test2();
+    test3();
+    test4();
+    test5();
+    test6();
+
+    Console::PrintLn("Test Finish.");
 }

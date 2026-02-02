@@ -272,8 +272,8 @@ namespace Gizbox
 
             using(var proc = new Process { StartInfo = psi })
             {
-                proc.OutputDataReceived += (s, e) => { if(e != null && e.Data != null) Console.WriteLine("[OUT] " + e.Data); };
-                proc.ErrorDataReceived += (s, e) => { if(e != null && e.Data != null) Console.WriteLine("[ERR] " + e.Data); };
+                proc.OutputDataReceived += (s, e) => { if(e != null && e.Data != null) GixConsole.WriteLine("[OUT] " + e.Data); };
+                proc.ErrorDataReceived += (s, e) => { if(e != null && e.Data != null) GixConsole.WriteLine("[ERR] " + e.Data); };
 
                 try
                 {
@@ -303,7 +303,6 @@ namespace Gizbox
         {
             var ir = this.CompileToIR(source, isMainUnit:false, libName);
             Gizbox.IR.ILSerializer.Serialize(savePath, ir);
-            ir.Print();
 
             Gizbox.GixConsole.WriteLine($"Lib {libName} Complete Finish!");
         }
@@ -408,7 +407,7 @@ namespace Gizbox
 
             foreach(var fileName in fileNames)
             {
-                Console.WriteLine($">>>nasm -f win64 {fileName}.asm -o {fileName}.obj");
+                GixConsole.WriteLine($">>>nasm -f win64 {fileName}.asm -o {fileName}.obj");
                 Run("nasm", $"-f win64 {fileName}.asm -o {fileName}.obj", outputDir);
             }
 

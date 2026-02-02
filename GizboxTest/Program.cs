@@ -175,7 +175,7 @@ switch(cmdIdx)
 
             il.Print();
 
-            if(true)
+            if(false)
             {
                 compiler.CompileIRToExe(il, System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
             }

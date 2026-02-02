@@ -116,4 +116,11 @@ SizeOf返回类型的字节大小。TypeOf返回类型信息对象（静态对�
 
 （DONE）capture和leak的产生式。    
 （DONE）capture和leak的产语义分析。  
-测试  
+
+own参数传递后，实参没有被置null。
+field-delete 必须置null，field是以值是否为null作为drop-flag的。    
+循环需要测试。（PossibleMove状态）      
+
+
+机制重大变更：
+数组赋值直接剥夺所有权，不需要leak关键字。  

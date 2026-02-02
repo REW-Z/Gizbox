@@ -29,43 +29,43 @@ namespace Gizbox.IR
 
         public string ToExpression(bool showlabel = true, bool indent = true)
         {
-            string str = "";
+            StringBuilder strb = new();
 
             if (showlabel)
             {
                 if (string.IsNullOrEmpty(label))
                 {
                     if(indent)
-                        str += new string(' ', 20);
+                        strb.Append(new string(' ', 20));
                     
                 }
                 else
                 {
                     if(indent)
-                        str += (label + ":").PadRight(20);
+                        strb.Append((label + ":").PadRight(20));
                     else
-                        str += (label + ":");
+                        strb.Append(label + ":") ;
                 }
             }
-            str += op;
+            strb.Append(op) ;
 
             if (string.IsNullOrEmpty(arg0) == false)
             {
-                str += " " + arg0;
+                strb.Append(" " + arg0) ;
             }
             if (string.IsNullOrEmpty(arg1) == false)
             {
-                str += " " + arg1;
+                strb.Append(" " + arg1) ;
             }
             if (string.IsNullOrEmpty(arg2) == false)
             {
-                str += " " + arg2;
+                strb.Append(" " + arg2) ;
             }
             if (string.IsNullOrEmpty(comment) == false)
             {
-                str += "    // " + comment;
+                strb.Append("    // " + comment);
             }
-            return str;
+            return strb.ToString();
         }
     }
 
@@ -478,7 +478,46 @@ namespace Gizbox.IR
             GixConsole.WriteLine(new string('-', 50));
             for (int i = 0; i < codes.Count; ++i)
             {
-                GixConsole.WriteLine($"{i.ToString().PadRight(4)}|status {scopeStatusArr[i].ToString().PadRight(3)}|{codes[i].ToExpression()}");
+                GixConsole.Write(i.ToString().PadRight(4), ConsoleColor.Gray);
+                GixConsole.Write("|status ", ConsoleColor.Gray);
+                GixConsole.Write(scopeStatusArr[i].ToString().PadRight(3), ConsoleColor.Gray);
+                GixConsole.Write("|", ConsoleColor.Gray);
+
+                var tac = codes[i];
+                {
+                    if(string.IsNullOrEmpty(tac.label))
+                    {
+                        GixConsole.Write(new string(' ', 20));
+                    }
+                    else
+                    {
+                        GixConsole.Write((tac.label + ":").PadRight(20), ConsoleColor.DarkYellow);
+                    }
+                }
+                {
+                    GixConsole.Write(" ");
+                    ConsoleColor opColor = ConsoleColor.DarkBlue;
+                    if(tac.op == "JUMP" || tac.op == "CALL" || tac.op == "MCALL" || tac.op == "IF_FALSE_JUMP")
+                        opColor = ConsoleColor.Magenta;
+                    else if(tac.op == "RETURN")
+                        opColor = ConsoleColor.DarkMagenta;
+
+                    GixConsole.Write(tac.op, opColor);
+                }
+
+
+                GixConsole.Write(" ");
+                GixConsole.Write(tac.arg0, ConsoleColor.White);
+                GixConsole.Write(" ");
+                GixConsole.Write(tac.arg1, ConsoleColor.DarkGray);
+                GixConsole.Write(" ");
+                GixConsole.Write(tac.arg2, ConsoleColor.White);
+
+                GixConsole.Write(" ");
+                GixConsole.Write(tac.comment, ConsoleColor.DarkGreen);
+                GixConsole.Write("\n\r");
+
+                //GixConsole.WriteLine($"{i.ToString().PadRight(4)}|status {scopeStatusArr[i].ToString().PadRight(3)}|{codes[i].ToExpression()}");
             }
             GixConsole.WriteLine(new string('-', 50));
         }

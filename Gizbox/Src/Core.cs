@@ -1253,11 +1253,21 @@ namespace Gizbox
     {
         public static bool enableSystemConsole = true;
         
-        public static void Write(object msg = null)
+
+        public static void Write(object msg = null, ConsoleColor textColor = ConsoleColor.White, ConsoleColor bgColor = ConsoleColor.Black)
         {
             if(GixConsole.enableSystemConsole)
             {
+                var prevTextColor = Console.ForegroundColor;
+                var prevBgColor = Console.BackgroundColor;
+
+                Console.ForegroundColor = textColor;
+                Console.BackgroundColor = bgColor;
+
                 Console.Write(msg);
+
+                Console.ForegroundColor = prevTextColor;
+                Console.BackgroundColor = prevBgColor;
             }
         }
         public static void WriteLine(object msg = null)
