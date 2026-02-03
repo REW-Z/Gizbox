@@ -107,20 +107,3 @@ delete[]目前不会逐个调用元素的析构函数。因为Gizbox没有结构
 ### SizeOf和TypeOf实现  
 
 SizeOf返回类型的字节大小。TypeOf返回类型信息对象（静态对象）。  
-
-### 所有权-成员字段    
-
-（DONE）禁止Move-Out  
-（DONE）drop_field_before_stmt实现  
-（DONE）隐含析构函数。析构时同时Drop所有成员字段  
-
-（DONE）capture和leak的产生式。    
-（DONE）capture和leak的产语义分析。  
-
-own参数传递后，实参没有被置null。
-field-delete 必须置null，field是以值是否为null作为drop-flag的。    
-循环需要测试。（PossibleMove状态）      
-
-
-机制重大变更：
-数组赋值直接剥夺所有权，不需要leak关键字。  

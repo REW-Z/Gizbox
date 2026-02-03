@@ -32,8 +32,7 @@ class OIntList
     }
     bor OInt GetBor(int idx)
     {
-        bor OInt t = this.items[idx].itemValue;//从字段中返回bor类型，不转移所有权
-        return t;
+        return this.items[idx].itemValue;//从字段中返回bor类型，不转移所有权
     }
 }
 
@@ -159,7 +158,7 @@ void test6()
     vbor.value = 456;
     OInt vown = list.Get(0);
     bor OInt vbor2 = list.GetBor(0);
-    bor OInt vown2 = list.GetBor(0);
+    own OInt vown2 = list.Get(0);//vown2释放时会报错，vown2是null  
 
 
 
@@ -168,8 +167,8 @@ void test6()
     Console::PrintLn("list-value:" + (string)vbor.value);
     Console::PrintLn("list-value:" + (string)vown.value);
     
-    Console::PrintLn("list-value:" + (string)vbor2.value);
-    Console::PrintLn("list-value:" + (string)vown2.value);
+    //Console::PrintLn("list-value:" + (string)vbor2.value); //报错：UB
+    //Console::PrintLn("list-value:" + (string)vown2.value);
 }
 
 

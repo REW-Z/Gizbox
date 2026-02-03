@@ -3310,10 +3310,7 @@ namespace Gizbox.SemanticRule
                         var frec = funcDecl.attributes[eAttr.func_rec] as SymbolTable.Record;
                         frec.flags |= GetOwnershipModel(funcDecl.returnFlags, funcDecl.returnTypeNode);
 
-
-                        // 检查：返回值不能是borrow模型  
-                        if(frec.flags.HasFlag(SymbolTable.RecordFlag.BorrowVar))
-                            throw new SemanticException(ExceptioName.OwnershipError_ReturnBorrowValueNotSupport, funcDecl, string.Empty);
+                    // NOTE: 允许借用返回值。健全性(safety)需要通过逃逸/生命周期检查保证。
 
 
                         // 更新当前函数返回值信息  
@@ -3608,7 +3605,7 @@ namespace Gizbox.SemanticRule
                             // 如果字段是owner且不为null，则先删
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
-                                assignNode.attributes[eAttr.drop_field_before_assign_stmt] = null;
+                                assignNode.attributes[eAttr.drop_field_before_assign_stmt] = 0;
                             }
 
 
@@ -3695,6 +3692,12 @@ namespace Gizbox.SemanticRule
                     {
                         // 先递归，确保内层调用的move已处理
                         Pass4_OwnershipLifetime(ret.returnExprNode);
+
+                        // borrow-return escape check: returned borrow must be derived from `this` or a borrow parameter
+                        if(lifeTimeInfo.currentFuncReturnFlag.HasFlag(SymbolTable.RecordFlag.BorrowVar))
+                        {
+                            CheckBorrowReturnEscape(ret, ret.returnExprNode);
+                        }
 
                         // 如果返回的是owner，且返回变量是Identity，则将其标记为moved，避免被删除
                         string returnedName = null;
@@ -3942,6 +3945,64 @@ namespace Gizbox.SemanticRule
 
         private static readonly SymbolTable.RecordFlag OwnershipModelMask =
             SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.BorrowVar | SymbolTable.RecordFlag.ManualVar;
+
+
+        private void CheckBorrowReturnEscape(SyntaxTree.ReturnStmtNode retNode, SyntaxTree.ExprNode returnExpr)
+        {
+            if(returnExpr == null)
+                throw new SemanticException(ExceptioName.OwnershipError, retNode, "borrow return must have expression.");
+
+            // 仅允许：1) 以 this/bor 参数为根的成员/元素访问；2) 直接返回 bor 参数（以及 this 本身）
+            if(IsBorrowDerivedFromAllowedInput(returnExpr))
+                return;
+
+            throw new SemanticException(ExceptioName.OwnershipError, retNode, "borrow return must be derived from this or borrow parameter.");
+        }
+
+        private bool IsBorrowDerivedFromAllowedInput(SyntaxTree.ExprNode expr)
+        {
+            // 允许 return this（等价于借用调用者持有的对象）
+            if(expr is SyntaxTree.ThisNode)
+                return true;
+
+            // return 标识符：必须是显式 bor 参数
+            if(expr is SyntaxTree.IdentityNode id)
+            {
+                var rec = Query(id.FullName);
+                if(rec == null)
+                    return false;
+
+                if(rec.category != SymbolTable.RecordCatagory.Param)
+                    return false;
+
+                var model = rec.flags & OwnershipModelMask;
+                return model.HasFlag(SymbolTable.RecordFlag.BorrowVar);
+            }
+
+            // return 成员访问：递归检查其根，必须是 this 或 bor 参数
+            if(expr is SyntaxTree.ObjectMemberAccessNode ma)
+            {
+                // 根为 this.* 或 borParam.* 则允许
+                if(IsBorrowDerivedFromAllowedInput(ma.objectNode))
+                    return true;
+                return false;
+            }
+
+            // return 下标访问：仅当容器表达式派生自允许的输入
+            if(expr is SyntaxTree.ElementAccessNode ea)
+            {
+                return IsBorrowDerivedFromAllowedInput(ea.containerNode);
+            }
+
+            // return cast：cast 不改变所有权/借用来源，只递归检查操作数
+            if(expr is SyntaxTree.CastNode c)
+            {
+                return IsBorrowDerivedFromAllowedInput(c.factorNode);
+            }
+
+            // 其余情况都视为临时值/未知来源 => 拒绝（new/call/literal/binary/unary 等）
+            return false;
+        }
 
         /// <summary> 所有权比较 </summary>
         private void CheckOwnershipCompare_Core(SyntaxTree.Node errorNode, SymbolTable.RecordFlag lModel, string lname, SyntaxTree.ExprNode rNode, out SymbolTable.RecordFlag rModel)
