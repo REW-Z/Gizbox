@@ -691,6 +691,39 @@ namespace Gizbox.IR
                         }
                     }
                     break;
+                case ReplaceNode replaceNode:
+                    {
+                        if(replaceNode.targetNode is not ObjectMemberAccessNode targetAccess)
+                            throw new SemanticException(ExceptioName.OwnershipError, replaceNode, "replace target must be a field access.");
+
+                        GenNode(targetAccess.objectNode);
+                        string obj = TrimName(GetRet(targetAccess.objectNode));
+                        string field = targetAccess.memberNode.FullName;
+                        string accessExpr = obj + "->" + field;
+
+                        string returnType = (string)replaceNode.attributes[eAttr.type];
+                        string tmp = NewTemp(returnType);
+                        EmitCode("=", tmp, accessExpr);
+
+                        GenNode(replaceNode.newValueNode);
+                        EmitCode("=", accessExpr, GetRet(replaceNode.newValueNode));
+
+                        SetRet(replaceNode, tmp);
+
+                        if(replaceNode.attributes.ContainsKey(eAttr.set_null_after_stmt))
+                        {
+                            var toNull = replaceNode.attributes[eAttr.set_null_after_stmt] as List<string>;
+                            if(toNull != null)
+                            {
+                                foreach(var v in toNull)
+                                {
+                                    EmitCode("=", v, "%LITNULL:");
+                                }
+                            }
+                            replaceNode.attributes.Remove(eAttr.set_null_after_stmt);
+                        }
+                    }
+                    break;
                 case CallNode callNode:
                     {
                         //函数全名  

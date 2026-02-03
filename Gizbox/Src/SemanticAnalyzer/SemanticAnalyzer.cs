@@ -2447,6 +2447,7 @@ namespace Gizbox.SemanticRule
                 return;
             }
 
+
             switch (node)
             {
                 case SyntaxTree.ProgramNode programNode:
@@ -2902,6 +2903,26 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.CallNode callNode:
                     {
+                        if(callNode.isMemberAccessFunction == false
+                            && callNode.funcNode is SyntaxTree.IdentityNode replaceId
+                            && (replaceId.FullName == "replace" || replaceId.token?.attribute == "replace"))
+                        {
+                            if(callNode.argumantsNode.arguments.Count != 2)
+                                throw new SemanticException(ExceptioName.SemanticAnalysysError, callNode, "replace expects 2 arguments.");
+
+                            var replaceNode = new SyntaxTree.ReplaceNode()
+                            {
+                                targetNode = callNode.argumantsNode.arguments[0],
+                                newValueNode = callNode.argumantsNode.arguments[1],
+                                attributes = callNode.attributes,
+                            };
+                            replaceNode.Parent = callNode.Parent;
+                            callNode.overrideNode = replaceNode;
+
+                            Pass3_AnalysisNode(replaceNode);
+                            break;
+                        }
+
                         //实参分析  
                         foreach (var argNode in callNode.argumantsNode.arguments)
                         {
@@ -2926,6 +2947,21 @@ namespace Gizbox.SemanticRule
                         //参数个数检查暂无...
 
                         //参数重载对应检查暂无...
+                    }
+                    break;
+                case SyntaxTree.ReplaceNode replaceNode:
+                    {
+                        Pass3_AnalysisNode(replaceNode.targetNode);
+                        Pass3_AnalysisNode(replaceNode.newValueNode);
+
+                        if(replaceNode.targetNode is not SyntaxTree.ObjectMemberAccessNode)
+                            throw new SemanticException(ExceptioName.OwnershipError, replaceNode, "replace target must be a field access.");
+
+                        bool valid = CheckType_Equal(replaceNode.targetNode, replaceNode.newValueNode);
+                        if(!valid)
+                            throw new SemanticException(ExceptioName.AssignmentTypeError, replaceNode, "replace value type mismatch.");
+
+                        AnalyzeTypeExpression(replaceNode);
                     }
                     break;
                 case SyntaxTree.AssignNode assignNode:
@@ -3712,10 +3748,9 @@ namespace Gizbox.SemanticRule
                         }
 
                         // 检查:对象成员不可以MoveOut  
-                        if(lifeTimeInfo.currentFuncReturnFlag.HasFlag(SymbolTable.RecordFlag.OwnerVar) && ret.returnExprNode is SyntaxTree.ObjectMemberAccessNode accessNode)
+                        if(lifeTimeInfo.currentFuncReturnFlag.HasFlag(SymbolTable.RecordFlag.OwnerVar) && ret.returnExprNode is SyntaxTree.ObjectMemberAccessNode)
                         {
-                            // allow move-out from field; ensure drop-flag
-                            ret.attributes[eAttr.set_null_field_after_stmt] = accessNode;
+                            throw new SemanticException(ExceptioName.OwnershipError_CanNotMoveOutClassField, ret, "returning owner field is not allowed; use replace.");
                         }
 
                         // 汇总当前所有活跃Owner（所有栈帧），return前删除（排除被返回者）
@@ -3767,12 +3802,62 @@ namespace Gizbox.SemanticRule
                             }
                                 
                         }
+                        else if(sstmt.exprNode is SyntaxTree.ReplaceNode rnode)
+                        {
+                            if(rnode.targetNode is SyntaxTree.ObjectMemberAccessNode targetAccess)
+                            {
+                                var objTypeExpr = (string)targetAccess.objectNode.attributes[eAttr.type];
+                                var objClassRec = Query(objTypeExpr);
+                                var fieldRec = objClassRec?.envPtr?.Class_GetMemberRecordInChain(targetAccess.memberNode.FullName);
+                                if(fieldRec != null && fieldRec.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                                {
+                                    delExprs.Add(sstmt.exprNode);
+                                }
+                            }
+                        }
 
                         if(delExprs.Count > 0)
                         {
                             sstmt.attributes[eAttr.drop_expr_result_after_stmt] = delExprs;
                         }
 
+                        break;
+                    }
+                case SyntaxTree.ReplaceNode replaceNode:
+                    {
+                        Pass4_OwnershipLifetime(replaceNode.targetNode);
+                        Pass4_OwnershipLifetime(replaceNode.newValueNode);
+
+                        if(replaceNode.targetNode is not SyntaxTree.ObjectMemberAccessNode targetAccess)
+                            throw new SemanticException(ExceptioName.OwnershipError, replaceNode, "replace target must be a field access.");
+
+                        var objTypeExpr = (string)targetAccess.objectNode.attributes[eAttr.type];
+                        var objClassRec = Query(objTypeExpr);
+                        if(objClassRec == null || objClassRec.envPtr == null)
+                            throw new SemanticException(ExceptioName.ClassSymbolTableNotFound, replaceNode, objTypeExpr);
+
+                        var fieldRec = objClassRec.envPtr.Class_GetMemberRecordInChain(targetAccess.memberNode.FullName);
+                        if(fieldRec == null)
+                            throw new SemanticException(ExceptioName.MemberFieldNotFound, replaceNode, targetAccess.memberNode.FullName);
+
+                        if(GType.Parse(fieldRec.typeExpression).IsReferenceType)
+                        {
+                            var lmodel = fieldRec.flags & OwnershipModelMask;
+                            CheckOwnershipCompare_Core(replaceNode, lmodel, fieldRec.name, replaceNode.newValueNode, out var _);
+
+                            if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                            {
+                                CheckOwnershipCanMoveOut(replaceNode.newValueNode);
+
+                                if(replaceNode.newValueNode is SyntaxTree.IdentityNode idrvalue)
+                                {
+                                    var rrec = Query(idrvalue.FullName);
+                                    lifeTimeInfo.currBranch.SetVarStatus(rrec.name, LifetimeInfo.VarStatus.Dead);
+
+                                    replaceNode.attributes[eAttr.set_null_after_stmt] = new List<string> { rrec.name };
+                                }
+                            }
+                        }
                         break;
                     }
 
@@ -4040,6 +4125,52 @@ namespace Gizbox.SemanticRule
                 return;
             }
 
+            // 右值：replace
+            else if(rNode is ReplaceNode replaceNode)
+            {
+                if(replaceNode.targetNode is not ObjectMemberAccessNode memAccess)
+                    throw new SemanticException(ExceptioName.OwnershipError, errorNode, "replace target must be a field access.");
+
+                if(memAccess.objectNode.attributes.TryGetValue(eAttr.type, out var objTypeObj) == false || objTypeObj is not string objTypeExpr)
+                    throw new GizboxException(ExceptioName.Undefine, "member access object type not set.");
+
+                var objClassRec = Query(objTypeExpr);
+                if(objClassRec == null || objClassRec.envPtr == null)
+                    throw new GizboxException(ExceptioName.Undefine, "class record not found for member access.");
+
+                var fieldRec = objClassRec.envPtr.Class_GetMemberRecordInChain(memAccess.memberNode.FullName);
+                if(fieldRec == null)
+                    throw new GizboxException(ExceptioName.Undefine, "field record not found for member access.");
+
+                rModel = fieldRec.flags & OwnershipModelMask;
+
+                // manual <- (owner|borrow) 禁止
+                if(lModel == SymbolTable.RecordFlag.ManualVar && rModel != SymbolTable.RecordFlag.ManualVar)
+                {
+                    if(rModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                        throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignOwnToManual, errorNode, lname);
+                    if(rModel.HasFlag(SymbolTable.RecordFlag.BorrowVar))
+                        throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignBorrwToManual, errorNode, lname);
+                }
+
+                // owner <- (manual|borrow) 禁止
+                if(lModel == SymbolTable.RecordFlag.OwnerVar && rModel != SymbolTable.RecordFlag.OwnerVar)
+                {
+                    if(rModel.HasFlag(SymbolTable.RecordFlag.ManualVar))
+                        throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignManualToOwn, errorNode, lname);
+                    if(rModel.HasFlag(SymbolTable.RecordFlag.BorrowVar))
+                        throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignBorrowToOwn, errorNode, lname);
+                }
+
+                // borrow <- manual 禁止
+                if(lModel == SymbolTable.RecordFlag.BorrowVar && rModel == SymbolTable.RecordFlag.ManualVar)
+                {
+                    throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignManualToBorrow, errorNode, lname);
+                }
+
+                return;
+            }
+
             // 右值：对象成员访问 obj.field
             else if(rNode is ObjectMemberAccessNode memAccess)
             {
@@ -4215,7 +4346,16 @@ namespace Gizbox.SemanticRule
         /// <summary> 所有权可移出检查 </summary>
         private void CheckOwnershipCanMoveOut(SyntaxTree.ExprNode rvalNode)
         {
-            // allow move-out from owner fields (drop/move will set place to null as drop-flag)
+            if(rvalNode == null)
+                return;
+
+            if(rvalNode is SyntaxTree.ObjectMemberAccessNode || rvalNode is SyntaxTree.ElementAccessNode)
+                throw new SemanticException(ExceptioName.OwnershipError_CanNotMoveOutClassField, rvalNode, "move-out from field is disabled; use replace.");
+
+            if(rvalNode is SyntaxTree.CastNode castNode)
+            {
+                CheckOwnershipCanMoveOut(castNode.factorNode);
+            }
         }
 
 
@@ -4426,6 +4566,14 @@ namespace Gizbox.SemanticRule
                                 callNode.attributes[eAttr.mangled_name] = funcMangledName;
                             }
                         }
+                    }
+                    break;
+                case SyntaxTree.ReplaceNode replaceNode:
+                    {
+                        if(replaceNode.targetNode is not SyntaxTree.ObjectMemberAccessNode)
+                            throw new SemanticException(ExceptioName.OwnershipError, replaceNode, "replace target must be a field access.");
+
+                        nodeTypeExprssion = AnalyzeTypeExpression(replaceNode.targetNode);
                     }
                     break;
                 case SyntaxTree.NewObjectNode newObjNode:

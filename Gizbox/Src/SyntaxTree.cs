@@ -837,6 +837,19 @@ namespace Gizbox
             }
         }
 
+        public class ReplaceNode : SpecialExprNode//replace(member, newValue)
+        {
+            public ExprNode targetNode { get => (ExprNode)children_group_0[0]; set => children_group_0[0] = value; }
+            public ExprNode newValueNode { get => (ExprNode)children_group_0[1]; set => children_group_0[1] = value; }
+
+            public ReplaceNode()
+            {
+                children_group_0 = new();
+                children_group_0.Add(null);
+                children_group_0.Add(null);
+            }
+        }
+
 
 
         public class IncDecNode : SpecialExprNode//自增自减表达式（低优先级）

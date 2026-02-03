@@ -27,8 +27,10 @@ class OIntList
     }
     OInt Get(int idx)
     {
-        OInt t = this.items[idx].itemValue;
-        return t; //从字段中返回own类型，所有权转移
+        OInt rep = new OInt();
+        rep.value = 999;
+        OInt t = replace(this.items[idx].itemValue, rep);
+        return t; //从字段中返回own类型，使用replace进行所有权转移  
     }
     bor OInt GetBor(int idx)
     {
@@ -154,11 +156,15 @@ void test6()
 
     OIntList list = new OIntList();
     list.Add(new OInt());
+
+    //取出所有权赋值  
     bor OInt vbor = list.GetBor(0);
     vbor.value = 456;
-    OInt vown = list.Get(0);
+    OInt vown = list.Get(0);//replace后字段被填入新对象  
+
+    //第二次取出，验证replace效果  
     bor OInt vbor2 = list.GetBor(0);
-    own OInt vown2 = list.Get(0);//vown2释放时会报错，vown2是null  
+    own OInt vown2 = list.Get(0);
 
 
 
@@ -167,8 +173,8 @@ void test6()
     Console::PrintLn("list-value:" + (string)vbor.value);
     Console::PrintLn("list-value:" + (string)vown.value);
     
-    //Console::PrintLn("list-value:" + (string)vbor2.value); //报错：UB
-    //Console::PrintLn("list-value:" + (string)vown2.value);
+    Console::PrintLn("list-value:" + (string)vbor2.value); 
+    Console::PrintLn("list-value:" + (string)vown2.value);
 }
 
 
