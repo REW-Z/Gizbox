@@ -461,23 +461,8 @@ namespace Gizbox.Src.Backend
                 var tac = ir.codes[i];
                 var nextTac = (i + 1 < ir.codes.Count) ? ir.codes[i + 1] : null;
 
-                if(UtilsW64.IsJump(tac))
-                {
-                    //Block End
-                    BasicBlock b = new BasicBlock() { startIdx = blockstart, endIdx = i };
-                    if(currentLabel != null)
-                    {
-                        b.hasLabel = currentLabel;
-                        currentLabel = null;
-                    }
 
-
-                    blocks.Add(b);
-                    blockstart = i + 1;
-                    continue;
-                }
-
-                if((nextTac != null &&  UtilsW64.HasLabel(nextTac)))
+                if((nextTac != null && UtilsW64.HasLabel(nextTac)))//优先判断
                 {
                     //Block End
                     BasicBlock b = new BasicBlock() { startIdx = blockstart, endIdx = i };
@@ -490,6 +475,22 @@ namespace Gizbox.Src.Backend
                     blocks.Add(b);
                     blockstart = i + 1;
                     currentLabel = nextTac.label;
+                    continue;
+                }
+
+                if(UtilsW64.IsJump(tac))//次要判断  
+                {
+                    //Block End
+                    BasicBlock b = new BasicBlock() { startIdx = blockstart, endIdx = i };
+                    if(currentLabel != null)
+                    {
+                        b.hasLabel = currentLabel;
+                        currentLabel = null;
+                    }
+
+
+                    blocks.Add(b);
+                    blockstart = i + 1;
                     continue;
                 }
             }
@@ -887,18 +888,21 @@ namespace Gizbox.Src.Backend
                             Debug.Assert(targetFuncRec != null);
 
 
-                            //this参数载入寄存器  
-                            var codeParamObj = tempParamList.FirstOrDefault(c => c.PARAM_paramidx == 0);
-                            var x64obj = ParseOperand(codeParamObj.oprand0);
-                            Emit(X64.mov(X64.rcx, x64obj, X64Size.qword));//指针
+                            //this参数载入寄存器(占用了rcx)  
+                            //using(new RegUsageRange(this, RegisterEnum.RCX))
+                            {
+                                var codeParamObj = tempParamList.FirstOrDefault(c => c.PARAM_paramidx == tempParamList.Count - 1);//最后一个压入的参数就是this实参  
+                                var x64obj = ParseOperand(codeParamObj.oprand0);
+                                Emit(X64.mov(X64.rcx, x64obj, X64Size.qword));//指针
 
-                            //取Vptr  
-                            string className = codeParamObj.oprand0.typeExpr.ToString();
-                            var (index, vrec) = QueryVTable(className, methodName);
-                            Emit(X64.mov(X64.rax, X64.mem(X64.rcx, disp: 0), X64Size.qword));
-                            //函数地址（addr表示在虚函数表中的偏移(Index*8)）  
-                            Emit(X64.mov(X64.rax, X64.mem(X64.rax, disp: index * 8), X64Size.qword));
+                                //取Vptr  
+                                string className = codeParamObj.oprand0.typeExpr.ToString();
+                                var (index, vrec) = QueryVTable(className, methodName);
+                                Emit(X64.mov(X64.rax, X64.mem(X64.rcx, disp: 0), X64Size.qword));
+                                //函数地址（addr表示在虚函数表中的偏移(Index*8)）  
+                                Emit(X64.mov(X64.rax, X64.mem(X64.rax, disp: index * 8), X64Size.qword));
 
+                            }
 
                             //调用前准备(和CALL指令一致)  
                             int rspSub = 0;
@@ -2037,7 +2041,7 @@ namespace Gizbox.Src.Backend
                 case "=":
                     {
                         // arg1 = arg2
-                        DEF(tac.arg0, lineNum, block, envStack);
+                        ASN(tac.arg0, lineNum, block, envStack);
                         USE(tac.arg1, lineNum, block, envStack);
                     }
                     break;
@@ -2049,7 +2053,7 @@ namespace Gizbox.Src.Backend
                     {
                         // arg1 += arg2
                         USE(tac.arg0, lineNum, block, envStack);
-                        DEF(tac.arg0, lineNum, block, envStack);
+                        ASN(tac.arg0, lineNum, block, envStack);
                         USE(tac.arg1, lineNum, block, envStack);
                     }
                     break;
@@ -2066,7 +2070,7 @@ namespace Gizbox.Src.Backend
                 case "!=":
                     {
                         // arg1 = arg2 op arg3
-                        DEF(tac.arg0, lineNum, block, envStack);
+                        ASN(tac.arg0, lineNum, block, envStack);
                         USE(tac.arg1, lineNum, block, envStack);
                         USE(tac.arg2, lineNum, block, envStack);
                     }
@@ -2076,7 +2080,7 @@ namespace Gizbox.Src.Backend
                 case "CAST":
                     {
                         // arg1 = op arg2
-                        DEF(tac.arg0, lineNum, block, envStack);
+                        ASN(tac.arg0, lineNum, block, envStack);
                         USE(tac.arg1, lineNum, block, envStack);
                     }
                     break;
@@ -2085,7 +2089,7 @@ namespace Gizbox.Src.Backend
                     {
                         // ++arg1 或 --arg1
                         USE(tac.arg0, lineNum, block, envStack);
-                        DEF(tac.arg0, lineNum, block, envStack);
+                        ASN(tac.arg0, lineNum, block, envStack);
                     }
                     break;
                 case "IF_FALSE_JUMP":
@@ -2109,13 +2113,13 @@ namespace Gizbox.Src.Backend
                 case "ALLOC":
                     {
                         // arg1 = alloc
-                        DEF(tac.arg0, lineNum, block, envStack);
+                        ASN(tac.arg0, lineNum, block, envStack);
                     }
                     break;
                 case "ALLOC_ARRAY":
                     {
                         // arg1 = alloc_array arg2
-                        DEF(tac.arg0, lineNum, block, envStack);
+                        ASN(tac.arg0, lineNum, block, envStack);
                         USE(tac.arg1, lineNum, block, envStack);
                     }
                     break;
@@ -2140,66 +2144,93 @@ namespace Gizbox.Src.Backend
         /// </summary>
         /// <param name="operand"></param>
         /// <returns></returns>
-        private string AnalyzeOprand(string operand)
+        private bool IsAccess(string operand, out string memberOrElementOwner)
         {
             var irOperand = ParseIRExpr(operand);
 
+            memberOrElementOwner = null;
+
             switch(irOperand.type)
             {
-                case IROperandExpr.Type.Label:
-                        return null;
-                case IROperandExpr.Type.LitOrConst:
-                    return null;
                 case IROperandExpr.Type.Identifier:
                     {
-                        return irOperand.segments[0];
+                        return false;
                     }
                     break;
                 case IROperandExpr.Type.ClassMemberAccess:
                     {
-                        return irOperand.segments[0];
+                        memberOrElementOwner = irOperand.segments[0];
+                        return true;
                     }
                 case IROperandExpr.Type.ArrayElementAccess:
                     {
-                        return irOperand.segments[0];
+                        memberOrElementOwner = irOperand.segments[0];
+                        return true;
                     }
             }
-            return null;
+            return false;
         }
 
+        // USE  
         private void USE(string operand, int lineNum, BasicBlock block, Gizbox.GStack<SymbolTable> envStack)
         {
             if(string.IsNullOrEmpty(operand))
                 return;
 
-            var operandVar = AnalyzeOprand(operand);
-
-            var record = Query(operandVar, envStack);
-            if(record != null)
+            var irOperand = ParseIRExpr(operand);
+            if(irOperand.type == IROperandExpr.Type.ClassMemberAccess)
             {
-                if(!block.USE.ContainsKey(record))
+                USE(irOperand.segments[0], lineNum, block, envStack);
+            }
+            else if(irOperand.type == IROperandExpr.Type.ArrayElementAccess)
+            {
+                USE(irOperand.segments[0], lineNum, block, envStack);
+                USE(irOperand.segments[1], lineNum, block, envStack);
+            }
+            else if(irOperand.type == IROperandExpr.Type.Identifier)
+            {
+                var record = Query(operand, envStack);
+                if(record != null)
                 {
-                    block.USE[record] = new List<int>();
+                    if(!block.USE.ContainsKey(record))
+                    {
+                        block.USE[record] = new List<int>();
+                    }
+                    block.USE[record].Add(lineNum);
                 }
-                block.USE[record].Add(lineNum);
             }
         }
 
-        private void DEF(string operand, int lineNum, BasicBlock block, Gizbox.GStack<SymbolTable> envStack)
+        // 赋值 -> 可能是DEF也可能是USE  
+        private void ASN(string operand, int lineNum, BasicBlock block, Gizbox.GStack<SymbolTable> envStack)
         {
             if(string.IsNullOrEmpty(operand))
                 return;
 
-            var operandVar = AnalyzeOprand(operand);
 
-            var record = Query(operandVar, envStack);
-            if(record != null)
+            var irOperand = ParseIRExpr(operand);
+            if(irOperand.type == IROperandExpr.Type.ClassMemberAccess)
             {
-                if(!block.DEF.ContainsKey(record))
+                USE(irOperand.segments[0], lineNum, block, envStack);
+            }
+            else if(irOperand.type == IROperandExpr.Type.ArrayElementAccess)
+            {
+                USE(irOperand.segments[0], lineNum, block, envStack);
+                USE(irOperand.segments[1], lineNum, block, envStack);
+            }
+            else
+            {
+                var operandVar = operand;
+
+                var record = Query(operandVar, envStack);
+                if(record != null)
                 {
-                    block.DEF[record] = new List<int>();
+                    if(!block.DEF.ContainsKey(record))
+                    {
+                        block.DEF[record] = new List<int>();
+                    }
+                    block.DEF[record].Add(lineNum);
                 }
-                block.DEF[record].Add(lineNum);
             }
         }
 
@@ -3810,7 +3841,10 @@ namespace Gizbox.Src.Backend
         
         private BasicBlock QueryBlockHasLabel(string label)
         {
-            return blocks.FirstOrDefault(b => b.hasLabel == label);
+            string l = label;
+            if(l.StartsWith("%LABEL:"))
+                l = l.Substring(("%LABEL:").Length);
+            return blocks.FirstOrDefault(b => b.hasLabel == l);
         }
 
         private BasicBlock QueryFunctionEndBlock(int instructionIndex)
@@ -3837,11 +3871,21 @@ namespace Gizbox.Src.Backend
             {
                 this.context = context;
                 this.regUsed = regUsed;
+                if(context.currBorrowRegisters.ContainsKey(this.regUsed))
+                {
+                    throw new GizboxException(ExceptioName.CodeGen, "register already in use: " + this.regUsed);
+                }
                 context.currBorrowRegisters.Add(this.regUsed, this);
             }
             public void Dispose()
             {
                 context.currBorrowRegisters.Remove(this.regUsed);
+
+                //如果是参数寄存器 -> 需要从home槽拿出复原    
+                if(UtilsW64.IsParamReg(this.regUsed, out bool isSse, out int paramidx))
+                {
+                    context.EmitMov(new X64Reg(regUsed), X64.mem(X64.rbp, disp: 16 + (paramidx * 8)), X64Size.qword, isSse);
+                }
             }
         }
     }
@@ -3882,7 +3926,7 @@ namespace Gizbox.Src.Backend
 
         public List<IROperand> allOprands = new();
 
-        public int PARAM_paramidx;//参数索引（如果是PARAM指令）
+        public int PARAM_paramidx;//参数索引 (倒序压入)（如果是PARAM指令）
         public int CALL_paramCount;//参数个数（如果是CALL指令）
         public IROperand CTOR_CALL_TargetObject;//对象参数（如果是构造函数调用指令）
         public IROperand MCALL_methodTargetObject;//this参数（如果是MCALL指令）
@@ -4550,6 +4594,48 @@ namespace Gizbox.Src.Backend
             }
 
             throw new GizboxException(ExceptioName.CodeGen, $"param cannot pass by register. idx:{paramIdx}");
+        }
+
+        public static bool IsParamReg(RegisterEnum reg, out bool isSSe, out int paramIdx)
+        {
+            isSSe = false;
+
+            paramIdx = reg switch
+            {
+                RegisterEnum.RCX => 0,
+                RegisterEnum.RDX => 1,
+                RegisterEnum.R8 => 2,
+                RegisterEnum.R9 => 3,
+
+                RegisterEnum.XMM0 => 0,
+                RegisterEnum.XMM1 => 1,
+                RegisterEnum.XMM2 => 2,
+                RegisterEnum.XMM3 => 3,
+                _ => -1
+            };
+
+            switch(reg)
+            {
+                case RegisterEnum.RCX:
+                case RegisterEnum.RDX:
+                case RegisterEnum.R8:
+                case RegisterEnum.R9:
+                    {
+                        isSSe = false;
+                        return true;
+                    }
+                case RegisterEnum.XMM0:
+                case RegisterEnum.XMM1:
+                case RegisterEnum.XMM2:
+                case RegisterEnum.XMM3:
+                    {
+                        isSSe = true;
+                        return true;
+                    }
+
+            }
+
+            return false;
         }
 
         public static bool IsConstAddrSemantic(SymbolRecord rec)// 地址即值的全局静态常量（目前只有字符串全局常量）（使用lea指令加载地址） 

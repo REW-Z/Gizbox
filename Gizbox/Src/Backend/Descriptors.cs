@@ -228,13 +228,17 @@ namespace Gizbox.Src.Backend
                             ranges.Add((line, deadPos));
                             isLive = false;
                         }
+                        //只有def行、本行以及后面都没有use -> 也认为是活跃（否则寄存器冲突时，def赋值时会赋到别的变量上）
+                        else if(isLive == false && isUse == false)
+                        {
+                            ranges.Add((line, line + 1));
+                        }
 
                         //一行可能有多个def  
                         while(defidx >= 0 && defLines[defidx] == line)
                         {
                             defidx--;
                         }
-                            
 
                     }
 
@@ -258,6 +262,7 @@ namespace Gizbox.Src.Backend
                 {
                     ranges.Add((this.startIdx, deadPos));
                 }
+
 
                 //写入基本块  
                 if(this.variableLiveRanges.TryGetValue(va, out var list) == false)

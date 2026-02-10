@@ -30,6 +30,8 @@ namespace Gizbox.IR
         //status  
         private int tmpCounter = 0;//临时变量自增    
         private GStack<string> loopExitStack = new GStack<string>();
+        private int markCounter = 0;//防重复标签自增  
+
 
 
         public IRGenerator(SyntaxTree ast, IRUnit ir, bool isMainUnit)
@@ -1011,7 +1013,7 @@ namespace Gizbox.IR
             {
                 string tmp = RentTemp("bool", "drop_flag"); //借用共享的临时bool变量
                 EmitCode("!=", tmp, varname, "%LITNULL:");
-                string label = $"_owner_skip_drop_{varname}_{envStackTemp.Count}"; //用变量名和作用域深度避免重名  
+                string label = $"_owner_skip_drop_{varname}_{markCounter++}";
                 EmitCode("IF_FALSE_JUMP", tmp, "%LABEL:" + label);
                 EmitOwnDropCode(varname);
                 EmitCode("").label = label;
@@ -1030,7 +1032,7 @@ namespace Gizbox.IR
             string tmp = RentTemp("bool", "drop_field_flag");
             EmitCode("!=", tmp, accessExpr, "%LITNULL:");
 
-            string label = $"_owner_skip_drop_field_{fieldName}_{envStackTemp.Count}";
+            string label = $"_owner_skip_drop_field_{fieldName}_{markCounter++}";
             EmitCode("IF_FALSE_JUMP", tmp, "%LABEL:" + label);
 
             //赋值到共用临时变量再删除  

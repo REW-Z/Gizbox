@@ -21,8 +21,11 @@ class OIntList
     void Add(OInt v)
     {
         int idx = this.count;
+
         this.items[idx] = new ItemOInt();
+
         this.items[idx].itemValue = v;
+
         this.count += 1;
     }
     OInt Get(int idx)
@@ -34,6 +37,8 @@ class OIntList
     }
     bor OInt GetBor(int idx)
     {
+        Console::PrintLn("--GetBor");
+
         return this.items[idx].itemValue;//从字段中返回bor类型，不转移所有权
     }
 }
@@ -49,8 +54,27 @@ class TestClass
 own Int OAdd(own Int x, own Int y)
 {
     own Int rs = new Int();
-    
+    int resvalue = x.value + y.value;
+    Console::PrintLn("resvalue assign111...");
+    rs.value = resvalue;
+    Console::PrintLn("resvalue assign222...");
     return rs;
+}
+
+
+void test0()
+{
+    own Int t0  = new Int();
+    t0.value = 1111;
+    Console::PrintLn("t0" + (string)(t0.value));
+    own Int t1  = new Int();
+    t1.value = 2222;
+    Console::PrintLn("t1" + (string)(t1.value));
+
+    own Int t3 = OAdd(t0, t1);
+    
+    Console::PrintLn("t3:");
+    Console::PrintLn((string)(t3.value));
 }
 
 //测试参数和返回值的所有权传递  
@@ -65,7 +89,9 @@ void test1()
     
     //测试返回值的所有权传递
     own Int ccc  = OAdd(aaa, bbb);
-
+    
+    Console::PrintLn("value of ccc");
+    Console::PrintLn((string)(ccc.value));
 
     //测试返回值被抛弃    
     own Int xxx = new Int(); xxx.value = 3;
@@ -73,9 +99,6 @@ void test1()
 
     OAdd(xxx, yyy);
 
-    
-    Console::PrintLn("value of ccc");
-    Console::PrintLn((string)ccc.value);
 
     //Console::PrintLn("aaa:" + (string)aaa.value); //已经被移动，不能再使用  
 }
@@ -145,15 +168,20 @@ void test5()
     
     Int src2 = new Int();
     own Int dst2 = capture(src2);
+
+    Console::PrintLn("end test5.");
 }
 
 //数组测试  
 void test6()
 {
+    Console::PrintLn("Test6 : arr test.");
+
     ItemOInt[] arr = new ItemOInt[10];
     arr[0] = new ItemOInt();
     arr[0].itemValue.value = 123;
 
+    
     OIntList list = new OIntList();
     list.Add(new OInt());
 
@@ -162,11 +190,12 @@ void test6()
     vbor.value = 456;
     OInt vown = list.Get(0);//replace后字段被填入新对象  
 
+    
     //第二次取出，验证replace效果  
     bor OInt vbor2 = list.GetBor(0);
     own OInt vown2 = list.Get(0);
 
-
+    
 
     Console::PrintLn("value:" + (string)arr[0].itemValue.value);
 
@@ -181,6 +210,7 @@ void test6()
 
 void main()
 {
+    test0();
     test1();
     test2();
     test3();
