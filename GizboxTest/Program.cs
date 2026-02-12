@@ -7,9 +7,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using Gizbox;
-using Gizbox.ScriptEngine;
-using Gizbox.ScriptEngineV2;
-using Gizbox.Interop.CSharp;
 using GizboxTest;
 using Gizbox.Src.Backend;
 
@@ -21,9 +18,8 @@ string[] cmds = {
     "0.生成互操作代码",
     "1.生成库文件",
     "2.生成分析器硬编码",
-    "3.执行Test脚本",
-    "4.测试杂项",
-    "5.测试x64目标代码生成",
+    "3.测试杂项",
+    "4.测试x64目标代码生成",
     };
 
 Console.WindowWidth = 150;
@@ -101,37 +97,13 @@ switch(cmdIdx)
         case 3:
         {
             //测试脚本Test  
-            Console.WriteLine("测试脚本test.gix");
-            string source = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\test.gix");
-            Gizbox.Compiler compiler = new Compiler();
-            compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
-            compiler.ConfigParserDataSource(hardcode: true);
-            //compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
-            var il = compiler.CompileToIR(source, isMainUnit:true, "test");
-            Compiler.Pause("Compile End");
-
-            il.Print();
-
-            ScriptEngine engine = new ScriptEngine(compiler);
-            engine.AddLibSearchDirectory(AppDomain.CurrentDomain.BaseDirectory);
-            engine.csharpInteropContext.ConfigExternCallClasses(new Type[] {
-                typeof(TestExternCalls),
-            });
-            engine.Execute(il);
-
-            Compiler.Pause("Execute End");
-        }
-        break;
-        case 4:
-        {
-            //测试脚本Test  
             Console.WriteLine("测试杂项");
 
 
             break;  
         }
         break;
-        case 5:
+        case 4:
         {
             Console.WriteLine("测试x64目标代码生成");
 
@@ -164,8 +136,8 @@ switch(cmdIdx)
         case 9:
         {
             //测试脚本Test  
-            Console.WriteLine("测试-所有权");
-            string source = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\test_ownership.gix");
+            Console.WriteLine("测试-模板");
+            string source = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\test_template.gix");
             Gizbox.Compiler compiler = new Compiler();
             compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
             compiler.ConfigParserDataSource(hardcode: true);
@@ -175,21 +147,7 @@ switch(cmdIdx)
 
             il.Print();
 
-            if(true)
-            {
-                compiler.CompileIRToExe(il, System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
-            }
-            else
-            {
-                ScriptEngine engine = new ScriptEngine(compiler);
-                engine.AddLibSearchDirectory(AppDomain.CurrentDomain.BaseDirectory);
-                engine.csharpInteropContext.ConfigExternCallClasses(new Type[] {
-                    typeof(TestExternCalls),
-                });
-                engine.Execute(il);
-
-                Compiler.Pause("Execute End");
-            }
+            compiler.CompileIRToExe(il, System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
         }
         break;
 }

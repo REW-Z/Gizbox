@@ -176,24 +176,4 @@ namespace Gizbox
         public override string Message => LineMessage() + base.Message;
     }
 
-    public class RuntimeException : GizboxException
-    {
-        public Gizbox.ScriptEngine.RuntimeCode code;
-        public RuntimeException(ExceptioName etype, Gizbox.ScriptEngine.RuntimeCode c, string message):base(etype, message)
-        {
-            this.code = c;
-        }
-        public string TacMessage()
-        {
-            if(code != null)
-            {
-                return "\"" + code.ToExpression() + "\"";
-            }
-            else
-            {
-                return "";
-            }
-        }
-        public override string Message => TacMessage() + base.Message;
-    }
 }

@@ -207,8 +207,29 @@ void test6()
 }
 
 
+class AAA
+{
+    int field1 = 0;
+}
+class BBB<T1,T2>
+{
+    T1 field1 = default(T1);
+    int a = 0;
+}
 void main()
 {
+    int a = 0;
+    bool b = (a < 0);
+    AAA[] arr = new AAA[10];
+    arr[0] = new AAA();
+    arr[0].field1 = 123;
+    Console::PrintLn("arr[0].field1:" + (string)(arr[0].field1));
+    //Core::Object boxed = (Core::Object)(arr[0]);
+
+    BBB<int, string> genobj = new BBB<int, string>();
+
+
+
     test0();
     test1();
     test2();

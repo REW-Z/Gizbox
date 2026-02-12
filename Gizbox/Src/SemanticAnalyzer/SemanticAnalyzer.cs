@@ -55,6 +55,7 @@ namespace Gizbox
         not_a_property,
         name_completed,
         generic_params,
+        generic_args,
 
         __codegen_mark_min,
 
@@ -691,6 +692,7 @@ namespace Gizbox.SemanticRule
                 psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ClassDeclareNode()
                 {
                     flags = TypeModifiers.None,
+                    isTemplateClass = false,
 
                     classNameNode = new SyntaxTree.IdentityNode()
                     {
@@ -702,6 +704,14 @@ namespace Gizbox.SemanticRule
                     attributes = psr.newElement.attributes,
                 };
 
+                if(psr.stack[psr.stack.Top - 4].attributes.TryGetValue(eAttr.generic_params, out var gpObj)
+                    && gpObj is List<SyntaxTree.IdentityNode> gpList
+                    && gpList.Count > 0)
+                {
+                    var classNode = (SyntaxTree.ClassDeclareNode)psr.newElement.attributes[eAttr.ast_node];
+                    classNode.isTemplateClass = true;
+                    classNode.templateParameters.AddRange(gpList);
+                }
 
                 if (psr.stack[psr.stack.Top - 3].attributes.ContainsKey(eAttr.ast_node))
                 {
@@ -721,6 +731,7 @@ namespace Gizbox.SemanticRule
                 psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ClassDeclareNode()
                 {
                     flags = TypeModifiers.Own,
+                    isTemplateClass = false,
 
                     classNameNode = new SyntaxTree.IdentityNode()
                     {
@@ -732,6 +743,15 @@ namespace Gizbox.SemanticRule
 
                     attributes = psr.newElement.attributes,
                 };
+
+                if(psr.stack[psr.stack.Top - 4].attributes.TryGetValue(eAttr.generic_params, out var gpObj)
+                    && gpObj is List<SyntaxTree.IdentityNode> gpList
+                    && gpList.Count > 0)
+                {
+                    var classNode = (SyntaxTree.ClassDeclareNode)psr.newElement.attributes[eAttr.ast_node];
+                    classNode.isTemplateClass = true;
+                    classNode.templateParameters.AddRange(gpList);
+                }
 
 
                 if(psr.stack[psr.stack.Top - 3].attributes.ContainsKey(eAttr.ast_node))
@@ -787,6 +807,27 @@ namespace Gizbox.SemanticRule
                         token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.Class,
                     });
+            });
+
+            AddActionAtTail("genargs -> < typearglist >", (psr, production) =>
+            {
+                psr.newElement.attributes[eAttr.generic_args] = psr.stack[psr.stack.Top - 1].attributes[eAttr.generic_args];
+            });
+
+            AddActionAtTail("typearglist -> type", (psr, production) =>
+            {
+                psr.newElement.attributes[eAttr.generic_args] = new List<SyntaxTree.TypeNode>
+                {
+                    (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node]
+                };
+            });
+
+            AddActionAtTail("typearglist -> typearglist , type", (psr, production) =>
+            {
+                psr.newElement.attributes[eAttr.generic_args] = psr.stack[psr.stack.Top - 2].attributes[eAttr.generic_args];
+                ((List<SyntaxTree.TypeNode>)psr.newElement.attributes[eAttr.generic_args]).Add(
+                    (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node]
+                );
             });
 
 
@@ -917,12 +958,21 @@ namespace Gizbox.SemanticRule
                 var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[eAttr.id];
                 idNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
 
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ClassTypeNode()
+                var classTypeNode = new SyntaxTree.ClassTypeNode()
                 {
                     classname = idNode,
 
                     attributes = psr.newElement.attributes,
                 };
+
+                if(psr.stack[psr.stack.Top].attributes.TryGetValue(eAttr.generic_args, out var genericArgsObj)
+                    && genericArgsObj is List<SyntaxTree.TypeNode> genericArgs
+                    && genericArgs.Count > 0)
+                {
+                    classTypeNode.genericArguments.AddRange(genericArgs);
+                }
+
+                psr.newElement.attributes[eAttr.ast_node] = classTypeNode;
             });
 
             AddActionAtTail("stype -> primitive", (psr, production) => {
@@ -936,6 +986,7 @@ namespace Gizbox.SemanticRule
                     token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
                     identiferType = SyntaxTree.IdentityNode.IdType.Undefined,
                 };
+                psr.newElement.attributes[eAttr.generic_args] = new List<SyntaxTree.TypeNode>();
             });
             AddActionAtTail("namedtype -> TYPE_NAME genargs", (psr, production) => {
                 psr.newElement.attributes[eAttr.id] = new SyntaxTree.IdentityNode()
@@ -944,6 +995,7 @@ namespace Gizbox.SemanticRule
                     token = psr.stack[psr.stack.Top - 1].attributes[eAttr.token] as Token,
                     identiferType = SyntaxTree.IdentityNode.IdType.Undefined,
                 };
+                psr.newElement.attributes[eAttr.generic_args] = psr.stack[psr.stack.Top].attributes[eAttr.generic_args];
             });
 
             string[] primiveProductions = new string[] { "void", "bool", "int", "long", "float", "double", "char", "string" };
@@ -1313,9 +1365,23 @@ namespace Gizbox.SemanticRule
                 var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.id];
                 idNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
 
+                var classTypeNode = new SyntaxTree.ClassTypeNode()
+                {
+                    classname = idNode,
+                    attributes = psr.newElement.attributes,
+                };
+
+                if(psr.stack[psr.stack.Top - 2].attributes.TryGetValue(eAttr.generic_args, out var genericArgsObj)
+                    && genericArgsObj is List<SyntaxTree.TypeNode> genericArgs
+                    && genericArgs.Count > 0)
+                {
+                    classTypeNode.genericArguments.AddRange(genericArgs);
+                }
+
                 psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.NewObjectNode()
                 {
                     className = idNode,
+                    typeNode = classTypeNode,
 
                     attributes = psr.newElement.attributes,
                 };
@@ -1326,13 +1392,22 @@ namespace Gizbox.SemanticRule
                 var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top - 3].attributes[eAttr.id];
                 idNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
 
+                var classTypeNode = new SyntaxTree.ClassTypeNode()
+                {
+                    classname = idNode,
+                    attributes = psr.newElement.attributes,
+                };
+
+                if(psr.stack[psr.stack.Top - 3].attributes.TryGetValue(eAttr.generic_args, out var genericArgsObj)
+                    && genericArgsObj is List<SyntaxTree.TypeNode> genericArgs
+                    && genericArgs.Count > 0)
+                {
+                    classTypeNode.genericArguments.AddRange(genericArgs);
+                }
+
                 psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.NewArrayNode()
                 {
-                    typeNode = new SyntaxTree.ClassTypeNode()
-                    {
-                        classname = idNode,
-                        attributes = psr.newElement.attributes,
-                    },
+                    typeNode = classTypeNode,
                     lengthNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
 
                     attributes = psr.newElement.attributes,
@@ -1574,12 +1649,21 @@ namespace Gizbox.SemanticRule
 
                 ((SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[eAttr.id]).identiferType = SyntaxTree.IdentityNode.IdType.Class;
 
-                psr.newElement.attributes[eAttr.stype] = new SyntaxTree.ClassTypeNode()
+                var classTypeNode = new SyntaxTree.ClassTypeNode()
                 {
                     classname = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[eAttr.id],
 
                     attributes = psr.newElement.attributes
                 };
+
+                if(psr.stack[psr.stack.Top].attributes.TryGetValue(eAttr.generic_args, out var genericArgsObj)
+                    && genericArgsObj is List<SyntaxTree.TypeNode> genericArgs
+                    && genericArgs.Count > 0)
+                {
+                    classTypeNode.genericArguments.AddRange(genericArgs);
+                }
+
+                psr.newElement.attributes[eAttr.stype] = classTypeNode;
 
                 psr.newElement.attributes[eAttr.optidx] = null;
             });
@@ -1604,6 +1688,7 @@ namespace Gizbox.SemanticRule
                 idNode.identiferType = SyntaxTree.IdentityNode.IdType.Undefined;
 
                 psr.newElement.attributes[eAttr.id] = idNode;
+                psr.newElement.attributes[eAttr.generic_args] = psr.stack[psr.stack.Top - 2].attributes[eAttr.generic_args];
                 psr.newElement.attributes[eAttr.optidx] = null;
             });
             AddActionAtTail("primitivesb -> primitive [ ]", (psr, production) => {
@@ -1612,6 +1697,9 @@ namespace Gizbox.SemanticRule
             });
             AddActionAtTail("optidx -> aexpr", (psr, production) => {
                 psr.newElement.attributes[eAttr.ast_node] = psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+            });
+            AddActionAtTail("optidx -> ε", (psr, production) => {
+                psr.newElement.attributes[eAttr.ast_node] = null;
             });
 
 
@@ -4674,7 +4762,8 @@ namespace Gizbox.SemanticRule
                     {
                         string className = newObjNode.className.FullName;
                         if (Query(className) == null) throw new SemanticException(ExceptioName.ClassDefinitionNotFound, newObjNode.className, className);
-                        nodeTypeExprssion = className;
+
+                        nodeTypeExprssion = newObjNode.typeNode?.TypeExpression() ?? className;
                     }
                     break;
                 case SyntaxTree.NewArrayNode newArrNode:
