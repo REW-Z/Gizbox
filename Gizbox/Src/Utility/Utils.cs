@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Linq;
 
 namespace Gizbox
 {
@@ -20,6 +21,31 @@ namespace Gizbox
         public static string ToExternFuncName(string gizFullName)
         {
             return gizFullName.Replace("::", "__");
+        }
+
+        public static string MangleTypeName(string baseName, IEnumerable<string> argTypes)
+        {
+            if (argTypes == null)
+                return baseName;
+
+            var args = argTypes.Where(a => !string.IsNullOrWhiteSpace(a)).Select(SanitizeTypeName).ToArray();
+            if (args.Length == 0)
+                return baseName;
+
+            return baseName + "_" + string.Join("_", args);
+        }
+
+        private static string SanitizeTypeName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return "";
+
+            return name.Replace("::", "_")
+                .Replace("[]", "Arr")
+                .Replace("<", "_")
+                .Replace(">", "_")
+                .Replace(",", "_")
+                .Replace(" ", "");
         }
 
         public static GType CtorType(SymbolTable.Record classRec)

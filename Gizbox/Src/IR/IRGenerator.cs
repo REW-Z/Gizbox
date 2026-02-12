@@ -142,6 +142,9 @@ namespace Gizbox.IR
                 //类声明  
                 case ClassDeclareNode classDeclNode:
                     {
+                        if (classDeclNode.isTemplateClass)
+                            break;
+
                         string className = classDeclNode.classNameNode.FullName;
                         //GenerateCode("JUMP", "%LABEL:class_end:" + className);//顶级语句重排之后不再需要跳过
 

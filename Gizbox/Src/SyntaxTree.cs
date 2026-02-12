@@ -881,6 +881,7 @@ namespace Gizbox
         public class NewObjectNode : SpecialExprNode
         {
             public IdentityNode className { get => (IdentityNode)children_group_0[0]; set => children_group_0[0] = value; }
+            public TypeNode typeNode;
 
             public NewObjectNode()
             {
@@ -995,6 +996,7 @@ namespace Gizbox
         public class ClassTypeNode : TypeNode
         {
             public IdentityNode classname { get => (IdentityNode)children_group_0[0]; set => children_group_0[0] = value; }
+            public readonly List<TypeNode> genericArguments = new();
 
             public ClassTypeNode()
             {
@@ -1004,7 +1006,10 @@ namespace Gizbox
 
             public override string TypeExpression()
             {
-                return classname.FullName;
+                if(genericArguments.Count == 0)
+                    return classname.FullName;
+
+                return Utils.MangleTypeName(classname.FullName, genericArguments.Select(t => t.TypeExpression()));
             }
         }
         public class PrimitiveTypeNode : TypeNode

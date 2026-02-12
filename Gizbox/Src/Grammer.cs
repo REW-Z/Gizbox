@@ -296,6 +296,7 @@ namespace Gizbox
             "typeidsb -> namedtype [ ]",
             "primitivesb -> primitive [ ]",
             "optidx -> aexpr",
+            "optidx -> ε",
 
             "genparams -> < genparamlist >",
             "genparams -> ε",
