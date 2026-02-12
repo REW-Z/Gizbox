@@ -40,6 +40,8 @@ namespace Gizbox
         public TokenPattern whitespace;
         public TokenPattern comment;
 
+        private readonly HashSet<string> typeNameSet = new HashSet<string>(StringComparer.Ordinal);
+
 
         public Scanner()
         {
@@ -72,6 +74,7 @@ namespace Gizbox
             keywords.Add(new TokenPattern("leak", "leak\\W", 1));
             keywords.Add(new TokenPattern("sizeof", "sizeof\\W", 1));
             keywords.Add(new TokenPattern("typeof", "typeof\\W", 1));
+            keywords.Add(new TokenPattern("default", "default\\W", 1));
 
             keywords.Add(new TokenPattern(",", ",", 0));
             keywords.Add(new TokenPattern(";", ";", 0));
@@ -152,8 +155,22 @@ namespace Gizbox
             results.AddRange(operators.Select(p => p.tokenName));
             results.AddRange(literals.Select(p => p.tokenName));
             results.Add(identifierPattern.tokenName);
+            results.Add("TYPE_NAME");
 
             return results;
+        }
+
+        public void SetTypeNames(IEnumerable<string> typeNames)
+        {
+            typeNameSet.Clear();
+            if (typeNames == null)
+                return;
+
+            foreach (var name in typeNames)
+            {
+                if (!string.IsNullOrWhiteSpace(name))
+                    typeNameSet.Add(name);
+            }
         }
 
         public static bool PatternMatch(string input, TokenPattern pattern)
@@ -309,7 +326,8 @@ namespace Gizbox
                     if (Compiler.enableLogScanner) Log("\n>>>>> identifier:" + identifierName + "\n\n");
 
                     //int idx = globalSymbolTable.AddIdentifier(identifierName);//词法分析阶段最好不创建符号表条目（编译原理p53）  
-                    Token token = new Token(identifierPattern.tokenName, PatternType.Id, identifierName, currLine, lexemBegin - currLineStart, identifierName.Length);
+                    string tokenName = typeNameSet.Contains(identifierName) ? "TYPE_NAME" : identifierPattern.tokenName;
+                    Token token = new Token(tokenName, PatternType.Id, identifierName, currLine, lexemBegin - currLineStart, identifierName.Length);
                     tokens.Add(token);
 
                     MovePointer(seg.Length - identifierPattern.back);

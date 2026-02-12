@@ -239,11 +239,11 @@ namespace Gizbox.LRParse
                 strb.Append("| ");
                 AppendProductionWithDot(strb, production, iDot);
 
-                strb.Append(", ");
+                strb.Append("  lookaheads:");
                 var lookaheadList = groups[production][iDot];
                 foreach(var la in lookaheadList)
                 {
-                    strb.Append("," + (la != null ? la.name : "ε"));
+                    strb.Append("  " + (la != null ? la.name : "ε"));
                 }
                 strb.Append('\n');
             }
@@ -1200,6 +1200,23 @@ namespace Gizbox.LALRGenerator
         /// </summary>
         private void InitLALRCollection()
         {
+            if (genratorInput?.noMergeNonterminals != null &&
+                genratorInput.noMergeNonterminals.Any(n => outputData.grammerSet.nonterminalDict.ContainsKey(n)))
+            {
+                this.groups = new List<List<int>>();
+                outputData.lalrStates = new List<State>();
+
+                for (int i = 0; i < this.canonicalItemCollection.Count; ++i)
+                {
+                    groups.Add(new List<int> { i });
+                    State state = new State(i, "I_" + i, this.canonicalItemCollection[i]);
+                    outputData.lalrStates.Add(state);
+                }
+
+                Compiler.Pause("使用规范LR(1)项集族(禁用合并)" + outputData.lalrStates.Count);
+                return;
+            }
+
             //计算重新分的组  
             List<int> markedSet = new List<int>();
             this.groups = new List<List<int>>();

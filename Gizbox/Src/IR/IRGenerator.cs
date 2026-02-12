@@ -552,6 +552,14 @@ namespace Gizbox.IR
                         SetRet(literalNode, litret);
                     }
                     break;
+                case DefaultValueNode defaultNode:
+                    {
+                        string typeExpr = defaultNode.typeNode.TypeExpression();
+                        string temp = NewTemp(typeExpr);
+                        EmitCode("=", temp, GenDefaultOperandStr(typeExpr));
+                        SetRet(defaultNode, temp);
+                    }
+                    break;
                 case ObjectMemberAccessNode objMemberAccess:
                     {
                         GenNode(objMemberAccess.objectNode);
@@ -1419,6 +1427,35 @@ namespace Gizbox.IR
 
 
             return operandStr;
+        }
+
+        private string GenDefaultOperandStr(string typeExpr)
+        {
+            var gtype = GType.Parse(typeExpr);
+            if (gtype.IsReferenceType)
+            {
+                return "%LITNULL:";
+            }
+
+            switch (typeExpr)
+            {
+                case "bool":
+                    return "%LITBOOL:false";
+                case "char":
+                    return "%LITCHAR:'\\0'";
+                case "float":
+                    return "%LITFLOAT:0.0f";
+                case "double":
+                    return "%LITDOUBLE:0.0d";
+                case "long":
+                    return "%LITLONG:0L";
+                case "int":
+                    return "%LITINT:0";
+                case "string":
+                    return "%LITNULL:";
+            }
+
+            return "%LITNULL:";
         }
 
 

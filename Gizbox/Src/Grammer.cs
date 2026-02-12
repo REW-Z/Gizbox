@@ -11,6 +11,10 @@ namespace Gizbox
     {
         public List<string> terminalNames;
 
+        public HashSet<string> noMergeNonterminals = new HashSet<string>() {
+            "genargs",
+        };
+
         public List<string> nonterminalNames = new List<string>() {
 
             //起始符  
@@ -53,9 +57,15 @@ namespace Gizbox
             "incdec",//++\--
 
             //类型  
+            "decltype",
             "type",
             "stype",
             "arrtype",
+            "namedtype",
+            "genparams",
+            "genparamlist",
+            "genargs",
+            "typearglist",
             "primitive",
 
             //表达式
@@ -81,6 +91,7 @@ namespace Gizbox
             //其他辅助符号
             "stypesb",
             "idsb",
+            "typeidsb",
             "primitivesb",
             "optidx",
 
@@ -130,21 +141,21 @@ namespace Gizbox
             "stmt -> for ( stmt bexpr ; stmtexpr ) stmt",
             "stmt -> if ( expr ) stmt elifclauselist elseclause",
 
-            "declstmt -> type ID = expr ;",
-            "declstmt -> tmodf type ID = expr ;",
-            "declstmt -> const type ID = lit ;",
+            "declstmt -> decltype ID = expr ;",
+            "declstmt -> tmodf decltype ID = expr ;",
+            "declstmt -> const decltype ID = lit ;",
 
-            "declstmt -> tmodf type ID = capture ( ID ) ;",
-            "declstmt -> type ID = leak ( ID ) ;",
+            "declstmt -> tmodf decltype ID = capture ( ID ) ;",
+            "declstmt -> decltype ID = leak ( ID ) ;",
 
-            "declstmt -> type ID ( params ) { statements }",
-            "declstmt -> tmodf type ID ( params ) { statements }",
-            "declstmt -> type operator ID ( params ) { statements }",
-            "declstmt -> tmodf type operator ID ( params ) { statements }",
-            "declstmt -> extern type ID ( params ) ;",
+            "declstmt -> decltype ID genparams ( params ) { statements }",
+            "declstmt -> tmodf decltype ID genparams ( params ) { statements }",
+            "declstmt -> decltype operator ID genparams ( params ) { statements }",
+            "declstmt -> tmodf decltype operator ID genparams ( params ) { statements }",
+            "declstmt -> extern decltype ID genparams ( params ) ;",
 
-            "declstmt -> class ID inherit { declstatements }",
-            "declstmt -> class own ID inherit { declstatements }",
+            "declstmt -> class TYPE_NAME genparams inherit { declstatements }",
+            "declstmt -> class own TYPE_NAME genparams inherit { declstatements }",
 
             "tmodf -> own",
             "tmodf -> bor",
@@ -167,12 +178,15 @@ namespace Gizbox
             "lvalue -> indexaccess",
 
 
+            "decltype -> type",
             "type -> arrtype",
             "type -> stype",
             "type -> var",
             "arrtype -> stypesb",
             "stype -> primitive",
-            "stype -> ID",
+            "stype -> namedtype",
+            "namedtype -> TYPE_NAME",
+            "namedtype -> TYPE_NAME genargs",
             "primitive -> void",
             "primitive -> bool",
             "primitive -> int",
@@ -243,8 +257,9 @@ namespace Gizbox
             "indexaccess -> idsb",
             "indexaccess -> memberaccess [ aexpr ]",
 
-            "newobj -> new ID ( )",
-            "newarr -> new stypesb",
+            "newobj -> new namedtype ( )",
+            "newarr -> new namedtype [ aexpr ]",
+            "newarr -> new primitive [ aexpr ]",
 
             "cast -> ( type ) factor",
 
@@ -252,6 +267,7 @@ namespace Gizbox
 
             "kwexpr -> typeof ( type )",
             "kwexpr -> sizeof ( type )",
+            "kwexpr -> default ( type )",
 
             "lit -> LITBOOL",
             "lit -> LITINT",
@@ -274,15 +290,22 @@ namespace Gizbox
             "args -> args , expr",
 
 
-            "stypesb -> idsb",
+            "stypesb -> typeidsb",
             "stypesb -> primitivesb",
             "idsb -> ID [ optidx ]",
-            "primitivesb -> primitive [ optidx ]",
+            "typeidsb -> namedtype [ ]",
+            "primitivesb -> primitive [ ]",
             "optidx -> aexpr",
-            "optidx -> ε",
 
+            "genparams -> < genparamlist >",
+            "genparams -> ε",
+            "genparamlist -> TYPE_NAME",
+            "genparamlist -> genparamlist , TYPE_NAME",
+            "genargs -> < typearglist >",
+            "typearglist -> type",
+            "typearglist -> typearglist , type",
 
-            "inherit -> : ID",
+            "inherit -> : namedtype",
             "inherit -> ε",
         };
     }

@@ -54,6 +54,7 @@ namespace Gizbox
         obj_class_rec,
         not_a_property,
         name_completed,
+        generic_params,
 
         __codegen_mark_min,
 
@@ -249,6 +250,13 @@ namespace Gizbox.SemanticRule
 
                     attributes = psr.newElement.attributes,
                 };
+
+                if(psr.stack[psr.stack.Top - 4].attributes.TryGetValue(eAttr.generic_params, out var gpObj) && gpObj is List<SyntaxTree.IdentityNode> gpList && gpList.Count > 0)
+                {
+                    var classNode = (SyntaxTree.ClassDeclareNode)psr.newElement.attributes[eAttr.ast_node];
+                    classNode.isTemplateClass = true;
+                    classNode.templateParameters.AddRange(gpList);
+                }
             });
 
             AddActionAtTail("namespaceusings -> namespaceusings namespaceusing", (psr, production) =>
@@ -482,7 +490,7 @@ namespace Gizbox.SemanticRule
             });
 
 
-            AddActionAtTail("declstmt -> type ID = expr ;", (psr, production) => {
+            AddActionAtTail("declstmt -> decltype ID = expr ;", (psr, production) => {
 
                 psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.VarDeclareNode()
                 {
@@ -502,7 +510,7 @@ namespace Gizbox.SemanticRule
 
 
 
-            AddActionAtTail("declstmt -> tmodf type ID = expr ;", (psr, production) => {
+            AddActionAtTail("declstmt -> tmodf decltype ID = expr ;", (psr, production) => {
 
                 psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.VarDeclareNode()
                 {
@@ -520,7 +528,7 @@ namespace Gizbox.SemanticRule
                 };
             });
 
-            AddActionAtTail("declstmt -> const type ID = lit ;", (psr, production) => {
+            AddActionAtTail("declstmt -> const decltype ID = lit ;", (psr, production) => {
 
                 psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ConstantDeclareNode()
                 {
@@ -539,7 +547,7 @@ namespace Gizbox.SemanticRule
             });
 
 
-            AddActionAtTail("declstmt -> tmodf type ID = capture ( ID ) ;", (psr, production) => {
+            AddActionAtTail("declstmt -> tmodf decltype ID = capture ( ID ) ;", (psr, production) => {
                 psr.newElement.attributes[eAttr.ast_node] = new OwnershipCaptureStmtNode()
                 {
                     flags = (VarModifiers)psr.stack[psr.stack.Top - 8].attributes[eAttr.tmodf],
@@ -562,7 +570,7 @@ namespace Gizbox.SemanticRule
 
 
 
-            AddActionAtTail("declstmt -> type ID = leak ( ID ) ;", (psr, production) => {
+            AddActionAtTail("declstmt -> decltype ID = leak ( ID ) ;", (psr, production) => {
                 psr.newElement.attributes[eAttr.ast_node] = new OwnershipLeakStmtNode()
                 {
                     rIdentifier = new SyntaxTree.IdentityNode()
@@ -584,56 +592,17 @@ namespace Gizbox.SemanticRule
 
 
 
-            AddActionAtTail("declstmt -> type ID ( params ) { statements }", (psr, production) => {
+            AddActionAtTail("declstmt -> decltype ID genparams ( params ) { statements }", (psr, production) => {
                 psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.FuncDeclareNode()
                 {
                     funcType = FunctionKind.Normal,
-                    returnFlags = VarModifiers.None,
-
-                    returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 7].attributes[eAttr.ast_node],
-                    identifierNode = new SyntaxTree.IdentityNode()
-                    {
-                        attributes = psr.stack[psr.stack.Top - 6].attributes,
-                        token = psr.stack[psr.stack.Top - 6].attributes[eAttr.token] as Token,
-                        identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
-                    },
-                    parametersNode = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes[eAttr.ast_node],
-                    statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
-
-                    attributes = psr.newElement.attributes,
-                };
-            });
-            AddActionAtTail("declstmt -> tmodf type ID ( params ) { statements }", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.FuncDeclareNode()
-                {
-                    funcType = FunctionKind.Normal,
-                    returnFlags = (VarModifiers)psr.stack[psr.stack.Top - 8].attributes[eAttr.tmodf],
-
-                    returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 7].attributes[eAttr.ast_node],
-                    identifierNode = new SyntaxTree.IdentityNode()
-                    {
-                        attributes = psr.stack[psr.stack.Top - 6].attributes,
-                        token = psr.stack[psr.stack.Top - 6].attributes[eAttr.token] as Token,
-                        identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
-                    },
-                    parametersNode = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes[eAttr.ast_node],
-                    statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
-
-                    attributes = psr.newElement.attributes,
-                };
-            });
-
-            AddActionAtTail("declstmt -> type operator ID ( params ) { statements }", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.FuncDeclareNode()
-                {
-                    funcType = FunctionKind.OperatorOverload,
                     returnFlags = VarModifiers.None,
 
                     returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 8].attributes[eAttr.ast_node],
                     identifierNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top - 6].attributes,
-                        token = psr.stack[psr.stack.Top - 6].attributes[eAttr.token] as Token,
+                        attributes = psr.stack[psr.stack.Top - 7].attributes,
+                        token = psr.stack[psr.stack.Top - 7].attributes[eAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
                     },
                     parametersNode = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes[eAttr.ast_node],
@@ -642,17 +611,17 @@ namespace Gizbox.SemanticRule
                     attributes = psr.newElement.attributes,
                 };
             });
-            AddActionAtTail("declstmt -> tmodf type operator ID ( params ) { statements }", (psr, production) => {
+            AddActionAtTail("declstmt -> tmodf decltype ID genparams ( params ) { statements }", (psr, production) => {
                 psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.FuncDeclareNode()
                 {
-                    funcType = FunctionKind.OperatorOverload,
+                    funcType = FunctionKind.Normal,
                     returnFlags = (VarModifiers)psr.stack[psr.stack.Top - 9].attributes[eAttr.tmodf],
 
                     returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 8].attributes[eAttr.ast_node],
                     identifierNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top - 6].attributes,
-                        token = psr.stack[psr.stack.Top - 6].attributes[eAttr.token] as Token,
+                        attributes = psr.stack[psr.stack.Top - 7].attributes,
+                        token = psr.stack[psr.stack.Top - 7].attributes[eAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
                     },
                     parametersNode = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes[eAttr.ast_node],
@@ -662,15 +631,54 @@ namespace Gizbox.SemanticRule
                 };
             });
 
-            AddActionAtTail("declstmt -> extern type ID ( params ) ;", (psr, production) => {
+            AddActionAtTail("declstmt -> decltype operator ID genparams ( params ) { statements }", (psr, production) => {
+                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.FuncDeclareNode()
+                {
+                    funcType = FunctionKind.OperatorOverload,
+                    returnFlags = VarModifiers.None,
+
+                    returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 9].attributes[eAttr.ast_node],
+                    identifierNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = psr.stack[psr.stack.Top - 7].attributes,
+                        token = psr.stack[psr.stack.Top - 7].attributes[eAttr.token] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
+                    },
+                    parametersNode = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes[eAttr.ast_node],
+                    statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
+            AddActionAtTail("declstmt -> tmodf decltype operator ID genparams ( params ) { statements }", (psr, production) => {
+                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.FuncDeclareNode()
+                {
+                    funcType = FunctionKind.OperatorOverload,
+                    returnFlags = (VarModifiers)psr.stack[psr.stack.Top - 10].attributes[eAttr.tmodf],
+
+                    returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 9].attributes[eAttr.ast_node],
+                    identifierNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = psr.stack[psr.stack.Top - 7].attributes,
+                        token = psr.stack[psr.stack.Top - 7].attributes[eAttr.token] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
+                    },
+                    parametersNode = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes[eAttr.ast_node],
+                    statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
+
+            AddActionAtTail("declstmt -> extern decltype ID genparams ( params ) ;", (psr, production) => {
 
                 psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ExternFuncDeclareNode()
                 {
-                    returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 5].attributes[eAttr.ast_node],
+                    returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 6].attributes[eAttr.ast_node],
                     identifierNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top - 4].attributes,
-                        token = psr.stack[psr.stack.Top - 4].attributes[eAttr.token] as Token,
+                        attributes = psr.stack[psr.stack.Top - 5].attributes,
+                        token = psr.stack[psr.stack.Top - 5].attributes[eAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
                     },
                     parametersNode = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node],
@@ -679,15 +687,15 @@ namespace Gizbox.SemanticRule
                 };
             });
 
-            AddActionAtTail("declstmt -> class ID inherit { declstatements }", (psr, production) => {
+            AddActionAtTail("declstmt -> class TYPE_NAME genparams inherit { declstatements }", (psr, production) => {
                 psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ClassDeclareNode()
                 {
                     flags = TypeModifiers.None,
 
                     classNameNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top - 4].attributes,
-                        token = psr.stack[psr.stack.Top - 4].attributes[eAttr.token] as Token,
+                        attributes = psr.stack[psr.stack.Top - 5].attributes,
+                        token = psr.stack[psr.stack.Top - 5].attributes[eAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.Class,
                     },
 
@@ -709,15 +717,15 @@ namespace Gizbox.SemanticRule
                 );
             });
 
-            AddActionAtTail("declstmt -> class own ID inherit { declstatements }", (psr, production) => {
+            AddActionAtTail("declstmt -> class own TYPE_NAME genparams inherit { declstatements }", (psr, production) => {
                 psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ClassDeclareNode()
                 {
                     flags = TypeModifiers.Own,
 
                     classNameNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top - 4].attributes,
-                        token = psr.stack[psr.stack.Top - 4].attributes[eAttr.token] as Token,
+                        attributes = psr.stack[psr.stack.Top - 5].attributes,
+                        token = psr.stack[psr.stack.Top - 5].attributes[eAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.Class,
                     },
 
@@ -749,6 +757,38 @@ namespace Gizbox.SemanticRule
                 psr.newElement.attributes[eAttr.tmodf] = VarModifiers.Bor;
             });
 
+            AddActionAtTail("genparams -> < genparamlist >", (psr, production) =>
+            {
+                psr.newElement.attributes[eAttr.generic_params] = psr.stack[psr.stack.Top - 1].attributes[eAttr.generic_params];
+            });
+            AddActionAtTail("genparams -> ε", (psr, production) =>
+            {
+                psr.newElement.attributes[eAttr.generic_params] = new List<SyntaxTree.IdentityNode>();
+            });
+            AddActionAtTail("genparamlist -> TYPE_NAME", (psr, production) =>
+            {
+                psr.newElement.attributes[eAttr.generic_params] = new List<SyntaxTree.IdentityNode>
+                {
+                    new SyntaxTree.IdentityNode()
+                    {
+                        attributes = psr.stack[psr.stack.Top].attributes,
+                        token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.Class,
+                    }
+                };
+            });
+            AddActionAtTail("genparamlist -> genparamlist , TYPE_NAME", (psr, production) =>
+            {
+                psr.newElement.attributes[eAttr.generic_params] = psr.stack[psr.stack.Top - 2].attributes[eAttr.generic_params];
+                ((List<SyntaxTree.IdentityNode>)psr.newElement.attributes[eAttr.generic_params]).Add(
+                    new SyntaxTree.IdentityNode()
+                    {
+                        attributes = psr.stack[psr.stack.Top].attributes,
+                        token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.Class,
+                    });
+            });
+
 
 
             AddActionAtTail("elifclauselist -> ε", (psr, production) => {
@@ -769,6 +809,14 @@ namespace Gizbox.SemanticRule
                     conditionNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node],
                     thenNode = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node],
 
+                    attributes = psr.newElement.attributes,
+                };
+            });
+            AddActionAtTail("kwexpr -> default ( type )", (psr, production) => {
+
+                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.DefaultValueNode()
+                {
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
                     attributes = psr.newElement.attributes,
                 };
             });
@@ -835,6 +883,10 @@ namespace Gizbox.SemanticRule
                 psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ElementAccessNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
             });
 
+            AddActionAtTail("decltype -> type", (psr, production) => {
+                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+            });
+
             AddActionAtTail("type -> arrtype", (psr, production) => {
                 psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ArrayTypeNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
             });
@@ -861,16 +913,13 @@ namespace Gizbox.SemanticRule
                 };
             });
 
-            AddActionAtTail("stype -> ID", (psr, production) => {
+            AddActionAtTail("stype -> namedtype", (psr, production) => {
+                var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[eAttr.id];
+                idNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
+
                 psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ClassTypeNode()
                 {
-
-                    classname = new SyntaxTree.IdentityNode()
-                    {
-                        attributes = psr.stack[psr.stack.Top].attributes,
-                        token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
-                        identiferType = SyntaxTree.IdentityNode.IdType.Class,
-                    },
+                    classname = idNode,
 
                     attributes = psr.newElement.attributes,
                 };
@@ -878,6 +927,23 @@ namespace Gizbox.SemanticRule
 
             AddActionAtTail("stype -> primitive", (psr, production) => {
                 psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.PrimitiveTypeNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+            });
+
+            AddActionAtTail("namedtype -> TYPE_NAME", (psr, production) => {
+                psr.newElement.attributes[eAttr.id] = new SyntaxTree.IdentityNode()
+                {
+                    attributes = psr.stack[psr.stack.Top].attributes,
+                    token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+                    identiferType = SyntaxTree.IdentityNode.IdType.Undefined,
+                };
+            });
+            AddActionAtTail("namedtype -> TYPE_NAME genargs", (psr, production) => {
+                psr.newElement.attributes[eAttr.id] = new SyntaxTree.IdentityNode()
+                {
+                    attributes = psr.stack[psr.stack.Top - 1].attributes,
+                    token = psr.stack[psr.stack.Top - 1].attributes[eAttr.token] as Token,
+                    identiferType = SyntaxTree.IdentityNode.IdType.Undefined,
+                };
             });
 
             string[] primiveProductions = new string[] { "void", "bool", "int", "long", "float", "double", "char", "string" };
@@ -1242,27 +1308,42 @@ namespace Gizbox.SemanticRule
             });
 
 
-            AddActionAtTail("newobj -> new ID ( )", (psr, production) => {
+            AddActionAtTail("newobj -> new namedtype ( )", (psr, production) => {
+
+                var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.id];
+                idNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
 
                 psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.NewObjectNode()
                 {
-                    className = new SyntaxTree.IdentityNode()
-                    {
-                        attributes = psr.stack[psr.stack.Top - 2].attributes,
-                        token = psr.stack[psr.stack.Top - 2].attributes[eAttr.token] as Token,
-                        identiferType = SyntaxTree.IdentityNode.IdType.Class
-                    },
+                    className = idNode,
 
                     attributes = psr.newElement.attributes,
                 };
             });
 
-            AddActionAtTail("newarr -> new stypesb", (psr, production) => {
+            AddActionAtTail("newarr -> new namedtype [ aexpr ]", (psr, production) => {
+
+                var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top - 3].attributes[eAttr.id];
+                idNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
 
                 psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.NewArrayNode()
                 {
-                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes[eAttr.stype],
-                    lengthNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.optidx],
+                    typeNode = new SyntaxTree.ClassTypeNode()
+                    {
+                        classname = idNode,
+                        attributes = psr.newElement.attributes,
+                    },
+                    lengthNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+
+                    attributes = psr.newElement.attributes,
+                };
+            });
+            AddActionAtTail("newarr -> new primitive [ aexpr ]", (psr, production) => {
+
+                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.NewArrayNode()
+                {
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 3].attributes[eAttr.ast_node],
+                    lengthNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
 
                     attributes = psr.newElement.attributes,
                 };
@@ -1489,7 +1570,7 @@ namespace Gizbox.SemanticRule
             });
 
 
-            AddActionAtTail("stypesb -> idsb", (psr, production) => {
+            AddActionAtTail("stypesb -> typeidsb", (psr, production) => {
 
                 ((SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[eAttr.id]).identiferType = SyntaxTree.IdentityNode.IdType.Class;
 
@@ -1500,12 +1581,12 @@ namespace Gizbox.SemanticRule
                     attributes = psr.newElement.attributes
                 };
 
-                psr.newElement.attributes[eAttr.optidx] = psr.stack[psr.stack.Top].attributes[eAttr.optidx];
+                psr.newElement.attributes[eAttr.optidx] = null;
             });
 
             AddActionAtTail("stypesb -> primitivesb", (psr, production) => {
                 psr.newElement.attributes[eAttr.stype] = psr.stack[psr.stack.Top].attributes[eAttr.primitive];
-                psr.newElement.attributes[eAttr.optidx] = psr.stack[psr.stack.Top].attributes[eAttr.optidx];
+                psr.newElement.attributes[eAttr.optidx] = null;
             });
             AddActionAtTail("idsb -> ID [ optidx ]", (psr, production) => {
 
@@ -1517,26 +1598,29 @@ namespace Gizbox.SemanticRule
                 };
                 psr.newElement.attributes[eAttr.optidx] = psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node];
             });
-            AddActionAtTail("primitivesb -> primitive [ optidx ]", (psr, production) => {
-                psr.newElement.attributes[eAttr.primitive] = psr.stack[psr.stack.Top - 3].attributes[eAttr.ast_node];
-                psr.newElement.attributes[eAttr.optidx] = psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node];
+            AddActionAtTail("typeidsb -> namedtype [ ]", (psr, production) => {
+
+                var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.id];
+                idNode.identiferType = SyntaxTree.IdentityNode.IdType.Undefined;
+
+                psr.newElement.attributes[eAttr.id] = idNode;
+                psr.newElement.attributes[eAttr.optidx] = null;
+            });
+            AddActionAtTail("primitivesb -> primitive [ ]", (psr, production) => {
+                psr.newElement.attributes[eAttr.primitive] = psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node];
+                psr.newElement.attributes[eAttr.optidx] = null;
             });
             AddActionAtTail("optidx -> aexpr", (psr, production) => {
                 psr.newElement.attributes[eAttr.ast_node] = psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
             });
-            AddActionAtTail("optidx -> ε", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = null;
-            });
 
 
 
-            AddActionAtTail("inherit -> : ID", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.IdentityNode()
-                {
-                    attributes = psr.stack[psr.stack.Top].attributes,
-                    token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
-                    identiferType = SyntaxTree.IdentityNode.IdType.Class
-                };
+            AddActionAtTail("inherit -> : namedtype", (psr, production) => {
+                var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[eAttr.id];
+                idNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
+
+                psr.newElement.attributes[eAttr.ast_node] = idNode;
             });
             AddActionAtTail("inherit -> ε", (psr, production) => {
             });
@@ -2447,7 +2531,6 @@ namespace Gizbox.SemanticRule
                 return;
             }
 
-
             switch (node)
             {
                 case SyntaxTree.ProgramNode programNode:
@@ -2797,6 +2880,12 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.LiteralNode litNode:
                     {
                         AnalyzeTypeExpression(litNode);
+                    }
+                    break;
+                case SyntaxTree.DefaultValueNode defaultNode:
+                    {
+                        TryCompleteType(defaultNode.typeNode);
+                        AnalyzeTypeExpression(defaultNode);
                     }
                     break;
                 case SyntaxTree.UnaryOpNode unaryNode:
@@ -4442,6 +4531,11 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.LiteralNode litNode:
                     {
                         nodeTypeExprssion = GetLitType(litNode.token);
+                    }
+                    break;
+                case SyntaxTree.DefaultValueNode defaultNode:
+                    {
+                        nodeTypeExprssion = defaultNode.typeNode.TypeExpression();
                     }
                     break;
                 case SyntaxTree.ThisNode thisnode:

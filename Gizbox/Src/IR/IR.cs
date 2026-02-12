@@ -161,8 +161,15 @@ namespace Gizbox.IR
             if(dependencyLibs == null)
                 dependencyLibs = new();
 
-            if(dependencyLibs.Count > 0 && dependencies.Count != dependencyLibs.Count)
-                throw new GizboxException(ExceptioName.Undefine, "libs loaded error.");
+            if(dependencyLibs.Count > 0)
+            {
+                var uniqueCount = dependencyLibs.Select(d => d.name).Distinct().Count();
+                if (dependencies.Count != uniqueCount)
+                {
+                    throw new GizboxException(ExceptioName.Undefine, $"libs of {this.name} loaded error.");
+                }
+            }
+                
 
             if(this.dependencyLibs.Count == 0 && this.dependencies.Count != 0)
             {
@@ -188,10 +195,14 @@ namespace Gizbox.IR
             if (dep == null) throw new GizboxException(ExceptioName.LibraryDependencyCannotBeEmpty);
 
             if (dependencyLibs == null) dependencyLibs = new List<IRUnit>();
+            if (dependencyLibs.Any(d => d.name == dep.name))
+                return;
+
             dependencyLibs.Add(dep);
 
             if (dep.libsDenpendThis == null) dep.libsDenpendThis = new List<IRUnit>();
-            dep.libsDenpendThis.Add(this);
+            if (dep.libsDenpendThis.Any(u => u.name == this.name) == false)
+                dep.libsDenpendThis.Add(this);
         }
 
         //完成构建  

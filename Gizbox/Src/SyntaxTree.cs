@@ -551,6 +551,8 @@ namespace Gizbox
         public class ClassDeclareNode : DeclareNode
         {
             public TypeModifiers flags;
+            public bool isTemplateClass;
+            public readonly List<IdentityNode> templateParameters = new();
 
             public IdentityNode classNameNode { get => (IdentityNode)children_group_0[0]; set => children_group_0[0] = value; }
             public IdentityNode baseClassNameNode { get => (IdentityNode)children_group_0[1]; set => children_group_0[1] = value; }
@@ -758,6 +760,17 @@ namespace Gizbox
         public class LiteralNode : ExprNode
         {
             public Token token;
+        }
+
+        public class DefaultValueNode : ExprNode
+        {
+            public TypeNode typeNode { get => (TypeNode)children_group_0[0]; set => children_group_0[0] = value; }
+
+            public DefaultValueNode()
+            {
+                children_group_0 = new();
+                children_group_0.Add(null);
+            }
         }
 
         public class BinaryOpNode : ExprNode
