@@ -1804,15 +1804,22 @@ namespace Gizbox.SemanticRule
             foreach (var lname in this.ilUnit.dependencies)
             {
                 var lib = compilerContext.LoadLib(lname);
+                lib.EnsureAst();
 
                 foreach (var depNameOfLib in lib.dependencies)
                 {
                     var libdep = compilerContext.LoadLib(depNameOfLib);
+                    libdep.EnsureAst();
                     lib.AddDependencyLib(libdep);
                 }
 
                 this.ilUnit.AddDependencyLib(lib);
             }
+
+            //模板特化（AST层面）
+            SpecializeTemplates();
+
+            this.ilUnit.astRoot = ast.rootNode;
 
             //global env  
             ast.rootNode.attributes[eAttr.global_env] = ilUnit.globalScope.env;
@@ -1849,6 +1856,301 @@ namespace Gizbox.SemanticRule
             envStack.Push(ilUnit.globalScope.env);
             lifeTimeInfo.mainBranch.scopeStack.Push(new LifetimeInfo.ScopeInfo());
             Pass4_OwnershipLifetime(ast.rootNode);
+        }
+
+        private class TemplateInstance
+        {
+            public string templateName;
+            public string mangledName;
+            public List<SyntaxTree.TypeNode> typeArguments;
+        }
+
+        private void SpecializeTemplates()
+        {
+            if(ast?.rootNode == null)
+                return;
+
+            var templatesLocal = new Dictionary<string, SyntaxTree.ClassDeclareNode>();
+            CollectTemplateClasses(ast.rootNode, templatesLocal);
+
+            var templatesDeps = new Dictionary<string, SyntaxTree.ClassDeclareNode>();
+            foreach(var dep in ilUnit.dependencyLibs)
+            {
+                dep.EnsureAst();
+                if(dep.ast?.rootNode == null)
+                    continue;
+
+                CollectTemplateClasses(dep.ast.rootNode, templatesDeps);
+            }
+
+            var instances = new Dictionary<string, TemplateInstance>();
+            CollectTemplateInstantiations(ast.rootNode, instances, inTemplate:false);
+
+            var newSpecializations = new List<SyntaxTree.ClassDeclareNode>();
+
+            foreach(var inst in instances.Values)
+            {
+                if(IsSpecializationAvailable(inst.mangledName))
+                    continue;
+
+                var templateNode = FindTemplateClass(inst.templateName, templatesLocal, templatesDeps);
+                if(templateNode == null)
+                    continue;
+
+                var specialized = (SyntaxTree.ClassDeclareNode)templateNode.DeepClone();
+                ApplyTemplateSpecialization(templateNode, specialized, inst.mangledName, inst.typeArguments);
+                newSpecializations.Add(specialized);
+            }
+
+            if(newSpecializations.Count > 0)
+            {
+                for(int i = newSpecializations.Count - 1; i >= 0; --i)
+                {
+                    ast.rootNode.statementsNode.statements.Insert(0, newSpecializations[i]);
+                }
+            }
+        }
+
+        // 收集模板类定义  
+        private void CollectTemplateClasses(SyntaxTree.Node node, Dictionary<string, SyntaxTree.ClassDeclareNode> templates)
+        {
+            if(node == null)
+                return;
+
+            if(node is SyntaxTree.ClassDeclareNode classDecl && classDecl.isTemplateClass)
+            {
+                templates[classDecl.classNameNode.FullName] = classDecl;
+                return;
+            }
+
+            foreach(var child in node.Children())
+            {
+                CollectTemplateClasses(child, templates);
+            }
+        }
+
+        private void CollectTemplateInstantiations(SyntaxTree.Node node, Dictionary<string, TemplateInstance> instances, bool inTemplate)
+        {
+            if(node == null)
+                return;
+
+            if(node is SyntaxTree.ClassDeclareNode classDecl && classDecl.isTemplateClass)
+            {
+                inTemplate = true;
+            }
+
+            if(!inTemplate)
+            {
+                if(node is SyntaxTree.ClassTypeNode classType && classType.genericArguments.Count > 0)
+                {
+                    RegisterTemplateInstance(classType, instances);
+                }
+
+                if(node is SyntaxTree.NewObjectNode newObjNode && newObjNode.typeNode is SyntaxTree.ClassTypeNode newObjType && newObjType.genericArguments.Count > 0)
+                {
+                    RegisterTemplateInstance(newObjType, instances);
+                    NormalizeGenericUsage(newObjNode, newObjType);
+                }
+            }
+
+            foreach(var child in node.Children())
+            {
+                CollectTemplateInstantiations(child, instances, inTemplate);
+            }
+
+            if(node is SyntaxTree.ClassTypeNode classTypeWithArgs)
+            {
+                foreach(var arg in classTypeWithArgs.genericArguments)
+                {
+                    CollectTemplateInstantiations(arg, instances, inTemplate);
+                }
+            }
+
+            if(!inTemplate && node is SyntaxTree.ClassTypeNode classTypeNode && classTypeNode.genericArguments.Count > 0)
+            {
+                NormalizeGenericUsage(classTypeNode);
+            }
+        }
+
+        private void RegisterTemplateInstance(SyntaxTree.ClassTypeNode classType, Dictionary<string, TemplateInstance> instances)
+        {
+            var mangledName = classType.TypeExpression();
+            if(instances.ContainsKey(mangledName))
+                return;
+
+            instances[mangledName] = new TemplateInstance
+            {
+                templateName = classType.classname.FullName,
+                mangledName = mangledName,
+                typeArguments = classType.genericArguments.ToList(),
+            };
+        }
+
+        private void NormalizeGenericUsage(SyntaxTree.ClassTypeNode classType)
+        {
+            var mangledName = classType.TypeExpression();
+            classType.genericArguments.Clear();
+            classType.classname.SetPrefix(null);
+            classType.classname.token.attribute = mangledName;
+        }
+
+        private void NormalizeGenericUsage(SyntaxTree.NewObjectNode newObjNode, SyntaxTree.ClassTypeNode classType)
+        {
+            var mangledName = classType.TypeExpression();
+            classType.genericArguments.Clear();
+            classType.classname.SetPrefix(null);
+            classType.classname.token.attribute = mangledName;
+
+            newObjNode.className.SetPrefix(null);
+            newObjNode.className.token.attribute = mangledName;
+        }
+
+        private SyntaxTree.ClassDeclareNode FindTemplateClass(string name,
+            Dictionary<string, SyntaxTree.ClassDeclareNode> localTemplates,
+            Dictionary<string, SyntaxTree.ClassDeclareNode> depTemplates)
+        {
+            if(localTemplates.TryGetValue(name, out var local))
+                return local;
+            if(depTemplates.TryGetValue(name, out var dep))
+                return dep;
+            return null;
+        }
+
+        private bool IsSpecializationAvailable(string mangledName)
+        {
+            if(ast.rootNode?.statementsNode?.statements != null)
+            {
+                foreach(var stmt in ast.rootNode.statementsNode.statements)
+                {
+                    if(stmt is SyntaxTree.ClassDeclareNode classDecl && !classDecl.isTemplateClass && classDecl.classNameNode.FullName == mangledName)
+                        return true;
+                }
+            }
+
+            foreach(var dep in ilUnit.dependencyLibs)
+            {
+                if(dep.QueryTopSymbol(mangledName) != null)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private void ApplyTemplateSpecialization(SyntaxTree.ClassDeclareNode template,
+            SyntaxTree.ClassDeclareNode specialized,
+            string mangledName,
+            List<SyntaxTree.TypeNode> typeArguments)
+        {
+            var paramList = template.templateParameters;
+            if(paramList.Count != typeArguments.Count)
+                throw new SemanticException(ExceptioName.SemanticAnalysysError, template, "template argument count mismatch");
+
+            specialized.isTemplateClass = false;
+            specialized.templateParameters.Clear();
+
+            specialized.classNameNode.SetPrefix(null);
+            specialized.classNameNode.token.attribute = mangledName;
+            specialized.classNameNode.SetPrefix(null);
+            specialized.classNameNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
+
+            var typeMap = new Dictionary<string, SyntaxTree.TypeNode>();
+            for(int i = 0; i < paramList.Count; ++i)
+            {
+                typeMap[paramList[i].FullName] = typeArguments[i];
+                typeMap[paramList[i].token.attribute] = typeArguments[i];
+            }
+
+            ApplyTemplateTypeReplacement(specialized, typeMap);
+        }
+
+        private void ApplyTemplateTypeReplacement(SyntaxTree.Node node, Dictionary<string, SyntaxTree.TypeNode> typeMap)
+        {
+            if(node == null)
+                return;
+
+            switch(node)
+            {
+                case SyntaxTree.ConstantDeclareNode constDecl:
+                    constDecl.typeNode = ReplaceTypeNode(constDecl.typeNode, typeMap, constDecl);
+                    break;
+                case SyntaxTree.VarDeclareNode varDecl:
+                    varDecl.typeNode = ReplaceTypeNode(varDecl.typeNode, typeMap, varDecl);
+                    break;
+                case SyntaxTree.ParameterNode param:
+                    param.typeNode = ReplaceTypeNode(param.typeNode, typeMap, param);
+                    break;
+                case SyntaxTree.FuncDeclareNode funcDecl:
+                    funcDecl.returnTypeNode = ReplaceTypeNode(funcDecl.returnTypeNode, typeMap, funcDecl);
+                    break;
+                case SyntaxTree.ExternFuncDeclareNode externDecl:
+                    externDecl.returnTypeNode = ReplaceTypeNode(externDecl.returnTypeNode, typeMap, externDecl);
+                    break;
+                case SyntaxTree.OwnershipCaptureStmtNode captureNode:
+                    captureNode.typeNode = ReplaceTypeNode(captureNode.typeNode, typeMap, captureNode);
+                    break;
+                case SyntaxTree.OwnershipLeakStmtNode leakNode:
+                    leakNode.typeNode = ReplaceTypeNode(leakNode.typeNode, typeMap, leakNode);
+                    break;
+                case SyntaxTree.DefaultValueNode defaultNode:
+                    defaultNode.typeNode = ReplaceTypeNode(defaultNode.typeNode, typeMap, defaultNode);
+                    break;
+                case SyntaxTree.CastNode castNode:
+                    castNode.typeNode = ReplaceTypeNode(castNode.typeNode, typeMap, castNode);
+                    break;
+                case SyntaxTree.NewArrayNode newArrayNode:
+                    newArrayNode.typeNode = ReplaceTypeNode(newArrayNode.typeNode, typeMap, newArrayNode);
+                    break;
+                case SyntaxTree.NewObjectNode newObjNode:
+                    if(newObjNode.typeNode != null)
+                        newObjNode.typeNode = ReplaceTypeNode(newObjNode.typeNode, typeMap, newObjNode);
+                    if(newObjNode.className != null && typeMap.TryGetValue(newObjNode.className.FullName, out var replType) && replType is SyntaxTree.ClassTypeNode replClass)
+                    {
+                        newObjNode.className = (SyntaxTree.IdentityNode)replClass.classname.DeepClone();
+                        newObjNode.className.Parent = newObjNode;
+                    }
+                    break;
+                case SyntaxTree.ClassTypeNode classTypeNode:
+                    for(int i = 0; i < classTypeNode.genericArguments.Count; ++i)
+                    {
+                        classTypeNode.genericArguments[i] = ReplaceTypeNode(classTypeNode.genericArguments[i], typeMap, classTypeNode);
+                    }
+                    break;
+            }
+
+            foreach(var child in node.Children())
+            {
+                ApplyTemplateTypeReplacement(child, typeMap);
+            }
+        }
+
+        private SyntaxTree.TypeNode ReplaceTypeNode(SyntaxTree.TypeNode typeNode, Dictionary<string, SyntaxTree.TypeNode> typeMap, SyntaxTree.Node parent)
+        {
+            if(typeNode == null)
+                return null;
+
+            switch(typeNode)
+            {
+                case SyntaxTree.ClassTypeNode classTypeNode:
+                    if(typeMap.TryGetValue(classTypeNode.classname.FullName, out var replacement) && classTypeNode.genericArguments.Count == 0)
+                    {
+                        var cloned = (SyntaxTree.TypeNode)replacement.DeepClone();
+                        cloned.Parent = parent;
+                        return cloned;
+                    }
+                    for(int i = 0; i < classTypeNode.genericArguments.Count; ++i)
+                    {
+                        classTypeNode.genericArguments[i] = ReplaceTypeNode(classTypeNode.genericArguments[i], typeMap, classTypeNode);
+                    }
+                    classTypeNode.Parent = parent;
+                    return classTypeNode;
+                case SyntaxTree.ArrayTypeNode arrayTypeNode:
+                    arrayTypeNode.elemtentType = ReplaceTypeNode(arrayTypeNode.elemtentType, typeMap, arrayTypeNode);
+                    arrayTypeNode.Parent = parent;
+                    return arrayTypeNode;
+                default:
+                    typeNode.Parent = parent;
+                    return typeNode;
+            }
         }
 
         /// <summary>
@@ -2102,6 +2404,9 @@ namespace Gizbox.SemanticRule
 
                 case SyntaxTree.ClassDeclareNode classDeclNode:
                     {
+                        if(classDeclNode.isTemplateClass)
+                            break;
+
                         //附加命名空间名称    
                         if (isGlobalOrTopNamespace)
                         {
@@ -2457,6 +2762,9 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.ClassDeclareNode classDeclNode:
                     {
+                        if(classDeclNode.isTemplateClass)
+                            break;
+
                         //Id at env
                         classDeclNode.classNameNode.attributes[eAttr.def_at_env] = envStack.Peek();
 
@@ -2840,6 +3148,9 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.ClassDeclareNode classdeclNode:
                     {
+                        if(classdeclNode.isTemplateClass)
+                            break;
+
                         //进入作用域    
                         envStack.Push(classdeclNode.attributes[eAttr.env] as SymbolTable);
 
@@ -2970,10 +3281,11 @@ namespace Gizbox.SemanticRule
                         AnalyzeTypeExpression(litNode);
                     }
                     break;
-                case SyntaxTree.DefaultValueNode defaultNode:
+                case SyntaxTree.DefaultValueNode defaultValNode:
                     {
-                        TryCompleteType(defaultNode.typeNode);
-                        AnalyzeTypeExpression(defaultNode);
+                        var litnode = GenDefaultLitNode(defaultValNode.typeNode);
+                        defaultValNode.overrideNode = litnode;
+                        AnalyzeTypeExpression(litnode);
                     }
                     break;
                 case SyntaxTree.UnaryOpNode unaryNode:
@@ -3484,6 +3796,9 @@ namespace Gizbox.SemanticRule
                     }
                 case SyntaxTree.ClassDeclareNode classDecl:
                     {
+                        if(classDecl.isTemplateClass)
+                            break;
+
                         // 类作用域成员字段的初始化表达式做所有权合法性检查
                         foreach(var decl in classDecl.memberDelareNodes)
                         {
@@ -4391,6 +4706,12 @@ namespace Gizbox.SemanticRule
                 return;
             }
 
+            // 数组元素访问  
+            else if(rNode is ElementAccessNode elementAccessNode)
+            {
+                rModel = SymbolTable.RecordFlag.ManualVar;//数组只能存放非own类型  
+            }
+
             // 字面量
             else if(rNode is LiteralNode litnode)
             {
@@ -4618,7 +4939,7 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.LiteralNode litNode:
                     {
-                        nodeTypeExprssion = GetLitType(litNode.token);
+                        nodeTypeExprssion = TypeUtils.GetLitType(litNode.token);
                     }
                     break;
                 case SyntaxTree.DefaultValueNode defaultNode:
@@ -4761,7 +5082,15 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.NewObjectNode newObjNode:
                     {
                         string className = newObjNode.className.FullName;
-                        if (Query(className) == null) throw new SemanticException(ExceptioName.ClassDefinitionNotFound, newObjNode.className, className);
+                        if(Query(className) == null)
+                        {
+                            Console.WriteLine("AST");
+                            this.ilUnit.globalScope.env.Print();
+                            Console.WriteLine();
+                            
+                            throw new SemanticException(ExceptioName.ClassDefinitionNotFound, newObjNode.className, className);
+                        }
+                        
 
                         nodeTypeExprssion = newObjNode.typeNode?.TypeExpression() ?? className;
                     }
@@ -4890,30 +5219,6 @@ namespace Gizbox.SemanticRule
 
 
             return false;
-        }
-
-        private string GetLitType(Token token)
-        {
-            switch (token.name)
-            {
-                case "null":
-                    return "null";
-                case "LITBOOL":
-                    return "bool";
-                case "LITINT":
-                    return "int";
-                case "LITLONG":
-                    return "long";
-                case "LITFLOAT":
-                    return "float";
-                case "LITDOUBLE":
-                    return "double";
-                case "LITCHAR":
-                    return "char";
-                case "LITSTRING":
-                    return "string";
-            }
-            return default;
         }
 
         private bool CheckReturnStmt(SyntaxTree.Node node, string returnType)
@@ -5256,6 +5561,19 @@ namespace Gizbox.SemanticRule
             }
         }
 
+        private LiteralNode GenDefaultLitNode(SyntaxTree.TypeNode typenode)
+        {
+            string strLit = TypeUtils.GenDefaultValue(typenode.TypeExpression());
+            string tokenname = TypeUtils.GetLitTokenName(typenode.TypeExpression());
+            var start = typenode.StartToken();
+            LiteralNode litnode = new LiteralNode()
+            {
+                token = new Token(tokenname, PatternType.Literal, strLit, start.line, start.start, start.length),
+                attributes = new Dictionary<eAttr, object>(),
+            };
+            return litnode;
+        }
+
         public static void Log(object content)
         {
             if (!Compiler.enableLogSemanticAnalyzer) return;
@@ -5263,6 +5581,7 @@ namespace Gizbox.SemanticRule
         }
     }
 }
+
 
 
 

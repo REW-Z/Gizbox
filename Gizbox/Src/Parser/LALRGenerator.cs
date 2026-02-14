@@ -1399,7 +1399,7 @@ namespace Gizbox.LALRGenerator
 
             //DEBUG
             {
-                outputData.table.Print();
+                //outputData.table.Print();
                 Compiler.Pause("\nLALR分析表构建完毕");
             }
         }

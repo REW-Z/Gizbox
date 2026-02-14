@@ -23,37 +23,44 @@ namespace Gizbox
     /// <summary>
     /// 词法单元  
     /// </summary>
+    [DataContract]
     public class Token
     {
         /// <summary>
         /// 词法单元名  
         /// </summary>
+        [DataMember]
         public string name;
 
         /// <summary>
         /// 类型  
         /// </summary>
+        [DataMember]
         public PatternType patternType;
 
 
         /// <summary>
         /// 行号    
         /// </summary>
+        [DataMember]
         public int line;
 
         /// <summary>
         /// 行内起始位置  
         /// </summary>
+        [DataMember]
         public int start;
 
         /// <summary>
         /// 行内结束位置  
         /// </summary>
+        [DataMember]
         public int length;
 
         /// <summary>
         /// 属性值（一般是词素或者指针）    
         /// </summary>
+        [DataMember]
         public string attribute;
 
 
@@ -830,6 +837,61 @@ namespace Gizbox
     }
 
 
+    public static class TypeUtils
+    {
+        public static string GetLitType(Token token)
+        {
+            switch(token.name)
+            {
+                case "null":
+                    return "null";
+                case "LITBOOL":
+                    return "bool";
+                case "LITINT":
+                    return "int";
+                case "LITLONG":
+                    return "long";
+                case "LITFLOAT":
+                    return "float";
+                case "LITDOUBLE":
+                    return "double";
+                case "LITCHAR":
+                    return "char";
+                case "LITSTRING":
+                    return "string";
+            }
+            return default;
+        }
+
+        public static string GenDefaultValue(string type)
+        {
+            return type switch
+            {
+                "int" => "0",
+                "long" => "0L",
+                "float" => "0f",
+                "double" => "0d",
+                "bool" => "false",
+                "char" => "\'\\0\'",
+                _ => "null"
+            };
+        }
+
+        public static string GetLitTokenName(string type)
+        {
+            return type switch
+            {
+                "int" => "LITINT",
+                "long" => "LITLONG",
+                "float" => "LITFLOAT",
+                "double" => "LITDOUBLE",
+                "char" => "LITCHAR",
+                "bool" => "LITBOOL",
+                "string" => "LITSTRING",
+                _ => "null"
+            };
+        }
+    }
 
     /// <summary>
     /// 虚函数表  

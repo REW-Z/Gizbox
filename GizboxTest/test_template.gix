@@ -214,22 +214,10 @@ class AAA
 class BBB<T1,T2>
 {
     T1 field1 = default(T1);
-    int a = 0;
+    T2 field2 = default(T2);
 }
 void main()
 {
-    int a = 0;
-    bool b = (a < 0);
-    AAA[] arr = new AAA[10];
-    arr[0] = new AAA();
-    arr[0].field1 = 123;
-    Console::PrintLn("arr[0].field1:" + (string)(arr[0].field1));
-    //Core::Object boxed = (Core::Object)(arr[0]);
-
-    BBB<int, string> genobj = new BBB<int, string>();
-
-
-
     test0();
     test1();
     test2();
@@ -237,6 +225,29 @@ void main()
     test4();
     test5();
     test6();
+
+    
+    int a = 0;
+    bool b = (a < 0);
+    AAA[] arr = new AAA[10];
+    arr[0] = new AAA();
+    arr[0].field1 = 123;
+    Console::PrintLn("arr[0].field1:" + (string)(arr[0].field1));
+    Core::Object boxed = (Core::Object)(arr[0]);
+
+    BBB<int, string> genobj = new BBB<int, string>();
+    genobj.field1 = 23343;
+    Console::PrintLn("gen:");
+    Console::PrintLn((string)(genobj.field1));
+
+    List<int> list = new List<int>();
+    list.Add(111);
+    list.Add(222);
+    list.Add(333);
+    Console::PrintLn("list:");
+    Console::PrintLn((string)(list.Get(0)));
+    Console::PrintLn((string)(list.Get(1)));
+    Console::PrintLn((string)(list.Get(2)));
 
     Console::PrintLn("Test Finish.");
 }

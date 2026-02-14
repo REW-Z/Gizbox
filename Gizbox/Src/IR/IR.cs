@@ -138,11 +138,18 @@ namespace Gizbox.IR
         [DataMember]
         public List<(string typeExpress, string valueExpr)> constData = new ();
 
+        //AST根节点(用于模板特化等)
+        [DataMember]
+        public SyntaxTree.ProgramNode astRoot;
+
 
         //(不序列化) 临时载入的依赖      
         public List<IRUnit> dependencyLibs = new List<IRUnit>();
         //(不序列化) 
         public List<IRUnit> libsDenpendThis = new List<IRUnit>();
+
+        //(不序列化) AST缓存
+        public SyntaxTree ast;
 
 
 
@@ -203,6 +210,17 @@ namespace Gizbox.IR
             if (dep.libsDenpendThis == null) dep.libsDenpendThis = new List<IRUnit>();
             if (dep.libsDenpendThis.Any(u => u.name == this.name) == false)
                 dep.libsDenpendThis.Add(this);
+        }
+
+        public void EnsureAst()
+        {
+            if(ast != null)
+                return;
+
+            if(astRoot != null)
+            {
+                ast = new SyntaxTree(astRoot);
+            }
         }
 
         //完成构建  

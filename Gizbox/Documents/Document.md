@@ -51,6 +51,18 @@ class Human : Creature
 }
 ```
 
+## 模板  
+
+```
+class Container<T>
+{
+    T[] data;
+    //...
+}
+```
+
+模板会作为ast节点保存在IR文件中。在第一次使用的编译单元中特化。    
+
 
 ## 所有权（Ownership）
 

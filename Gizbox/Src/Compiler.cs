@@ -136,6 +136,7 @@ namespace Gizbox
                                 }
                                 else
                                 {
+                                    unit.EnsureAst();
                                     libsCache.Add(unit.name, unit);//cached
                                 }
                                 return unit;

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 
@@ -10,6 +11,8 @@ using System.Net;
 
 
 using System.Runtime.CompilerServices;
+using System.Runtime.Serialization;
+using System.Reflection;
 
 
 namespace Gizbox
@@ -104,26 +107,83 @@ namespace Gizbox
     /// <summary>
     /// 抽象语法树（AST）  
     /// </summary>
+    [DataContract(IsReference = true)]
     public partial class SyntaxTree
     {
         public static string[] compareOprators = new string[] { ">", "<", ">=", "<=", "==", "!=", };
 
 
+        [DataContract(IsReference = true)]
+        [KnownType(typeof(ProgramNode))]
+        [KnownType(typeof(ImportNode))]
+        [KnownType(typeof(StatementsNode))]
+        [KnownType(typeof(StatementBlockNode))]
+        [KnownType(typeof(UsingNode))]
+        [KnownType(typeof(NamespaceNode))]
+        [KnownType(typeof(ConstantDeclareNode))]
+        [KnownType(typeof(VarDeclareNode))]
+        [KnownType(typeof(ExternFuncDeclareNode))]
+        [KnownType(typeof(FuncDeclareNode))]
+        [KnownType(typeof(ClassDeclareNode))]
+        [KnownType(typeof(OwnershipLeakStmtNode))]
+        [KnownType(typeof(OwnershipCaptureStmtNode))]
+        [KnownType(typeof(SingleExprStmtNode))]
+        [KnownType(typeof(BreakStmtNode))]
+        [KnownType(typeof(ReturnStmtNode))]
+        [KnownType(typeof(DeleteStmtNode))]
+        [KnownType(typeof(WhileStmtNode))]
+        [KnownType(typeof(ForStmtNode))]
+        [KnownType(typeof(IfStmtNode))]
+        [KnownType(typeof(ConditionClauseNode))]
+        [KnownType(typeof(ElseClauseNode))]
+        [KnownType(typeof(IdentityNode))]
+        [KnownType(typeof(LiteralNode))]
+        [KnownType(typeof(DefaultValueNode))]
+        [KnownType(typeof(BinaryOpNode))]
+        [KnownType(typeof(UnaryOpNode))]
+        [KnownType(typeof(AssignNode))]
+        [KnownType(typeof(CallNode))]
+        [KnownType(typeof(ReplaceNode))]
+        [KnownType(typeof(IncDecNode))]
+        [KnownType(typeof(NewObjectNode))]
+        [KnownType(typeof(NewArrayNode))]
+        [KnownType(typeof(CastNode))]
+        [KnownType(typeof(ElementAccessNode))]
+        [KnownType(typeof(ObjectMemberAccessNode))]
+        [KnownType(typeof(ThisNode))]
+        [KnownType(typeof(TypeOfNode))]
+        [KnownType(typeof(SizeOfNode))]
+        [KnownType(typeof(ArrayTypeNode))]
+        [KnownType(typeof(ClassTypeNode))]
+        [KnownType(typeof(PrimitiveTypeNode))]
+        [KnownType(typeof(InferTypeNode))]
+        [KnownType(typeof(ArgumentListNode))]
+        [KnownType(typeof(ParameterListNode))]
+        [KnownType(typeof(ParameterNode))]
         public abstract class Node 
         {
+            [DataMember]
             protected List<Node> children_group_0; //可选附加节点列表1
+            [DataMember]
             protected List<Node> children_group_1; //可选附加节点列表1
+            [DataMember]
             protected List<Node> children_group_2; //可选附加节点列表2
 
+            [IgnoreDataMember]
             private Node parent;
 
+            [IgnoreDataMember]
             public Node overrideNode = null;
+            [IgnoreDataMember]
             public Node rawNode = null;
 
+            [DataMember]
             public bool isOverrideReplaced = false;
+            [DataMember]
             public int depth = -1;
 
-            public Dictionary<eAttr, object> attributes;
+            [IgnoreDataMember]
+            public Dictionary<eAttr, object> attributes = new();
 
 
 
@@ -302,6 +362,171 @@ namespace Gizbox
             {
                 return this.GetType().Name.ToString();
             }
+
+            public Node DeepClone()
+            {
+                return DeepClone(new Dictionary<Node, Node>());
+            }
+
+            internal virtual Node DeepClone(Dictionary<Node, Node> visited)
+            {
+                if(visited.TryGetValue(this, out var existing))
+                    return existing;
+
+                var clone = (Node)Activator.CreateInstance(GetType());
+                visited[this] = clone;
+
+                clone.isOverrideReplaced = isOverrideReplaced;
+                clone.depth = depth;
+                clone.attributes = CloneAttributes(attributes, visited);
+                clone.attributes ??= new();//源字典可能为空
+
+                clone.children_group_0 = CloneChildrenGroup(children_group_0, clone.children_group_0, visited, clone);
+                clone.children_group_1 = CloneChildrenGroup(children_group_1, clone.children_group_1, visited, clone);
+                clone.children_group_2 = CloneChildrenGroup(children_group_2, clone.children_group_2, visited, clone);
+
+                clone.overrideNode = overrideNode?.DeepClone(visited);
+                clone.rawNode = rawNode?.DeepClone(visited);
+
+                CopyCustomFields(this, clone, visited);
+
+                return clone;
+            }
+        }
+
+        private static List<Node> CloneChildrenGroup(List<Node> source, List<Node> target, Dictionary<Node, Node> visited, Node parent)
+        {
+            if(source == null)
+            {
+                if(target != null)
+                    target.Clear();
+                return target;
+            }
+
+            if(target == null)
+                target = new List<Node>();
+            else
+                target.Clear();
+
+            foreach(var child in source)
+            {
+                var cloned = child?.DeepClone(visited);
+                if(cloned != null)
+                    cloned.Parent = parent;
+                target.Add(cloned);
+            }
+
+            return target;
+        }
+
+        private static Dictionary<eAttr, object> CloneAttributes(Dictionary<eAttr, object> attributes, Dictionary<Node, Node> visited)
+        {
+            if(attributes == null)
+                return null;
+
+            var cloned = new Dictionary<eAttr, object>();
+            foreach(var kv in attributes)
+            {
+                cloned[kv.Key] = CloneAttributeValue(kv.Value, visited);
+            }
+            return cloned;
+        }
+
+        private static object CloneAttributeValue(object value, Dictionary<Node, Node> visited)
+        {
+            if(value == null)
+                return null;
+
+            if(value is Node node)
+                return node.DeepClone(visited);
+
+            if(value is Token token)
+                return CloneToken(token);
+
+            if(value is IList list)
+            {
+                var listType = value.GetType();
+                if(listType.IsGenericType)
+                {
+                    var elementType = listType.GetGenericArguments()[0];
+                    var newList = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(elementType));
+                    foreach(var item in list)
+                    {
+                        newList.Add(CloneAttributeValue(item, visited));
+                    }
+                    return newList;
+                }
+
+                var copy = new ArrayList();
+                foreach(var item in list)
+                {
+                    copy.Add(CloneAttributeValue(item, visited));
+                }
+                return copy;
+            }
+
+            return value;
+        }
+
+        private static void CopyCustomFields(Node source, Node target, Dictionary<Node, Node> visited)
+        {
+            var flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            var fields = source.GetType().GetFields(flags);
+            foreach(var field in fields)
+            {
+                if(field.DeclaringType == typeof(Node))
+                    continue;
+
+                if(field.FieldType.IsGenericType && field.FieldType.GetGenericTypeDefinition() == typeof(ChildList<>))
+                    continue;
+
+                var sourceValue = field.GetValue(source);
+
+                if(typeof(Node).IsAssignableFrom(field.FieldType))
+                {
+                    field.SetValue(target, sourceValue == null ? null : ((Node)sourceValue).DeepClone(visited));
+                    continue;
+                }
+
+                if(typeof(Token).IsAssignableFrom(field.FieldType))
+                {
+                    field.SetValue(target, CloneToken((Token)sourceValue));
+                    continue;
+                }
+
+                if(typeof(IList).IsAssignableFrom(field.FieldType) && sourceValue is IList sourceList)
+                {
+                    var targetList = field.GetValue(target) as IList;
+                    if(targetList == null)
+                    {
+                        if(field.IsInitOnly)
+                            continue;
+
+                        targetList = (IList)Activator.CreateInstance(field.FieldType);
+                        field.SetValue(target, targetList);
+                    }
+
+                    targetList.Clear();
+                    foreach(var item in sourceList)
+                    {
+                        targetList.Add(CloneAttributeValue(item, visited));
+                    }
+                    continue;
+                }
+
+                if(field.IsInitOnly)
+                    continue;
+
+                field.SetValue(target, sourceValue);
+            }
+        }
+
+        private static Token CloneToken(Token token)
+        {
+            if(token == null)
+                return null;
+
+            return new Token(token.name, token.patternType, token.attribute, token.line, token.start, token.length);
         }
 
         public class ChildList<T> where T : Node
@@ -328,6 +553,12 @@ namespace Gizbox
             public void AddRange(IEnumerable<T> nodes)
             {
                 container.AddRange(nodes);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Insert(int index, T node)
+            {
+                container.Insert(index, node);
             }
 
             public int Count
@@ -386,6 +617,7 @@ namespace Gizbox
 
         // ******************** ROOT ******************************
 
+        [DataContract(IsReference = true)]
         public class ProgramNode : Node
         {
             public readonly ChildList<ImportNode> importNodes;
@@ -407,14 +639,17 @@ namespace Gizbox
 
         // ******************** IMPT NODES ******************************
 
+        [DataContract(IsReference = true)]
         public class ImportNode : Node
         {
+            [DataMember]
             public string uri;
         }
 
         // ******************** STMT NODES ******************************
 
 
+        [DataContract(IsReference = true)]
         public class StatementsNode : Node
         {
             public readonly ChildList<StmtNode> statements;
@@ -426,6 +661,7 @@ namespace Gizbox
             }
         }
 
+        [DataContract(IsReference = true)]
         public class StatementBlockNode : StmtNode
         {
             public readonly ChildList<StmtNode> statements;
@@ -437,9 +673,11 @@ namespace Gizbox
             }
         }
 
+        [DataContract(IsReference = true)]
         public abstract class StmtNode : Node { }
 
 
+        [DataContract(IsReference = true)]
         public class UsingNode: Node
         {
             public IdentityNode namespaceNameNode { get => (IdentityNode)children_group_0[0]; set => children_group_0[0] = value; }
@@ -451,6 +689,7 @@ namespace Gizbox
             }
         }
 
+        [DataContract(IsReference = true)]
         public class NamespaceNode : StmtNode
         {
             public IdentityNode namepsaceNode { get => (IdentityNode)children_group_0[0]; set => children_group_0[0] = value; }
@@ -465,8 +704,10 @@ namespace Gizbox
 
         }
         
+        [DataContract(IsReference = true)]
         public abstract class DeclareNode : StmtNode { }
 
+        [DataContract(IsReference = true)]
         public class ConstantDeclareNode : DeclareNode
         {
             public TypeNode typeNode { get => (TypeNode)children_group_0[0]; set => children_group_0[0] = value; }
@@ -493,8 +734,10 @@ namespace Gizbox
             None = 0,
             Own = 2,
         }
+        [DataContract(IsReference = true)]
         public class VarDeclareNode : DeclareNode
         {
+            [DataMember]
             public VarModifiers flags;
             public TypeNode typeNode { get => (TypeNode)children_group_0[0]; set => children_group_0[0] = value; }
             public IdentityNode identifierNode { get => (IdentityNode)children_group_0[1]; set => children_group_0[1] = value; }
@@ -510,6 +753,7 @@ namespace Gizbox
         }
 
 
+        [DataContract(IsReference = true)]
         public class ExternFuncDeclareNode : DeclareNode
         {
             public TypeNode returnTypeNode { get => (TypeNode)children_group_0[0]; set => children_group_0[0] = value; }
@@ -530,9 +774,12 @@ namespace Gizbox
             Normal,
             OperatorOverload,
         }
+        [DataContract(IsReference = true)]
         public class FuncDeclareNode : DeclareNode
         {
+            [DataMember]
             public FunctionKind funcType;
+            [DataMember]
             public VarModifiers returnFlags;
 
             public TypeNode returnTypeNode { get => (TypeNode)children_group_0[0]; set => children_group_0[0] = value; }
@@ -548,10 +795,14 @@ namespace Gizbox
 
         }
 
+        [DataContract(IsReference = true)]
         public class ClassDeclareNode : DeclareNode
         {
+            [DataMember]
             public TypeModifiers flags;
+            [DataMember]
             public bool isTemplateClass;
+            [DataMember]
             public readonly List<IdentityNode> templateParameters = new();
 
             public IdentityNode classNameNode { get => (IdentityNode)children_group_0[0]; set => children_group_0[0] = value; }
@@ -569,6 +820,7 @@ namespace Gizbox
 
         }
 
+        [DataContract(IsReference = true)]
         public class OwnershipLeakStmtNode : StmtNode
         {
             public TypeNode typeNode { get => (TypeNode)children_group_0[0]; set => children_group_0[0] = value; }
@@ -583,8 +835,10 @@ namespace Gizbox
                 children_group_0.Add(null);
             }
         }
+        [DataContract(IsReference = true)]
         public class OwnershipCaptureStmtNode : StmtNode
         {
+            [DataMember]
             public VarModifiers flags;
             public TypeNode typeNode { get => (TypeNode)children_group_0[0]; set => children_group_0[0] = value; }
             public IdentityNode lIdentifier { get => (IdentityNode)children_group_0[1]; set => children_group_0[1] = value; }
@@ -599,6 +853,7 @@ namespace Gizbox
             }
         }
 
+        [DataContract(IsReference = true)]
         public class SingleExprStmtNode : StmtNode//单个特殊表达式(new、assign、call、increase)的语句  
         {
             public SpecialExprNode exprNode { get => (SpecialExprNode)children_group_0[0]; set => children_group_0[0] = value; }
@@ -610,10 +865,12 @@ namespace Gizbox
             }
         }
 
+        [DataContract(IsReference = true)]
         public class BreakStmtNode : StmtNode
         {
         }
 
+        [DataContract(IsReference = true)]
         public class ReturnStmtNode : StmtNode
         {
             public ExprNode returnExprNode { get => (ExprNode)children_group_0[0]; set => children_group_0[0] = value; }
@@ -624,8 +881,10 @@ namespace Gizbox
             }
         }
 
+        [DataContract(IsReference = true)]
         public class DeleteStmtNode : StmtNode
         {
+            [DataMember]
             public bool isArrayDelete;
 
             public ExprNode objToDelete { get => (ExprNode)children_group_0[0]; set => children_group_0[0] = value; }
@@ -636,6 +895,7 @@ namespace Gizbox
             }
         }
 
+        [DataContract(IsReference = true)]
         public class WhileStmtNode : StmtNode
         {
             public ExprNode conditionNode { get => (ExprNode)children_group_0[0]; set => children_group_0[0] = value; }
@@ -649,6 +909,7 @@ namespace Gizbox
             }
         }
 
+        [DataContract(IsReference = true)]
         public class ForStmtNode : StmtNode
         {
             public StmtNode initializerNode { get => (StmtNode)children_group_0[0]; set => children_group_0[0] = value; }
@@ -664,6 +925,7 @@ namespace Gizbox
             }
         }
 
+        [DataContract(IsReference = true)]
         public class IfStmtNode : StmtNode
         {
             public readonly ChildList<ConditionClauseNode> conditionClauseList;
@@ -682,6 +944,7 @@ namespace Gizbox
 
         // ******************** CONDITION CLAUSE NODES ******************************
 
+        [DataContract(IsReference = true)]
         public class ConditionClauseNode : Node
         {
             public ExprNode conditionNode { get => (ExprNode)children_group_0[0]; set => children_group_0[0] = value; }
@@ -694,6 +957,7 @@ namespace Gizbox
                 children_group_0.Add(null);
             }
         }
+        [DataContract(IsReference = true)]
         public class ElseClauseNode : Node
         {
             public StmtNode stmt { get => (StmtNode)children_group_0[0]; set => children_group_0[0] = value; }
@@ -706,8 +970,10 @@ namespace Gizbox
         }
 
         // ******************** EXPR NODES ******************************
+        [DataContract(IsReference = true)]
         public abstract class ExprNode : Node { }
 
+        [DataContract(IsReference = true)]
         public class IdentityNode : ExprNode
         {
             public enum IdType
@@ -719,12 +985,16 @@ namespace Gizbox
                 FunctionOrMethod,
             }
 
+            [DataMember]
             public Token token;
 
+            [DataMember]
             public IdType identiferType = IdType.Undefined;
 
+            [DataMember]
             public bool isMemberIdentifier = false;
 
+            [DataMember]
             private string fullname = null;
 
             public string FullName
@@ -746,7 +1016,7 @@ namespace Gizbox
                 }
                 else
                 {
-                    this.fullname = token.attribute;
+                    this.fullname = null;
                 }
             }
 
@@ -757,11 +1027,14 @@ namespace Gizbox
         }
 
 
+        [DataContract(IsReference = true)]
         public class LiteralNode : ExprNode
         {
+            [DataMember]
             public Token token;
         }
 
+        [DataContract(IsReference = true)]
         public class DefaultValueNode : ExprNode
         {
             public TypeNode typeNode { get => (TypeNode)children_group_0[0]; set => children_group_0[0] = value; }
@@ -773,8 +1046,10 @@ namespace Gizbox
             }
         }
 
+        [DataContract(IsReference = true)]
         public class BinaryOpNode : ExprNode
         {
+            [DataMember]
             public string op;
             public ExprNode leftNode { get => (ExprNode)children_group_0[0]; set => children_group_0[0] = value; }
             public ExprNode rightNode { get => (ExprNode)children_group_0[1]; set => children_group_0[1] = value; }
@@ -806,8 +1081,10 @@ namespace Gizbox
             }
         }
 
+        [DataContract(IsReference = true)]
         public class UnaryOpNode : ExprNode
         {
+            [DataMember]
             public string op;
             public ExprNode exprNode { get => (ExprNode)children_group_0[0]; set => children_group_0[0] = value; }
 
@@ -818,10 +1095,13 @@ namespace Gizbox
             }
         }
 
+        [DataContract(IsReference = true)]
         public abstract class SpecialExprNode : ExprNode { }//特殊表达式(new、assign、call、increase)（带有副作用）     
 
+        [DataContract(IsReference = true)]
         public class AssignNode : SpecialExprNode//赋值表达式（高优先级）
         {
+            [DataMember]
             public string op;//=、+=、-=、*=、/=、%=  
             public ExprNode lvalueNode { get => (ExprNode)children_group_0[0]; set => children_group_0[0] = value; }
             public ExprNode rvalueNode { get => (ExprNode)children_group_0[1]; set => children_group_0[1] = value; }
@@ -834,8 +1114,10 @@ namespace Gizbox
             }
         }
 
+        [DataContract(IsReference = true)]
         public class CallNode : SpecialExprNode//调用表达式（低优先级）
         {
+            [DataMember]
             public bool isMemberAccessFunction;
 
             //id or memberaccesss  
@@ -850,6 +1132,7 @@ namespace Gizbox
             }
         }
 
+        [DataContract(IsReference = true)]
         public class ReplaceNode : SpecialExprNode//replace(member, newValue)
         {
             public ExprNode targetNode { get => (ExprNode)children_group_0[0]; set => children_group_0[0] = value; }
@@ -865,9 +1148,12 @@ namespace Gizbox
 
 
 
+        [DataContract(IsReference = true)]
         public class IncDecNode : SpecialExprNode//自增自减表达式（低优先级）
         {
+            [DataMember]
             public bool isOperatorFront;//操作符在标识符前
+            [DataMember]
             public string op;//++、--  
             public IdentityNode identifierNode { get => (IdentityNode)children_group_0[0]; set => children_group_0[0] = value; }
 
@@ -878,9 +1164,11 @@ namespace Gizbox
             }
         }
 
+        [DataContract(IsReference = true)]
         public class NewObjectNode : SpecialExprNode
         {
             public IdentityNode className { get => (IdentityNode)children_group_0[0]; set => children_group_0[0] = value; }
+            [DataMember]
             public TypeNode typeNode;
 
             public NewObjectNode()
@@ -890,6 +1178,7 @@ namespace Gizbox
             }
         }
 
+        [DataContract(IsReference = true)]
         public class NewArrayNode : SpecialExprNode
         {
             public TypeNode typeNode { get => (TypeNode)children_group_0[0]; set => children_group_0[0] = value; }
@@ -903,6 +1192,7 @@ namespace Gizbox
             }
         }
 
+        [DataContract(IsReference = true)]
         public class CastNode : ExprNode
         {
             public TypeNode typeNode { get => (TypeNode)children_group_0[0]; set => children_group_0[0] = value; }
@@ -916,6 +1206,7 @@ namespace Gizbox
             }
         }
 
+        [DataContract(IsReference = true)]
         public class ElementAccessNode : ExprNode
         {
             //id or memberaccesss  
@@ -931,6 +1222,7 @@ namespace Gizbox
         }
 
 
+        [DataContract(IsReference = true)]
         public class ObjectMemberAccessNode : ExprNode
         {
             //attributes: memberType func/var/property
@@ -945,11 +1237,14 @@ namespace Gizbox
             }
         }
 
+        [DataContract(IsReference = true)]
         public class ThisNode : ExprNode
         {
+            [DataMember]
             public Token token;
         }
 
+        [DataContract(IsReference = true)]
         public class TypeOfNode : ExprNode
         {
             public TypeNode typeNode { get => (TypeNode)children_group_0[0]; set => children_group_0[0] = value; }
@@ -960,6 +1255,7 @@ namespace Gizbox
                 children_group_0.Add(null);
             }
         }
+        [DataContract(IsReference = true)]
         public class SizeOfNode : ExprNode
         {
             public TypeNode typeNode { get => (TypeNode)children_group_0[0]; set => children_group_0[0] = value; }
@@ -975,8 +1271,14 @@ namespace Gizbox
 
         // ******************** TYPE NODES ******************************
 
+        [DataContract(IsReference = true)]
+        [KnownType(typeof(ArrayTypeNode))]
+        [KnownType(typeof(ClassTypeNode))]
+        [KnownType(typeof(PrimitiveTypeNode))]
+        [KnownType(typeof(InferTypeNode))]
         public abstract class TypeNode : Node { public abstract string TypeExpression(); }
 
+        [DataContract(IsReference = true)]
         public class ArrayTypeNode : TypeNode
         {
             public TypeNode elemtentType { get => (TypeNode)children_group_0[0]; set => children_group_0[0] = value; }
@@ -993,9 +1295,11 @@ namespace Gizbox
             }
         }
 
+        [DataContract(IsReference = true)]
         public class ClassTypeNode : TypeNode
         {
             public IdentityNode classname { get => (IdentityNode)children_group_0[0]; set => children_group_0[0] = value; }
+            [DataMember]
             public readonly List<TypeNode> genericArguments = new();
 
             public ClassTypeNode()
@@ -1012,8 +1316,10 @@ namespace Gizbox
                 return Utils.MangleTypeName(classname.FullName, genericArguments.Select(t => t.TypeExpression()));
             }
         }
+        [DataContract(IsReference = true)]
         public class PrimitiveTypeNode : TypeNode
         {
+            [DataMember]
             public Token token;
 
             public override string TypeExpression()
@@ -1022,6 +1328,7 @@ namespace Gizbox
             }
         }
 
+        [DataContract(IsReference = true)]
         public class InferTypeNode : TypeNode
         {
             public override string TypeExpression()
@@ -1032,6 +1339,7 @@ namespace Gizbox
 
 
         // ******************** OTHER NODES ******************************
+        [DataContract(IsReference = true)]
         public class ArgumentListNode : Node
         {
             public readonly ChildList<ExprNode> arguments;
@@ -1043,6 +1351,7 @@ namespace Gizbox
             }
         }
 
+        [DataContract(IsReference = true)]
         public class ParameterListNode : Node
         {
             public readonly ChildList<ParameterNode> parameterNodes;
@@ -1054,8 +1363,10 @@ namespace Gizbox
             }
         }
 
+        [DataContract(IsReference = true)]
         public class ParameterNode : Node
         {
+            [DataMember]
             public VarModifiers flags;
             public TypeNode typeNode { get => (TypeNode)children_group_0[0]; set => children_group_0[0] = value; }
             public IdentityNode identifierNode { get => (IdentityNode)children_group_0[1]; set => children_group_0[1] = value; }
