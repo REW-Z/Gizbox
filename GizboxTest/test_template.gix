@@ -5,208 +5,6 @@ using Core;
 using Console;
 using Collections;
 
-class own OInt
-{
-    int value = 0;
-}
-class ItemOInt
-{
-    OInt itemValue = new OInt();
-}
-class OIntList
-{
-    ItemOInt[] items = new ItemOInt[10];
-    int count = 0;
-
-    void Add(OInt v)
-    {
-        int idx = this.count;
-
-        this.items[idx] = new ItemOInt();
-
-        this.items[idx].itemValue = v;
-
-        this.count += 1;
-    }
-    OInt Get(int idx)
-    {
-        OInt rep = new OInt();
-        rep.value = 999;
-        OInt t = replace(this.items[idx].itemValue, rep);
-        return t; //从字段中返回own类型，使用replace进行所有权转移  
-    }
-    bor OInt GetBor(int idx)
-    {
-        Console::PrintLn("--GetBor");
-
-        return this.items[idx].itemValue;//从字段中返回bor类型，不转移所有权
-    }
-}
-
-
-//测试类，含有own字段
-class TestClass
-{
-    own Int field1 = new Int();
-}
-
-//测试函数，参数和返回值均为own类型
-own Int OAdd(own Int x, own Int y)
-{
-    own Int rs = new Int();
-    int resvalue = x.value + y.value;
-    Console::PrintLn("resvalue assign111...");
-    rs.value = resvalue;
-    Console::PrintLn("resvalue assign222...");
-    return rs;
-}
-
-
-void test0()
-{
-    own Int t0  = new Int();
-    t0.value = 1111;
-    Console::PrintLn("t0" + (string)(t0.value));
-    own Int t1  = new Int();
-    t1.value = 2222;
-    Console::PrintLn("t1" + (string)(t1.value));
-
-    own Int t3 = OAdd(t0, t1);
-    
-    Console::PrintLn("t3:");
-    Console::PrintLn((string)(t3.value));
-}
-
-//测试参数和返回值的所有权传递  
-void test1()
-{
-    Console::PrintLn("Test1 : own param & own return.");
-    
-    own Int aaa = new Int(); aaa.value = 1;
-    own Int bbb = new Int(); bbb.value = 2;
-    
-    Console::PrintLn("aaa:" + (string)aaa.value);
-    
-    //测试返回值的所有权传递
-    own Int ccc  = OAdd(aaa, bbb);
-    
-    Console::PrintLn("value of ccc");
-    Console::PrintLn((string)(ccc.value));
-
-    //测试返回值被抛弃    
-    own Int xxx = new Int(); xxx.value = 3;
-    own Int yyy = new Int(); yyy.value = 4;
-
-    OAdd(xxx, yyy);
-
-
-    //Console::PrintLn("aaa:" + (string)aaa.value); //已经被移动，不能再使用  
-}
-
-
-//分支测试  
-void test2()
-{
-    Console::PrintLn("Test2 : own in branches.");
-
-    own Int ccc = new Int();
-    if(true)
-    {
-        own Int ddd = ccc;
-        
-    }
-    else if(true)
-    {
-        own Int fff = ccc;
-    }
-    else
-    {
-    }
-
-    //IR中会条件删除ccc
-}
-
-
-//循环测试  
-void test3()
-{
-    Console::PrintLn("Test3 : own in loops.");
-
-    for(int i = 0; i < 3; i++)
-    {
-        own Int eee = new Int();
-        eee.value = i;
-        Console::PrintLn("eee:" + (string)eee.value);
-    }
-
-    own Int fff = new Int();
-    int counter = 0;
-    while(counter < 10)
-    {
-        //own Int ggg = fff; //报错: 不能多次移动同一个own对象  
-        counter++;
-    }
-}
-
-//字段测试  
-void test4()
-{
-    Console::PrintLn("Test4 : own fields.");
-
-    TestClass obj1 = new TestClass();
-    //delete obj1.field1; //编译错误：delete不能用于所有权类型  
-    delete obj1;                  //析构函数会自动释放own字段  
-}
-
-//捕获和泄露测试  
-void test5()
-{
-    Console::PrintLn("Test5 : own capture & leak.");
-
-    own Int src1 = new Int();
-    Int dst1 = leak(src1);
-    
-    Int src2 = new Int();
-    own Int dst2 = capture(src2);
-
-    Console::PrintLn("end test5.");
-}
-
-//数组测试  
-void test6()
-{
-    Console::PrintLn("Test6 : arr test.");
-
-    ItemOInt[] arr = new ItemOInt[10];
-    arr[0] = new ItemOInt();
-    arr[0].itemValue.value = 123;
-
-    
-    OIntList list = new OIntList();
-    list.Add(new OInt());
-
-    //取出所有权赋值  
-    bor OInt vbor = list.GetBor(0);
-    vbor.value = 456;
-    OInt vown = list.Get(0);//replace后字段被填入新对象  
-
-    
-    //第二次取出，验证replace效果  
-    bor OInt vbor2 = list.GetBor(0);
-    own OInt vown2 = list.Get(0);
-
-    
-
-    Console::PrintLn("value:" + (string)arr[0].itemValue.value);
-
-    Console::PrintLn("list-value:" + (string)vbor.value);
-    Console::PrintLn("list-value:" + (string)vown.value);
-    
-    Console::PrintLn("list-value:" + (string)vbor2.value); 
-    Console::PrintLn("list-value:" + (string)vown2.value);
-}
-
-
 class AAA
 {
     int field1 = 0;
@@ -216,17 +14,20 @@ class BBB<T1,T2>
     T1 field1 = default(T1);
     T2 field2 = default(T2);
 }
+
+T Add<T>(T x, T y)
+{
+    return x + y;
+}
+
+T Pow<T>(T x)
+{
+    return (T)((double)x * (double)x);
+}
+
 void main()
 {
-    test0();
-    test1();
-    test2();
-    test3();
-    test4();
-    test5();
-    test6();
-
-    
+    //语法冲突(小于比较和类型转换)  
     int a = 0;
     bool b = (a < 0);
     AAA[] arr = new AAA[10];
@@ -235,11 +36,13 @@ void main()
     Console::PrintLn("arr[0].field1:" + (string)(arr[0].field1));
     Core::Object boxed = (Core::Object)(arr[0]);
 
+    //模板类特化测试  
     BBB<int, string> genobj = new BBB<int, string>();
     genobj.field1 = 23343;
     Console::PrintLn("gen:");
     Console::PrintLn((string)(genobj.field1));
 
+    //其他单元的模板类特化测试  
     List<int> list = new List<int>();
     list.Add(111);
     list.Add(222);
@@ -248,6 +51,28 @@ void main()
     Console::PrintLn((string)(list.Get(0)));
     Console::PrintLn((string)(list.Get(1)));
     Console::PrintLn((string)(list.Get(2)));
+
+
+    //模板函数（泛型函数测试）  
+    int x = 10;
+    int y = 20;
+    int z = Add<int>(x, y);
+    Console::PrintLn("z:" + (string)z);
+
+    int p = 5;
+    int q = Pow<int>(p);
+    Console::PrintLn("q:" + (string)q);
+
+    //其他编译单元的模板函数测试  
+    int m = -12;
+    int n = Math::Abs<int>(m);
+    Console::PrintLn("n:" + (string)n);
+    int m2 = 12;
+    int n2 = Math::Abs<int>(m2);
+    Console::PrintLn("n2:" + (string)n2);
+    int m3 = 0;
+    int n3 = Math::Abs<int>(m3);
+    Console::PrintLn("n3:" + (string)n3);
 
     Console::PrintLn("Test Finish.");
 }

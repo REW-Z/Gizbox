@@ -41,6 +41,20 @@ namespace Gizbox
         public TokenPattern comment;
 
         private readonly HashSet<string> typeNameSet = new HashSet<string>(StringComparer.Ordinal);
+        private static readonly HashSet<string> typeLikeTokenNames = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "TYPE_NAME",
+            "ID",
+            "void",
+            "bool",
+            "int",
+            "long",
+            "float",
+            "double",
+            "char",
+            "string",
+            "var",
+        };
 
 
         public Scanner()
@@ -156,6 +170,8 @@ namespace Gizbox
             results.AddRange(literals.Select(p => p.tokenName));
             results.Add(identifierPattern.tokenName);
             results.Add("TYPE_NAME");
+            results.Add("GEN_LT");
+            results.Add("GEN_GT");
 
             return results;
         }
@@ -342,6 +358,8 @@ namespace Gizbox
 
             //DEBUG  
             {
+                ReclassifyGenericBrackets(tokens);
+
                 if (Compiler.enableLogScanner) Log("Token列表：");
                 foreach(var token in tokens)
                 {
@@ -359,6 +377,81 @@ namespace Gizbox
         {
             if(!Compiler.enableLogScanner) return;
             GixConsole.WriteLine("Scanner >>>" + content);
+        }
+
+        private static bool IsTypeLikeToken(Token token)
+        {
+            if(token == null)
+                return false;
+
+            if(typeLikeTokenNames.Contains(token.name))
+                return true;
+
+            return false;
+        }
+
+        private static bool IsGenericStart(List<Token> tokens, int ltIndex)
+        {
+            if(ltIndex <= 0 || ltIndex >= tokens.Count - 1)
+                return false;
+
+            var prev = tokens[ltIndex - 1];
+            if(prev == null || (prev.name != "ID" && prev.name != "TYPE_NAME"))
+                return false;
+
+            var next = tokens[ltIndex + 1];
+            return IsTypeLikeToken(next);
+        }
+
+        private static bool TryFindGenericEnd(List<Token> tokens, int start, out int endIndex)
+        {
+            endIndex = -1;
+            int depth = 0;
+
+            for(int i = start; i < tokens.Count; i++)
+            {
+                var t = tokens[i];
+                if(t.name == "<")
+                {
+                    depth++;
+                }
+                else if(t.name == ">")
+                {
+                    depth--;
+                    if(depth == 0)
+                    {
+                        endIndex = i;
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static void ReclassifyGenericBrackets(List<Token> tokens)
+        {
+            for(int i = 0; i < tokens.Count; i++)
+            {
+                if(tokens[i].name != "<")
+                    continue;
+
+                if(!IsGenericStart(tokens, i))
+                    continue;
+
+                if(!TryFindGenericEnd(tokens, i, out var endIndex))
+                    continue;
+
+                for(int j = i; j <= endIndex; j++)
+                {
+                    if(tokens[j].name == "<")
+                        tokens[j].name = "GEN_LT";
+                    else if(tokens[j].name == ">")
+                        tokens[j].name = "GEN_GT";
+                }
+
+                i = endIndex;
+            }
         }
     }
 }

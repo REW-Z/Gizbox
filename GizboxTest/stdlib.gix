@@ -46,6 +46,13 @@ namespace Math
 		return guess;
 	}
 
+	T Abs<T>(T number)
+	{
+		T result = number;
+		if(number < default(T))
+			result = -number;
+		return result;
+	}
 }
 
 

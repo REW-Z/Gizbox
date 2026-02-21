@@ -1,4 +1,4 @@
-ï»¿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,15 +19,14 @@ using System.Xml.Linq;
 namespace Gizbox
 {
     /// <summary>
-    /// èŠ‚ç‚¹å±æ€§æšä¸¾  
+    /// Óï·¨·ÖÎö½×¶ÎÊôĞÔÃ¶¾Ù
     /// </summary>
-    public enum eAttr
+    public enum ParseAttr
     {
         token,
         start,
         end,
 
-        env,
         cst_node,
         ast_node,
 
@@ -35,16 +34,29 @@ namespace Gizbox
         using_list,
         decl_stmts,
         condition_clause_list,
-        global_env,
         tmodf,
-        klass,
-        member_name,
         id,
-        uid,
-        type,
         stype,
         optidx,
         primitive,
+        generic_params,
+        generic_args,
+    }
+
+    /// <summary>
+    /// ÓïÒå·ÖÎö½×¶ÎÊôĞÔÃ¶¾Ù
+    /// </summary>
+    public enum AstAttr
+    {
+        start,
+        end,
+
+        env,
+        global_env,
+        klass,
+        member_name,
+        uid,
+        type,
         mangled_name,
         extern_name,
         def_at_env,
@@ -54,8 +66,6 @@ namespace Gizbox
         obj_class_rec,
         not_a_property,
         name_completed,
-        generic_params,
-        generic_args,
 
         __codegen_mark_min,
 
@@ -79,14 +89,14 @@ namespace Gizbox
 }
 
 /// <summary>
-/// è¯­ä¹‰è§„åˆ™  
+/// ÓïÒå¹æÔò  
 /// </summary>
 namespace Gizbox.SemanticRule
 {
 
 
     /// <summary>
-    /// è¯­ä¹‰åŠ¨ä½œ  
+    /// ÓïÒå¶¯×÷  
     /// </summary>
     public class SemanticAction
     {
@@ -111,41 +121,41 @@ namespace Gizbox.SemanticRule
 
 
     /// <summary>
-    /// è‡ªåº•å‘ä¸Šçš„è¯­æ³•åˆ†ææ ‘æ„é€ å™¨  
+    /// ×Ôµ×ÏòÉÏµÄÓï·¨·ÖÎöÊ÷¹¹ÔìÆ÷  
     /// </summary>
     public class BottomUpParseTreeBuilder
     {
-        // åˆ†ææ ‘  
+        // ·ÖÎöÊ÷  
         public ParseTree resultTree = new ParseTree();
 
-        // åŠ¨ä½œæ„å»º  
+        // ¶¯×÷¹¹½¨  
         public void BuildAction(LRParser parser, Production production)
         {
-            //äº§ç”Ÿå¼å¤´  
-            ParseTree.Node newNode = (parser.newElement.attributes[eAttr.cst_node] = new ParseTree.Node() { isLeaf = false, name = production.head.name }) as ParseTree.Node;
+            //²úÉúÊ½Í·  
+            ParseTree.Node newNode = (parser.newElement.attributes[ParseAttr.cst_node] = new ParseTree.Node() { isLeaf = false, name = production.head.name }) as ParseTree.Node;
             resultTree.allnodes.Add(newNode);
 
-            //äº§ç”Ÿå¼ä½“  
+            //²úÉúÊ½Ìå  
             for (int i = 0; i < production.body.Length; ++i)
             {
                 int offset = parser.stack.Count - production.body.Length;
                 var ele = parser.stack[offset + i];
                 var symbol = production.body[i];
 
-                //å¶å­èŠ‚ç‚¹ï¼ˆç»ˆç»“ç¬¦èŠ‚ç‚¹ï¼‰  
+                //Ò¶×Ó½Úµã£¨ÖÕ½á·û½Úµã£©  
                 if (symbol is Terminal)
                 {
-                    var node = (ele.attributes[eAttr.cst_node] = new ParseTree.Node() { isLeaf = true, name = symbol.name + "," + (ele.attributes[eAttr.token] as Token).attribute }) as ParseTree.Node;
+                    var node = (ele.attributes[ParseAttr.cst_node] = new ParseTree.Node() { isLeaf = true, name = symbol.name + "," + (ele.attributes[ParseAttr.token] as Token).attribute }) as ParseTree.Node;
 
                     resultTree.allnodes.Add(node);
 
                     node.parent = newNode;
                     newNode.children.Add(node);
                 }
-                //å†…éƒ¨èŠ‚ç‚¹ï¼ˆéç»ˆç»“ç¬¦èŠ‚ç‚¹ï¼‰
+                //ÄÚ²¿½Úµã£¨·ÇÖÕ½á·û½Úµã£©
                 else
                 {
-                    var node = ele.attributes[eAttr.cst_node] as ParseTree.Node;
+                    var node = ele.attributes[ParseAttr.cst_node] as ParseTree.Node;
 
                     node.parent = newNode;
                     newNode.children.Add(node);
@@ -160,22 +170,22 @@ namespace Gizbox.SemanticRule
 
         }
 
-        // å®Œæˆ  
+        // Íê³É  
         public void Accept(LRParser parser)
         {
-            //è®¾ç½®æ ¹èŠ‚ç‚¹  
-            resultTree.root = parser.newElement.attributes[eAttr.cst_node] as ParseTree.Node;
+            //ÉèÖÃ¸ù½Úµã  
+            resultTree.root = parser.newElement.attributes[ParseAttr.cst_node] as ParseTree.Node;
 
-            //å®Œæˆæ„å»º ï¼ˆè®¾ç½®æ·±åº¦ç­‰æ“ä½œï¼‰  
+            //Íê³É¹¹½¨ £¨ÉèÖÃÉî¶ÈµÈ²Ù×÷£©  
             resultTree.CompleteBuild();
 
-            SemanticAnalyzer.Log("æ ¹èŠ‚ç‚¹:" + resultTree.root.name);
-            SemanticAnalyzer.Log("èŠ‚ç‚¹æ•°:" + resultTree.allnodes.Count);
+            SemanticAnalyzer.Log("¸ù½Úµã:" + resultTree.root.name);
+            SemanticAnalyzer.Log("½ÚµãÊı:" + resultTree.allnodes.Count);
         }
     }
 
     /// <summary>
-    /// è¯­ä¹‰åŠ¨ä½œæ‰§è¡Œå™¨  
+    /// ÓïÒå¶¯×÷Ö´ĞĞÆ÷  
     /// </summary>
     public class SematicActionExecutor
     {
@@ -184,77 +194,77 @@ namespace Gizbox.SemanticRule
         public Dictionary<Production, List<SemanticAction>> translateScheme = new Dictionary<Production, List<SemanticAction>>();
 
 
-        // è¯­æ³•åˆ†ææ ‘æ„é€     
+        // Óï·¨·ÖÎöÊ÷¹¹Ôì    
         public BottomUpParseTreeBuilder parseTreeBuilder;
 
-        // æŠ½è±¡è¯­æ³•æ ‘æ„é€     
+        // ³éÏóÓï·¨Ê÷¹¹Ôì    
         public SyntaxTree.ProgramNode syntaxRootNode;
 
-        // æ„é€   
+        // ¹¹Ôì  
         public SematicActionExecutor(LRParser parser)
         {
             this.parserContext = parser;
 
-            //è¯­æ³•æ ‘æ„é€ å™¨  
+            //Óï·¨Ê÷¹¹ÔìÆ÷  
             parseTreeBuilder = new BottomUpParseTreeBuilder();
 
-            //æ„å»ºè¯­æ³•åˆ†ææ ‘çš„è¯­ä¹‰åŠ¨ä½œ    
+            //¹¹½¨Óï·¨·ÖÎöÊ÷µÄÓïÒå¶¯×÷    
             foreach (var p in parserContext.data.grammerSet.productions)
             {
                 this.AddActionAtTail(p, parseTreeBuilder.BuildAction);
             }
 
-            //return; //ä¸é™„åŠ å…¶ä»–è¯­ä¹‰è§„åˆ™-ä»…è¯­æ³•åˆ†æ
+            //return; //²»¸½¼ÓÆäËûÓïÒå¹æÔò-½öÓï·¨·ÖÎö
 
-            //æ„å»ºæŠ½è±¡è¯­æ³•æ ‘(AST)çš„è¯­ä¹‰åŠ¨ä½œ   
+            //¹¹½¨³éÏóÓï·¨Ê÷(AST)µÄÓïÒå¶¯×÷   
             AddActionAtTail("S -> importations namespaceusings statements", (psr, production) =>
             {
                 var n = new SyntaxTree.ProgramNode()
                 {
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
 
-                n.importNodes.AddRange((List<SyntaxTree.ImportNode>)psr.stack[psr.stack.Top - 2].attributes[eAttr.import_list]);
-                n.usingNamespaceNodes.AddRange((List<SyntaxTree.UsingNode>)psr.stack[psr.stack.Top - 1].attributes[eAttr.using_list]);
-                n.statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                n.importNodes.AddRange((List<SyntaxTree.ImportNode>)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.import_list]);
+                n.usingNamespaceNodes.AddRange((List<SyntaxTree.UsingNode>)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.using_list]);
+                n.statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
 
-                psr.newElement.attributes[eAttr.ast_node] = n;
+                psr.newElement.attributes[ParseAttr.ast_node] = n;
 
-                this.syntaxRootNode = (SyntaxTree.ProgramNode)psr.newElement.attributes[eAttr.ast_node];
+                this.syntaxRootNode = (SyntaxTree.ProgramNode)psr.newElement.attributes[ParseAttr.ast_node];
             });
 
             AddActionAtTail("importations -> importations importation", (psr, production) =>
             {
-                psr.newElement.attributes[eAttr.import_list] = psr.stack[psr.stack.Top - 1].attributes[eAttr.import_list];
-                ((List<SyntaxTree.ImportNode>)psr.newElement.attributes[eAttr.import_list]).Add(
-                    (SyntaxTree.ImportNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node]
+                psr.newElement.attributes[ParseAttr.import_list] = psr.stack[psr.stack.Top - 1].attributes[ParseAttr.import_list];
+                ((List<SyntaxTree.ImportNode>)psr.newElement.attributes[ParseAttr.import_list]).Add(
+                    (SyntaxTree.ImportNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node]
                 ); ;
             });
             AddActionAtTail("importations -> importation", (psr, production) =>
             {
-                psr.newElement.attributes[eAttr.import_list] = new List<SyntaxTree.ImportNode>();
-                ((List<SyntaxTree.ImportNode>)psr.newElement.attributes[eAttr.import_list]).Add(
-                    (SyntaxTree.ImportNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node]
+                psr.newElement.attributes[ParseAttr.import_list] = new List<SyntaxTree.ImportNode>();
+                ((List<SyntaxTree.ImportNode>)psr.newElement.attributes[ParseAttr.import_list]).Add(
+                    (SyntaxTree.ImportNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node]
                 ); ;
             });
-            AddActionAtTail("importations -> Îµ", (psr, production) =>
+            AddActionAtTail("importations -> ¦Å", (psr, production) =>
             {
-                psr.newElement.attributes[eAttr.import_list] = new List<SyntaxTree.ImportNode>();
+                psr.newElement.attributes[ParseAttr.import_list] = new List<SyntaxTree.ImportNode>();
             });
             AddActionAtTail("importation -> import < LITSTRING >", (psr, production) =>
             {
-                string uriRaw = (psr.stack[psr.stack.Top - 1].attributes[eAttr.token] as Token).attribute;
+                string uriRaw = (psr.stack[psr.stack.Top - 1].attributes[ParseAttr.token] as Token).attribute;
                 string uri = uriRaw.Substring(1, uriRaw.Length - 2);
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ImportNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.ImportNode()
                 {
                     uri = uri,
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
 
-                if(psr.stack[psr.stack.Top - 4].attributes.TryGetValue(eAttr.generic_params, out var gpObj) && gpObj is List<SyntaxTree.IdentityNode> gpList && gpList.Count > 0)
+                if(psr.stack[psr.stack.Top - 4].attributes.TryGetValue(ParseAttr.generic_params, out var gpObj) && gpObj is List<SyntaxTree.IdentityNode> gpList && gpList.Count > 0)
                 {
-                    var classNode = (SyntaxTree.ClassDeclareNode)psr.newElement.attributes[eAttr.ast_node];
+                    var classNode = (SyntaxTree.ClassDeclareNode)psr.newElement.attributes[ParseAttr.ast_node];
                     classNode.isTemplateClass = true;
                     classNode.templateParameters.AddRange(gpList);
                 }
@@ -262,31 +272,31 @@ namespace Gizbox.SemanticRule
 
             AddActionAtTail("namespaceusings -> namespaceusings namespaceusing", (psr, production) =>
             {
-                psr.newElement.attributes[eAttr.using_list] = psr.stack[psr.stack.Top - 1].attributes[eAttr.using_list];
-                ((List<SyntaxTree.UsingNode>)psr.newElement.attributes[eAttr.using_list]).Add(
-                    (SyntaxTree.UsingNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node]
+                psr.newElement.attributes[ParseAttr.using_list] = psr.stack[psr.stack.Top - 1].attributes[ParseAttr.using_list];
+                ((List<SyntaxTree.UsingNode>)psr.newElement.attributes[ParseAttr.using_list]).Add(
+                    (SyntaxTree.UsingNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node]
                 ); ;
             });
             AddActionAtTail("namespaceusings -> namespaceusing", (psr, production) =>
             {
-                psr.newElement.attributes[eAttr.using_list] = new List<SyntaxTree.UsingNode>();
-                ((List<SyntaxTree.UsingNode>)psr.newElement.attributes[eAttr.using_list]).Add(
-                    (SyntaxTree.UsingNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node]
+                psr.newElement.attributes[ParseAttr.using_list] = new List<SyntaxTree.UsingNode>();
+                ((List<SyntaxTree.UsingNode>)psr.newElement.attributes[ParseAttr.using_list]).Add(
+                    (SyntaxTree.UsingNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node]
                 ); ;
             });
-            AddActionAtTail("namespaceusings -> Îµ", (psr, production) =>
+            AddActionAtTail("namespaceusings -> ¦Å", (psr, production) =>
             {
-                psr.newElement.attributes[eAttr.using_list] = new List<SyntaxTree.UsingNode>();
+                psr.newElement.attributes[ParseAttr.using_list] = new List<SyntaxTree.UsingNode>();
             });
 
             AddActionAtTail("namespaceusing -> using ID ;", (psr, production) =>
             {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.UsingNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.UsingNode()
                 {
                     namespaceNameNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top - 1].attributes,
-                        token = psr.stack[psr.stack.Top - 1].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 1].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.Namespace,
                     }
                 };
@@ -296,173 +306,173 @@ namespace Gizbox.SemanticRule
 
             AddActionAtTail("statements -> statements stmt", (psr, production) => {
 
-                var newStmt = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                var newStmt = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
 
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node];
-                ((SyntaxTree.StatementsNode)psr.newElement.attributes[eAttr.ast_node]).statements.Add(newStmt);
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node];
+                ((SyntaxTree.StatementsNode)psr.newElement.attributes[ParseAttr.ast_node]).statements.Add(newStmt);
             });
             AddActionAtTail("statements -> stmt", (psr, production) => {
 
-                var newStmt = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                var newStmt = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
 
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.StatementsNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.StatementsNode()
                 {
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
 
-                ((SyntaxTree.StatementsNode)psr.newElement.attributes[eAttr.ast_node]).statements.Add(newStmt);
+                ((SyntaxTree.StatementsNode)psr.newElement.attributes[ParseAttr.ast_node]).statements.Add(newStmt);
             });
-            AddActionAtTail("statements -> Îµ", (psr, production) => {
+            AddActionAtTail("statements -> ¦Å", (psr, production) => {
 
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.StatementsNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.StatementsNode()
                 {
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
 
             AddActionAtTail("namespaceblock -> namespace ID { statements }", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.NamespaceNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.NamespaceNode()
                 {
                     namepsaceNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top - 3].attributes,
-                        token = psr.stack[psr.stack.Top - 3].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 3].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.Namespace,
                     },
-                    stmtsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+                    stmtsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
             AddActionAtTail("statementblock -> { statements }", (psr, production) => {
                 var node = new SyntaxTree.StatementBlockNode()
                 {
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
 
-                node.statements.AddRange(((SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node]).statements.ToList());
+                node.statements.AddRange(((SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node]).statements.ToList());
 
-                psr.newElement.attributes[eAttr.ast_node] = node;
+                psr.newElement.attributes[ParseAttr.ast_node] = node;
             });
 
 
 
             AddActionAtTail("declstatements -> declstatements declstmt", (psr, production) => {
 
-                var newDeclStmt = (SyntaxTree.DeclareNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                var newDeclStmt = (SyntaxTree.DeclareNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
 
-                psr.newElement.attributes[eAttr.decl_stmts] = (List<SyntaxTree.DeclareNode>)psr.stack[psr.stack.Top - 1].attributes[eAttr.decl_stmts];
+                psr.newElement.attributes[ParseAttr.decl_stmts] = (List<SyntaxTree.DeclareNode>)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.decl_stmts];
 
-                ((List<SyntaxTree.DeclareNode>)psr.newElement.attributes[eAttr.decl_stmts]).Add(newDeclStmt);
+                ((List<SyntaxTree.DeclareNode>)psr.newElement.attributes[ParseAttr.decl_stmts]).Add(newDeclStmt);
             });
 
             AddActionAtTail("declstatements -> declstmt", (psr, production) => {
 
-                var newDeclStmt = (SyntaxTree.DeclareNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                var newDeclStmt = (SyntaxTree.DeclareNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
 
-                psr.newElement.attributes[eAttr.decl_stmts] = new List<SyntaxTree.DeclareNode>() { newDeclStmt };
+                psr.newElement.attributes[ParseAttr.decl_stmts] = new List<SyntaxTree.DeclareNode>() { newDeclStmt };
             });
 
-            AddActionAtTail("declstatements -> Îµ", (psr, production) => {
+            AddActionAtTail("declstatements -> ¦Å", (psr, production) => {
 
-                psr.newElement.attributes[eAttr.decl_stmts] = new List<SyntaxTree.DeclareNode>() { };
+                psr.newElement.attributes[ParseAttr.decl_stmts] = new List<SyntaxTree.DeclareNode>() { };
             });
 
             AddActionAtTail("stmt -> namespaceblock", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
 
             AddActionAtTail("stmt -> statementblock", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
 
             AddActionAtTail("stmt -> declstmt", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
 
 
             AddActionAtTail("stmt -> stmtexpr ;", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.SingleExprStmtNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.SingleExprStmtNode()
                 {
-                    exprNode = (SyntaxTree.SpecialExprNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+                    exprNode = (SyntaxTree.SpecialExprNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
 
             AddActionAtTail("stmt -> break ;", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.BreakStmtNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.BreakStmtNode()
                 {
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
             AddActionAtTail("stmt -> return expr ;", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ReturnStmtNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.ReturnStmtNode()
                 {
-                    returnExprNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+                    returnExprNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
             AddActionAtTail("stmt -> return ;", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ReturnStmtNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.ReturnStmtNode()
                 {
                     returnExprNode = null,
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
             AddActionAtTail("stmt -> delete expr ;", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.DeleteStmtNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.DeleteStmtNode()
                 {
                     isArrayDelete = false,
 
-                    objToDelete = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+                    objToDelete = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
 
             AddActionAtTail("stmt -> delete [ ] expr ;", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.DeleteStmtNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.DeleteStmtNode()
                 {
                     isArrayDelete = true,
 
-                    objToDelete = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+                    objToDelete = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
             AddActionAtTail("stmt -> while ( expr ) stmt", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.WhileStmtNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.WhileStmtNode()
                 {
 
-                    conditionNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node],
-                    stmtNode = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node],
+                    conditionNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node],
+                    stmtNode = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
 
             AddActionAtTail("stmt -> for ( stmt bexpr ; stmtexpr ) stmt", (psr, production) =>
             {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ForStmtNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.ForStmtNode()
                 {
-                    initializerNode = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top - 5].attributes[eAttr.ast_node],
-                    conditionNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 4].attributes[eAttr.ast_node],
-                    iteratorNode = (SyntaxTree.SpecialExprNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node],
-                    stmtNode = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node],
+                    initializerNode = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top - 5].attributes[ParseAttr.ast_node],
+                    conditionNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 4].attributes[ParseAttr.ast_node],
+                    iteratorNode = (SyntaxTree.SpecialExprNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node],
+                    stmtNode = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
@@ -470,42 +480,42 @@ namespace Gizbox.SemanticRule
             AddActionAtTail("stmt -> if ( expr ) stmt elifclauselist elseclause", (psr, production) => {
                 var n = new SyntaxTree.IfStmtNode()
                 {
-                    elseClause = (SyntaxTree.ElseClauseNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node],
+                    elseClause = (SyntaxTree.ElseClauseNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
 
                 n.conditionClauseList.AddRange(
                     new List<SyntaxTree.ConditionClauseNode>() {
                         new SyntaxTree.ConditionClauseNode(){
-                            conditionNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 4].attributes[eAttr.ast_node],
-                            thenNode = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node],
+                            conditionNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 4].attributes[ParseAttr.ast_node],
+                            thenNode = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node],
                         },
                     });
                 
-                psr.newElement.attributes[eAttr.ast_node] = n;
+                psr.newElement.attributes[ParseAttr.ast_node] = n;
 
-                ((SyntaxTree.IfStmtNode)psr.newElement.attributes[eAttr.ast_node]).conditionClauseList.AddRange(
-                        (List<SyntaxTree.ConditionClauseNode>)psr.stack[psr.stack.Top - 1].attributes[eAttr.condition_clause_list]
+                ((SyntaxTree.IfStmtNode)psr.newElement.attributes[ParseAttr.ast_node]).conditionClauseList.AddRange(
+                        (List<SyntaxTree.ConditionClauseNode>)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.condition_clause_list]
                     );
             });
 
 
             AddActionAtTail("declstmt -> decltype ID = expr ;", (psr, production) => {
 
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.VarDeclareNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.VarDeclareNode()
                 {
                     flags = (VarModifiers.None),
-                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 4].attributes[eAttr.ast_node],
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 4].attributes[ParseAttr.ast_node],
                     identifierNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top - 3].attributes,
-                        token = psr.stack[psr.stack.Top - 3].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 3].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField,
                     },
-                    initializerNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+                    initializerNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
@@ -513,380 +523,428 @@ namespace Gizbox.SemanticRule
 
             AddActionAtTail("declstmt -> tmodf decltype ID = expr ;", (psr, production) => {
 
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.VarDeclareNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.VarDeclareNode()
                 {
-                    flags = (VarModifiers)psr.stack[psr.stack.Top - 5].attributes[eAttr.tmodf],
-                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 4].attributes[eAttr.ast_node],
+                    flags = (VarModifiers)psr.stack[psr.stack.Top - 5].attributes[ParseAttr.tmodf],
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 4].attributes[ParseAttr.ast_node],
                     identifierNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top - 3].attributes,
-                        token = psr.stack[psr.stack.Top - 3].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 3].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField,
                     },
-                    initializerNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+                    initializerNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
             AddActionAtTail("declstmt -> const decltype ID = lit ;", (psr, production) => {
 
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ConstantDeclareNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.ConstantDeclareNode()
                 {
-                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 4].attributes[eAttr.ast_node],
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 4].attributes[ParseAttr.ast_node],
                     identifierNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top - 3].attributes,
-                        token = psr.stack[psr.stack.Top - 3].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 3].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField,
                     },
-                    litValNode = (SyntaxTree.LiteralNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+                    litValNode = (SyntaxTree.LiteralNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
 
             });
 
 
             AddActionAtTail("declstmt -> tmodf decltype ID = capture ( ID ) ;", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new OwnershipCaptureStmtNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new OwnershipCaptureStmtNode()
                 {
-                    flags = (VarModifiers)psr.stack[psr.stack.Top - 8].attributes[eAttr.tmodf],
+                    flags = (VarModifiers)psr.stack[psr.stack.Top - 8].attributes[ParseAttr.tmodf],
                     rIdentifier = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top - 2].attributes,
-                        token = psr.stack[psr.stack.Top - 2].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 2].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField,
                     },
                     lIdentifier = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top - 6].attributes,
-                        token = psr.stack[psr.stack.Top - 6].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 6].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField,
                     },
-                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 7].attributes[eAttr.ast_node],
-                    attributes = psr.newElement.attributes,
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 7].attributes[ParseAttr.ast_node],
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
 
 
             AddActionAtTail("declstmt -> decltype ID = leak ( ID ) ;", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new OwnershipLeakStmtNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new OwnershipLeakStmtNode()
                 {
                     rIdentifier = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top - 2].attributes,
-                        token = psr.stack[psr.stack.Top - 2].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 2].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField,
                     },
                     lIdentifier = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top - 6].attributes,
-                        token = psr.stack[psr.stack.Top - 6].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 6].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField,
                     },
-                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 7].attributes[eAttr.ast_node],
-                    attributes = psr.newElement.attributes,
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 7].attributes[ParseAttr.ast_node],
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
 
 
             AddActionAtTail("declstmt -> decltype ID genparams ( params ) { statements }", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.FuncDeclareNode()
+                var funcNode = new SyntaxTree.FuncDeclareNode()
                 {
                     funcType = FunctionKind.Normal,
                     returnFlags = VarModifiers.None,
 
-                    returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 8].attributes[eAttr.ast_node],
+                    returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 8].attributes[ParseAttr.ast_node],
                     identifierNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top - 7].attributes,
-                        token = psr.stack[psr.stack.Top - 7].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 7].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
                     },
-                    parametersNode = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes[eAttr.ast_node],
-                    statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+                    parametersNode = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes[ParseAttr.ast_node],
+                    statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
+
+                if(psr.stack[psr.stack.Top - 6].attributes.TryGetValue(ParseAttr.generic_params, out var gpObj)
+                    && gpObj is List<SyntaxTree.IdentityNode> gpList
+                    && gpList.Count > 0)
+                {
+                    funcNode.isTemplateFunction = true;
+                    funcNode.templateParameters.AddRange(gpList);
+                }
+
+                psr.newElement.attributes[ParseAttr.ast_node] = funcNode;
             });
             AddActionAtTail("declstmt -> tmodf decltype ID genparams ( params ) { statements }", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.FuncDeclareNode()
+                var funcNode = new SyntaxTree.FuncDeclareNode()
                 {
                     funcType = FunctionKind.Normal,
-                    returnFlags = (VarModifiers)psr.stack[psr.stack.Top - 9].attributes[eAttr.tmodf],
+                    returnFlags = (VarModifiers)psr.stack[psr.stack.Top - 9].attributes[ParseAttr.tmodf],
 
-                    returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 8].attributes[eAttr.ast_node],
+                    returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 8].attributes[ParseAttr.ast_node],
                     identifierNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top - 7].attributes,
-                        token = psr.stack[psr.stack.Top - 7].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 7].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
                     },
-                    parametersNode = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes[eAttr.ast_node],
-                    statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+                    parametersNode = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes[ParseAttr.ast_node],
+                    statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
+
+                if(psr.stack[psr.stack.Top - 6].attributes.TryGetValue(ParseAttr.generic_params, out var gpObj)
+                    && gpObj is List<SyntaxTree.IdentityNode> gpList
+                    && gpList.Count > 0)
+                {
+                    funcNode.isTemplateFunction = true;
+                    funcNode.templateParameters.AddRange(gpList);
+                }
+
+                psr.newElement.attributes[ParseAttr.ast_node] = funcNode;
             });
 
             AddActionAtTail("declstmt -> decltype operator ID genparams ( params ) { statements }", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.FuncDeclareNode()
+                var funcNode = new SyntaxTree.FuncDeclareNode()
                 {
                     funcType = FunctionKind.OperatorOverload,
                     returnFlags = VarModifiers.None,
 
-                    returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 9].attributes[eAttr.ast_node],
+                    returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 9].attributes[ParseAttr.ast_node],
                     identifierNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top - 7].attributes,
-                        token = psr.stack[psr.stack.Top - 7].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 7].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
                     },
-                    parametersNode = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes[eAttr.ast_node],
-                    statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+                    parametersNode = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes[ParseAttr.ast_node],
+                    statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
+
+                if(psr.stack[psr.stack.Top - 6].attributes.TryGetValue(ParseAttr.generic_params, out var gpObj)
+                    && gpObj is List<SyntaxTree.IdentityNode> gpList
+                    && gpList.Count > 0)
+                {
+                    funcNode.isTemplateFunction = true;
+                    funcNode.templateParameters.AddRange(gpList);
+                }
+
+                psr.newElement.attributes[ParseAttr.ast_node] = funcNode;
             });
             AddActionAtTail("declstmt -> tmodf decltype operator ID genparams ( params ) { statements }", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.FuncDeclareNode()
+                var funcNode = new SyntaxTree.FuncDeclareNode()
                 {
                     funcType = FunctionKind.OperatorOverload,
-                    returnFlags = (VarModifiers)psr.stack[psr.stack.Top - 10].attributes[eAttr.tmodf],
+                    returnFlags = (VarModifiers)psr.stack[psr.stack.Top - 10].attributes[ParseAttr.tmodf],
 
-                    returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 9].attributes[eAttr.ast_node],
+                    returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 9].attributes[ParseAttr.ast_node],
                     identifierNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top - 7].attributes,
-                        token = psr.stack[psr.stack.Top - 7].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 7].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
                     },
-                    parametersNode = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes[eAttr.ast_node],
-                    statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+                    parametersNode = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes[ParseAttr.ast_node],
+                    statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
+
+                if(psr.stack[psr.stack.Top - 6].attributes.TryGetValue(ParseAttr.generic_params, out var gpObj)
+                    && gpObj is List<SyntaxTree.IdentityNode> gpList
+                    && gpList.Count > 0)
+                {
+                    funcNode.isTemplateFunction = true;
+                    funcNode.templateParameters.AddRange(gpList);
+                }
+
+                psr.newElement.attributes[ParseAttr.ast_node] = funcNode;
             });
 
             AddActionAtTail("declstmt -> extern decltype ID genparams ( params ) ;", (psr, production) => {
-
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ExternFuncDeclareNode()
+                var externNode = new SyntaxTree.ExternFuncDeclareNode()
                 {
-                    returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 6].attributes[eAttr.ast_node],
+                    returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 6].attributes[ParseAttr.ast_node],
                     identifierNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top - 5].attributes,
-                        token = psr.stack[psr.stack.Top - 5].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 5].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
                     },
-                    parametersNode = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node],
+                    parametersNode = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
+
+                if(psr.stack[psr.stack.Top - 4].attributes.TryGetValue(ParseAttr.generic_params, out var gpObj)
+                    && gpObj is List<SyntaxTree.IdentityNode> gpList
+                    && gpList.Count > 0)
+                {
+                    throw new ParseException(ExceptioName.SyntaxAnalysisError, externNode.StartToken(), "extern function cannot have generic ");
+                }
+
+                psr.newElement.attributes[ParseAttr.ast_node] = externNode;
             });
 
             AddActionAtTail("declstmt -> class TYPE_NAME genparams inherit { declstatements }", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ClassDeclareNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.ClassDeclareNode()
                 {
                     flags = TypeModifiers.None,
                     isTemplateClass = false,
 
                     classNameNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top - 5].attributes,
-                        token = psr.stack[psr.stack.Top - 5].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 5].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.Class,
                     },
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
 
-                if(psr.stack[psr.stack.Top - 4].attributes.TryGetValue(eAttr.generic_params, out var gpObj)
+                if(psr.stack[psr.stack.Top - 4].attributes.TryGetValue(ParseAttr.generic_params, out var gpObj)
                     && gpObj is List<SyntaxTree.IdentityNode> gpList
                     && gpList.Count > 0)
                 {
-                    var classNode = (SyntaxTree.ClassDeclareNode)psr.newElement.attributes[eAttr.ast_node];
+                    var classNode = (SyntaxTree.ClassDeclareNode)psr.newElement.attributes[ParseAttr.ast_node];
                     classNode.isTemplateClass = true;
                     classNode.templateParameters.AddRange(gpList);
                 }
 
-                if (psr.stack[psr.stack.Top - 3].attributes.ContainsKey(eAttr.ast_node))
+                if (psr.stack[psr.stack.Top - 3].attributes.ContainsKey(ParseAttr.ast_node))
                 {
-                    ((SyntaxTree.ClassDeclareNode)psr.newElement.attributes[eAttr.ast_node]).baseClassNameNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top - 3].attributes[eAttr.ast_node];
+                    ((SyntaxTree.ClassDeclareNode)psr.newElement.attributes[ParseAttr.ast_node]).baseClassNameNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top - 3].attributes[ParseAttr.ast_node];
                 }
                 else
                 {
-                    ((SyntaxTree.ClassDeclareNode)psr.newElement.attributes[eAttr.ast_node]).baseClassNameNode = null;
+                    ((SyntaxTree.ClassDeclareNode)psr.newElement.attributes[ParseAttr.ast_node]).baseClassNameNode = null;
                 }
 
-                ((SyntaxTree.ClassDeclareNode)psr.newElement.attributes[eAttr.ast_node]).memberDelareNodes.AddRange(
-                    (List<SyntaxTree.DeclareNode>)psr.stack[psr.stack.Top - 1].attributes[eAttr.decl_stmts]
+                ((SyntaxTree.ClassDeclareNode)psr.newElement.attributes[ParseAttr.ast_node]).memberDelareNodes.AddRange(
+                    (List<SyntaxTree.DeclareNode>)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.decl_stmts]
                 );
             });
 
             AddActionAtTail("declstmt -> class own TYPE_NAME genparams inherit { declstatements }", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ClassDeclareNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.ClassDeclareNode()
                 {
                     flags = TypeModifiers.Own,
                     isTemplateClass = false,
 
                     classNameNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top - 5].attributes,
-                        token = psr.stack[psr.stack.Top - 5].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 5].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.Class,
                     },
 
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
 
-                if(psr.stack[psr.stack.Top - 4].attributes.TryGetValue(eAttr.generic_params, out var gpObj)
+                if(psr.stack[psr.stack.Top - 4].attributes.TryGetValue(ParseAttr.generic_params, out var gpObj)
                     && gpObj is List<SyntaxTree.IdentityNode> gpList
                     && gpList.Count > 0)
                 {
-                    var classNode = (SyntaxTree.ClassDeclareNode)psr.newElement.attributes[eAttr.ast_node];
+                    var classNode = (SyntaxTree.ClassDeclareNode)psr.newElement.attributes[ParseAttr.ast_node];
                     classNode.isTemplateClass = true;
                     classNode.templateParameters.AddRange(gpList);
                 }
 
 
-                if(psr.stack[psr.stack.Top - 3].attributes.ContainsKey(eAttr.ast_node))
+                if(psr.stack[psr.stack.Top - 3].attributes.ContainsKey(ParseAttr.ast_node))
                 {
-                    ((SyntaxTree.ClassDeclareNode)psr.newElement.attributes[eAttr.ast_node]).baseClassNameNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top - 3].attributes[eAttr.ast_node];
+                    ((SyntaxTree.ClassDeclareNode)psr.newElement.attributes[ParseAttr.ast_node]).baseClassNameNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top - 3].attributes[ParseAttr.ast_node];
                 }
                 else
                 {
-                    ((SyntaxTree.ClassDeclareNode)psr.newElement.attributes[eAttr.ast_node]).baseClassNameNode = null;
+                    ((SyntaxTree.ClassDeclareNode)psr.newElement.attributes[ParseAttr.ast_node]).baseClassNameNode = null;
                 }
 
-                ((SyntaxTree.ClassDeclareNode)psr.newElement.attributes[eAttr.ast_node]).memberDelareNodes.AddRange(
-                    (List<SyntaxTree.DeclareNode>)psr.stack[psr.stack.Top - 1].attributes[eAttr.decl_stmts]
+                ((SyntaxTree.ClassDeclareNode)psr.newElement.attributes[ParseAttr.ast_node]).memberDelareNodes.AddRange(
+                    (List<SyntaxTree.DeclareNode>)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.decl_stmts]
                 );
             });
 
             AddActionAtTail("tmodf -> own", (psr, production) =>
             {
-                psr.newElement.attributes[eAttr.tmodf] = VarModifiers.Own;
+                psr.newElement.attributes[ParseAttr.tmodf] = VarModifiers.Own;
             });
             AddActionAtTail("tmodf -> bor", (psr, production) =>
             {
-                psr.newElement.attributes[eAttr.tmodf] = VarModifiers.Bor;
+                psr.newElement.attributes[ParseAttr.tmodf] = VarModifiers.Bor;
             });
 
-            AddActionAtTail("genparams -> < genparamlist >", (psr, production) =>
+            AddActionAtTail("genparams -> GEN_LT genparamlist GEN_GT", (psr, production) =>
             {
-                psr.newElement.attributes[eAttr.generic_params] = psr.stack[psr.stack.Top - 1].attributes[eAttr.generic_params];
+                psr.newElement.attributes[ParseAttr.generic_params] = psr.stack[psr.stack.Top - 1].attributes[ParseAttr.generic_params];
             });
-            AddActionAtTail("genparams -> Îµ", (psr, production) =>
+            AddActionAtTail("genparams -> ¦Å", (psr, production) =>
             {
-                psr.newElement.attributes[eAttr.generic_params] = new List<SyntaxTree.IdentityNode>();
+                psr.newElement.attributes[ParseAttr.generic_params] = new List<SyntaxTree.IdentityNode>();
             });
             AddActionAtTail("genparamlist -> TYPE_NAME", (psr, production) =>
             {
-                psr.newElement.attributes[eAttr.generic_params] = new List<SyntaxTree.IdentityNode>
+                psr.newElement.attributes[ParseAttr.generic_params] = new List<SyntaxTree.IdentityNode>
                 {
                     new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top].attributes,
-                        token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.Class,
                     }
                 };
             });
             AddActionAtTail("genparamlist -> genparamlist , TYPE_NAME", (psr, production) =>
             {
-                psr.newElement.attributes[eAttr.generic_params] = psr.stack[psr.stack.Top - 2].attributes[eAttr.generic_params];
-                ((List<SyntaxTree.IdentityNode>)psr.newElement.attributes[eAttr.generic_params]).Add(
+                psr.newElement.attributes[ParseAttr.generic_params] = psr.stack[psr.stack.Top - 2].attributes[ParseAttr.generic_params];
+                ((List<SyntaxTree.IdentityNode>)psr.newElement.attributes[ParseAttr.generic_params]).Add(
                     new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top].attributes,
-                        token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.Class,
                     });
             });
 
-            AddActionAtTail("genargs -> < typearglist >", (psr, production) =>
+            AddActionAtTail("genargs -> GEN_LT typearglist GEN_GT", (psr, production) =>
             {
-                psr.newElement.attributes[eAttr.generic_args] = psr.stack[psr.stack.Top - 1].attributes[eAttr.generic_args];
+                psr.newElement.attributes[ParseAttr.generic_args] = psr.stack[psr.stack.Top - 1].attributes[ParseAttr.generic_args];
             });
 
             AddActionAtTail("typearglist -> type", (psr, production) =>
             {
-                psr.newElement.attributes[eAttr.generic_args] = new List<SyntaxTree.TypeNode>
+                psr.newElement.attributes[ParseAttr.generic_args] = new List<SyntaxTree.TypeNode>
                 {
-                    (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node]
+                    (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node]
                 };
             });
 
             AddActionAtTail("typearglist -> typearglist , type", (psr, production) =>
             {
-                psr.newElement.attributes[eAttr.generic_args] = psr.stack[psr.stack.Top - 2].attributes[eAttr.generic_args];
-                ((List<SyntaxTree.TypeNode>)psr.newElement.attributes[eAttr.generic_args]).Add(
-                    (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node]
+                psr.newElement.attributes[ParseAttr.generic_args] = psr.stack[psr.stack.Top - 2].attributes[ParseAttr.generic_args];
+                ((List<SyntaxTree.TypeNode>)psr.newElement.attributes[ParseAttr.generic_args]).Add(
+                    (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node]
                 );
             });
 
 
 
-            AddActionAtTail("elifclauselist -> Îµ", (psr, production) => {
-                psr.newElement.attributes[eAttr.condition_clause_list] = new List<SyntaxTree.ConditionClauseNode>();
+            AddActionAtTail("elifclauselist -> ¦Å", (psr, production) => {
+                psr.newElement.attributes[ParseAttr.condition_clause_list] = new List<SyntaxTree.ConditionClauseNode>();
             });
 
             AddActionAtTail("elifclauselist -> elifclauselist elifclause", (psr, production) => {
-                psr.newElement.attributes[eAttr.condition_clause_list] = psr.stack[psr.stack.Top - 1].attributes[eAttr.condition_clause_list];
+                psr.newElement.attributes[ParseAttr.condition_clause_list] = psr.stack[psr.stack.Top - 1].attributes[ParseAttr.condition_clause_list];
 
-                ((List<SyntaxTree.ConditionClauseNode>)(psr.newElement.attributes[eAttr.condition_clause_list])).Add(
-                    (SyntaxTree.ConditionClauseNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node]
+                ((List<SyntaxTree.ConditionClauseNode>)(psr.newElement.attributes[ParseAttr.condition_clause_list])).Add(
+                    (SyntaxTree.ConditionClauseNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node]
                     );
             });
 
             AddActionAtTail("elifclause -> else if ( expr ) stmt", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ConditionClauseNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.ConditionClauseNode()
                 {
-                    conditionNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node],
-                    thenNode = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node],
+                    conditionNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node],
+                    thenNode = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
             AddActionAtTail("kwexpr -> default ( type )", (psr, production) => {
 
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.DefaultValueNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.DefaultValueNode()
                 {
-                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
-                    attributes = psr.newElement.attributes,
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
-            AddActionAtTail("elseclause -> Îµ", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = null;
+            AddActionAtTail("elseclause -> ¦Å", (psr, production) => {
+                psr.newElement.attributes[ParseAttr.ast_node] = null;
             });
 
             AddActionAtTail("elseclause -> else stmt", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ElseClauseNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.ElseClauseNode()
                 {
 
-                    stmt = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node],
+                    stmt = (SyntaxTree.StmtNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
 
             AddActionAtTail("assign -> lvalue = expr", (psr, production) => {
 
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.AssignNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.AssignNode()
                 {
                     op = "=",
 
-                    lvalueNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node],
-                    rvalueNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node],
+                    lvalueNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node],
+                    rvalueNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
             string[] specialAssignOps = new string[] { "+=", "-=", "*=", "/=", "%=" };
@@ -894,128 +952,128 @@ namespace Gizbox.SemanticRule
             {
                 AddActionAtTail("assign -> lvalue " + assignOp + " expr", (psr, production) => {
 
-                    psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.AssignNode()
+                    psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.AssignNode()
                     {
                         op = assignOp,
 
-                        lvalueNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node],
-                        rvalueNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node],
+                        lvalueNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node],
+                        rvalueNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
 
-                        attributes = psr.newElement.attributes,
+                        attributes = new Dictionary<AstAttr, object>(),
                     };
                 });
             }
 
 
             AddActionAtTail("lvalue -> ID", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.IdentityNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.IdentityNode()
                 {
-                    attributes = psr.stack[psr.stack.Top].attributes,
-                    token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+                    attributes = new Dictionary<AstAttr, object>(),
+                    token = psr.stack[psr.stack.Top].attributes[ParseAttr.token] as Token,
                     identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
                 };
             });
 
             AddActionAtTail("lvalue -> memberaccess", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ObjectMemberAccessNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ObjectMemberAccessNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
 
             AddActionAtTail("lvalue -> indexaccess", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ElementAccessNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ElementAccessNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
 
             AddActionAtTail("decltype -> type", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
 
             AddActionAtTail("type -> arrtype", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ArrayTypeNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ArrayTypeNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
             AddActionAtTail("type -> stype", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
             AddActionAtTail("type -> var", (psr, production) =>
             {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.InferTypeNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.InferTypeNode()
                 {
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
             AddActionAtTail("arrtype -> stypesb", (psr, production) => {
 
-                var node = psr.stack[psr.stack.Top].attributes[eAttr.stype];
+                var node = psr.stack[psr.stack.Top].attributes[ParseAttr.stype];
 
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ArrayTypeNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.ArrayTypeNode()
                 {
-                    elemtentType = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes[eAttr.stype],
+                    elemtentType = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes[ParseAttr.stype],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
             AddActionAtTail("stype -> namedtype", (psr, production) => {
-                var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[eAttr.id];
+                var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[ParseAttr.id];
                 idNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
 
                 var classTypeNode = new SyntaxTree.ClassTypeNode()
                 {
                     classname = idNode,
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
 
-                if(psr.stack[psr.stack.Top].attributes.TryGetValue(eAttr.generic_args, out var genericArgsObj)
+                if(psr.stack[psr.stack.Top].attributes.TryGetValue(ParseAttr.generic_args, out var genericArgsObj)
                     && genericArgsObj is List<SyntaxTree.TypeNode> genericArgs
                     && genericArgs.Count > 0)
                 {
                     classTypeNode.genericArguments.AddRange(genericArgs);
                 }
 
-                psr.newElement.attributes[eAttr.ast_node] = classTypeNode;
+                psr.newElement.attributes[ParseAttr.ast_node] = classTypeNode;
             });
 
             AddActionAtTail("stype -> primitive", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.PrimitiveTypeNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.PrimitiveTypeNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
 
             AddActionAtTail("namedtype -> TYPE_NAME", (psr, production) => {
-                psr.newElement.attributes[eAttr.id] = new SyntaxTree.IdentityNode()
+                psr.newElement.attributes[ParseAttr.id] = new SyntaxTree.IdentityNode()
                 {
-                    attributes = psr.stack[psr.stack.Top].attributes,
-                    token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+                    attributes = new Dictionary<AstAttr, object>(),
+                    token = psr.stack[psr.stack.Top].attributes[ParseAttr.token] as Token,
                     identiferType = SyntaxTree.IdentityNode.IdType.Undefined,
                 };
-                psr.newElement.attributes[eAttr.generic_args] = new List<SyntaxTree.TypeNode>();
+                psr.newElement.attributes[ParseAttr.generic_args] = new List<SyntaxTree.TypeNode>();
             });
             AddActionAtTail("namedtype -> TYPE_NAME genargs", (psr, production) => {
-                psr.newElement.attributes[eAttr.id] = new SyntaxTree.IdentityNode()
+                psr.newElement.attributes[ParseAttr.id] = new SyntaxTree.IdentityNode()
                 {
-                    attributes = psr.stack[psr.stack.Top - 1].attributes,
-                    token = psr.stack[psr.stack.Top - 1].attributes[eAttr.token] as Token,
+                    attributes = new Dictionary<AstAttr, object>(),
+                    token = psr.stack[psr.stack.Top - 1].attributes[ParseAttr.token] as Token,
                     identiferType = SyntaxTree.IdentityNode.IdType.Undefined,
                 };
-                psr.newElement.attributes[eAttr.generic_args] = psr.stack[psr.stack.Top].attributes[eAttr.generic_args];
+                psr.newElement.attributes[ParseAttr.generic_args] = psr.stack[psr.stack.Top].attributes[ParseAttr.generic_args];
             });
 
             string[] primiveProductions = new string[] { "void", "bool", "int", "long", "float", "double", "char", "string" };
             foreach (var t in primiveProductions)
             {
                 AddActionAtTail("primitive -> " + t, (psr, production) => {
-                    psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.PrimitiveTypeNode()
+                    psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.PrimitiveTypeNode()
                     {
-                        attributes = psr.stack[psr.stack.Top].attributes,
-                        token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top].attributes[ParseAttr.token] as Token,
                     };
                 });
             }
 
 
             AddActionAtTail("expr -> assign", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
             AddActionAtTail("expr -> nexpr", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
 
 
@@ -1023,326 +1081,369 @@ namespace Gizbox.SemanticRule
 
             AddActionAtTail("stmtexpr -> assign", (psr, production) => {
 
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.SpecialExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.SpecialExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
             AddActionAtTail("stmtexpr -> call", (psr, production) => {
 
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.SpecialExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.SpecialExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
             AddActionAtTail("stmtexpr -> incdec", (psr, production) => {
 
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.SpecialExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.SpecialExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
             AddActionAtTail("stmtexpr -> newobj", (psr, production) => {
 
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.SpecialExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.SpecialExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
 
 
 
 
             AddActionAtTail("nexpr -> bexpr", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
             AddActionAtTail("nexpr -> aexpr", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
 
             string[] logicOperators = new string[] { "||", "&&" };
             foreach (var opname in logicOperators)
             {
                 AddActionAtTail("bexpr -> bexpr " + opname + " bexpr", (psr, production) => {
-                    psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.BinaryOpNode()
+                    psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.BinaryOpNode()
                     {
                         op = opname,
-                        leftNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node],
-                        rightNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node],
+                        leftNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node],
+                        rightNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
 
-                        attributes = psr.newElement.attributes,
+                        attributes = new Dictionary<AstAttr, object>(),
                     };
                 });
             }
             foreach (var opname in compareOprators)
             {
                 AddActionAtTail("bexpr -> aexpr " + opname + " aexpr", (psr, production) => {
-                    psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.BinaryOpNode()
+                    psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.BinaryOpNode()
                     {
                         op = opname,
-                        leftNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node],
-                        rightNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node],
+                        leftNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node],
+                        rightNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
 
-                        attributes = psr.newElement.attributes,
+                        attributes = new Dictionary<AstAttr, object>(),
                     };
                 });
             }
             AddActionAtTail("bexpr -> factor", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
 
 
 
 
             AddActionAtTail("aexpr -> aexpr + term", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.BinaryOpNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.BinaryOpNode()
                 {
                     op = "+",
-                    leftNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node],
-                    rightNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node],
+                    leftNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node],
+                    rightNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
             AddActionAtTail("aexpr -> aexpr - term", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.BinaryOpNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.BinaryOpNode()
                 {
                     op = "-",
-                    leftNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node],
-                    rightNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node],
+                    leftNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node],
+                    rightNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
             AddActionAtTail("aexpr -> term", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
 
 
             AddActionAtTail("term -> term * factor", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.BinaryOpNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.BinaryOpNode()
                 {
                     op = "*",
-                    leftNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node],
-                    rightNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node],
+                    leftNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node],
+                    rightNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
             AddActionAtTail("term -> term / factor", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.BinaryOpNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.BinaryOpNode()
                 {
                     op = "/",
-                    leftNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node],
-                    rightNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node],
+                    leftNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node],
+                    rightNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
             AddActionAtTail("term -> term % factor", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.BinaryOpNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.BinaryOpNode()
                 {
                     op = "%",
-                    leftNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node],
-                    rightNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node],
+                    leftNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node],
+                    rightNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
             AddActionAtTail("term -> factor", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
 
             AddActionAtTail("factor -> incdec", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.SpecialExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.SpecialExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
 
             AddActionAtTail("factor -> ! factor", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.UnaryOpNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.UnaryOpNode()
                 {
                     op = "!",
-                    exprNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node],
+                    exprNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
             AddActionAtTail("factor -> - factor", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.UnaryOpNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.UnaryOpNode()
                 {
                     op = "NEG",
-                    exprNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node],
+                    exprNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
             AddActionAtTail("factor -> cast", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
 
             AddActionAtTail("factor -> primary", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
 
 
             AddActionAtTail("primary -> ( expr )", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node];
             });
             AddActionAtTail("primary -> ID", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.IdentityNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.IdentityNode()
                 {
-                    attributes = psr.stack[psr.stack.Top].attributes,
-                    token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+                    attributes = new Dictionary<AstAttr, object>(),
+                    token = psr.stack[psr.stack.Top].attributes[ParseAttr.token] as Token,
                     identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
                 };
             });
             AddActionAtTail("primary -> this", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ThisNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.ThisNode()
                 {
-                    attributes = psr.stack[psr.stack.Top].attributes,
-                    token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+                    attributes = new Dictionary<AstAttr, object>(),
+                    token = psr.stack[psr.stack.Top].attributes[ParseAttr.token] as Token,
                 };
             });
             AddActionAtTail("primary -> memberaccess", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
 
             AddActionAtTail("primary -> newobj", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
             AddActionAtTail("primary -> newarr", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
 
             AddActionAtTail("primary -> kwexpr", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
 
             AddActionAtTail("primary -> indexaccess", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ElementAccessNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ElementAccessNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
 
             AddActionAtTail("primary -> call", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.SpecialExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.SpecialExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
 
 
             AddActionAtTail("primary -> lit", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
 
 
             AddActionAtTail("incdec -> ++ ID", (psr, production) => {
 
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.IncDecNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.IncDecNode()
                 {
                     op = "++",
                     isOperatorFront = true,
                     identifierNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top].attributes,
-                        token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
                     },
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
             AddActionAtTail("incdec -> -- ID", (psr, production) => {
 
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.IncDecNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.IncDecNode()
                 {
                     op = "--",
                     isOperatorFront = true,
                     identifierNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top].attributes,
-                        token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
                     },
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
             AddActionAtTail("incdec -> ID ++", (psr, production) => {
 
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.IncDecNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.IncDecNode()
                 {
                     op = "++",
                     isOperatorFront = false,
                     identifierNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top - 1].attributes,
-                        token = psr.stack[psr.stack.Top - 1].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 1].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
                     },
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
             AddActionAtTail("incdec -> ID --", (psr, production) => {
 
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.IncDecNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.IncDecNode()
                 {
                     op = "--",
                     isOperatorFront = false,
                     identifierNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top - 1].attributes,
-                        token = psr.stack[psr.stack.Top - 1].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 1].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
                     },
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
             AddActionAtTail("call -> ID ( args )", (psr, production) => {
-
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.CallNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.CallNode()
                 {
                     isMemberAccessFunction = false,
                     funcNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top - 3].attributes,
-                        token = psr.stack[psr.stack.Top - 3].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 3].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod
                     },
-                    argumantsNode = (SyntaxTree.ArgumentListNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+                    argumantsNode = (SyntaxTree.ArgumentListNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
 
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
             AddActionAtTail("call -> memberaccess ( args )", (psr, production) => {
-
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.CallNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.CallNode()
                 {
                     isMemberAccessFunction = true,
-                    funcNode = (SyntaxTree.ObjectMemberAccessNode)psr.stack[psr.stack.Top - 3].attributes[eAttr.ast_node],
-                    argumantsNode = (SyntaxTree.ArgumentListNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+                    funcNode = (SyntaxTree.ObjectMemberAccessNode)psr.stack[psr.stack.Top - 3].attributes[ParseAttr.ast_node],
+                    argumantsNode = (SyntaxTree.ArgumentListNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
 
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
+            });
+
+            // call with generic args: ID genargs ( args )
+            AddActionAtTail("call -> ID genargs ( args )", (psr, production) => {
+                var callNode = new SyntaxTree.CallNode()
+                {
+                    isMemberAccessFunction = false,
+                    funcNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 4].attributes[ParseAttr.token] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod
+                    },
+                    argumantsNode = (SyntaxTree.ArgumentListNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+
+                if(psr.stack[psr.stack.Top - 3].attributes.TryGetValue(ParseAttr.generic_args, out var gaObj)
+                    && gaObj is List<SyntaxTree.TypeNode> gaList
+                    && gaList.Count > 0)
+                {
+                    callNode.genericArguments.AddRange(gaList);
+                }
+
+                psr.newElement.attributes[ParseAttr.ast_node] = callNode;
+            });
+
+            // call with generic args on member access: memberaccess genargs ( args )
+            AddActionAtTail("call -> memberaccess genargs ( args )", (psr, production) => {
+                var callNode = new SyntaxTree.CallNode()
+                {
+                    isMemberAccessFunction = true,
+                    funcNode = (SyntaxTree.ObjectMemberAccessNode)psr.stack[psr.stack.Top - 4].attributes[ParseAttr.ast_node],
+                    argumantsNode = (SyntaxTree.ArgumentListNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+
+                if(psr.stack[psr.stack.Top - 3].attributes.TryGetValue(ParseAttr.generic_args, out var gaObj)
+                    && gaObj is List<SyntaxTree.TypeNode> gaList
+                    && gaList.Count > 0)
+                {
+                    callNode.genericArguments.AddRange(gaList);
+                }
+
+                psr.newElement.attributes[ParseAttr.ast_node] = callNode;
             });
 
 
             AddActionAtTail("indexaccess -> idsb", (psr, production) => {
 
-                ((SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[eAttr.id]).identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField;
+                ((SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[ParseAttr.id]).identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField;
 
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ElementAccessNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.ElementAccessNode()
                 {
-                    containerNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[eAttr.id],
-                    indexNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.optidx],
+                    containerNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[ParseAttr.id],
+                    indexNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.optidx],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
 
             });
 
             AddActionAtTail("indexaccess -> memberaccess [ aexpr ]", (psr, production) => {
 
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ElementAccessNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.ElementAccessNode()
                 {
-                    containerNode = (SyntaxTree.ObjectMemberAccessNode)psr.stack[psr.stack.Top - 3].attributes[eAttr.ast_node],
-                    indexNode = ((SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node]),
+                    containerNode = (SyntaxTree.ObjectMemberAccessNode)psr.stack[psr.stack.Top - 3].attributes[ParseAttr.ast_node],
+                    indexNode = ((SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node]),
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
@@ -1350,112 +1451,112 @@ namespace Gizbox.SemanticRule
 
             AddActionAtTail("cast -> ( type ) factor", (psr, production) => {
 
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.CastNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.CastNode()
                 {
-                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node],
-                    factorNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node],
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node],
+                    factorNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
 
             AddActionAtTail("newobj -> new namedtype ( )", (psr, production) => {
 
-                var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.id];
+                var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.id];
                 idNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
 
                 var classTypeNode = new SyntaxTree.ClassTypeNode()
                 {
                     classname = idNode,
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
 
-                if(psr.stack[psr.stack.Top - 2].attributes.TryGetValue(eAttr.generic_args, out var genericArgsObj)
+                if(psr.stack[psr.stack.Top - 2].attributes.TryGetValue(ParseAttr.generic_args, out var genericArgsObj)
                     && genericArgsObj is List<SyntaxTree.TypeNode> genericArgs
                     && genericArgs.Count > 0)
                 {
                     classTypeNode.genericArguments.AddRange(genericArgs);
                 }
 
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.NewObjectNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.NewObjectNode()
                 {
                     className = idNode,
                     typeNode = classTypeNode,
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
             AddActionAtTail("newarr -> new namedtype [ aexpr ]", (psr, production) => {
 
-                var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top - 3].attributes[eAttr.id];
+                var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top - 3].attributes[ParseAttr.id];
                 idNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
 
                 var classTypeNode = new SyntaxTree.ClassTypeNode()
                 {
                     classname = idNode,
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
 
-                if(psr.stack[psr.stack.Top - 3].attributes.TryGetValue(eAttr.generic_args, out var genericArgsObj)
+                if(psr.stack[psr.stack.Top - 3].attributes.TryGetValue(ParseAttr.generic_args, out var genericArgsObj)
                     && genericArgsObj is List<SyntaxTree.TypeNode> genericArgs
                     && genericArgs.Count > 0)
                 {
                     classTypeNode.genericArguments.AddRange(genericArgs);
                 }
 
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.NewArrayNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.NewArrayNode()
                 {
                     typeNode = classTypeNode,
-                    lengthNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+                    lengthNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
             AddActionAtTail("newarr -> new primitive [ aexpr ]", (psr, production) => {
 
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.NewArrayNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.NewArrayNode()
                 {
-                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 3].attributes[eAttr.ast_node],
-                    lengthNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 3].attributes[ParseAttr.ast_node],
+                    lengthNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
             AddActionAtTail("memberaccess -> primary . ID", (psr, production) => {
 
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ObjectMemberAccessNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.ObjectMemberAccessNode()
                 {
-                    objectNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node],
+                    objectNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node],
                     memberNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top].attributes,
-                        token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField,
                         isMemberIdentifier = true,
                     },
 
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
             AddActionAtTail("kwexpr -> typeof ( type )", (psr, production) => { 
                 
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.TypeOfNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.TypeOfNode()
                 {
-                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
-                    attributes = psr.newElement.attributes,
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
             AddActionAtTail("kwexpr -> sizeof ( type )", (psr, production) => {
 
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.SizeOfNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.SizeOfNode()
                 {
-                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
-                    attributes = psr.newElement.attributes,
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
@@ -1466,10 +1567,10 @@ namespace Gizbox.SemanticRule
             {
 
                 AddActionAtTail("lit -> " + litType, (psr, production) => {
-                    psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.LiteralNode()
+                    psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.LiteralNode()
                     {
-                        attributes = psr.stack[psr.stack.Top].attributes,
-                        token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top].attributes[ParseAttr.token] as Token,
                     };
                 });
             }
@@ -1479,121 +1580,121 @@ namespace Gizbox.SemanticRule
                 var node = new SyntaxTree.ParameterNode()
                 {
                     flags = VarModifiers.None,
-                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
                     identifierNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top].attributes,
-                        token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField,
                     },
                     attributes = new(),
                 };
 
-                psr.newElement.attributes[eAttr.ast_node] = node;
+                psr.newElement.attributes[ParseAttr.ast_node] = node;
             });
 
             AddActionAtTail("param -> tmodf type ID", (psr, production) => {
                 var node = new SyntaxTree.ParameterNode()
                 {
-                    flags = (VarModifiers)psr.stack[psr.stack.Top - 2].attributes[eAttr.tmodf],
-                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+                    flags = (VarModifiers)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.tmodf],
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
                     identifierNode = new SyntaxTree.IdentityNode()
                     {
-                        attributes = psr.stack[psr.stack.Top].attributes,
-                        token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField,
                     },
                     attributes = new(),
                 };
 
-                psr.newElement.attributes[eAttr.ast_node] = node;
+                psr.newElement.attributes[ParseAttr.ast_node] = node;
             });
 
             AddActionAtTail("params -> param", (psr, production) => {
                 var list = new SyntaxTree.ParameterListNode()
                 {
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
                 list.parameterNodes.Add(
-                    (SyntaxTree.ParameterNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node]
+                    (SyntaxTree.ParameterNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node]
                 );
 
-                psr.newElement.attributes[eAttr.ast_node] = list;
+                psr.newElement.attributes[ParseAttr.ast_node] = list;
             });
 
             AddActionAtTail("params -> params , param", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] =
-                    (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] =
+                    (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node];
 
-                ((SyntaxTree.ParameterListNode)psr.newElement.attributes[eAttr.ast_node]).parameterNodes.Add(
-                    (SyntaxTree.ParameterNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node]
+                ((SyntaxTree.ParameterListNode)psr.newElement.attributes[ParseAttr.ast_node]).parameterNodes.Add(
+                    (SyntaxTree.ParameterNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node]
                 );
             });
 
-            AddActionAtTail("params -> Îµ", (psr, production) =>
+            AddActionAtTail("params -> ¦Å", (psr, production) =>
             {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ParameterListNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.ParameterListNode()
                 {
-                    attributes = psr.newElement.attributes,
+                    attributes = new Dictionary<AstAttr, object>(),
                 };
             });
 
             //AddActionAtTail("params -> type ID", (psr, production) => {
             //    var node = new SyntaxTree.ParameterListNode()
             //    {
-            //        attributes = psr.newElement.attributes,
+            //        attributes = new Dictionary<AstAttr, object>(),
             //    };
 
             //    node.parameterNodes.Add(new SyntaxTree.ParameterNode()
             //    {
             //        flags = VarModifiers.None,
-            //        typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+            //        typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
             //        identifierNode = new SyntaxTree.IdentityNode()
             //        {
-            //            attributes = psr.stack[psr.stack.Top].attributes,
-            //            token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+            //            attributes = new Dictionary<AstAttr, object>(),
+            //            token = psr.stack[psr.stack.Top].attributes[ParseAttr.token] as Token,
             //            identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
             //        },
             //        attributes = new(),
             //    });
 
-            //    psr.newElement.attributes[eAttr.ast_node] = node;
+            //    psr.newElement.attributes[ParseAttr.ast_node] = node;
 
             //});
             //AddActionAtTail("params -> tmodf type ID", (psr, production) => {
             //    var node = new SyntaxTree.ParameterListNode()
             //    {
-            //        attributes = psr.newElement.attributes,
+            //        attributes = new Dictionary<AstAttr, object>(),
             //    };
 
             //    node.parameterNodes.Add(new SyntaxTree.ParameterNode()
             //    {
-            //        flags = (VarModifiers)psr.stack[psr.stack.Top - 2].attributes[eAttr.tmodf],
-            //        typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+            //        flags = (VarModifiers)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.tmodf],
+            //        typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
             //        identifierNode = new SyntaxTree.IdentityNode()
             //        {
-            //            attributes = psr.stack[psr.stack.Top].attributes,
-            //            token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+            //            attributes = new Dictionary<AstAttr, object>(),
+            //            token = psr.stack[psr.stack.Top].attributes[ParseAttr.token] as Token,
             //            identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
             //        },
             //        attributes = new(),
             //    });
 
-            //    psr.newElement.attributes[eAttr.ast_node] = node;
+            //    psr.newElement.attributes[ParseAttr.ast_node] = node;
             //});
 
             //AddActionAtTail("params -> params , type ID", (psr, production) => {
-            //    psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 3].attributes[eAttr.ast_node];
+            //    psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 3].attributes[ParseAttr.ast_node];
 
-            //    ((SyntaxTree.ParameterListNode)psr.newElement.attributes[eAttr.ast_node]).parameterNodes.Add(
+            //    ((SyntaxTree.ParameterListNode)psr.newElement.attributes[ParseAttr.ast_node]).parameterNodes.Add(
             //        new SyntaxTree.ParameterNode()
             //        {
             //            flags = VarModifiers.None,
-            //            typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+            //            typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
             //            identifierNode = new SyntaxTree.IdentityNode()
             //            {
-            //                attributes = psr.stack[psr.stack.Top].attributes,
-            //                token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+            //                attributes = new Dictionary<AstAttr, object>(),
+            //                token = psr.stack[psr.stack.Top].attributes[ParseAttr.token] as Token,
             //                identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
             //            },
             //            attributes = new(),
@@ -1601,17 +1702,17 @@ namespace Gizbox.SemanticRule
             //    );
             //});
             //AddActionAtTail("params -> params , tmodf type ID", (psr, production) => {
-            //    psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes[eAttr.ast_node];
+            //    psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes[ParseAttr.ast_node];
 
-            //    ((SyntaxTree.ParameterListNode)psr.newElement.attributes[eAttr.ast_node]).parameterNodes.Add(
+            //    ((SyntaxTree.ParameterListNode)psr.newElement.attributes[ParseAttr.ast_node]).parameterNodes.Add(
             //        new SyntaxTree.ParameterNode()
             //        {
-            //            flags = (VarModifiers)psr.stack[psr.stack.Top - 2].attributes[eAttr.tmodf],
-            //            typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node],
+            //            flags = (VarModifiers)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.tmodf],
+            //            typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
             //            identifierNode = new SyntaxTree.IdentityNode()
             //            {
-            //                attributes = psr.stack[psr.stack.Top].attributes,
-            //                token = psr.stack[psr.stack.Top].attributes[eAttr.token] as Token,
+            //                attributes = new Dictionary<AstAttr, object>(),
+            //                token = psr.stack[psr.stack.Top].attributes[ParseAttr.token] as Token,
             //                identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
             //            },
             //            attributes = new(),
@@ -1620,9 +1721,9 @@ namespace Gizbox.SemanticRule
             //});
 
 
-            AddActionAtTail("args -> Îµ", (psr, production) =>
+            AddActionAtTail("args -> ¦Å", (psr, production) =>
             {
-                psr.newElement.attributes[eAttr.ast_node] = new SyntaxTree.ArgumentListNode()
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.ArgumentListNode()
                 {};
             });
 
@@ -1631,90 +1732,90 @@ namespace Gizbox.SemanticRule
                 var node = new SyntaxTree.ArgumentListNode()
                 {};
 
-                node.arguments.Add((SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node]);
+                node.arguments.Add((SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node]);
 
-                psr.newElement.attributes[eAttr.ast_node] = node;
+                psr.newElement.attributes[ParseAttr.ast_node] = node;
             });
 
             AddActionAtTail("args -> args , expr", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = (SyntaxTree.ArgumentListNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ArgumentListNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node];
 
-                ((SyntaxTree.ArgumentListNode)psr.newElement.attributes[eAttr.ast_node]).arguments.Add(
-                    (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[eAttr.ast_node]
+                ((SyntaxTree.ArgumentListNode)psr.newElement.attributes[ParseAttr.ast_node]).arguments.Add(
+                    (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node]
                 );
             });
 
 
             AddActionAtTail("stypesb -> typeidsb", (psr, production) => {
 
-                ((SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[eAttr.id]).identiferType = SyntaxTree.IdentityNode.IdType.Class;
+                ((SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[ParseAttr.id]).identiferType = SyntaxTree.IdentityNode.IdType.Class;
 
                 var classTypeNode = new SyntaxTree.ClassTypeNode()
                 {
-                    classname = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[eAttr.id],
+                    classname = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[ParseAttr.id],
 
-                    attributes = psr.newElement.attributes
+                    attributes = new Dictionary<AstAttr, object>()
                 };
 
-                if(psr.stack[psr.stack.Top].attributes.TryGetValue(eAttr.generic_args, out var genericArgsObj)
+                if(psr.stack[psr.stack.Top].attributes.TryGetValue(ParseAttr.generic_args, out var genericArgsObj)
                     && genericArgsObj is List<SyntaxTree.TypeNode> genericArgs
                     && genericArgs.Count > 0)
                 {
                     classTypeNode.genericArguments.AddRange(genericArgs);
                 }
 
-                psr.newElement.attributes[eAttr.stype] = classTypeNode;
+                psr.newElement.attributes[ParseAttr.stype] = classTypeNode;
 
-                psr.newElement.attributes[eAttr.optidx] = null;
+                psr.newElement.attributes[ParseAttr.optidx] = null;
             });
 
             AddActionAtTail("stypesb -> primitivesb", (psr, production) => {
-                psr.newElement.attributes[eAttr.stype] = psr.stack[psr.stack.Top].attributes[eAttr.primitive];
-                psr.newElement.attributes[eAttr.optidx] = null;
+                psr.newElement.attributes[ParseAttr.stype] = psr.stack[psr.stack.Top].attributes[ParseAttr.primitive];
+                psr.newElement.attributes[ParseAttr.optidx] = null;
             });
             AddActionAtTail("idsb -> ID [ optidx ]", (psr, production) => {
 
-                psr.newElement.attributes[eAttr.id] = new SyntaxTree.IdentityNode()
+                psr.newElement.attributes[ParseAttr.id] = new SyntaxTree.IdentityNode()
                 {
-                    attributes = psr.stack[psr.stack.Top - 3].attributes,
-                    token = psr.stack[psr.stack.Top - 3].attributes[eAttr.token] as Token,
+                    attributes = new Dictionary<AstAttr, object>(),
+                    token = psr.stack[psr.stack.Top - 3].attributes[ParseAttr.token] as Token,
                     identiferType = SyntaxTree.IdentityNode.IdType.Undefined
                 };
-                psr.newElement.attributes[eAttr.optidx] = psr.stack[psr.stack.Top - 1].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.optidx] = psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node];
             });
             AddActionAtTail("typeidsb -> namedtype [ ]", (psr, production) => {
 
-                var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top - 2].attributes[eAttr.id];
+                var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.id];
                 idNode.identiferType = SyntaxTree.IdentityNode.IdType.Undefined;
 
-                psr.newElement.attributes[eAttr.id] = idNode;
-                psr.newElement.attributes[eAttr.generic_args] = psr.stack[psr.stack.Top - 2].attributes[eAttr.generic_args];
-                psr.newElement.attributes[eAttr.optidx] = null;
+                psr.newElement.attributes[ParseAttr.id] = idNode;
+                psr.newElement.attributes[ParseAttr.generic_args] = psr.stack[psr.stack.Top - 2].attributes[ParseAttr.generic_args];
+                psr.newElement.attributes[ParseAttr.optidx] = null;
             });
             AddActionAtTail("primitivesb -> primitive [ ]", (psr, production) => {
-                psr.newElement.attributes[eAttr.primitive] = psr.stack[psr.stack.Top - 2].attributes[eAttr.ast_node];
-                psr.newElement.attributes[eAttr.optidx] = null;
+                psr.newElement.attributes[ParseAttr.primitive] = psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.optidx] = null;
             });
             AddActionAtTail("optidx -> aexpr", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = psr.stack[psr.stack.Top].attributes[eAttr.ast_node];
+                psr.newElement.attributes[ParseAttr.ast_node] = psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
-            AddActionAtTail("optidx -> Îµ", (psr, production) => {
-                psr.newElement.attributes[eAttr.ast_node] = null;
+            AddActionAtTail("optidx -> ¦Å", (psr, production) => {
+                psr.newElement.attributes[ParseAttr.ast_node] = null;
             });
 
 
 
             AddActionAtTail("inherit -> : namedtype", (psr, production) => {
-                var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[eAttr.id];
+                var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[ParseAttr.id];
                 idNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
 
-                psr.newElement.attributes[eAttr.ast_node] = idNode;
+                psr.newElement.attributes[ParseAttr.ast_node] = idNode;
             });
-            AddActionAtTail("inherit -> Îµ", (psr, production) => {
+            AddActionAtTail("inherit -> ¦Å", (psr, production) => {
             });
         }
 
-        // æ’å…¥è¯­ä¹‰åŠ¨ä½œ
+        // ²åÈëÓïÒå¶¯×÷
         public void AddActionAtTail(string productionExpression, System.Action<LRParser, Production> act)
         {
             Production production = parserContext.data.grammerSet.productions.FirstOrDefault(p => p.ToExpression() == productionExpression);
@@ -1736,7 +1837,7 @@ namespace Gizbox.SemanticRule
         }
 
 
-        // æ‰§è¡Œè¯­ä¹‰åŠ¨ä½œ  
+        // Ö´ĞĞÓïÒå¶¯×÷  
         public void ExecuteSemanticAction(Production production)
         {
             if (translateScheme.ContainsKey(production) == false) return;
@@ -1750,9 +1851,9 @@ namespace Gizbox.SemanticRule
 
 
     /// <summary>
-    /// è¯­ä¹‰åˆ†æå™¨  
+    /// ÓïÒå·ÖÎöÆ÷  
     /// </summary>
-    public class SemanticAnalyzer//ï¼ˆè¡¥å……çš„è¯­ä¹‰åˆ†æå™¨ï¼Œè‡ªåº•å‘ä¸Šè§„çº¦å·²ç»è¿›è¡Œäº†éƒ¨åˆ†è¯­ä¹‰åˆ†æï¼‰  
+    public class SemanticAnalyzer//£¨²¹³äµÄÓïÒå·ÖÎöÆ÷£¬×Ôµ×ÏòÉÏ¹æÔ¼ÒÑ¾­½øĞĞÁË²¿·ÖÓïÒå·ÖÎö£©  
     {
         public Compiler compilerContext;
 
@@ -1764,10 +1865,10 @@ namespace Gizbox.SemanticRule
 
 
         //temp  
-        private int blockCounter = 0;//Blockè‡ªå¢  
-        private int ifCounter = 0;//ifè¯­å¥æ ‡å·è‡ªå¢  
-        private int whileCounter = 0;//whileè¯­å¥æ ‡å·è‡ªå¢  
-        private int forCounter = 0;//forè¯­å¥æ ‡å·è‡ªå¢  
+        private int blockCounter = 0;//Block×ÔÔö  
+        private int ifCounter = 0;//ifÓï¾ä±êºÅ×ÔÔö  
+        private int whileCounter = 0;//whileÓï¾ä±êºÅ×ÔÔö  
+        private int forCounter = 0;//forÓï¾ä±êºÅ×ÔÔö  
 
         //temp  
         private string currentNamespace = "";
@@ -1779,7 +1880,7 @@ namespace Gizbox.SemanticRule
 
 
         /// <summary>
-        /// æ„é€   
+        /// ¹¹Ôì  
         /// </summary>
         public SemanticAnalyzer(SyntaxTree ast, IRUnit ilUnit, Compiler compilerContext)
         {
@@ -1791,7 +1892,7 @@ namespace Gizbox.SemanticRule
 
 
         /// <summary>
-        /// å¼€å§‹è¯­ä¹‰åˆ†æ  
+        /// ¿ªÊ¼ÓïÒå·ÖÎö  
         /// </summary>
         public void Analysis()
         {
@@ -1816,20 +1917,19 @@ namespace Gizbox.SemanticRule
                 this.ilUnit.AddDependencyLib(lib);
             }
 
-            //æ¨¡æ¿ç‰¹åŒ–ï¼ˆASTå±‚é¢ï¼‰
-            SpecializeTemplates();
-
             this.ilUnit.astRoot = ast.rootNode;
 
             //global env  
-            ast.rootNode.attributes[eAttr.global_env] = ilUnit.globalScope.env;
+            ast.rootNode.attributes[AstAttr.global_env] = ilUnit.globalScope.env;
 
+            //Pass0: Ä£°åÌØ»¯£¨AST²ãÃæ£©
+            SpecializeClassTemplates();
+            SpecializeFunctionTemplates();
 
             //Pass1
             envStack = new GStack<SymbolTable>();
             envStack.Push(ilUnit.globalScope.env);
             Pass1_CollectGlobalSymbols(ast.rootNode);
-
 
             //Pass2
             envStack.Clear();
@@ -1839,8 +1939,8 @@ namespace Gizbox.SemanticRule
             if (Compiler.enableLogSemanticAnalyzer)
             {
                 ilUnit.globalScope.env.Print();
-                Log("ç¬¦å·è¡¨åˆæ­¥æ”¶é›†å®Œæ¯•");
-                Compiler.Pause("ç¬¦å·è¡¨åˆæ­¥æ”¶é›†å®Œæ¯•");
+                Log("·ûºÅ±í³õ²½ÊÕ¼¯Íê±Ï");
+                Compiler.Pause("·ûºÅ±í³õ²½ÊÕ¼¯Íê±Ï");
             }
 
             //Pass3
@@ -1848,7 +1948,7 @@ namespace Gizbox.SemanticRule
             envStack.Push(ilUnit.globalScope.env);
             Pass3_AnalysisNode(ast.rootNode);
 
-            //åº”ç”¨æ‰€æœ‰æ ‘èŠ‚ç‚¹é‡å†™  
+            //Ó¦ÓÃËùÓĞÊ÷½ÚµãÖØĞ´  
             ast.ApplyAllOverrides();
 
             //Pass4
@@ -1858,15 +1958,26 @@ namespace Gizbox.SemanticRule
             Pass4_OwnershipLifetime(ast.rootNode);
         }
 
-        private class TemplateInstance
+        //Ä£°åÀàÊµÀıĞÅÏ¢
+        private class ClassTemplateInstance
         {
             public string templateName;
             public string mangledName;
             public List<SyntaxTree.TypeNode> typeArguments;
         }
 
-        private void SpecializeTemplates()
+        //Ä£°åº¯ÊıÊµÀıĞÅÏ¢
+        private class FunctionTemplateInstance
         {
+            public string templateName;
+            public string mangledBaseName;
+            public List<SyntaxTree.TypeNode> typeArguments;
+        }
+
+        //Ä£°åÀàÌØ»¯£¨AST²ãÃæ£©£ºÊÕ¼¯Ä£°å¶¨Òå¡¢ÊµÀı»¯²¢Éú³É×¨ÓÃÀà
+        private void SpecializeClassTemplates()
+        {
+            //ÊÕ¼¯²¢Éú³ÉÄ£°åÀàÌØ»¯ÊµÀı
             if(ast?.rootNode == null)
                 return;
 
@@ -1883,7 +1994,7 @@ namespace Gizbox.SemanticRule
                 CollectTemplateClasses(dep.ast.rootNode, templatesDeps);
             }
 
-            var instances = new Dictionary<string, TemplateInstance>();
+            var instances = new Dictionary<string, ClassTemplateInstance>();
             CollectTemplateInstantiations(ast.rootNode, instances, inTemplate:false);
 
             var newSpecializations = new List<SyntaxTree.ClassDeclareNode>();
@@ -1911,9 +2022,10 @@ namespace Gizbox.SemanticRule
             }
         }
 
-        // æ”¶é›†æ¨¡æ¿ç±»å®šä¹‰  
+        // ÊÕ¼¯Ä£°åÀà¶¨Òå
         private void CollectTemplateClasses(SyntaxTree.Node node, Dictionary<string, SyntaxTree.ClassDeclareNode> templates)
         {
+            //±éÀúÓï·¨Ê÷ÊÕ¼¯Ä£°åÀà¶¨Òå
             if(node == null)
                 return;
 
@@ -1929,8 +2041,10 @@ namespace Gizbox.SemanticRule
             }
         }
 
-        private void CollectTemplateInstantiations(SyntaxTree.Node node, Dictionary<string, TemplateInstance> instances, bool inTemplate)
+        // ÊÕ¼¯Ä£°åÀàÊµÀı»¯ĞÅÏ¢
+        private void CollectTemplateInstantiations(SyntaxTree.Node node, Dictionary<string, ClassTemplateInstance> instances, bool inTemplate)
         {
+            //±éÀúÓï·¨Ê÷ÊÕ¼¯Ä£°åÀàÊµÀı
             if(node == null)
                 return;
 
@@ -1943,11 +2057,13 @@ namespace Gizbox.SemanticRule
             {
                 if(node is SyntaxTree.ClassTypeNode classType && classType.genericArguments.Count > 0)
                 {
+                    // ¼ÇÂ¼ÀàĞÍÒıÓÃ´¦µÄÄ£°åÊµÀı
                     RegisterTemplateInstance(classType, instances);
                 }
 
                 if(node is SyntaxTree.NewObjectNode newObjNode && newObjNode.typeNode is SyntaxTree.ClassTypeNode newObjType && newObjType.genericArguments.Count > 0)
                 {
+                    // ¼ÇÂ¼ new ´¦µÄÄ£°åÊµÀı²¢¹æ·¶»¯Ãû³Æ
                     RegisterTemplateInstance(newObjType, instances);
                     NormalizeGenericUsage(newObjNode, newObjType);
                 }
@@ -1956,6 +2072,14 @@ namespace Gizbox.SemanticRule
             foreach(var child in node.Children())
             {
                 CollectTemplateInstantiations(child, instances, inTemplate);
+            }
+
+            if(node is SyntaxTree.CallNode callNode)
+            {
+                foreach(var arg in callNode.genericArguments)
+                {
+                    CollectTemplateInstantiations(arg, instances, inTemplate);
+                }
             }
 
             if(node is SyntaxTree.ClassTypeNode classTypeWithArgs)
@@ -1968,17 +2092,217 @@ namespace Gizbox.SemanticRule
 
             if(!inTemplate && node is SyntaxTree.ClassTypeNode classTypeNode && classTypeNode.genericArguments.Count > 0)
             {
+                //·ÇÄ£°åÌåÖĞÊ¹ÓÃµÄ·ºĞÍÀàĞÍĞèÌæ»»ÎªÊµÀıÃû
                 NormalizeGenericUsage(classTypeNode);
             }
         }
 
-        private void RegisterTemplateInstance(SyntaxTree.ClassTypeNode classType, Dictionary<string, TemplateInstance> instances)
+        //ÌØ»¯º¯ÊıÄ£°å£ºÊÕ¼¯Ä£°å¶¨Òå¡¢ÊµÀı»¯²¢Éú³É×¨ÓÃº¯Êı
+        private void SpecializeFunctionTemplates()
         {
+            //ÊÕ¼¯²¢Éú³ÉÄ£°åº¯ÊıÌØ»¯ÊµÀı
+            var templatesLocal = new Dictionary<string, SyntaxTree.FuncDeclareNode>();
+            CollectTemplateFunctions(ast.rootNode, templatesLocal);
+
+            var templatesDeps = new Dictionary<string, SyntaxTree.FuncDeclareNode>();
+            foreach(var dep in ilUnit.dependencyLibs)
+            {
+                dep.EnsureAst();
+                if(dep.ast?.rootNode == null)
+                    continue;
+
+                CollectTemplateFunctions(dep.ast.rootNode, templatesDeps);
+            }
+
+            var instances = new Dictionary<string, FunctionTemplateInstance>();
+            CollectFunctionTemplateInstantiations(ast.rootNode, instances, inTemplate: false);
+
+            var newSpecializations = new List<SyntaxTree.FuncDeclareNode>();
+            foreach(var inst in instances.Values)
+            {
+                if(IsFunctionSpecializationAvailable(inst.mangledBaseName))
+                    continue;
+
+                var templateNode = FindTemplateFunction(inst.templateName, templatesLocal, templatesDeps);
+                if(templateNode == null)
+                    continue;
+
+                var specialized = (SyntaxTree.FuncDeclareNode)templateNode.DeepClone();
+                ApplyFunctionTemplateSpecialization(templateNode, specialized, inst.mangledBaseName, inst.typeArguments);
+                newSpecializations.Add(specialized);
+            }
+
+            if(newSpecializations.Count > 0)
+            {
+                for(int i = newSpecializations.Count - 1; i >= 0; --i)
+                {
+                    ast.rootNode.statementsNode.statements.Insert(0, newSpecializations[i]);
+                }
+            }
+        }
+
+        // ÊÕ¼¯Ä£°åº¯Êı¶¨Òå
+        private void CollectTemplateFunctions(SyntaxTree.Node node, Dictionary<string, SyntaxTree.FuncDeclareNode> templates)
+        {
+            //±éÀúÓï·¨Ê÷ÊÕ¼¯Ä£°åº¯Êı¶¨Òå
+            if(node == null)
+                return;
+
+            if(node is SyntaxTree.FuncDeclareNode funcDecl && funcDecl.isTemplateFunction)
+            {
+                if(funcDecl.Parent is not SyntaxTree.ClassDeclareNode)
+                {
+                    CheckIdentifierFullName(funcDecl.identifierNode);
+                    templates[funcDecl.identifierNode.FullName] = funcDecl;
+                }
+                return;
+            }
+
+            foreach(var child in node.Children())
+            {
+                CollectTemplateFunctions(child, templates);
+            }
+        }
+
+
+
+        // ÊÕ¼¯Ä£°åº¯ÊıÊµÀı»¯ĞÅÏ¢
+        private void CollectFunctionTemplateInstantiations(SyntaxTree.Node node, Dictionary<string, FunctionTemplateInstance> instances, bool inTemplate)
+        {
+            //±éÀúÓï·¨Ê÷ÊÕ¼¯Ä£°åº¯ÊıÊµÀı
+            if(node == null)
+                return;
+
+            if(node is SyntaxTree.FuncDeclareNode funcDecl && funcDecl.isTemplateFunction)
+            {
+                inTemplate = true;
+            }
+
+            if(!inTemplate && node is SyntaxTree.CallNode callNode && callNode.isMemberAccessFunction == false && callNode.genericArguments.Count > 0)
+            {
+                if(callNode.funcNode is SyntaxTree.IdentityNode funcId)
+                {
+                    //¼ÇÂ¼º¯Êıµ÷ÓÃ´¦µÄÄ£°åÊµÀı
+                    RegisterFunctionTemplateInstance(funcId, callNode, instances);
+                }
+            }
+
+            foreach(var child in node.Children())
+            {
+                CollectFunctionTemplateInstantiations(child, instances, inTemplate);
+            }
+        }
+
+        //×¢²áº¯ÊıÄ£°åÊµÀı
+        private void RegisterFunctionTemplateInstance(SyntaxTree.IdentityNode funcId, SyntaxTree.CallNode callNode, Dictionary<string, FunctionTemplateInstance> instances)
+        {
+            //¼ÇÂ¼Ä£°åº¯ÊıÊµÀı²¢¹æ·¶»¯·ºĞÍµ÷ÓÃ
+            var argTypes = callNode.genericArguments.Select(t => t.TypeExpression()).ToArray();
+            var mangledBaseName = Utils.MangleTemplateInstanceName(funcId.FullName, argTypes);
+            if(instances.ContainsKey(mangledBaseName))
+            {
+                // ÒÑ¼ÇÂ¼ÊµÀı£¬ÈÔĞè¹æ·¶»¯µ÷ÓÃ±í´ïÊ½
+                NormalizeFunctionGenericUsage(callNode, mangledBaseName);
+                return;
+            }
+
+            instances[mangledBaseName] = new FunctionTemplateInstance
+            {
+                templateName = funcId.FullName,
+                mangledBaseName = mangledBaseName,
+                typeArguments = callNode.genericArguments.ToList(),
+            };
+
+            NormalizeFunctionGenericUsage(callNode, mangledBaseName);
+        }
+
+        //¹æ·¶»¯º¯ÊıÄ£°åÊµÀıµ÷ÓÃ£¨ÇåÀí·ºĞÍ²ÎÊı²¢Ìæ»»º¯ÊıÃû£©
+        private void NormalizeFunctionGenericUsage(SyntaxTree.CallNode callNode, string mangledBaseName)
+        {
+            //ÇåÀí·ºĞÍ²ÎÊı²¢Ìæ»»º¯ÊıÃûÎªÊµÀıÃû
+            callNode.genericArguments.Clear();
+
+            if(callNode.funcNode is SyntaxTree.IdentityNode funcId)
+            {
+                funcId.SetPrefix(null);
+                funcId.token.attribute = mangledBaseName;
+            }
+        }
+
+        private SyntaxTree.FuncDeclareNode FindTemplateFunction(string name,
+            Dictionary<string, SyntaxTree.FuncDeclareNode> localTemplates,
+            Dictionary<string, SyntaxTree.FuncDeclareNode> depTemplates)
+        {
+            if(localTemplates.TryGetValue(name, out var local))
+                return local;
+            if(depTemplates.TryGetValue(name, out var dep))
+                return dep;
+            return null;
+        }
+
+        private bool IsFunctionSpecializationAvailable(string mangledBaseName)
+        {
+            if(ast.rootNode?.statementsNode?.statements != null)
+            {
+                foreach(var stmt in ast.rootNode.statementsNode.statements)
+                {
+                    if(stmt is SyntaxTree.FuncDeclareNode funcDecl && !funcDecl.isTemplateFunction && funcDecl.identifierNode.FullName == mangledBaseName)
+                        return true;
+                }
+            }
+
+            foreach(var dep in ilUnit.dependencyLibs)
+            {
+                dep.EnsureAst();
+                if(dep.ast?.rootNode?.statementsNode?.statements == null)
+                    continue;
+
+                foreach(var stmt in dep.ast.rootNode.statementsNode.statements)
+                {
+                    if(stmt is SyntaxTree.FuncDeclareNode funcDecl && !funcDecl.isTemplateFunction && funcDecl.identifierNode.FullName == mangledBaseName)
+                        return true;
+                }
+            }
+
+            return false;
+        }
+
+        private void ApplyFunctionTemplateSpecialization(SyntaxTree.FuncDeclareNode template,
+            SyntaxTree.FuncDeclareNode specialized,
+            string mangledBaseName,
+            List<SyntaxTree.TypeNode> typeArguments)
+        {
+            //Ìæ»»º¯ÊıÄ£°å²ÎÊı²¢Éú³É¾ßÌåº¯ÊıÉùÃ÷
+            var paramList = template.templateParameters;
+            if(paramList.Count != typeArguments.Count)
+                throw new SemanticException(ExceptioName.SemanticAnalysysError, template, "template argument count mismatch");
+
+            specialized.isTemplateFunction = false;
+            specialized.templateParameters.Clear();
+
+            specialized.identifierNode.SetPrefix(null);
+            specialized.identifierNode.token.attribute = mangledBaseName;
+            specialized.identifierNode.identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod;
+
+            var typeMap = new Dictionary<string, SyntaxTree.TypeNode>();
+            for(int i = 0; i < paramList.Count; ++i)
+            {
+                typeMap[paramList[i].FullName] = typeArguments[i];
+                typeMap[paramList[i].token.attribute] = typeArguments[i];
+            }
+
+            ApplyTemplateTypeReplacement(specialized, typeMap);
+        }
+
+        //×¢²áÄ£°åÀàÊµÀı
+        private void RegisterTemplateInstance(SyntaxTree.ClassTypeNode classType, Dictionary<string, ClassTemplateInstance> instances)
+        {
+            //¼ÇÂ¼Ä£°åÀàÊµÀı
             var mangledName = classType.TypeExpression();
             if(instances.ContainsKey(mangledName))
                 return;
 
-            instances[mangledName] = new TemplateInstance
+            instances[mangledName] = new ClassTemplateInstance
             {
                 templateName = classType.classname.FullName,
                 mangledName = mangledName,
@@ -1986,16 +2310,20 @@ namespace Gizbox.SemanticRule
             };
         }
 
+        //¹æ·¶»¯Ä£°åÀàÀàĞÍÒıÓÃ£¨ÇåÀí·ºĞÍ²ÎÊı²¢Ìæ»»ÀàĞÍÃû£©
         private void NormalizeGenericUsage(SyntaxTree.ClassTypeNode classType)
         {
+            //ÇåÀí·ºĞÍ²ÎÊı²¢Ìæ»»ÀàĞÍÃûÎªÊµÀıÃû
             var mangledName = classType.TypeExpression();
             classType.genericArguments.Clear();
             classType.classname.SetPrefix(null);
             classType.classname.token.attribute = mangledName;
         }
 
+        //¹æ·¶»¯newÓï¾äÖĞµÄÄ£°åÀàĞÍÒıÓÃ
         private void NormalizeGenericUsage(SyntaxTree.NewObjectNode newObjNode, SyntaxTree.ClassTypeNode classType)
         {
+            //ÇåÀí·ºĞÍ²ÎÊı²¢Ìæ»»¶ÔÏó´´½¨ÀàĞÍÃûÎªÊµÀıÃû
             var mangledName = classType.TypeExpression();
             classType.genericArguments.Clear();
             classType.classname.SetPrefix(null);
@@ -2036,11 +2364,13 @@ namespace Gizbox.SemanticRule
             return false;
         }
 
+        //Ó¦ÓÃÀàÄ£°åÌØ»¯£¨Ìæ»»Ä£°å²ÎÊı²¢Éú³É¾ßÌåÀà£©
         private void ApplyTemplateSpecialization(SyntaxTree.ClassDeclareNode template,
             SyntaxTree.ClassDeclareNode specialized,
             string mangledName,
             List<SyntaxTree.TypeNode> typeArguments)
         {
+            //Ìæ»»ÀàÄ£°å²ÎÊı²¢Éú³É¾ßÌåÀàÉùÃ÷
             var paramList = template.templateParameters;
             if(paramList.Count != typeArguments.Count)
                 throw new SemanticException(ExceptioName.SemanticAnalysysError, template, "template argument count mismatch");
@@ -2154,12 +2484,12 @@ namespace Gizbox.SemanticRule
         }
 
         /// <summary>
-        /// PASS1:é€’å½’å‘ä¸‹é¡¶å±‚å®šä¹‰ä¿¡æ¯(é™æ€å˜é‡ã€é™æ€å‡½æ•°åã€ç±»å)      
+        /// PASS1:µİ¹éÏòÏÂ¶¥²ã¶¨ÒåĞÅÏ¢(¾²Ì¬±äÁ¿¡¢¾²Ì¬º¯ÊıÃû¡¢ÀàÃû)      
         /// </summary>
         private void Pass1_CollectGlobalSymbols(SyntaxTree.Node node)
         {
-            ///å¾ˆå¤šç¼–è¯‘å™¨ä»è¯­æ³•åˆ†æé˜¶æ®µç”šè‡³è¯æ³•åˆ†æé˜¶æ®µå¼€å§‹åˆå§‹åŒ–å’Œç®¡ç†ç¬¦å·è¡¨    
-            ///ä¸ºäº†é™ä½å¤æ‚æ€§ã€å®ç°ä½è€¦åˆå’Œæ¨¡å—åŒ–ï¼Œåœ¨è¯­ä¹‰åˆ†æé˜¶æ®µå’Œä¸­é—´ä»£ç ç”Ÿæˆé˜¶æ®µç®¡ç†ç¬¦å·è¡¨  
+            ///ºÜ¶à±àÒëÆ÷´ÓÓï·¨·ÖÎö½×¶ÎÉõÖÁ´Ê·¨·ÖÎö½×¶Î¿ªÊ¼³õÊ¼»¯ºÍ¹ÜÀí·ûºÅ±í    
+            ///ÎªÁË½µµÍ¸´ÔÓĞÔ¡¢ÊµÏÖµÍñîºÏºÍÄ£¿é»¯£¬ÔÚÓïÒå·ÖÎö½×¶ÎºÍÖĞ¼ä´úÂëÉú³É½×¶Î¹ÜÀí·ûºÅ±í  
 
             bool isTopLevelAtNamespace = false;
             if (node.Parent != null && node.Parent.Parent != null)
@@ -2196,16 +2526,16 @@ namespace Gizbox.SemanticRule
                         currentNamespace = "";
                     }
                     break;
-                //é¡¶çº§å¸¸é‡å£°æ˜è¯­å¥  
+                //¶¥¼¶³£Á¿ÉùÃ÷Óï¾ä  
                 case SyntaxTree.ConstantDeclareNode constDeclNode:
                     {
                         if (isGlobalOrTopNamespace)
                         {
-                            //é™„åŠ å‘½åç©ºé—´å  
+                            //¸½¼ÓÃüÃû¿Õ¼äÃû  
                             if (isTopLevelAtNamespace)
                                 constDeclNode.identifierNode.SetPrefix(currentNamespace);
 
-                            //æ–°å»ºç¬¦å·è¡¨æ¡ç›®  
+                            //ĞÂ½¨·ûºÅ±íÌõÄ¿  
                             var newRec = envStack.Peek().NewRecord(
                                 constDeclNode.identifierNode.FullName,
                                 SymbolTable.RecordCatagory.Constant,
@@ -2213,88 +2543,91 @@ namespace Gizbox.SemanticRule
 
                                 initValue: constDeclNode.litValNode.token.attribute
                                 );
-                            constDeclNode.attributes[eAttr.const_rec] = newRec;
+                            constDeclNode.attributes[AstAttr.const_rec] = newRec;
                         }
                     }
                     break;
-                //é¡¶çº§å˜é‡å£°æ˜è¯­å¥
+                //¶¥¼¶±äÁ¿ÉùÃ÷Óï¾ä
                 case SyntaxTree.VarDeclareNode varDeclNode:
                     {
                         if (isGlobalOrTopNamespace)
                         {
-                            //å…¨å±€å˜é‡ä¸å…è®¸æœ‰æ‰€æœ‰æƒä¿®é¥°ç¬¦
+                            //È«¾Ö±äÁ¿²»ÔÊĞíÓĞËùÓĞÈ¨ĞŞÊÎ·û
                             if(varDeclNode.flags.HasFlag(VarModifiers.Own) || varDeclNode.flags.HasFlag(VarModifiers.Bor))
                                 throw new SemanticException(ExceptioName.OwnershipError, varDeclNode, "global variable can not have ownership modifiers");
 
-                            //é™„åŠ å‘½åç©ºé—´å  
+                            //¸½¼ÓÃüÃû¿Õ¼äÃû  
                             if (isTopLevelAtNamespace)
                                 varDeclNode.identifierNode.SetPrefix(currentNamespace);
 
-                            //è¡¥å…¨ç±»å‹å  
+                            //²¹È«ÀàĞÍÃû  
                             TryCompleteType(varDeclNode.typeNode);
 
-                            //æ˜¯å¦åˆå§‹å€¼æ˜¯å¸¸é‡
+                            //ÊÇ·ñ³õÊ¼ÖµÊÇ³£Á¿
                             string initVal = string.Empty;
                             if(varDeclNode.initializerNode is LiteralNode lit)
                             {
                                 initVal = lit.token.attribute;
                             }
 
-                            //æ–°å»ºç¬¦å·è¡¨æ¡ç›®  
+                            //ĞÂ½¨·ûºÅ±íÌõÄ¿  
                             var newRec = envStack.Peek().NewRecord(
                                 varDeclNode.identifierNode.FullName,
                                 SymbolTable.RecordCatagory.Variable,
                                 varDeclNode.typeNode.TypeExpression(),
                                 initValue:initVal
                                 );
-                            varDeclNode.attributes[eAttr.var_rec] = newRec;
+                            varDeclNode.attributes[AstAttr.var_rec] = newRec;
                         }
                     }
                     break;
-                //æ‰€æœ‰æƒCaptureè¯­å¥
+                //ËùÓĞÈ¨CaptureÓï¾ä
                 case SyntaxTree.OwnershipCaptureStmtNode captureNode:
                     {
                         if(isGlobalOrTopNamespace)
                         {
-                            //æ‰€æœ‰æƒcaptureè¯­å¥ä¸èƒ½åœ¨å…¨å±€ä½œç”¨åŸŸä½¿ç”¨ã€‚åªèƒ½åœ¨å±€éƒ¨ä½œç”¨åŸŸä½¿ç”¨ã€‚  
+                            //ËùÓĞÈ¨captureÓï¾ä²»ÄÜÔÚÈ«¾Ö×÷ÓÃÓòÊ¹ÓÃ¡£Ö»ÄÜÔÚ¾Ö²¿×÷ÓÃÓòÊ¹ÓÃ¡£  
                             throw new SemanticException(ExceptioName.OwnershipError, captureNode, "ownership capture stmt can not be used in global scope");
                         }
                     }
                     break;
-                //æ‰€æœ‰æƒLeakè¯­å¥  
+                //ËùÓĞÈ¨LeakÓï¾ä  
                 case SyntaxTree.OwnershipLeakStmtNode leakNode:
                     {
                         if(isGlobalOrTopNamespace)
                         {
-                            //æ‰€æœ‰æƒleakè¯­å¥ä¸èƒ½åœ¨å…¨å±€ä½œç”¨åŸŸä½¿ç”¨ã€‚åªèƒ½åœ¨å±€éƒ¨ä½œç”¨åŸŸä½¿ç”¨ã€‚
+                            //ËùÓĞÈ¨leakÓï¾ä²»ÄÜÔÚÈ«¾Ö×÷ÓÃÓòÊ¹ÓÃ¡£Ö»ÄÜÔÚ¾Ö²¿×÷ÓÃÓòÊ¹ÓÃ¡£
                             throw new SemanticException(ExceptioName.OwnershipError, leakNode, "ownership leak stmt can not be used in global scope");
                         }
                     }
                     break;
-                //é¡¶çº§å‡½æ•°å£°æ˜è¯­å¥
+                //¶¥¼¶º¯ÊıÉùÃ÷Óï¾ä
                 case SyntaxTree.FuncDeclareNode funcDeclNode:
                     {
-                        //ï¼ˆé™æ€å‡½æ•°ï¼‰    
+                        //£¨¾²Ì¬º¯Êı£©    
+                        // skip template function declarations during passes
+                        if(funcDeclNode.isTemplateFunction)
+                            break;
                         if (isGlobalOrTopNamespace)
                         {
 
                             bool isMethod = envStack.Peek().tableCatagory == SymbolTable.TableCatagory.ClassScope;
-                            if (isMethod) throw new Exception();//é¡¶å±‚å‡½æ•°ä¸å¯èƒ½æ˜¯æ–¹æ³•
+                            if (isMethod) throw new Exception();//¶¥²ãº¯Êı²»¿ÉÄÜÊÇ·½·¨
 
-                            //é™„åŠ å‘½åç©ºé—´å  
+                            //¸½¼ÓÃüÃû¿Õ¼äÃû  
                             if (isTopLevelAtNamespace)
                                 funcDeclNode.identifierNode.SetPrefix(currentNamespace);
 
 
-                            //å½¢å‚ç±»å‹è¡¥å…¨  
+                            //ĞÎ²ÎÀàĞÍ²¹È«  
                             foreach (var p in funcDeclNode.parametersNode.parameterNodes)
                             {
                                 TryCompleteType(p.typeNode);
                             }
-                            //è¿”å›ç±»å‹è¡¥å…¨
+                            //·µ»ØÀàĞÍ²¹È«
                             TryCompleteType(funcDeclNode.returnTypeNode);
 
-                            //ç¬¦å·çš„ç±»å‹è¡¨è¾¾å¼  
+                            //·ûºÅµÄÀàĞÍ±í´ïÊ½  
                             string typeExpr = "";
                             for (int i = 0; i < funcDeclNode.parametersNode.parameterNodes.Count; ++i)
                             {
@@ -2305,7 +2638,7 @@ namespace Gizbox.SemanticRule
                             typeExpr += (" => " + funcDeclNode.returnTypeNode.TypeExpression());
 
 
-                            //å‡½æ•°ä¿®é¥°åç§°  
+                            //º¯ÊıĞŞÊÎÃû³Æ  
                             var paramTypeArr = funcDeclNode.parametersNode.parameterNodes.Select(n => n.typeNode.TypeExpression()).ToArray();
                             var funcMangledName = funcDeclNode.identifierNode.FullName;
                             if(funcMangledName != "main")
@@ -2314,16 +2647,16 @@ namespace Gizbox.SemanticRule
                             }
                             
 
-                            funcDeclNode.attributes[eAttr.mangled_name] = funcMangledName;
+                            funcDeclNode.attributes[AstAttr.mangled_name] = funcMangledName;
 
-                            //æ–°çš„ä½œç”¨åŸŸ  
+                            //ĞÂµÄ×÷ÓÃÓò  
                             string envName = isMethod ? envStack.Peek().name + "." + funcMangledName : funcMangledName;
 
                             var newEnv = new SymbolTable(envName, SymbolTable.TableCatagory.FuncScope, envStack.Peek());
-                            funcDeclNode.attributes[eAttr.env] = newEnv;
+                            funcDeclNode.attributes[AstAttr.env] = newEnv;
 
 
-                            //æ·»åŠ æ¡ç›®  
+                            //Ìí¼ÓÌõÄ¿  
                             var newRec = envStack.Peek().NewRecord(
                                 funcMangledName,
                                 SymbolTable.RecordCatagory.Function,
@@ -2332,9 +2665,9 @@ namespace Gizbox.SemanticRule
                                 );
                             newRec.rawname = funcDeclNode.identifierNode.FullName;
 
-                            funcDeclNode.attributes[eAttr.func_rec] = newRec;
+                            funcDeclNode.attributes[AstAttr.func_rec] = newRec;
 
-                            //é‡è½½å‡½æ•°  
+                            //ÖØÔØº¯Êı  
                             if(funcDeclNode.funcType == FunctionKind.OperatorOverload)
                             {
                                 newRec.flags |= SymbolTable.RecordFlag.OperatorOverloadFunc;
@@ -2342,26 +2675,26 @@ namespace Gizbox.SemanticRule
                         }
                     }
                     break;
-                //å¤–éƒ¨å‡½æ•°å£°æ˜  
+                //Íâ²¿º¯ÊıÉùÃ÷  
                 case SyntaxTree.ExternFuncDeclareNode externFuncDeclNode:
                     {
-                        //é™„åŠ å‘½åç©ºé—´åç§°    
+                        //¸½¼ÓÃüÃû¿Õ¼äÃû³Æ    
                         if (isGlobalOrTopNamespace)
                         {
-                            //é™„åŠ å‘½åç©ºé—´  
+                            //¸½¼ÓÃüÃû¿Õ¼ä  
                             if (isTopLevelAtNamespace)
                                 externFuncDeclNode.identifierNode.SetPrefix(currentNamespace);
 
 
-                            //å½¢å‚ç±»å‹è¡¥å…¨  
+                            //ĞÎ²ÎÀàĞÍ²¹È«  
                             foreach (var p in externFuncDeclNode.parametersNode.parameterNodes)
                             {
                                 TryCompleteType(p.typeNode);
                             }
-                            //è¿”å›ç±»å‹è¡¥å…¨  
+                            //·µ»ØÀàĞÍ²¹È«  
                             TryCompleteType(externFuncDeclNode.returnTypeNode);
 
-                            //ç¬¦å·çš„ç±»å‹è¡¨è¾¾å¼  
+                            //·ûºÅµÄÀàĞÍ±í´ïÊ½  
                             string typeExpr = "";
                             for (int i = 0; i < externFuncDeclNode.parametersNode.parameterNodes.Count; ++i)
                             {
@@ -2371,20 +2704,20 @@ namespace Gizbox.SemanticRule
                             }
                             typeExpr += (" => " + externFuncDeclNode.returnTypeNode.TypeExpression());
 
-                            //å‡½æ•°ä¿®é¥°åç§°  
+                            //º¯ÊıĞŞÊÎÃû³Æ  
                             var paramTypeArr = externFuncDeclNode.parametersNode.parameterNodes.Select(n => n.typeNode.TypeExpression()).ToArray();
                             //var funcFullName = Utils.Mangle(externFuncDeclNode.identifierNode.FullName, paramTypeArr);
                             var funcFullName = Utils.ToExternFuncName(externFuncDeclNode.identifierNode.FullName);
-                            externFuncDeclNode.attributes[eAttr.extern_name] = funcFullName;
+                            externFuncDeclNode.attributes[AstAttr.extern_name] = funcFullName;
 
-                            //æ–°çš„ä½œç”¨åŸŸ  
+                            //ĞÂµÄ×÷ÓÃÓò  
                             string envName = funcFullName;
 
                             var newEnv = new SymbolTable(envName, SymbolTable.TableCatagory.FuncScope, envStack.Peek());
-                            externFuncDeclNode.attributes[eAttr.env] = newEnv;
+                            externFuncDeclNode.attributes[AstAttr.env] = newEnv;
 
 
-                            //æ·»åŠ æ¡ç›®  
+                            //Ìí¼ÓÌõÄ¿  
                             var newRec = envStack.Peek().NewRecord(
                                 funcFullName,
                                 SymbolTable.RecordCatagory.Function,
@@ -2393,7 +2726,7 @@ namespace Gizbox.SemanticRule
                                 );
                             newRec.rawname = externFuncDeclNode.identifierNode.FullName;
                             newRec.flags |= SymbolTable.RecordFlag.ExternFunc;
-                            externFuncDeclNode.attributes[eAttr.func_rec] = newRec;
+                            externFuncDeclNode.attributes[AstAttr.func_rec] = newRec;
                         }
                         else
                         {
@@ -2407,7 +2740,7 @@ namespace Gizbox.SemanticRule
                         if(classDeclNode.isTemplateClass)
                             break;
 
-                        //é™„åŠ å‘½åç©ºé—´åç§°    
+                        //¸½¼ÓÃüÃû¿Õ¼äÃû³Æ    
                         if (isGlobalOrTopNamespace)
                         {
                             if (isTopLevelAtNamespace)
@@ -2421,11 +2754,11 @@ namespace Gizbox.SemanticRule
                                 }
                             }
 
-                            //æ–°çš„ä½œç”¨åŸŸ  
+                            //ĞÂµÄ×÷ÓÃÓò  
                             var newEnv = new SymbolTable(classDeclNode.classNameNode.FullName, SymbolTable.TableCatagory.ClassScope, envStack.Peek());
-                            classDeclNode.attributes[eAttr.env] = newEnv;
+                            classDeclNode.attributes[AstAttr.env] = newEnv;
 
-                            //æ·»åŠ æ¡ç›®-ç±»å    
+                            //Ìí¼ÓÌõÄ¿-ÀàÃû    
                             var newRec = envStack.Peek().NewRecord(
                                 classDeclNode.classNameNode.FullName,
                                 SymbolTable.RecordCatagory.Class,
@@ -2434,7 +2767,7 @@ namespace Gizbox.SemanticRule
                                 );
 
 
-                            //æ‰€æœ‰æƒæ¨¡å‹  
+                            //ËùÓĞÈ¨Ä£ĞÍ  
                             if(classDeclNode.flags.HasFlag(TypeModifiers.Own))
                                 newRec.flags |= SymbolTable.RecordFlag.OwnershipClass;
                             else
@@ -2453,7 +2786,7 @@ namespace Gizbox.SemanticRule
         }
 
         /// <summary>
-        /// PASS2:é€’å½’å‘ä¸‹æ”¶é›†å…¶ä»–ç¬¦å·ä¿¡æ¯    
+        /// PASS2:µİ¹éÏòÏÂÊÕ¼¯ÆäËû·ûºÅĞÅÏ¢    
         /// </summary>
         private void Pass2_CollectOtherSymbols(SyntaxTree.Node node)
         {
@@ -2497,9 +2830,9 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.StatementBlockNode stmtBlockNode:
                     {
-                        //è¿›å…¥ä½œç”¨åŸŸ  
+                        //½øÈë×÷ÓÃÓò  
                         var newEnv = new SymbolTable("stmtblock" + (this.blockCounter++), SymbolTable.TableCatagory.StmtBlockScope, envStack.Peek());
-                        stmtBlockNode.attributes[eAttr.env] = newEnv;
+                        stmtBlockNode.attributes[AstAttr.env] = newEnv;
                         envStack.Push(newEnv);
 
                         foreach (var stmtNode in stmtBlockNode.statements)
@@ -2507,16 +2840,16 @@ namespace Gizbox.SemanticRule
                             Pass2_CollectOtherSymbols(stmtNode);
                         }
 
-                        //ç¦»å¼€ä½œç”¨åŸŸ  
+                        //Àë¿ª×÷ÓÃÓò  
                         envStack.Pop();
                     }
                     break;
                 case SyntaxTree.ConstantDeclareNode constDeclNode:
                     {
                         //Id at env
-                        constDeclNode.identifierNode.attributes[eAttr.def_at_env] = envStack.Peek();
+                        constDeclNode.identifierNode.attributes[AstAttr.def_at_env] = envStack.Peek();
 
-                        //ï¼ˆéå…¨å±€ï¼‰ä¸æ”¯æŒæˆå‘˜å¸¸é‡  
+                        //£¨·ÇÈ«¾Ö£©²»Ö§³Ö³ÉÔ±³£Á¿  
                         if (isGlobalOrTopAtNamespace == false)
                         {
                             throw new SemanticException(ExceptioName.ConstantGlobalOrNamespaceOnly, constDeclNode, "");
@@ -2526,121 +2859,124 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.VarDeclareNode varDeclNode:
                     {
                         //Id at env
-                        varDeclNode.identifierNode.attributes[eAttr.def_at_env] = envStack.Peek();
+                        varDeclNode.identifierNode.attributes[AstAttr.def_at_env] = envStack.Peek();
 
 
-                        //ï¼ˆéå…¨å±€å˜é‡ï¼‰æˆå‘˜å­—æ®µæˆ–è€…å±€éƒ¨å˜é‡  
+                        //£¨·ÇÈ«¾Ö±äÁ¿£©³ÉÔ±×Ö¶Î»òÕß¾Ö²¿±äÁ¿  
                         if (isGlobalOrTopAtNamespace == false)
                         {
-                            //ä½¿ç”¨åŸå  
+                            //Ê¹ÓÃÔ­Ãû  
                             varDeclNode.identifierNode.SetPrefix(null);
 
-                            //è¡¥å…¨ç±»å‹  
+                            //²¹È«ÀàĞÍ  
                             TryCompleteType(varDeclNode.typeNode);
 
-                            //æ–°å»ºç¬¦å·è¡¨æ¡ç›®  
+                            //ĞÂ½¨·ûºÅ±íÌõÄ¿  
                             var newRec = envStack.Peek().NewRecord(
                                 varDeclNode.identifierNode.FullName,
                                 SymbolTable.RecordCatagory.Variable,
                                 varDeclNode.typeNode.TypeExpression()
                                 );
-                            varDeclNode.attributes[eAttr.var_rec] = newRec;
+                            varDeclNode.attributes[AstAttr.var_rec] = newRec;
 
-                            //æ˜¯æˆå‘˜å­—æ®µå®šä¹‰ -> é¢„å…ˆè¯»å–æ‰€æœ‰æƒæ¨¡å‹  
+                            //ÊÇ³ÉÔ±×Ö¶Î¶¨Òå -> Ô¤ÏÈ¶ÁÈ¡ËùÓĞÈ¨Ä£ĞÍ  
                             if(envStack.Peek().tableCatagory == SymbolTable.TableCatagory.ClassScope)
                             {
                                 var ownershipModel = GetOwnershipModel(varDeclNode.flags, varDeclNode.typeNode);
                                 newRec.flags |= ownershipModel;
 
-                                if(ownershipModel.HasFlag(SymbolTable.RecordFlag.BorrowVar))//æˆå‘˜å­—æ®µä¸èƒ½æ˜¯å€Ÿç”¨ç±»å‹  
+                                if(ownershipModel.HasFlag(SymbolTable.RecordFlag.BorrowVar))//³ÉÔ±×Ö¶Î²»ÄÜÊÇ½èÓÃÀàĞÍ  
                                     throw new SemanticException(ExceptioName.OwnershipError_MemberVarCannotBeBorrow, varDeclNode, newRec.name);
                             }
                         }
                     }
                     break;
-                //æ‰€æœ‰æƒCaptureè¯­å¥
+                //ËùÓĞÈ¨CaptureÓï¾ä
                 case SyntaxTree.OwnershipCaptureStmtNode captureNode:
                     {
                         //Id at env
-                        captureNode.lIdentifier.attributes[eAttr.def_at_env] = envStack.Peek();
+                        captureNode.lIdentifier.attributes[AstAttr.def_at_env] = envStack.Peek();
 
-                        //ï¼ˆéå…¨å±€å˜é‡ï¼‰æˆå‘˜å­—æ®µæˆ–è€…å±€éƒ¨å˜é‡  
+                        //£¨·ÇÈ«¾Ö±äÁ¿£©³ÉÔ±×Ö¶Î»òÕß¾Ö²¿±äÁ¿  
                         if(isGlobalOrTopAtNamespace == false)
                         {
-                            //ä½¿ç”¨åŸå  
+                            //Ê¹ÓÃÔ­Ãû  
                             captureNode.lIdentifier.SetPrefix(null);
 
-                            //è¡¥å…¨ç±»å‹  
+                            //²¹È«ÀàĞÍ  
                             TryCompleteType(captureNode.typeNode);
 
-                            //æ–°å»ºç¬¦å·è¡¨æ¡ç›®  
+                            //ĞÂ½¨·ûºÅ±íÌõÄ¿  
                             var newRec = envStack.Peek().NewRecord(
                                 captureNode.lIdentifier.FullName,
                                 SymbolTable.RecordCatagory.Variable,
                                 captureNode.typeNode.TypeExpression()
                                 );
-                            captureNode.attributes[eAttr.var_rec] = newRec;
+                            captureNode.attributes[AstAttr.var_rec] = newRec;
                         }
                     }
                     break;
-                //æ‰€æœ‰æƒLeakè¯­å¥  
+                //ËùÓĞÈ¨LeakÓï¾ä  
                 case SyntaxTree.OwnershipLeakStmtNode leakNode:
                     {
                         //Id at env
-                        leakNode.lIdentifier.attributes[eAttr.def_at_env] = envStack.Peek();
+                        leakNode.lIdentifier.attributes[AstAttr.def_at_env] = envStack.Peek();
 
-                        //ï¼ˆéå…¨å±€å˜é‡ï¼‰æˆå‘˜å­—æ®µæˆ–è€…å±€éƒ¨å˜é‡  
+                        //£¨·ÇÈ«¾Ö±äÁ¿£©³ÉÔ±×Ö¶Î»òÕß¾Ö²¿±äÁ¿  
                         if(isGlobalOrTopAtNamespace == false)
                         {
-                            //ä½¿ç”¨åŸå  
+                            //Ê¹ÓÃÔ­Ãû  
                             leakNode.lIdentifier.SetPrefix(null);
 
-                            //è¡¥å…¨ç±»å‹  
+                            //²¹È«ÀàĞÍ  
                             TryCompleteType(leakNode.typeNode);
 
-                            //æ–°å»ºç¬¦å·è¡¨æ¡ç›®  
+                            //ĞÂ½¨·ûºÅ±íÌõÄ¿  
                             var newRec = envStack.Peek().NewRecord(
                                 leakNode.lIdentifier.FullName,
                                 SymbolTable.RecordCatagory.Variable,
                                 leakNode.typeNode.TypeExpression()
                                 );
-                            leakNode.attributes[eAttr.var_rec] = newRec;
+                            leakNode.attributes[AstAttr.var_rec] = newRec;
                         }
                     }
                     break;
                 case SyntaxTree.FuncDeclareNode funcDeclNode:
                     {
+                        if(funcDeclNode.isTemplateFunction)
+                            break;
+
                         //Id at env
-                        funcDeclNode.identifierNode.attributes[eAttr.def_at_env] = envStack.Peek();
+                        funcDeclNode.identifierNode.attributes[AstAttr.def_at_env] = envStack.Peek();
 
 
-                        //æ˜¯å¦æ˜¯å®ä¾‹æˆå‘˜å‡½æ•°  
+                        //ÊÇ·ñÊÇÊµÀı³ÉÔ±º¯Êı  
                         bool isMethod = envStack.Peek().tableCatagory == SymbolTable.TableCatagory.ClassScope;
                         string className = null;
                         if (isMethod) className = envStack.Peek().name;
                         if (isMethod && isGlobalOrTopAtNamespace) throw new SemanticException(ExceptioName.NamespaceTopLevelNonMemberFunctionOnly, funcDeclNode, "");
 
 
-                        //å¦‚æœæ˜¯æˆå‘˜å‡½æ•° - åŠ å…¥ç¬¦å·è¡¨  
+                        //Èç¹ûÊÇ³ÉÔ±º¯Êı - ¼ÓÈë·ûºÅ±í  
                         if (isGlobalOrTopAtNamespace == false && isMethod == true)
                         {
-                            //ä½¿ç”¨åŸåï¼ˆæˆå‘˜å‡½æ•°ï¼‰  
+                            //Ê¹ÓÃÔ­Ãû£¨³ÉÔ±º¯Êı£©  
                             funcDeclNode.identifierNode.SetPrefix(null);
 
 
-                            //å½¢å‚ç±»å‹è¡¥å…¨  
+                            //ĞÎ²ÎÀàĞÍ²¹È«  
                             foreach (var p in funcDeclNode.parametersNode.parameterNodes)
                             {
                                 TryCompleteType(p.typeNode);
                             }
-                            //è¿”å›å€¼ç±»å‹è¡¥å…¨    
+                            //·µ»ØÖµÀàĞÍ²¹È«    
                             TryCompleteType(funcDeclNode.returnTypeNode);
 
-                            //å½¢å‚åˆ—è¡¨ ï¼ˆæˆå‘˜å‡½æ•°ï¼‰(ä¸åŒ…å«thisç±»å‹)  
+                            //ĞÎ²ÎÁĞ±í £¨³ÉÔ±º¯Êı£©(²»°üº¬thisÀàĞÍ)  
                             var paramTypeArr = funcDeclNode.parametersNode.parameterNodes.Select(n => n.typeNode.TypeExpression()).ToArray();
 
 
-                            //ç¬¦å·çš„ç±»å‹è¡¨è¾¾å¼ï¼ˆæˆå‘˜å‡½æ•°ï¼‰  
+                            //·ûºÅµÄÀàĞÍ±í´ïÊ½£¨³ÉÔ±º¯Êı£©  
                             string typeExpr = "";
                             for (int i = 0; i < paramTypeArr.Length; ++i)
                             {
@@ -2649,28 +2985,28 @@ namespace Gizbox.SemanticRule
                             }
                             typeExpr += (" => " + funcDeclNode.returnTypeNode.TypeExpression());
 
-                            //å‡½æ•°ä¿®é¥°åç§°ï¼ˆæˆå‘˜å‡½æ•°ï¼‰(è¦åŠ ä¸ŠthisåŸºç±»å‹)  
+                            //º¯ÊıĞŞÊÎÃû³Æ£¨³ÉÔ±º¯Êı£©(Òª¼ÓÉÏthis»ùÀàĞÍ)  
                             var funcMangledName = Utils.Mangle(funcDeclNode.identifierNode.FullName, paramTypeArr);
-                            funcDeclNode.attributes[eAttr.mangled_name] = funcMangledName;
+                            funcDeclNode.attributes[AstAttr.mangled_name] = funcMangledName;
 
 
-                            //æ–°çš„ä½œç”¨åŸŸï¼ˆæˆå‘˜å‡½æ•°ï¼‰  
+                            //ĞÂµÄ×÷ÓÃÓò£¨³ÉÔ±º¯Êı£©  
                             string envName = isMethod ? envStack.Peek().name + "." + funcMangledName : funcMangledName;
 
                             var newEnv = new SymbolTable(envName, SymbolTable.TableCatagory.FuncScope, envStack.Peek());
-                            funcDeclNode.attributes[eAttr.env] = newEnv;
+                            funcDeclNode.attributes[AstAttr.env] = newEnv;
 
-                            //ç±»ç¬¦å·è¡¨åŒåæ–¹æ³•å»é‡ï¼ˆæˆå‘˜å‡½æ•°ï¼‰    
+                            //Àà·ûºÅ±íÍ¬Ãû·½·¨È¥ÖØ£¨³ÉÔ±º¯Êı£©    
                             if (envStack.Peek().ContainRecordName(funcMangledName))
                             {
                                 envStack.Peek().records.Remove(funcMangledName);
                             }
 
-                            //æ·»åŠ åˆ°è™šå‡½æ•°è¡¨ï¼ˆæˆå‘˜å‡½æ•°ï¼‰    
+                            //Ìí¼Óµ½Ğéº¯Êı±í£¨³ÉÔ±º¯Êı£©    
                             this.ilUnit.vtables[className].NewRecord(funcMangledName, className);
 
 
-                            //æ·»åŠ æ¡ç›®ï¼ˆæˆå‘˜å‡½æ•°ï¼‰  
+                            //Ìí¼ÓÌõÄ¿£¨³ÉÔ±º¯Êı£©  
                             var newRec = envStack.Peek().NewRecord(
                                 funcMangledName,
                                 SymbolTable.RecordCatagory.Function,
@@ -2679,7 +3015,7 @@ namespace Gizbox.SemanticRule
                                 );
                             newRec.rawname = funcDeclNode.identifierNode.FullName;
 
-                            funcDeclNode.attributes[eAttr.func_rec] = newRec;
+                            funcDeclNode.attributes[AstAttr.func_rec] = newRec;
                         }
 
 
@@ -2687,32 +3023,32 @@ namespace Gizbox.SemanticRule
 
 
                         {
-                            SymbolTable funcEnv = (SymbolTable)funcDeclNode.attributes[eAttr.env];
+                            SymbolTable funcEnv = (SymbolTable)funcDeclNode.attributes[AstAttr.env];
 
-                            //è¿›å…¥å‡½æ•°ä½œç”¨åŸŸ  
+                            //½øÈëº¯Êı×÷ÓÃÓò  
                             envStack.Push(funcEnv);
 
 
 
-                            //éšè—çš„thiså‚æ•°åŠ å…¥ç¬¦å·è¡¨    
+                            //Òş²ØµÄthis²ÎÊı¼ÓÈë·ûºÅ±í    
                             if(isMethod)
                             {
                                 funcEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, className);
                             }
 
-                            //å½¢å‚åŠ å…¥ç¬¦å·è¡¨  
+                            //ĞÎ²Î¼ÓÈë·ûºÅ±í  
                             foreach (var paramNode in funcDeclNode.parametersNode.parameterNodes)
                             {
                                 Pass2_CollectOtherSymbols(paramNode);
                             }
 
-                            //å±€éƒ¨å˜é‡åŠ å…¥ç¬¦å·è¡¨    
+                            //¾Ö²¿±äÁ¿¼ÓÈë·ûºÅ±í    
                             foreach (var stmtNode in funcDeclNode.statementsNode.statements)
                             {
                                 Pass2_CollectOtherSymbols(stmtNode);
                             }
 
-                            //ç¦»å¼€å‡½æ•°ä½œç”¨åŸŸ  
+                            //Àë¿ªº¯Êı×÷ÓÃÓò  
                             envStack.Pop();
                         }
                     }
@@ -2721,24 +3057,24 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.ExternFuncDeclareNode externFuncDeclNode:
                     {
                         //Id at env
-                        externFuncDeclNode.identifierNode.attributes[eAttr.def_at_env] = envStack.Peek();
+                        externFuncDeclNode.identifierNode.attributes[AstAttr.def_at_env] = envStack.Peek();
 
 
-                        //PASS1æ­¢äºæ·»åŠ ç¬¦å·æ¡ç›®  
+                        //PASS1Ö¹ÓÚÌí¼Ó·ûºÅÌõÄ¿  
 
                         //Env  
-                        var funcEnv = (SymbolTable)externFuncDeclNode.attributes[eAttr.env];
+                        var funcEnv = (SymbolTable)externFuncDeclNode.attributes[AstAttr.env];
 
-                        //è¿›å…¥å‡½æ•°ä½œç”¨åŸŸ  
+                        //½øÈëº¯Êı×÷ÓÃÓò  
                         envStack.Push(funcEnv);
 
 
-                        //å½¢å‚åŠ å…¥ç¬¦å·è¡¨    
+                        //ĞÎ²Î¼ÓÈë·ûºÅ±í    
                         foreach (var paramNode in externFuncDeclNode.parametersNode.parameterNodes)
                         {
                             Pass2_CollectOtherSymbols(paramNode);
                         }
-                        //ç¦»å¼€å‡½æ•°ä½œç”¨åŸŸ  
+                        //Àë¿ªº¯Êı×÷ÓÃÓò  
                         envStack.Pop();
                     }
                     break;
@@ -2746,18 +3082,18 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.ParameterNode paramNode:
                     {
                         //Id at env
-                        paramNode.identifierNode.attributes[eAttr.def_at_env] = envStack.Peek();
+                        paramNode.identifierNode.attributes[AstAttr.def_at_env] = envStack.Peek();
 
-                        //å‚æ•°ç±»å‹è¡¥å…¨    
+                        //²ÎÊıÀàĞÍ²¹È«    
                         TryCompleteType(paramNode.typeNode);
 
-                        //å½¢å‚åŠ å…¥å‡½æ•°ä½œç”¨åŸŸçš„ç¬¦å·è¡¨  
+                        //ĞÎ²Î¼ÓÈëº¯Êı×÷ÓÃÓòµÄ·ûºÅ±í  
                         var newRec = envStack.Peek().NewRecord(
                             paramNode.identifierNode.FullName,
                             SymbolTable.RecordCatagory.Param,
                             paramNode.typeNode.TypeExpression()
                             );
-                        paramNode.attributes[eAttr.var_rec] = newRec;
+                        paramNode.attributes[AstAttr.var_rec] = newRec;
                     }
                     break;
                 case SyntaxTree.ClassDeclareNode classDeclNode:
@@ -2766,35 +3102,35 @@ namespace Gizbox.SemanticRule
                             break;
 
                         //Id at env
-                        classDeclNode.classNameNode.attributes[eAttr.def_at_env] = envStack.Peek();
+                        classDeclNode.classNameNode.attributes[AstAttr.def_at_env] = envStack.Peek();
 
 
-                        //PASS1æ­¢äºæ·»åŠ ç¬¦å·æ¡ç›®  
+                        //PASS1Ö¹ÓÚÌí¼Ó·ûºÅÌõÄ¿  
 
                         //ENV  
-                        var newEnv = (SymbolTable)classDeclNode.attributes[eAttr.env];
+                        var newEnv = (SymbolTable)classDeclNode.attributes[AstAttr.env];
 
 
-                        //è¡¥å…¨ç»§æ‰¿åŸºç±»çš„ç±»å    
+                        //²¹È«¼Ì³Ğ»ùÀàµÄÀàÃû    
                         if (classDeclNode.baseClassNameNode != null)
                             TryCompleteIdenfier(classDeclNode.baseClassNameNode);
 
-                        //æ–°å»ºè™šå‡½æ•°è¡¨  
+                        //ĞÂ½¨Ğéº¯Êı±í  
                         string classFullName = classDeclNode.classNameNode.FullName;
                         var vtable = ilUnit.vtables[classFullName] = new VTable(classFullName);
-                        Log("æ–°çš„è™šå‡½æ•°è¡¨ï¼š" + classFullName);
+                        Log("ĞÂµÄĞéº¯Êı±í£º" + classFullName);
 
-                        //è¿›å…¥ç±»ä½œç”¨åŸŸ  
+                        //½øÈëÀà×÷ÓÃÓò  
                         envStack.Push(newEnv);
 
-                        //æœ‰åŸºç±»  
+                        //ÓĞ»ùÀà  
                         if (classDeclNode.classNameNode.FullName != "Core::Object")
                         {
-                            //åŸºç±»å    
+                            //»ùÀàÃû    
                             string baseClassFullName;
                             if (classDeclNode.baseClassNameNode != null)
                             {
-                                //å°è¯•è¡¥å…¨åŸºç±»æ ‡è®°  
+                                //³¢ÊÔ²¹È«»ùÀà±ê¼Ç  
                                 TryCompleteIdenfier(classDeclNode.baseClassNameNode);
                                 baseClassFullName = classDeclNode.baseClassNameNode.FullName;
                             }
@@ -2809,7 +3145,7 @@ namespace Gizbox.SemanticRule
                             newEnv.NewRecord("base", SymbolTable.RecordCatagory.Other, "(inherit)", baseEnv);
 
 
-                            //åŸºç±»ç¬¦å·è¡¨æ¡ç›®å¹¶å…¥//ä»…å­—æ®µ  
+                            //»ùÀà·ûºÅ±íÌõÄ¿²¢Èë//½ö×Ö¶Î  
                             foreach (var reckv in baseEnv.records)
                             {
                                 if (reckv.Value.category == SymbolTable.RecordCatagory.Variable)
@@ -2817,25 +3153,25 @@ namespace Gizbox.SemanticRule
                                     newEnv.AddRecord(reckv.Key, reckv.Value);
                                 }
                             }
-                            //è™šå‡½æ•°è¡¨å…‹éš†  
+                            //Ğéº¯Êı±í¿ËÂ¡  
                             var baseVTable = this.ilUnit.QueryVTable(baseClassFullName);
                             if (baseVTable == null) throw new SemanticException(ExceptioName.BaseClassNotFound, classDeclNode.baseClassNameNode, baseClassFullName);
                             baseVTable.CloneDataTo(vtable);
                         }
 
 
-                        //æ–°å®šä¹‰çš„æˆå‘˜å­—æ®µåŠ å…¥ç¬¦å·è¡¨
+                        //ĞÂ¶¨ÒåµÄ³ÉÔ±×Ö¶Î¼ÓÈë·ûºÅ±í
                         foreach (var declNode in classDeclNode.memberDelareNodes)
                         {
                             Pass2_CollectOtherSymbols(declNode);
                         }
 
-                        //æ„é€ å‡½æ•°  
+                        //¹¹Ôìº¯Êı  
                         {
-                            //é»˜è®¤éšå¼æ„é€ å‡½æ•°çš„ç¬¦å·è¡¨  
+                            //Ä¬ÈÏÒşÊ½¹¹Ôìº¯ÊıµÄ·ûºÅ±í  
                             var ctorEnv = new SymbolTable(classDeclNode.classNameNode.FullName + "::ctor", SymbolTable.TableCatagory.FuncScope, newEnv);
                             ctorEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, classDeclNode.classNameNode.FullName);
-                            //æ·»åŠ æ¡ç›®-æ„é€ å‡½æ•°    
+                            //Ìí¼ÓÌõÄ¿-¹¹Ôìº¯Êı    
                             var ctorRec = newEnv.NewRecord(
                                 classDeclNode.classNameNode.FullName + "::ctor",
                                 SymbolTable.RecordCatagory.Function,
@@ -2846,12 +3182,12 @@ namespace Gizbox.SemanticRule
                             ctorRec.flags |= SymbolTable.RecordFlag.Ctor;
                         }
 
-                        //ææ„å‡½æ•°  
+                        //Îö¹¹º¯Êı  
                         {
-                            //é»˜è®¤éšå¼ææ„å‡½æ•°çš„ç¬¦å·è¡¨  
+                            //Ä¬ÈÏÒşÊ½Îö¹¹º¯ÊıµÄ·ûºÅ±í  
                             var dtorEnv = new SymbolTable(classDeclNode.classNameNode.FullName + "::dtor", SymbolTable.TableCatagory.FuncScope, newEnv);
                             dtorEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, classDeclNode.classNameNode.FullName);
-                            //æ·»åŠ æ¡ç›®-ææ„å‡½æ•°
+                            //Ìí¼ÓÌõÄ¿-Îö¹¹º¯Êı
                             var dtorRec = newEnv.NewRecord(
                                 classDeclNode.classNameNode.FullName + "::dtor",
                                 SymbolTable.RecordCatagory.Function,
@@ -2864,13 +3200,13 @@ namespace Gizbox.SemanticRule
 
 
 
-                        //ç¦»å¼€ç±»ä½œç”¨åŸŸ  
+                        //Àë¿ªÀà×÷ÓÃÓò  
                         envStack.Pop();
                     }
                     break;
                 case SyntaxTree.IfStmtNode ifNode:
                     {
-                        ifNode.attributes[eAttr.uid] = ifCounter++;
+                        ifNode.attributes[AstAttr.uid] = ifCounter++;
 
                         foreach (var clause in ifNode.conditionClauseList)
                         {
@@ -2884,29 +3220,29 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.WhileStmtNode whileNode:
                     {
-                        whileNode.attributes[eAttr.uid] = whileCounter++;
+                        whileNode.attributes[AstAttr.uid] = whileCounter++;
 
                         Pass2_CollectOtherSymbols(whileNode.stmtNode);
                     }
                     break;
                 case SyntaxTree.ForStmtNode forNode:
                     {
-                        forNode.attributes[eAttr.uid] = forCounter++;
+                        forNode.attributes[AstAttr.uid] = forCounter++;
 
-                        //æ–°çš„ä½œç”¨åŸŸ  
-                        var newEnv = new SymbolTable("ForLoop" + (int)forNode.attributes[eAttr.uid], SymbolTable.TableCatagory.LoopScope, envStack.Peek());
-                        forNode.attributes[eAttr.env] = newEnv;
+                        //ĞÂµÄ×÷ÓÃÓò  
+                        var newEnv = new SymbolTable("ForLoop" + (int)forNode.attributes[AstAttr.uid], SymbolTable.TableCatagory.LoopScope, envStack.Peek());
+                        forNode.attributes[AstAttr.env] = newEnv;
 
-                        //è¿›å…¥FORå¾ªç¯ä½œç”¨åŸŸ  
+                        //½øÈëFORÑ­»·×÷ÓÃÓò  
                         envStack.Push(newEnv);
 
-                        //æ”¶é›†åˆå§‹åŒ–è¯­å¥ä¸­çš„ç¬¦å·  
+                        //ÊÕ¼¯³õÊ¼»¯Óï¾äÖĞµÄ·ûºÅ  
                         Pass2_CollectOtherSymbols(forNode.initializerNode);
 
-                        //æ”¶é›†è¯­å¥ä¸­ç¬¦å·  
+                        //ÊÕ¼¯Óï¾äÖĞ·ûºÅ  
                         Pass2_CollectOtherSymbols(forNode.stmtNode);
 
-                        //ç¦»å¼€FORå¾ªç¯ä½œç”¨åŸŸ  
+                        //Àë¿ªFORÑ­»·×÷ÓÃÓò  
                         envStack.Pop();
                     }
                     break;
@@ -2917,7 +3253,7 @@ namespace Gizbox.SemanticRule
         }
 
         /// <summary>
-        /// PASS3:è¯­ä¹‰åˆ†æï¼ˆç±»å‹æ£€æŸ¥ã€æ ‘èŠ‚ç‚¹é‡å†™ç­‰ï¼‰      
+        /// PASS3:ÓïÒå·ÖÎö£¨ÀàĞÍ¼ì²é¡¢Ê÷½ÚµãÖØĞ´µÈ£©      
         /// </summary>
         private void Pass3_AnalysisNode(SyntaxTree.Node node)
         {
@@ -2958,29 +3294,29 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.StatementBlockNode stmtBlockNode:
                     {
-                        //è¿›å…¥ä½œç”¨åŸŸ 
-                        envStack.Push(stmtBlockNode.attributes[eAttr.env] as SymbolTable);
+                        //½øÈë×÷ÓÃÓò 
+                        envStack.Push(stmtBlockNode.attributes[AstAttr.env] as SymbolTable);
 
                         foreach (var stmtNode in stmtBlockNode.statements)
                         {
-                            //åˆ†æå—ä¸­çš„è¯­å¥  
+                            //·ÖÎö¿éÖĞµÄÓï¾ä  
                             Pass3_AnalysisNode(stmtNode);
                         }
 
-                        //ç¦»å¼€ä½œç”¨åŸŸ  
+                        //Àë¿ª×÷ÓÃÓò  
                         envStack.Pop();
                     }
                     break;
                 case SyntaxTree.ConstantDeclareNode constDeclNode:
                     {
-                        //åˆ†æå¸¸é‡å­—é¢å€¼
+                        //·ÖÎö³£Á¿×ÖÃæÖµ
                         Pass3_AnalysisNode(constDeclNode.litValNode);
 
-                        //å¸¸é‡ç±»å‹ä¸æ”¯æŒæ¨æ–­  
+                        //³£Á¿ÀàĞÍ²»Ö§³ÖÍÆ¶Ï  
                         if (constDeclNode.typeNode is SyntaxTree.InferTypeNode)
                             throw new SemanticException(ExceptioName.SemanticAnalysysError, constDeclNode.typeNode, "");
 
-                        //ç±»å‹æ£€æŸ¥ï¼ˆåˆå§‹å€¼ï¼‰  
+                        //ÀàĞÍ¼ì²é£¨³õÊ¼Öµ£©  
                         bool valid = CheckType_Equal(constDeclNode.typeNode.TypeExpression(), AnalyzeTypeExpression(constDeclNode.litValNode));
                         if (!valid)
                             throw new SemanticException(ExceptioName.ConstantTypeDeclarationError, constDeclNode, "type:" + constDeclNode.typeNode.TypeExpression() + "  value type:" + AnalyzeTypeExpression(constDeclNode.litValNode));
@@ -2988,17 +3324,17 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.VarDeclareNode varDeclNode:
                     {
-                        //åˆ†æåˆå§‹åŒ–è¡¨è¾¾å¼  
+                        //·ÖÎö³õÊ¼»¯±í´ïÊ½  
                         Pass3_AnalysisNode(varDeclNode.initializerNode);
 
-                        //ç±»å‹æ¨æ–­  
+                        //ÀàĞÍÍÆ¶Ï  
                         if (varDeclNode.typeNode is InferTypeNode typeNode)
                         {
                             var typeExpr = InferType(typeNode, varDeclNode.initializerNode);
                             var record = envStack.Peek().GetRecord(varDeclNode.identifierNode.FullName);
                             record.typeExpression = typeExpr;
                         }
-                        //ç±»å‹æ£€æŸ¥ï¼ˆåˆå§‹å€¼ï¼‰  
+                        //ÀàĞÍ¼ì²é£¨³õÊ¼Öµ£©  
                         else
                         {
                             bool valid = CheckType_Equal(varDeclNode.typeNode.TypeExpression(), varDeclNode.initializerNode);
@@ -3014,17 +3350,17 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.OwnershipCaptureStmtNode captureNode:
                     {
-                        //åˆ†æå³è¾¹å˜é‡ 
+                        //·ÖÎöÓÒ±ß±äÁ¿ 
                         Pass3_AnalysisNode(captureNode.rIdentifier);
 
-                        //ç±»å‹æ¨æ–­  
+                        //ÀàĞÍÍÆ¶Ï  
                         if(captureNode.typeNode is InferTypeNode typeNode)
                         {
                             var typeExpr = InferType(typeNode, captureNode.rIdentifier);
                             var record = envStack.Peek().GetRecord(captureNode.lIdentifier.FullName);
                             record.typeExpression = typeExpr;
                         }
-                        //ç±»å‹æ£€æŸ¥ï¼ˆåˆå§‹å€¼ï¼‰  
+                        //ÀàĞÍ¼ì²é£¨³õÊ¼Öµ£©  
                         else
                         {
                             bool valid = CheckType_Equal(captureNode.typeNode.TypeExpression(), captureNode.rIdentifier);
@@ -3037,11 +3373,11 @@ namespace Gizbox.SemanticRule
 
                         }
 
-                        //captureå·¦è¾¹å¿…é¡»æ˜¯ownå£°æ˜  
+                        //capture×ó±ß±ØĞëÊÇownÉùÃ÷  
                         if(captureNode.flags.HasFlag(VarModifiers.Own) == false)
                             throw new SemanticException(ExceptioName.OwnershipError, captureNode, "capture left identifier must be declared as own");
 
-                        //captureä¸èƒ½ç”¨äºå€¼ç±»å‹  
+                        //capture²»ÄÜÓÃÓÚÖµÀàĞÍ  
                         GType gtype = GType.Parse(captureNode.typeNode.TypeExpression());
                         if(gtype.IsReferenceType == false)
                         {
@@ -3051,16 +3387,16 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.OwnershipLeakStmtNode leakNode:
                     {
-                        //åˆ†æå³è¾¹å˜é‡ 
+                        //·ÖÎöÓÒ±ß±äÁ¿ 
                         Pass3_AnalysisNode(leakNode.rIdentifier);
-                        //ç±»å‹æ¨æ–­  
+                        //ÀàĞÍÍÆ¶Ï  
                         if(leakNode.typeNode is InferTypeNode typeNode)
                         {
                             var typeExpr = InferType(typeNode, leakNode.rIdentifier);
                             var record = envStack.Peek().GetRecord(leakNode.lIdentifier.FullName);
                             record.typeExpression = typeExpr;
                         }
-                        //ç±»å‹æ£€æŸ¥ï¼ˆåˆå§‹å€¼ï¼‰  
+                        //ÀàĞÍ¼ì²é£¨³õÊ¼Öµ£©  
                         else
                         {
                             bool valid = CheckType_Equal(leakNode.typeNode.TypeExpression(), leakNode.rIdentifier);
@@ -3072,7 +3408,7 @@ namespace Gizbox.SemanticRule
                             }
                         }
 
-                        //leakä¸èƒ½ç”¨äºå€¼ç±»å‹  
+                        //leak²»ÄÜÓÃÓÚÖµÀàĞÍ  
                         GType gtype = GType.Parse(leakNode.typeNode.TypeExpression());
                         if(gtype.IsReferenceType == false)
                         {
@@ -3082,36 +3418,39 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.FuncDeclareNode funcDeclNode:
                     {
-                        //è¿›å…¥ä½œç”¨åŸŸ    
-                        envStack.Push(funcDeclNode.attributes[eAttr.env] as SymbolTable);
+                        if(funcDeclNode.isTemplateFunction)
+                            break;
+
+                        //½øÈë×÷ÓÃÓò    
+                        envStack.Push(funcDeclNode.attributes[AstAttr.env] as SymbolTable);
 
 
-                        //åˆ†æå½¢å‚å®šä¹‰  
+                        //·ÖÎöĞÎ²Î¶¨Òå  
                         foreach (var paramNode in funcDeclNode.parametersNode.parameterNodes)
                         {
                             Pass3_AnalysisNode(paramNode);
                         }
 
-                        //åˆ†æå±€éƒ¨è¯­å¥  
+                        //·ÖÎö¾Ö²¿Óï¾ä  
                         foreach (var stmtNode in funcDeclNode.statementsNode.statements)
                         {
                             Pass3_AnalysisNode(stmtNode);
                         }
 
-                        //è¿”å›ç±»å‹ä¸æ”¯æŒæ¨æ–­  
+                        //·µ»ØÀàĞÍ²»Ö§³ÖÍÆ¶Ï  
                         if(funcDeclNode.returnTypeNode is SyntaxTree.InferTypeNode)
                             throw new SemanticException(ExceptioName.SemanticAnalysysError, funcDeclNode.returnTypeNode, "");
 
-                        //è¿”å›å€¼ç±»å‹æ£€æŸ¥ï¼ˆä»…é™évoidçš„å‡½æ•°ï¼‰  
+                        //·µ»ØÖµÀàĞÍ¼ì²é£¨½öÏŞ·ÇvoidµÄº¯Êı£©  
                         if (!(funcDeclNode.returnTypeNode is SyntaxTree.PrimitiveTypeNode && (funcDeclNode.returnTypeNode as SyntaxTree.PrimitiveTypeNode).token.name == "void"))
                         {
-                            ////æ£€æŸ¥è¿”å›è¯­å¥å’Œè¿”å›è¡¨è¾¾å¼    
+                            ////¼ì²é·µ»ØÓï¾äºÍ·µ»Ø±í´ïÊ½    
                             if (CheckReturnStmt(funcDeclNode.statementsNode, funcDeclNode.returnTypeNode.TypeExpression()) == false)
                             {
                                 throw new SemanticException(ExceptioName.MissingReturnStatement, funcDeclNode, "");
                             }
 
-                            ////æ£€æŸ¥è¿”å›è¯­å¥å’Œè¿”å›è¡¨è¾¾å¼ï¼ˆä¸´æ—¶ï¼‰    
+                            ////¼ì²é·µ»ØÓï¾äºÍ·µ»Ø±í´ïÊ½£¨ÁÙÊ±£©    
                             //var returnStmt = funcDeclNode.statementsNode.statements.FirstOrDefault(s => s is SyntaxTree.ReturnStmtNode);
                             //if (returnStmt == null) throw new SemanticException(ExceptioName.MissingReturnStatement, funcDeclNode, "");
 
@@ -3121,28 +3460,28 @@ namespace Gizbox.SemanticRule
 
 
 
-                        //ç¦»å¼€ä½œç”¨åŸŸ  
+                        //Àë¿ª×÷ÓÃÓò  
                         envStack.Pop();
                     }
                     break;
                 case SyntaxTree.ExternFuncDeclareNode externFuncDeclNode:
                     {
-                        //è¿›å…¥ä½œç”¨åŸŸ    
-                        envStack.Push(externFuncDeclNode.attributes[eAttr.env] as SymbolTable);
+                        //½øÈë×÷ÓÃÓò    
+                        envStack.Push(externFuncDeclNode.attributes[AstAttr.env] as SymbolTable);
 
-                        //åˆ†æå½¢å‚å®šä¹‰
+                        //·ÖÎöĞÎ²Î¶¨Òå
                         foreach (var paramNode in externFuncDeclNode.parametersNode.parameterNodes)
                         {
                             Pass3_AnalysisNode(paramNode);
                         }
 
 
-                        //è¿”å›ç±»å‹ä¸æ”¯æŒæ¨æ–­  
+                        //·µ»ØÀàĞÍ²»Ö§³ÖÍÆ¶Ï  
                         if(externFuncDeclNode.returnTypeNode is SyntaxTree.InferTypeNode)
                             throw new SemanticException(ExceptioName.SemanticAnalysysError, externFuncDeclNode.returnTypeNode, "");
 
 
-                        //ç¦»å¼€ä½œç”¨åŸŸ  
+                        //Àë¿ª×÷ÓÃÓò  
                         envStack.Pop();
                     }
                     break;
@@ -3151,22 +3490,22 @@ namespace Gizbox.SemanticRule
                         if(classdeclNode.isTemplateClass)
                             break;
 
-                        //è¿›å…¥ä½œç”¨åŸŸ    
-                        envStack.Push(classdeclNode.attributes[eAttr.env] as SymbolTable);
+                        //½øÈë×÷ÓÃÓò    
+                        envStack.Push(classdeclNode.attributes[AstAttr.env] as SymbolTable);
 
-                        //æˆå‘˜åˆ†æ  
+                        //³ÉÔ±·ÖÎö  
                         foreach (var declNode in classdeclNode.memberDelareNodes)
                         {
                             Pass3_AnalysisNode(declNode);
                         }
 
-                        //ç¦»å¼€ä½œç”¨åŸŸ  
+                        //Àë¿ª×÷ÓÃÓò  
                         envStack.Pop();
                     }
                     break;
                 case SyntaxTree.SingleExprStmtNode singleStmtNode:
                     {
-                        //å•è¯­å¥è¯­ä¹‰åˆ†æ  
+                        //µ¥Óï¾äÓïÒå·ÖÎö  
                         Pass3_AnalysisNode(singleStmtNode.exprNode);
                     }
                     break;
@@ -3174,56 +3513,56 @@ namespace Gizbox.SemanticRule
                     {
                         foreach (var clause in ifNode.conditionClauseList)
                         {
-                            //æ£€æŸ¥æ¡ä»¶æ˜¯å¦ä¸ºå¸ƒå°”ç±»å‹  
+                            //¼ì²éÌõ¼şÊÇ·ñÎª²¼¶ûÀàĞÍ  
                             CheckType_Equal("bool", clause.conditionNode);
-                            //æ£€æŸ¥è¯­å¥èŠ‚ç‚¹  
+                            //¼ì²éÓï¾ä½Úµã  
                             Pass3_AnalysisNode(clause.thenNode);
                         }
 
-                        //æ£€æŸ¥è¯­å¥  
+                        //¼ì²éÓï¾ä  
                         if (ifNode.elseClause != null) Pass3_AnalysisNode(ifNode.elseClause.stmt);
                     }
                     break;
                 case SyntaxTree.WhileStmtNode whileNode:
                     {
-                        //æ£€æŸ¥æ¡ä»¶æ˜¯å¦ä¸ºå¸ƒå°”ç±»å‹    
+                        //¼ì²éÌõ¼şÊÇ·ñÎª²¼¶ûÀàĞÍ    
                         CheckType_Equal("bool", whileNode.conditionNode);
 
-                        //æ£€æŸ¥è¯­å¥èŠ‚ç‚¹  
+                        //¼ì²éÓï¾ä½Úµã  
                         Pass3_AnalysisNode(whileNode.stmtNode);
                     }
                     break;
                 case SyntaxTree.ForStmtNode forNode:
                     {
-                        //è¿›å…¥FORä½œç”¨åŸŸ    
-                        envStack.Push(forNode.attributes[eAttr.env] as SymbolTable);
+                        //½øÈëFOR×÷ÓÃÓò    
+                        envStack.Push(forNode.attributes[AstAttr.env] as SymbolTable);
 
-                        //æ£€æŸ¥åˆå§‹åŒ–å™¨å’Œè¿­ä»£å™¨  
+                        //¼ì²é³õÊ¼»¯Æ÷ºÍµü´úÆ÷  
                         Pass3_AnalysisNode(forNode.initializerNode);
                         AnalyzeTypeExpression(forNode.iteratorNode);
 
-                        //æ£€æŸ¥æ¡ä»¶æ˜¯å¦ä¸ºå¸ƒå°”ç±»å‹    
+                        //¼ì²éÌõ¼şÊÇ·ñÎª²¼¶ûÀàĞÍ    
                         CheckType_Equal("bool", forNode.conditionNode);
 
-                        //æ£€æŸ¥è¯­å¥èŠ‚ç‚¹  
+                        //¼ì²éÓï¾ä½Úµã  
                         Pass3_AnalysisNode(forNode.stmtNode);
 
-                        //ç¦»å¼€FORå¾ªç¯ä½œç”¨åŸŸ  
+                        //Àë¿ªFORÑ­»·×÷ÓÃÓò  
                         envStack.Pop();
                     }
                     break;
                 case SyntaxTree.ReturnStmtNode retNode:
                     {
-                        //æ£€æŸ¥è¿”å›å€¼  
+                        //¼ì²é·µ»ØÖµ  
                         Pass3_AnalysisNode(retNode.returnExprNode);
                     }
                     break;
                 case SyntaxTree.DeleteStmtNode delNode:
                     {
-                        //æ£€æŸ¥è¦åˆ é™¤çš„å¯¹è±¡    
+                        //¼ì²éÒªÉ¾³ıµÄ¶ÔÏó    
                         Pass3_AnalysisNode(delNode.objToDelete);
 
-                        string objTypeExpr = (string)delNode.objToDelete.attributes[eAttr.type];
+                        string objTypeExpr = (string)delNode.objToDelete.attributes[AstAttr.type];
 
                         var type = GType.Parse(objTypeExpr);
                         if(type.IsArray == true && delNode.isArrayDelete == false)
@@ -3245,10 +3584,10 @@ namespace Gizbox.SemanticRule
                     }
                     break;
 
-                // ********************* å…¶ä»–èŠ‚ç‚¹æ£€æŸ¥ *********************************
+                // ********************* ÆäËû½Úµã¼ì²é *********************************
 
 
-                // ********************* è¡¨è¾¾å¼æ£€æŸ¥ *********************************
+                // ********************* ±í´ïÊ½¼ì²é *********************************
 
 
                 case SyntaxTree.IdentityNode idNode:
@@ -3259,17 +3598,17 @@ namespace Gizbox.SemanticRule
                         if (rec == null)
                             throw new SemanticException(ExceptioName.IdentifierNotFound, idNode, (idNode?.FullName ?? "???"));
 
-                        //å¸¸é‡æ›¿æ¢  
+                        //³£Á¿Ìæ»»  
                         if (rec.category == SymbolTable.RecordCatagory.Constant)
                         {
                             idNode.overrideNode = new SyntaxTree.LiteralNode
                             {
                                 token = new Token(null, PatternType.Literal, rec.initValue, -1, -1, -1),
 
-                                attributes = new Dictionary<eAttr, object>()
+                                attributes = new Dictionary<AstAttr, object>()
                             };
 
-                            idNode.overrideNode.attributes[eAttr.type] = rec.typeExpression;
+                            idNode.overrideNode.attributes[AstAttr.type] = rec.typeExpression;
                             break;
                         }
 
@@ -3301,7 +3640,7 @@ namespace Gizbox.SemanticRule
                         var typeL = GType.Parse(typeExprL);
                         var typeR = GType.Parse(typeExprR);
 
-                        // !! æ“ä½œç¬¦é‡è½½
+                        // !! ²Ù×÷·ûÖØÔØ
                         if(typeL.IsNumberType == false || typeR.IsNumberType == false)
                         {
                             var operatorRec = Query_OperatorOverload(binaryNode.GetOpName(), typeExprL, typeExprR);
@@ -3313,7 +3652,7 @@ namespace Gizbox.SemanticRule
                                 isMemberAccessFunction = false,
                                 funcNode = new SyntaxTree.IdentityNode()
                                 {
-                                    attributes = new Dictionary<eAttr, object>(),
+                                    attributes = new Dictionary<AstAttr, object>(),
                                     token = new Token("ID", PatternType.Id, operatorRec.rawname, default, default, default),
                                     identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
                                 },
@@ -3345,9 +3684,9 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.CastNode castNode:
                     {
-                        // !!ç‰¹æ®Šçš„è½¬æ¢éœ€è¦é‡å†™ä¸ºå‡½æ•°è°ƒç”¨
+                        // !!ÌØÊâµÄ×ª»»ĞèÒªÖØĞ´Îªº¯Êıµ÷ÓÃ
                         AnalyzeTypeExpression(castNode.factorNode);
-                        var srcType = GType.Parse((string)castNode.factorNode.attributes[eAttr.type]);
+                        var srcType = GType.Parse((string)castNode.factorNode.attributes[AstAttr.type]);
                         var targetType = GType.Parse(castNode.typeNode.TypeExpression());
 
                         if(targetType.Category == GType.Kind.String)
@@ -3357,7 +3696,7 @@ namespace Gizbox.SemanticRule
                                 isMemberAccessFunction = false,
                                 funcNode = new SyntaxTree.IdentityNode() 
                                 {
-                                    attributes = new Dictionary<eAttr, object>(),
+                                    attributes = new Dictionary<AstAttr, object>(),
                                     token = new Token("ID", PatternType.Id, srcType.ExternConvertStringFunction, default, default, default),
                                     identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
                                 },
@@ -3412,30 +3751,30 @@ namespace Gizbox.SemanticRule
                             break;
                         }
 
-                        //å®å‚åˆ†æ  
+                        //Êµ²Î·ÖÎö  
                         foreach (var argNode in callNode.argumantsNode.arguments)
                         {
                             Pass3_AnalysisNode(argNode);
                         }
 
-                        //åç§°åˆ†æè¡¥å…¨ï¼ˆæ˜¯ä¸æ˜¯ä¸åº”è¯¥æ”¾åœ¨Pass3 ??ï¼‰  
+                        //Ãû³Æ·ÖÎö²¹È«£¨ÊÇ²»ÊÇ²»Ó¦¸Ã·ÅÔÚPass3 ??£©  
                         if (callNode.isMemberAccessFunction == false && callNode.funcNode is SyntaxTree.IdentityNode)
                         {
                             TryCompleteIdenfier((callNode.funcNode as SyntaxTree.IdentityNode));
                         }
 
-                        //å‡½æ•°åˆ†æ(éœ€è¦å…ˆè¡¥å…¨åç§°)  
+                        //º¯Êı·ÖÎö(ĞèÒªÏÈ²¹È«Ãû³Æ)  
                         
-                        callNode.funcNode.attributes[eAttr.not_a_property] = null;//é˜²æ­¢è¢«å½“ä½œå±æ€§æ›¿æ¢  
+                        callNode.funcNode.attributes[AstAttr.not_a_property] = null;//·ÀÖ¹±»µ±×÷ÊôĞÔÌæ»»  
                         Pass3_AnalysisNode(callNode.funcNode);
 
 
-                        //Funcåˆ†æ  
+                        //Func·ÖÎö  
                         AnalyzeTypeExpression(callNode);
 
-                        //å‚æ•°ä¸ªæ•°æ£€æŸ¥æš‚æ— ...
+                        //²ÎÊı¸öÊı¼ì²éÔİÎŞ...
 
-                        //å‚æ•°é‡è½½å¯¹åº”æ£€æŸ¥æš‚æ— ...
+                        //²ÎÊıÖØÔØ¶ÔÓ¦¼ì²éÔİÎŞ...
                     }
                     break;
                 case SyntaxTree.ReplaceNode replaceNode:
@@ -3455,7 +3794,7 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.AssignNode assignNode:
                     {
-                        //!!setterå±æ€§æ›¿æ¢  
+                        //!!setterÊôĞÔÌæ»»  
                         if (assignNode.lvalueNode is SyntaxTree.ObjectMemberAccessNode)
                         {
                             var memberAccess = assignNode.lvalueNode as SyntaxTree.ObjectMemberAccessNode;
@@ -3470,14 +3809,14 @@ namespace Gizbox.SemanticRule
                             var memberName = memberAccess.memberNode.FullName;
 
                             var memberRec = classEnv.Class_GetMemberRecordInChain(memberName);
-                            if (memberRec == null) //ä¸å­˜åœ¨åŒåå­—æ®µ  
+                            if (memberRec == null) //²»´æÔÚÍ¬Ãû×Ö¶Î  
                             {
                                 var rvalType = AnalyzeTypeExpression(assignNode.rvalueNode);
 
                                 var setterMethod = classEnv.Class_GetMemberRecordInChain(Utils.Mangle(memberName, rvalType));
-                                if (setterMethod != null)//å­˜åœ¨setterå‡½æ•°  
+                                if (setterMethod != null)//´æÔÚsetterº¯Êı  
                                 {
-                                    //æ›¿æ¢èŠ‚ç‚¹  
+                                    //Ìæ»»½Úµã  
                                     var overrideNode = new SyntaxTree.CallNode()
                                     {
 
@@ -3500,7 +3839,7 @@ namespace Gizbox.SemanticRule
                         }
 
 
-                        //ç±»å‹æ£€æŸ¥ï¼ˆèµ‹å€¼ï¼‰  
+                        //ÀàĞÍ¼ì²é£¨¸³Öµ£©  
                         {
                             Pass3_AnalysisNode(assignNode.lvalueNode);
                             Pass3_AnalysisNode(assignNode.rvalueNode);
@@ -3512,8 +3851,8 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.ObjectMemberAccessNode objMemberAccessNode:
                     {
-                        //!!getterå±æ€§æ›¿æ¢  
-                        if (objMemberAccessNode.attributes.ContainsKey(eAttr.not_a_property) == false)
+                        //!!getterÊôĞÔÌæ»»  
+                        if (objMemberAccessNode.attributes.ContainsKey(AstAttr.not_a_property) == false)
                         {
                             var className = AnalyzeTypeExpression(objMemberAccessNode.objectNode);
 
@@ -3525,13 +3864,13 @@ namespace Gizbox.SemanticRule
                             var memberName = objMemberAccessNode.memberNode.FullName;
 
                             var memberRec = classEnv.Class_GetMemberRecordInChain(memberName);
-                            if (memberRec == null) //ä¸å­˜åœ¨åŒåå­—æ®µ  
+                            if (memberRec == null) //²»´æÔÚÍ¬Ãû×Ö¶Î  
                             {
                                 var getterRec = classEnv.Class_GetMemberRecordInChain(Utils.Mangle(memberName));
-                                if (getterRec != null)//å­˜åœ¨getterå‡½æ•°  
+                                if (getterRec != null)//´æÔÚgetterº¯Êı  
                                 {
 
-                                    //æ›¿æ¢èŠ‚ç‚¹  
+                                    //Ìæ»»½Úµã  
                                     objMemberAccessNode.overrideNode = new SyntaxTree.CallNode()
                                     {
 
@@ -3554,10 +3893,10 @@ namespace Gizbox.SemanticRule
 
                         var objClassName = AnalyzeTypeExpression(objMemberAccessNode.objectNode);
                         var objClassRec = Query(objClassName);
-                        objMemberAccessNode.attributes[eAttr.obj_class_rec] = objClassRec;
+                        objMemberAccessNode.attributes[AstAttr.obj_class_rec] = objClassRec;
 
-                        //ä¸èƒ½åˆ†ææˆå‘˜åç§°ï¼Œå½“å‰ä½œç”¨åŸŸä¼šæ‰¾ä¸åˆ°æ ‡è¯†ç¬¦ã€‚      
-                        //Debug.Log("åˆ†æï¼š" + objMemberAccessNode.memberNode.FirstToken().ToString());
+                        //²»ÄÜ·ÖÎö³ÉÔ±Ãû³Æ£¬µ±Ç°×÷ÓÃÓò»áÕÒ²»µ½±êÊ¶·û¡£      
+                        //Debug.Log("·ÖÎö£º" + objMemberAccessNode.memberNode.FirstToken().ToString());
                         //Pass3_AnalysisNode(objMemberAccessNode.memberNode);
 
                         AnalyzeTypeExpression(objMemberAccessNode);
@@ -3591,10 +3930,10 @@ namespace Gizbox.SemanticRule
                         Pass3_AnalysisNode(newArrNode.lengthNode);
                     }
                     break;
-                //å…¶ä»–èŠ‚ç‚¹     
+                //ÆäËû½Úµã     
                 default:
                     {
-                        //ç±»å‹èŠ‚ç‚¹  --> è¡¥å…¨ç±»å‹
+                        //ÀàĞÍ½Úµã  --> ²¹È«ÀàĞÍ
                         if (node is SyntaxTree.TypeNode)
                         {
                             TryCompleteType(node as SyntaxTree.TypeNode);
@@ -3607,7 +3946,7 @@ namespace Gizbox.SemanticRule
                         //}
                         //else
                         //{
-                        //    throw new Exception("æœªå®ç°èŠ‚ç‚¹åˆ†æï¼š" + node.GetType().Name);
+                        //    throw new Exception("Î´ÊµÏÖ½Úµã·ÖÎö£º" + node.GetType().Name);
                         //}
                     }
                     break;
@@ -3615,7 +3954,7 @@ namespace Gizbox.SemanticRule
         }
 
         /// <summary>
-        /// PASS4:æ‰€æœ‰æƒä¸ç”Ÿå‘½å‘¨æœŸåˆ†æ  
+        /// PASS4:ËùÓĞÈ¨ÓëÉúÃüÖÜÆÚ·ÖÎö  
         /// </summary>
         private void Pass4_OwnershipLifetime(SyntaxTree.Node node)
         {
@@ -3662,8 +4001,8 @@ namespace Gizbox.SemanticRule
                     }
                 case SyntaxTree.StatementBlockNode blockNode:
                     {
-                        // è¿›å…¥blockä½œç”¨åŸŸ  
-                        envStack.Push(blockNode.attributes[eAttr.env] as SymbolTable);
+                        // ½øÈëblock×÷ÓÃÓò  
+                        envStack.Push(blockNode.attributes[AstAttr.env] as SymbolTable);
                         lifeTimeInfo.currBranch.scopeStack.Push(new LifetimeInfo.ScopeInfo());
 
                         foreach(var s in blockNode.statements)
@@ -3671,7 +4010,7 @@ namespace Gizbox.SemanticRule
                             Pass4_OwnershipLifetime(s);
                         }
 
-                        // ä½œç”¨åŸŸé€€å‡ºéœ€è¦åˆ é™¤çš„Ownerå˜é‡
+                        // ×÷ÓÃÓòÍË³öĞèÒªÉ¾³ıµÄOwner±äÁ¿
                         var toDelete = new List<(LifetimeInfo.VarStatus status, string varname)>();
                         foreach(var (varname, varstatus) in lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict)
                         {
@@ -3682,7 +4021,7 @@ namespace Gizbox.SemanticRule
                         }
 
                         if(toDelete.Count > 0)
-                            blockNode.attributes[eAttr.drop_var_exit_env] = toDelete;
+                            blockNode.attributes[AstAttr.drop_var_exit_env] = toDelete;
 
                         lifeTimeInfo.currBranch.scopeStack.Pop();
                         envStack.Pop();
@@ -3690,18 +4029,18 @@ namespace Gizbox.SemanticRule
                     }
                 case SyntaxTree.ForStmtNode forNode:
                     {
-                        // å…¥å¾ªç¯ä½œç”¨åŸŸ
-                        envStack.Push(forNode.attributes[eAttr.env] as SymbolTable);
+                        // ÈëÑ­»·×÷ÓÃÓò
+                        envStack.Push(forNode.attributes[AstAttr.env] as SymbolTable);
                         lifeTimeInfo.currBranch.scopeStack.Push(new LifetimeInfo.ScopeInfo());
 
                         // initializer/condition/iterator/body
                         Pass4_OwnershipLifetime(forNode.initializerNode);
                         Pass4_OwnershipLifetime(forNode.conditionNode);
                         Pass4_OwnershipLifetime(forNode.iteratorNode);
-                        //forä½œç”¨åŸŸå†…initializerNode/conditionNode/iteratorNodeä¸äº§ç”ŸOwnerå˜é‡ï¼Œåªæœ‰bodyå†…å¯èƒ½äº§ç”Ÿ    
+                        //for×÷ÓÃÓòÄÚinitializerNode/conditionNode/iteratorNode²»²úÉúOwner±äÁ¿£¬Ö»ÓĞbodyÄÚ¿ÉÄÜ²úÉú    
 
 
-                        // ä¿å­˜å…¥å£çŠ¶æ€ï¼ˆä¼šåœ¨åˆå¹¶ä¸­è¢«å°±åœ°æ›´æ–°ï¼‰  
+                        // ±£´æÈë¿Ú×´Ì¬£¨»áÔÚºÏ²¢ÖĞ±»¾ÍµØ¸üĞÂ£©  
                         var saved = lifeTimeInfo.currBranch;
 
                         int itCount = 0;
@@ -3710,18 +4049,18 @@ namespace Gizbox.SemanticRule
                             if(itCount++ > 99)
                                 throw new GizboxException(ExceptioName.OwnershipError, "lifetime analysis not converge.");
                             
-                            // è·‘ä¸€è½®å¾ªç¯ä½“  
+                            // ÅÜÒ»ÂÖÑ­»·Ìå  
                             var loopBranch = lifeTimeInfo.NewBranch(saved);
                             lifeTimeInfo.currBranch = loopBranch;
                             Pass4_OwnershipLifetime(forNode.stmtNode);
 
-                            // åˆå¹¶åˆ†æ”¯ ->å¦‚æœæ”¶æ•›åˆ™é€€å‡ºå¦åˆ™ç»§ç»­è¿­ä»£  
+                            // ºÏ²¢·ÖÖ§ ->Èç¹ûÊÕÁ²ÔòÍË³ö·ñÔò¼ÌĞøµü´ú  
                             lifeTimeInfo.currBranch = saved;
                             bool isConverged = lifeTimeInfo.MergeBranchesTo(saved, new List<LifetimeInfo.Branch> { loopBranch });
                             if(isConverged)
                                 break;
                         }
-                        // æ¢å¤currBranch  
+                        // »Ö¸´currBranch  
                         lifeTimeInfo.currBranch = saved;
 
 
@@ -3733,7 +4072,7 @@ namespace Gizbox.SemanticRule
                     {
                         Pass4_OwnershipLifetime(whileNode.conditionNode);
 
-                        // ä¿å­˜å…¥å£çŠ¶æ€ï¼ˆä¼šåœ¨åˆå¹¶ä¸­è¢«å°±åœ°æ›´æ–°ï¼‰  
+                        // ±£´æÈë¿Ú×´Ì¬£¨»áÔÚºÏ²¢ÖĞ±»¾ÍµØ¸üĞÂ£©  
                         var saved = lifeTimeInfo.currBranch;
 
                         if(saved.scopeStack.Count == 0)
@@ -3745,19 +4084,19 @@ namespace Gizbox.SemanticRule
                             if(itCount++ > 99)
                                 throw new GizboxException(ExceptioName.OwnershipError, "lifetime analysis not converge.");
 
-                            // è·‘ä¸€è½®å¾ªç¯ä½“  
+                            // ÅÜÒ»ÂÖÑ­»·Ìå  
                             var loopBranch = lifeTimeInfo.NewBranch(saved);//bug
                             lifeTimeInfo.currBranch = loopBranch;
                             Pass4_OwnershipLifetime(whileNode.stmtNode);
 
-                            // åˆå¹¶åˆ†æ”¯ ->å¦‚æœæ”¶æ•›åˆ™é€€å‡ºå¦åˆ™ç»§ç»­è¿­ä»£  
+                            // ºÏ²¢·ÖÖ§ ->Èç¹ûÊÕÁ²ÔòÍË³ö·ñÔò¼ÌĞøµü´ú  
                             lifeTimeInfo.currBranch = saved;
                             bool isConverged = lifeTimeInfo.MergeBranchesTo(saved, new List<LifetimeInfo.Branch> { loopBranch });
                             if(isConverged)
                                 break;
                         }
 
-                        // æ¢å¤currBranch  
+                        // »Ö¸´currBranch  
                         lifeTimeInfo.currBranch = saved;
                         break;
                     }
@@ -3771,7 +4110,7 @@ namespace Gizbox.SemanticRule
                         {
                             Pass4_OwnershipLifetime(c.conditionNode);
 
-                            //æ¡ä»¶åˆ†æ”¯  
+                            //Ìõ¼ş·ÖÖ§  
                             var condBranch = lifeTimeInfo.NewBranch(lastCurrTemp);
                             lifeTimeInfo.currBranch = condBranch;
                             Pass4_OwnershipLifetime(c.thenNode);
@@ -3780,7 +4119,7 @@ namespace Gizbox.SemanticRule
                         }
                         if(ifNode.elseClause != null)
                         {
-                            //æ¡ä»¶åˆ†æ”¯  
+                            //Ìõ¼ş·ÖÖ§  
                             var condBranch = lifeTimeInfo.NewBranch(lastCurrTemp);
                             lifeTimeInfo.currBranch = condBranch;
                             Pass4_OwnershipLifetime(ifNode.elseClause.stmt);
@@ -3788,7 +4127,7 @@ namespace Gizbox.SemanticRule
                             branches.Add(condBranch);
                         }
 
-                        //å›å½’ä¸»åˆ†æ”¯  
+                        //»Ø¹éÖ÷·ÖÖ§  
                         lifeTimeInfo.currBranch = lastCurrTemp;
                         lifeTimeInfo.MergeBranchesTo(lastCurrTemp, branches);
 
@@ -3799,13 +4138,13 @@ namespace Gizbox.SemanticRule
                         if(classDecl.isTemplateClass)
                             break;
 
-                        // ç±»ä½œç”¨åŸŸæˆå‘˜å­—æ®µçš„åˆå§‹åŒ–è¡¨è¾¾å¼åšæ‰€æœ‰æƒåˆæ³•æ€§æ£€æŸ¥
+                        // Àà×÷ÓÃÓò³ÉÔ±×Ö¶ÎµÄ³õÊ¼»¯±í´ïÊ½×öËùÓĞÈ¨ºÏ·¨ĞÔ¼ì²é
                         foreach(var decl in classDecl.memberDelareNodes)
                         {
                             if(decl is VarDeclareNode fvar)
                             {
-                                // æˆå‘˜å­—æ®µåˆå§‹åŒ–  
-                                var rec = fvar.attributes[eAttr.var_rec] as SymbolTable.Record;
+                                // ³ÉÔ±×Ö¶Î³õÊ¼»¯  
+                                var rec = fvar.attributes[AstAttr.var_rec] as SymbolTable.Record;
                                 if(rec != null)
                                 {
                                     SymbolTable.RecordFlag lModel = rec.flags & OwnershipModelMask;
@@ -3814,7 +4153,7 @@ namespace Gizbox.SemanticRule
                             }
                             else if(decl is FuncDeclareNode fdecl)
                             {
-                                // å‡½æ•°æˆå‘˜çš„æ‰€æœ‰æƒæ£€æŸ¥é€’å½’
+                                // º¯Êı³ÉÔ±µÄËùÓĞÈ¨¼ì²éµİ¹é
                                 Pass4_OwnershipLifetime(decl);
                             }
                         }
@@ -3822,33 +4161,36 @@ namespace Gizbox.SemanticRule
                     }
                 case SyntaxTree.FuncDeclareNode funcDecl:
                     {
-                        // è¿›å…¥å‡½æ•°ä½œç”¨åŸŸ
-                        envStack.Push(funcDecl.attributes[eAttr.env] as SymbolTable);
+                        if(funcDecl.isTemplateFunction)
+                            break;
+
+                        // ½øÈëº¯Êı×÷ÓÃÓò
+                        envStack.Push(funcDecl.attributes[AstAttr.env] as SymbolTable);
                         lifeTimeInfo.currBranch.scopeStack.Push(new LifetimeInfo.ScopeInfo());
 
-                        // å‡½æ•°å‚æ•°æ‰€æœ‰æƒæ¨¡å‹  
+                        // º¯Êı²ÎÊıËùÓĞÈ¨Ä£ĞÍ  
                         foreach(var paramNode in funcDecl.parametersNode.parameterNodes)
                         {
                             Pass4_OwnershipLifetime(paramNode);
                         }
 
-                        // å‡½æ•°è¿”å›å€¼æ‰€æœ‰æƒæ¨¡å‹  
-                        if(funcDecl.attributes.ContainsKey(eAttr.func_rec) == false)
+                        // º¯Êı·µ»ØÖµËùÓĞÈ¨Ä£ĞÍ  
+                        if(funcDecl.attributes.ContainsKey(AstAttr.func_rec) == false)
                             throw new GizboxException(ExceptioName.Undefine, "func record not found.");
-                        var frec = funcDecl.attributes[eAttr.func_rec] as SymbolTable.Record;
+                        var frec = funcDecl.attributes[AstAttr.func_rec] as SymbolTable.Record;
                         frec.flags |= GetOwnershipModel(funcDecl.returnFlags, funcDecl.returnTypeNode);
 
-                    // NOTE: å…è®¸å€Ÿç”¨è¿”å›å€¼ã€‚å¥å…¨æ€§(safety)éœ€è¦é€šè¿‡é€ƒé€¸/ç”Ÿå‘½å‘¨æœŸæ£€æŸ¥ä¿è¯ã€‚
+                    // NOTE: ÔÊĞí½èÓÃ·µ»ØÖµ¡£½¡È«ĞÔ(safety)ĞèÒªÍ¨¹ıÌÓÒİ/ÉúÃüÖÜÆÚ¼ì²é±£Ö¤¡£
 
 
-                        // æ›´æ–°å½“å‰å‡½æ•°è¿”å›å€¼ä¿¡æ¯  
+                        // ¸üĞÂµ±Ç°º¯Êı·µ»ØÖµĞÅÏ¢  
                         lifeTimeInfo.currentFuncReturnFlag = SymbolTable.RecordFlag.None;
                         lifeTimeInfo.currentFuncParams = null;
 
                         lifeTimeInfo.currentFuncReturnFlag =
                             frec.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.ManualVar | SymbolTable.RecordFlag.BorrowVar);
 
-                        // å°†å½¢å‚åŠ å…¥å½“å‰ä½œç”¨åŸŸè·Ÿè¸ªï¼ˆä»…Owneréœ€è¦é‡Šæ”¾ï¼‰
+                        // ½«ĞÎ²Î¼ÓÈëµ±Ç°×÷ÓÃÓò¸ú×Ù£¨½öOwnerĞèÒªÊÍ·Å£©
                         var funcEnv = envStack.Peek();
                         var paramRecs = funcEnv.GetByCategory(SymbolTable.RecordCatagory.Param);
                         lifeTimeInfo.currentFuncParams = paramRecs;
@@ -3857,19 +4199,19 @@ namespace Gizbox.SemanticRule
                             foreach(var p in paramRecs)
                             {
                                 if(p.name == "this")
-                                    continue; // this ä¸æ‰˜ç®¡
+                                    continue; // this ²»ÍĞ¹Ü
                                 if(p.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                                     lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict[p.name] = LifetimeInfo.VarStatus.Alive;
                             }
                         }
 
-                        // é€’å½’è¯­å¥ä½“
+                        // µİ¹éÓï¾äÌå
                         foreach(var s in funcDecl.statementsNode.statements)
                         {
                             Pass4_OwnershipLifetime(s);
                         }
 
-                        // å‡½æ•°æ­£å¸¸é€€å‡ºéœ€è¦å›æ”¶çš„ Owner
+                        // º¯ÊıÕı³£ÍË³öĞèÒª»ØÊÕµÄ Owner
                         var exitDel = new List<(LifetimeInfo.VarStatus status, string varname)>();
                         foreach(var (varname, varstatus) in lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict)
                         {
@@ -3880,22 +4222,22 @@ namespace Gizbox.SemanticRule
                         }
 
                         if(exitDel.Count > 0)
-                            funcDecl.attributes[eAttr.drop_var_exit_env] = exitDel;
+                            funcDecl.attributes[AstAttr.drop_var_exit_env] = exitDel;
 
                         lifeTimeInfo.currBranch.scopeStack.Pop();
                         envStack.Pop();
                         break;
                     }
                 case SyntaxTree.ExternFuncDeclareNode _:
-                    // æ— éœ€å¤„ç†(å¤–éƒ¨å‡½æ•°ä¸åº”è¯¥ä½¿ç”¨æ‰€æœ‰æƒ)
+                    // ÎŞĞè´¦Àí(Íâ²¿º¯Êı²»Ó¦¸ÃÊ¹ÓÃËùÓĞÈ¨)
                     break;
                 case SyntaxTree.ParameterNode paramNode:
                     {
-                        var prec =  paramNode.attributes[eAttr.var_rec] as SymbolTable.Record;
+                        var prec =  paramNode.attributes[AstAttr.var_rec] as SymbolTable.Record;
                         if(prec == null)
                             throw new GizboxException(ExceptioName.Undefine, "param record not found.");
                         
-                        //æ‰€æœ‰æƒæ¨¡å‹
+                        //ËùÓĞÈ¨Ä£ĞÍ
                         var model = GetOwnershipModel(paramNode.flags, paramNode.typeNode);
                         prec.flags |= model;
 
@@ -3903,80 +4245,80 @@ namespace Gizbox.SemanticRule
                     }
                 case SyntaxTree.VarDeclareNode varDecl:
                     {
-                        // å…ˆå¤„ç†å³å€¼ä¸­çš„è°ƒç”¨/å‚æ•°ï¼ˆå¯èƒ½è§¦å‘moveï¼‰
+                        // ÏÈ´¦ÀíÓÒÖµÖĞµÄµ÷ÓÃ/²ÎÊı£¨¿ÉÄÜ´¥·¢move£©
                         Pass4_OwnershipLifetime(varDecl.initializerNode);
 
-                        var rec = varDecl.attributes[eAttr.var_rec] as SymbolTable.Record;// Query(varDecl.identifierNode.FullName);
+                        var rec = varDecl.attributes[AstAttr.var_rec] as SymbolTable.Record;// Query(varDecl.identifierNode.FullName);
                         if(rec == null)
                             throw new GizboxException(ExceptioName.Undefine, "var record not found.");
 
-                        // å€¼ç±»å‹ä¸ç”¨å¤„ç†æ‰€æœ‰æƒ
+                        // ÖµÀàĞÍ²»ÓÃ´¦ÀíËùÓĞÈ¨
                         if(GType.Parse(rec.typeExpression).IsReferenceType == false)
                             break;
 
 
-                        // æ£€æŸ¥ï¼šå˜é‡å·¦å€¼å’Œåˆå§‹å€¼çš„æ‰€æœ‰æƒæ¨¡å‹å¯¹æ¯”  
+                        // ¼ì²é£º±äÁ¿×óÖµºÍ³õÊ¼ÖµµÄËùÓĞÈ¨Ä£ĞÍ¶Ô±È  
                         CheckOwnershipCompare_VarDecl(varDecl, rec, out var lmodel, out var rmodel);
 
-                        // è®°å½•å˜é‡çš„æ‰€æœ‰æƒæ¨¡å‹  
+                        // ¼ÇÂ¼±äÁ¿µÄËùÓĞÈ¨Ä£ĞÍ  
                         rec.flags |= lmodel;
 
 
-                        // æ£€æŸ¥ï¼šå…¨å±€å˜é‡ä¸èƒ½å®šä¹‰ä¸ºown/borrowç±»å‹  
+                        // ¼ì²é£ºÈ«¾Ö±äÁ¿²»ÄÜ¶¨ÒåÎªown/borrowÀàĞÍ  
                         if(isGlobalOrTopAtNamespace && lmodel != SymbolTable.RecordFlag.ManualVar)
                             throw new SemanticException(ExceptioName.OwnershipError_GlobalVarMustBeManual, varDecl, string.Empty);
 
-                        // æ£€æŸ¥ï¼šç­‰å·å³è¾¹èƒ½å¦moveout
+                        // ¼ì²é£ºµÈºÅÓÒ±ßÄÜ·ñmoveout
                         if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             CheckOwnershipCanMoveOut(varDecl.initializerNode);
 
-                        // è®°å½•ownerç±»å‹çš„å±€éƒ¨å˜é‡  
+                        // ¼ÇÂ¼ownerÀàĞÍµÄ¾Ö²¿±äÁ¿  
                         if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict[rec.name] = LifetimeInfo.VarStatus.Alive;
 
-                        // æ‰€æœ‰æƒownç±»å‹åˆå§‹åŒ–å¤„ç†  
+                        // ËùÓĞÈ¨ownÀàĞÍ³õÊ¼»¯´¦Àí  
                         if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                         {
-                            //moveæºï¼šä¸´æ—¶å¯¹è±¡ - New   
+                            //moveÔ´£ºÁÙÊ±¶ÔÏó - New   
                             if(varDecl.initializerNode is NewObjectNode newobjNode)
                             {
-                                //æ— éœ€å¤„ç†  
+                                //ÎŞĞè´¦Àí  
                             }
-                            //moveæºï¼šä¸´æ—¶å¯¹è±¡ - å‡½æ•°è¿”å›(owner)
+                            //moveÔ´£ºÁÙÊ±¶ÔÏó - º¯Êı·µ»Ø(owner)
                             else if(varDecl.initializerNode is CallNode callnode)
                             {
-                                //æ— éœ€å¤„ç†  
+                                //ÎŞĞè´¦Àí  
                             }
-                            //moveæºï¼šå˜é‡
+                            //moveÔ´£º±äÁ¿
                             else if(varDecl.initializerNode is IdentityNode idrvalue)
                             {
-                                //æ ‡è®°ä¸ºDead  
+                                //±ê¼ÇÎªDead  
                                 var rrec = Query(idrvalue.FullName);
                                 lifeTimeInfo.currBranch.SetVarStatus(rrec.name, LifetimeInfo.VarStatus.Dead);
 
-                                //éœ€è¦æ’å…¥Nullè¯­å¥  
-                                varDecl.attributes[eAttr.set_null_after_stmt] = new List<string> { rrec.name };
+                                //ĞèÒª²åÈëNullÓï¾ä  
+                                varDecl.attributes[AstAttr.set_null_after_stmt] = new List<string> { rrec.name };
                             }
-                            //moveæºï¼šå­—æ®µ
+                            //moveÔ´£º×Ö¶Î
                             else if(varDecl.initializerNode is ObjectMemberAccessNode fieldRvalue)
                             {
-                                varDecl.attributes[eAttr.set_null_field_after_stmt] = fieldRvalue;
+                                varDecl.attributes[AstAttr.set_null_field_after_stmt] = fieldRvalue;
                             }
 
                         }
 
-                        // æ‰€æœ‰æƒå€Ÿç”¨ç±»å‹      
+                        // ËùÓĞÈ¨½èÓÃÀàĞÍ      
                         if(lmodel.HasFlag(SymbolTable.RecordFlag.BorrowVar))
                         {
-                            //æ— éœ€å¤„ç†  
+                            //ÎŞĞè´¦Àí  
                         }
 
                         break;
                     }
                 case SyntaxTree.OwnershipCaptureStmtNode captureNode:
                     {
-                        //æ£€æŸ¥ï¼šå˜é‡å·¦å€¼å’Œåˆå§‹å€¼çš„æ‰€æœ‰æƒæ¨¡å‹å¯¹æ¯”ï¼ˆå¿…é¡»own <- manualï¼‰ 
-                        var recL = captureNode.attributes[eAttr.var_rec] as SymbolTable.Record;
+                        //¼ì²é£º±äÁ¿×óÖµºÍ³õÊ¼ÖµµÄËùÓĞÈ¨Ä£ĞÍ¶Ô±È£¨±ØĞëown <- manual£© 
+                        var recL = captureNode.attributes[AstAttr.var_rec] as SymbolTable.Record;
                         var recR = Query(captureNode.rIdentifier.FullName);
                         var lModel = GetOwnershipModel(VarModifiers.Own, captureNode.typeNode);
                         var rModel = recR.flags & OwnershipModelMask;
@@ -3989,17 +4331,17 @@ namespace Gizbox.SemanticRule
                             throw new SemanticException(ExceptioName.OwnershipError, captureNode, "capture right side must be manual type.");
 
 
-                        //è®°å½•ownerç±»å‹çš„å±€éƒ¨å˜é‡   
+                        //¼ÇÂ¼ownerÀàĞÍµÄ¾Ö²¿±äÁ¿   
                         lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict[recL.name] = LifetimeInfo.VarStatus.Alive;
 
-                        //éœ€è¦æ’å…¥Nullè¯­å¥ï¼ˆåŸå˜é‡ä¸å¯å†ç”¨ï¼‰  
-                        captureNode.attributes[eAttr.set_null_after_stmt] = new List<string> { recR.name };
+                        //ĞèÒª²åÈëNullÓï¾ä£¨Ô­±äÁ¿²»¿ÉÔÙÓÃ£©  
+                        captureNode.attributes[AstAttr.set_null_after_stmt] = new List<string> { recR.name };
                     }
                     break;
                 case SyntaxTree.OwnershipLeakStmtNode leakNode:
                     {
-                        //æ‰€æœ‰æƒæ¨¡å‹æ£€æŸ¥ï¼ˆå¿…é¡»æ˜¯manual <- ownï¼‰
-                        var recL = leakNode.attributes[eAttr.var_rec] as SymbolTable.Record;
+                        //ËùÓĞÈ¨Ä£ĞÍ¼ì²é£¨±ØĞëÊÇmanual <- own£©
+                        var recL = leakNode.attributes[AstAttr.var_rec] as SymbolTable.Record;
                         var recR = Query(leakNode.rIdentifier.FullName);
                         var lModel = GetOwnershipModel(VarModifiers.None, leakNode.typeNode);
                         var rModel = recR.flags & OwnershipModelMask;
@@ -4011,33 +4353,33 @@ namespace Gizbox.SemanticRule
                         if(rModel != SymbolTable.RecordFlag.OwnerVar)
                             throw new SemanticException(ExceptioName.OwnershipError, leakNode, "leak right side must be own type.");
 
-                        //å³è¾¹å˜é‡æ ‡è®°ä¸ºDead  
+                        //ÓÒ±ß±äÁ¿±ê¼ÇÎªDead  
                         lifeTimeInfo.currBranch.SetVarStatus(recR.name, LifetimeInfo.VarStatus.Dead);
 
-                        //éœ€è¦æ’å…¥Nullè¯­å¥ï¼ˆåŸå˜é‡ä¸å¯å†ç”¨ï¼‰  
-                        leakNode.attributes[eAttr.set_null_after_stmt] = new List<string> { recR.name };
+                        //ĞèÒª²åÈëNullÓï¾ä£¨Ô­±äÁ¿²»¿ÉÔÙÓÃ£©  
+                        leakNode.attributes[AstAttr.set_null_after_stmt] = new List<string> { recR.name };
                     }
                     break;
                 case SyntaxTree.AssignNode assignNode:
                     {
-                        // å…ˆå¤„ç†å³å€¼ä¸­çš„è°ƒç”¨/å‚æ•°ï¼ˆå¯èƒ½è§¦å‘moveï¼‰
+                        // ÏÈ´¦ÀíÓÒÖµÖĞµÄµ÷ÓÃ/²ÎÊı£¨¿ÉÄÜ´¥·¢move£©
                         Pass4_OwnershipLifetime(assignNode.rvalueNode);
 
-                        // å˜é‡è¢«èµ‹å€¼  
+                        // ±äÁ¿±»¸³Öµ  
                         if(assignNode.lvalueNode is SyntaxTree.IdentityNode lid)
                         {
                             var lrec = Query(lid.FullName);
                             if(lrec == null)
                                 throw new GizboxException(ExceptioName.Undefine, "var record not found.");
 
-                            // å€¼ç±»å‹ä¸ç”¨å¤„ç†æ‰€æœ‰æƒ
+                            // ÖµÀàĞÍ²»ÓÃ´¦ÀíËùÓĞÈ¨
                             if(GType.Parse(lrec.typeExpression).IsReferenceType == false)
                                 break;
 
-                            // æ£€æŸ¥ï¼šå˜é‡å·¦å€¼å’Œåˆå§‹å€¼çš„æ‰€æœ‰æƒæ¨¡å‹å¯¹æ¯”  
+                            // ¼ì²é£º±äÁ¿×óÖµºÍ³õÊ¼ÖµµÄËùÓĞÈ¨Ä£ĞÍ¶Ô±È  
                             CheckOwnershipCompare_Assign(assignNode, lrec, out var lmodel, out var rmodel);
 
-                            // æ£€æŸ¥ï¼šæˆå‘˜æ‰€æœ‰æƒä¸èƒ½è¢« moveout
+                            // ¼ì²é£º³ÉÔ±ËùÓĞÈ¨²»ÄÜ±» moveout
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
                                 CheckOwnershipCanMoveOut(assignNode.rvalueNode);
@@ -4048,7 +4390,7 @@ namespace Gizbox.SemanticRule
                             }
                                 
 
-                            // å¦‚æœç›®æ ‡æ˜¯ownerä¸”ä¸ä¸ºDeadï¼Œåˆ™å…ˆåˆ ï¼Œç„¶åè®¾ç½®ä¸ºAlive  
+                            // Èç¹ûÄ¿±êÊÇownerÇÒ²»ÎªDead£¬ÔòÏÈÉ¾£¬È»ºóÉèÖÃÎªAlive  
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
                                 LifetimeInfo.VarStatus alive = LifetimeInfo.VarStatus.Dead;
@@ -4060,122 +4402,122 @@ namespace Gizbox.SemanticRule
                                 if(alive != LifetimeInfo.VarStatus.Dead)
                                 {
                                     var delList = new List<(LifetimeInfo.VarStatus, string)>();
-                                    if(assignNode.attributes.ContainsKey(eAttr.drop_var_before_assign_stmt))
+                                    if(assignNode.attributes.ContainsKey(AstAttr.drop_var_before_assign_stmt))
                                     {
-                                        delList = (List<(LifetimeInfo.VarStatus, string)>)assignNode.attributes[eAttr.drop_var_before_assign_stmt];
+                                        delList = (List<(LifetimeInfo.VarStatus, string)>)assignNode.attributes[AstAttr.drop_var_before_assign_stmt];
                                     }
                                     delList.Add((alive, lrec.name));
-                                    assignNode.attributes[eAttr.drop_var_before_assign_stmt] = delList;
+                                    assignNode.attributes[AstAttr.drop_var_before_assign_stmt] = delList;
 
                                     lifeTimeInfo.currBranch.SetVarStatus(lrec.name, LifetimeInfo.VarStatus.Dead);
                                 }
 
-                                // è¢«èµ‹å€¼çš„ownå˜é‡è®¾ç½®ä¸ºAlive  
+                                // ±»¸³ÖµµÄown±äÁ¿ÉèÖÃÎªAlive  
                                 lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict[lrec.name] = LifetimeInfo.VarStatus.Alive;
                             }
 
-                            // æ‰€æœ‰æƒownç±»å‹èµ‹å€¼å¤„ç†  
+                            // ËùÓĞÈ¨ownÀàĞÍ¸³Öµ´¦Àí  
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
-                                //moveæºï¼šä¸´æ—¶å¯¹è±¡ - New  
+                                //moveÔ´£ºÁÙÊ±¶ÔÏó - New  
                                 if(assignNode.rvalueNode is SyntaxTree.NewObjectNode newobjNode)
                                 {
-                                    //æ— éœ€å¤„ç†  
+                                    //ÎŞĞè´¦Àí  
                                 }
-                                //moveæºï¼šä¸´æ—¶å¯¹è±¡ - å‡½æ•°è¿”å›(owner)
+                                //moveÔ´£ºÁÙÊ±¶ÔÏó - º¯Êı·µ»Ø(owner)
                                 else if(assignNode.rvalueNode is SyntaxTree.CallNode callnode)
                                 {
-                                    //æ— éœ€å¤„ç†  
+                                    //ÎŞĞè´¦Àí  
                                 }
-                                //moveæºï¼šå˜é‡  
+                                //moveÔ´£º±äÁ¿  
                                 else if(assignNode.rvalueNode is SyntaxTree.IdentityNode idrvalueNode)
                                 {
-                                    //åŠ å…¥moved  
+                                    //¼ÓÈëmoved  
                                     var rrec = Query(idrvalueNode.FullName);
                                     lifeTimeInfo.currBranch.SetVarStatus(rrec.name, LifetimeInfo.VarStatus.Dead);
 
-                                    //éœ€è¦æ’å…¥Nullè¯­å¥
-                                    assignNode.attributes[eAttr.set_null_after_stmt] = new List<string> { rrec.name };
+                                    //ĞèÒª²åÈëNullÓï¾ä
+                                    assignNode.attributes[AstAttr.set_null_after_stmt] = new List<string> { rrec.name };
                                 }
-                                //moveæºï¼šå­—æ®µ
+                                //moveÔ´£º×Ö¶Î
                                 else if(assignNode.rvalueNode is ObjectMemberAccessNode fieldRvalue)
                                 {
-                                    assignNode.attributes[eAttr.set_null_field_after_stmt] = fieldRvalue;
+                                    assignNode.attributes[AstAttr.set_null_field_after_stmt] = fieldRvalue;
                                 }
                             }
 
-                            // æ‰€æœ‰æƒå€Ÿç”¨ç±»å‹      
+                            // ËùÓĞÈ¨½èÓÃÀàĞÍ      
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.BorrowVar))
                             {
-                                //æ— éœ€å¤„ç†  
+                                //ÎŞĞè´¦Àí  
                             }
                         }
-                        // æˆå‘˜å­—æ®µè¢«èµ‹å€¼  
+                        // ³ÉÔ±×Ö¶Î±»¸³Öµ  
                         else if(assignNode.lvalueNode is ObjectMemberAccessNode laccess)
                         {
-                            var objClassRec = (SymbolTable.Record)laccess.attributes[eAttr.obj_class_rec];
+                            var objClassRec = (SymbolTable.Record)laccess.attributes[AstAttr.obj_class_rec];
                             var lrec = objClassRec.envPtr.Class_GetMemberRecordInChain(laccess.memberNode.FullName); 
                             if(lrec == null)
                                 throw new GizboxException(ExceptioName.Undefine, $"field record {laccess.memberNode.FullName} not found.");
 
-                            // å€¼ç±»å‹ä¸ç”¨å¤„ç†æ‰€æœ‰æƒ
+                            // ÖµÀàĞÍ²»ÓÃ´¦ÀíËùÓĞÈ¨
                             if(GType.Parse(lrec.typeExpression).IsReferenceType == false)
                                 break;
                             
-                            // æ£€æŸ¥ï¼šå˜é‡å·¦å€¼å’Œåˆå§‹å€¼çš„æ‰€æœ‰æƒæ¨¡å‹å¯¹æ¯”  
+                            // ¼ì²é£º±äÁ¿×óÖµºÍ³õÊ¼ÖµµÄËùÓĞÈ¨Ä£ĞÍ¶Ô±È  
                             CheckOwnershipCompare_Assign(assignNode, lrec, out var lmodel, out var rmodel);
 
-                            // æ£€æŸ¥ï¼šæˆå‘˜æ‰€æœ‰æƒä¸èƒ½è¢« moveout
+                            // ¼ì²é£º³ÉÔ±ËùÓĞÈ¨²»ÄÜ±» moveout
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                                 CheckOwnershipCanMoveOut(assignNode.rvalueNode);
 
 
-                            // å¦‚æœå­—æ®µæ˜¯ownerä¸”ä¸ä¸ºnullï¼Œåˆ™å…ˆåˆ 
+                            // Èç¹û×Ö¶ÎÊÇownerÇÒ²»Îªnull£¬ÔòÏÈÉ¾
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
-                                assignNode.attributes[eAttr.drop_field_before_assign_stmt] = 0;
+                                assignNode.attributes[AstAttr.drop_field_before_assign_stmt] = 0;
                             }
 
 
-                            // æ‰€æœ‰æƒownç±»å‹èµ‹å€¼å¤„ç†  
+                            // ËùÓĞÈ¨ownÀàĞÍ¸³Öµ´¦Àí  
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
-                                //moveæºï¼šä¸´æ—¶å¯¹è±¡ - New  
+                                //moveÔ´£ºÁÙÊ±¶ÔÏó - New  
                                 if(assignNode.rvalueNode is SyntaxTree.NewObjectNode newobjNode)
                                 {
-                                    //æ— éœ€å¤„ç†  
+                                    //ÎŞĞè´¦Àí  
                                 }
-                                //moveæºï¼šä¸´æ—¶å¯¹è±¡ - å‡½æ•°è¿”å›(owner)
+                                //moveÔ´£ºÁÙÊ±¶ÔÏó - º¯Êı·µ»Ø(owner)
                                 else if(assignNode.rvalueNode is SyntaxTree.CallNode callnode)
                                 {
-                                    //æ— éœ€å¤„ç†  
+                                    //ÎŞĞè´¦Àí  
                                 }
-                                //moveæºï¼šå˜é‡  
+                                //moveÔ´£º±äÁ¿  
                                 else if(assignNode.rvalueNode is SyntaxTree.IdentityNode idrvalueNode)
                                 {
-                                    //åŠ å…¥moved  
+                                    //¼ÓÈëmoved  
                                     var rrec = Query(idrvalueNode.FullName);
                                     lifeTimeInfo.currBranch.SetVarStatus(rrec.name, LifetimeInfo.VarStatus.Dead);
 
-                                    //éœ€è¦æ’å…¥Nullè¯­å¥
-                                    assignNode.attributes[eAttr.set_null_after_stmt] = new List<string> { rrec.name };
+                                    //ĞèÒª²åÈëNullÓï¾ä
+                                    assignNode.attributes[AstAttr.set_null_after_stmt] = new List<string> { rrec.name };
                                 }
-                                //moveæºï¼šå­—æ®µ
+                                //moveÔ´£º×Ö¶Î
                                 else if(assignNode.rvalueNode is ObjectMemberAccessNode fieldRvalue)
                                 {
-                                    assignNode.attributes[eAttr.set_null_field_after_stmt] = fieldRvalue;
+                                    assignNode.attributes[AstAttr.set_null_field_after_stmt] = fieldRvalue;
                                 }
                             }
 
-                            // æ‰€æœ‰æƒå€Ÿç”¨ç±»å‹      
+                            // ËùÓĞÈ¨½èÓÃÀàĞÍ      
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.BorrowVar))
                             {
-                                //æ— éœ€å¤„ç†  
+                                //ÎŞĞè´¦Àí  
                             }
                         }
                         else
                         {
-                            // ç»§ç»­é€’å½’å­èŠ‚ç‚¹ï¼Œé¿å…é—æ¼
+                            // ¼ÌĞøµİ¹é×Ó½Úµã£¬±ÜÃâÒÅÂ©
                             Pass4_OwnershipLifetime(assignNode.lvalueNode);
                         }
                         break;
@@ -4184,7 +4526,7 @@ namespace Gizbox.SemanticRule
                     {  
                         if(del.isArrayDelete == false && del.objToDelete != null)
                         {
-                            // æ£€æŸ¥ï¼šç¦æ­¢åˆ é™¤éManualç±»å‹å˜é‡  
+                            // ¼ì²é£º½ûÖ¹É¾³ı·ÇManualÀàĞÍ±äÁ¿  
                             if(del.objToDelete is SyntaxTree.IdentityNode dId)
                             {
                                 var drec = Query(dId.FullName);
@@ -4196,10 +4538,10 @@ namespace Gizbox.SemanticRule
                                 }
                             }
 
-                            // æ£€æŸ¥ï¼šç¦æ­¢é‡Šæ”¾ownç±»å‹æˆå‘˜å­—æ®µ  
+                            // ¼ì²é£º½ûÖ¹ÊÍ·ÅownÀàĞÍ³ÉÔ±×Ö¶Î  
                             else if(del.objToDelete is SyntaxTree.ObjectMemberAccessNode dAccess)
                             {
-                                var objTypeExpr = (string)dAccess.objectNode.attributes[eAttr.type];
+                                var objTypeExpr = (string)dAccess.objectNode.attributes[AstAttr.type];
                                 var objClassRec = Query(objTypeExpr);
                                 if(objClassRec == null || objClassRec.envPtr == null)
                                     throw new SemanticException(ExceptioName.ClassSymbolTableNotFound, del, objTypeExpr);
@@ -4218,7 +4560,7 @@ namespace Gizbox.SemanticRule
                     }
                 case SyntaxTree.ReturnStmtNode ret:
                     {
-                        // å…ˆé€’å½’ï¼Œç¡®ä¿å†…å±‚è°ƒç”¨çš„moveå·²å¤„ç†
+                        // ÏÈµİ¹é£¬È·±£ÄÚ²ãµ÷ÓÃµÄmoveÒÑ´¦Àí
                         Pass4_OwnershipLifetime(ret.returnExprNode);
 
                         // borrow-return escape check: returned borrow must be derived from `this` or a borrow parameter
@@ -4227,7 +4569,7 @@ namespace Gizbox.SemanticRule
                             CheckBorrowReturnEscape(ret, ret.returnExprNode);
                         }
 
-                        // å¦‚æœè¿”å›çš„æ˜¯ownerï¼Œä¸”è¿”å›å˜é‡æ˜¯Identityï¼Œåˆ™å°†å…¶æ ‡è®°ä¸ºmovedï¼Œé¿å…è¢«åˆ é™¤
+                        // Èç¹û·µ»ØµÄÊÇowner£¬ÇÒ·µ»Ø±äÁ¿ÊÇIdentity£¬Ôò½«Æä±ê¼ÇÎªmoved£¬±ÜÃâ±»É¾³ı
                         string returnedName = null;
                         if(lifeTimeInfo.currentFuncReturnFlag.HasFlag(SymbolTable.RecordFlag.OwnerVar) && ret.returnExprNode is SyntaxTree.IdentityNode rid)
                         {
@@ -4239,13 +4581,13 @@ namespace Gizbox.SemanticRule
                             }
                         }
 
-                        // æ£€æŸ¥:å¯¹è±¡æˆå‘˜ä¸å¯ä»¥MoveOut  
+                        // ¼ì²é:¶ÔÏó³ÉÔ±²»¿ÉÒÔMoveOut  
                         if(lifeTimeInfo.currentFuncReturnFlag.HasFlag(SymbolTable.RecordFlag.OwnerVar) && ret.returnExprNode is SyntaxTree.ObjectMemberAccessNode)
                         {
                             throw new SemanticException(ExceptioName.OwnershipError_CanNotMoveOutClassField, ret, "returning owner field is not allowed; use replace.");
                         }
 
-                        // æ±‡æ€»å½“å‰æ‰€æœ‰æ´»è·ƒOwnerï¼ˆæ‰€æœ‰æ ˆå¸§ï¼‰ï¼Œreturnå‰åˆ é™¤ï¼ˆæ’é™¤è¢«è¿”å›è€…ï¼‰
+                        // »ã×Üµ±Ç°ËùÓĞ»îÔ¾Owner£¨ËùÓĞÕ»Ö¡£©£¬returnÇ°É¾³ı£¨ÅÅ³ı±»·µ»ØÕß£©
                         var delList = new List<(LifetimeInfo.VarStatus status, string varname)>();
                         HashSet<string> varnameSet = new();
                         foreach(var scope in lifeTimeInfo.currBranch.scopeStack)
@@ -4265,32 +4607,32 @@ namespace Gizbox.SemanticRule
                             }
                         }
                         if(delList.Count > 0)
-                            ret.attributes[eAttr.drop_var_before_return] = delList;
+                            ret.attributes[AstAttr.drop_var_before_return] = delList;
 
 
                         break;
                     }
                 case SyntaxTree.SingleExprStmtNode sstmt:
                     {
-                        // è¡¨è¾¾å¼ä½œä¸ºè¯­å¥ï¼šè‹¥newæˆ–callè¿”å›ownerï¼Œè¯­å¥æœ«åˆ é™¤
+                        // ±í´ïÊ½×÷ÎªÓï¾ä£ºÈônew»òcall·µ»Øowner£¬Óï¾äÄ©É¾³ı
                         Pass4_OwnershipLifetime(sstmt.exprNode);
 
                         var delExprs = new List<SyntaxTree.ExprNode>();
                         if(sstmt.exprNode is SyntaxTree.NewObjectNode)
                         {
-                            // è§†ä¸ºä¸´æ—¶æ‰€æœ‰æƒï¼Œéœ€åˆ é™¤
+                            // ÊÓÎªÁÙÊ±ËùÓĞÈ¨£¬ĞèÉ¾³ı
                             delExprs.Add(sstmt.exprNode);
-                            sstmt.exprNode.attributes[eAttr.store_expr_result] = true;
+                            sstmt.exprNode.attributes[AstAttr.store_expr_result] = true;
                         }
                         else if(sstmt.exprNode is SyntaxTree.CallNode cnode)
                         {
-                            SymbolTable.Record f = cnode.attributes[eAttr.func_rec] as SymbolTable.Record;
+                            SymbolTable.Record f = cnode.attributes[AstAttr.func_rec] as SymbolTable.Record;
 
                             if(f.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
-                                // è§†ä¸ºä¸´æ—¶æ‰€æœ‰æƒï¼Œéœ€åˆ é™¤
+                                // ÊÓÎªÁÙÊ±ËùÓĞÈ¨£¬ĞèÉ¾³ı
                                 delExprs.Add(sstmt.exprNode);
-                                sstmt.exprNode.attributes[eAttr.store_expr_result] = true;
+                                sstmt.exprNode.attributes[AstAttr.store_expr_result] = true;
                             }
                                 
                         }
@@ -4298,7 +4640,7 @@ namespace Gizbox.SemanticRule
                         {
                             if(rnode.targetNode is SyntaxTree.ObjectMemberAccessNode targetAccess)
                             {
-                                var objTypeExpr = (string)targetAccess.objectNode.attributes[eAttr.type];
+                                var objTypeExpr = (string)targetAccess.objectNode.attributes[AstAttr.type];
                                 var objClassRec = Query(objTypeExpr);
                                 var fieldRec = objClassRec?.envPtr?.Class_GetMemberRecordInChain(targetAccess.memberNode.FullName);
                                 if(fieldRec != null && fieldRec.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar))
@@ -4310,7 +4652,7 @@ namespace Gizbox.SemanticRule
 
                         if(delExprs.Count > 0)
                         {
-                            sstmt.attributes[eAttr.drop_expr_result_after_stmt] = delExprs;
+                            sstmt.attributes[AstAttr.drop_expr_result_after_stmt] = delExprs;
                         }
 
                         break;
@@ -4323,7 +4665,7 @@ namespace Gizbox.SemanticRule
                         if(replaceNode.targetNode is not SyntaxTree.ObjectMemberAccessNode targetAccess)
                             throw new SemanticException(ExceptioName.OwnershipError, replaceNode, "replace target must be a field access.");
 
-                        var objTypeExpr = (string)targetAccess.objectNode.attributes[eAttr.type];
+                        var objTypeExpr = (string)targetAccess.objectNode.attributes[AstAttr.type];
                         var objClassRec = Query(objTypeExpr);
                         if(objClassRec == null || objClassRec.envPtr == null)
                             throw new SemanticException(ExceptioName.ClassSymbolTableNotFound, replaceNode, objTypeExpr);
@@ -4346,17 +4688,17 @@ namespace Gizbox.SemanticRule
                                     var rrec = Query(idrvalue.FullName);
                                     lifeTimeInfo.currBranch.SetVarStatus(rrec.name, LifetimeInfo.VarStatus.Dead);
 
-                                    replaceNode.attributes[eAttr.set_null_after_stmt] = new List<string> { rrec.name };
+                                    replaceNode.attributes[AstAttr.set_null_after_stmt] = new List<string> { rrec.name };
                                 }
                             }
                         }
                         break;
                     }
 
-                //åªå¤„ç†ä¼ å‚çš„æ‰€æœ‰æƒè½¬ç§»ï¼Œè¿”å›å€¼çš„æ‰€æœ‰æƒè½¬ç§»å†SingleStmt/Assign/VarDeclèŠ‚ç‚¹å¤„ç†  
+                //Ö»´¦Àí´«²ÎµÄËùÓĞÈ¨×ªÒÆ£¬·µ»ØÖµµÄËùÓĞÈ¨×ªÒÆÔÙSingleStmt/Assign/VarDecl½Úµã´¦Àí  
                 case SyntaxTree.CallNode callNode:  
                     {
-                        // *** å…ˆå¤„ç†æ‰€æœ‰å®å‚ï¼ˆé€’å½’ï¼‰***
+                        // *** ÏÈ´¦ÀíËùÓĞÊµ²Î£¨µİ¹é£©***
                         foreach(var a in callNode.argumantsNode.arguments)
                         {
 
@@ -4374,22 +4716,22 @@ namespace Gizbox.SemanticRule
                         }
                      
 
-                        // *** è·å–å‡½æ•°çš„ç¬¦å·è¡¨è®°å½• ***  
+                        // *** »ñÈ¡º¯ÊıµÄ·ûºÅ±í¼ÇÂ¼ ***  
                         SymbolTable.Record funcRec = null;
                         if(callNode.isMemberAccessFunction == false)
                         {
-                            if(callNode.attributes.ContainsKey(eAttr.mangled_name))
-                                funcRec = Query((string)callNode.attributes[eAttr.mangled_name]);
-                            else if(callNode.attributes.ContainsKey(eAttr.extern_name))
-                                funcRec = Query((string)callNode.attributes[eAttr.extern_name]);
+                            if(callNode.attributes.ContainsKey(AstAttr.mangled_name))
+                                funcRec = Query((string)callNode.attributes[AstAttr.mangled_name]);
+                            else if(callNode.attributes.ContainsKey(AstAttr.extern_name))
+                                funcRec = Query((string)callNode.attributes[AstAttr.extern_name]);
                         }
                         else
                         {
                             if(callNode.funcNode is ObjectMemberAccessNode memberAccNode)
                             {
-                                var objtype = (string)memberAccNode.objectNode.attributes[eAttr.type];
+                                var objtype = (string)memberAccNode.objectNode.attributes[AstAttr.type];
                                 var classRec = Query(objtype);
-                                var memfuncRec = classRec.envPtr.GetRecord((string)callNode.attributes[eAttr.mangled_name]);
+                                var memfuncRec = classRec.envPtr.GetRecord((string)callNode.attributes[AstAttr.mangled_name]);
                                 funcRec = memfuncRec;
                             }
                         }
@@ -4397,7 +4739,7 @@ namespace Gizbox.SemanticRule
                         if(funcRec == null)
                             throw new GizboxException(ExceptioName.Undefine, $"funcrec not found.");
 
-                        callNode.attributes[eAttr.func_rec] = funcRec;
+                        callNode.attributes[AstAttr.func_rec] = funcRec;
 
 
                         if(funcRec == null || funcRec.envPtr == null)
@@ -4406,15 +4748,15 @@ namespace Gizbox.SemanticRule
                         }
 
 
-                        // *** æ ¹æ®è¢«è°ƒå‡½æ•°ç­¾åå¯¹å®å‚åšmove/æ ¡éªŒ ***
+                        // *** ¸ù¾İ±»µ÷º¯ÊıÇ©Ãû¶ÔÊµ²Î×ömove/Ğ£Ñé ***
 
                         var allParams = funcRec.envPtr.GetByCategory(SymbolTable.RecordCatagory.Param) ?? new List<SymbolTable.Record>();
-                        // æˆå‘˜å‡½æ•°å½¢å‚è¡¨å«thisï¼Œéæˆå‘˜ä¸å«
+                        // ³ÉÔ±º¯ÊıĞÎ²Î±íº¬this£¬·Ç³ÉÔ±²»º¬
                         int offset = 0;
                         if(callNode.isMemberAccessFunction && allParams.Count > 0 && allParams[0].name == "this")
                             offset = 1;
 
-                        // å®å‚åˆ†æ  
+                        // Êµ²Î·ÖÎö  
                         for(int i = 0; i < callNode.argumantsNode.arguments.Count; ++i)
                         {
                             if(i + offset >= allParams.Count)
@@ -4424,21 +4766,21 @@ namespace Gizbox.SemanticRule
                             var arg = callNode.argumantsNode.arguments[i];
                             var type = GType.Parse(pr.typeExpression);
 
-                            // å€¼ç±»å‹å‚æ•°ä¸ç”¨å¤„ç†æ‰€æœ‰æƒè¯­ä¹‰  
+                            // ÖµÀàĞÍ²ÎÊı²»ÓÃ´¦ÀíËùÓĞÈ¨ÓïÒå  
                             if(type.IsReferenceType == false)
                                 continue;
 
-                            // æ‰€æœ‰æƒæ¯”è¾ƒ  
+                            // ËùÓĞÈ¨±È½Ï  
                             CheckOwnershipCompare_Param(pr, arg, out var paramModel, out var argModel);
 
-                            // æ£€æŸ¥ownæ¨¡å‹å®å‚èƒ½å¦MoveOut
+                            // ¼ì²éownÄ£ĞÍÊµ²ÎÄÜ·ñMoveOut
                             if(paramModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
                                 CheckOwnershipCanMoveOut(arg);
                             }
 
 
-                            // æ‰€æœ‰æƒè½¬ç§»  
+                            // ËùÓĞÈ¨×ªÒÆ  
                             if(pflag.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
                                 if(arg is SyntaxTree.IdentityNode argIdNode && argModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
@@ -4447,12 +4789,12 @@ namespace Gizbox.SemanticRule
                                     lifeTimeInfo.currBranch.SetVarStatus(argRec.name, LifetimeInfo.VarStatus.Dead);
 
 
-                                    // è¯­å¥ç»“æŸå®å‚èµ‹å€¼NULLï¼Œä½œä¸ºdrop-flag  
-                                    if(callNode.attributes.TryGetValue(eAttr.set_null_after_call, out var v) == false || v is not List<string>)
+                                    // Óï¾ä½áÊøÊµ²Î¸³ÖµNULL£¬×÷Îªdrop-flag  
+                                    if(callNode.attributes.TryGetValue(AstAttr.set_null_after_call, out var v) == false || v is not List<string>)
                                     {
-                                        callNode.attributes[eAttr.set_null_after_call] = new List<string>();
+                                        callNode.attributes[AstAttr.set_null_after_call] = new List<string>();
                                     }
-                                    var listSetNull = (List<string>)callNode.attributes[eAttr.set_null_after_call];
+                                    var listSetNull = (List<string>)callNode.attributes[AstAttr.set_null_after_call];
                                     if(listSetNull.Contains(argRec.name) == false)
                                     {
                                         listSetNull.Add(argRec.name);
@@ -4466,7 +4808,7 @@ namespace Gizbox.SemanticRule
                     }
                 case SyntaxTree.IdentityNode id:
                     {
-                        // ä¸€èˆ¬ä½œä¸ºrvalueä½¿ç”¨ï¼šç¦æ­¢ä½¿ç”¨å·²moveçš„ownerå˜é‡
+                        // Ò»°ã×÷ÎªrvalueÊ¹ÓÃ£º½ûÖ¹Ê¹ÓÃÒÑmoveµÄowner±äÁ¿
                         var rec = Query(id.FullName);
                         if(rec != null && rec.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                         {
@@ -4480,7 +4822,7 @@ namespace Gizbox.SemanticRule
                         break;
                     }
 
-                // å…¶ä»–è¡¨è¾¾å¼ä»…é€’å½’å…¶å­èŠ‚ç‚¹ï¼Œé¿å…é—æ¼
+                // ÆäËû±í´ïÊ½½öµİ¹éÆä×Ó½Úµã£¬±ÜÃâÒÅÂ©
                 case SyntaxTree.BinaryOpNode b:
                     Pass4_OwnershipLifetime(b.leftNode);
                     Pass4_OwnershipLifetime(b.rightNode);
@@ -4506,11 +4848,11 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.ThisNode _:
                 case SyntaxTree.SizeOfNode _:
                 case SyntaxTree.TypeOfNode _:
-                    // æ— éœ€å¤„ç†
+                    // ÎŞĞè´¦Àí
                     break;
 
                 default:
-                    // ç±»å‹/å‚æ•°/å®å‚ä¸å…¶å®ƒèŠ‚ç‚¹ï¼Œå¯¹å­æ ‘é€’å½’
+                    // ÀàĞÍ/²ÎÊı/Êµ²ÎÓëÆäËü½Úµã£¬¶Ô×ÓÊ÷µİ¹é
                     foreach(var n in node.Children())
                     {
                         Pass4_OwnershipLifetime(n);
@@ -4529,7 +4871,7 @@ namespace Gizbox.SemanticRule
             if(returnExpr == null)
                 throw new SemanticException(ExceptioName.OwnershipError, retNode, "borrow return must have expression.");
 
-            // ä»…å…è®¸ï¼š1) ä»¥ this/bor å‚æ•°ä¸ºæ ¹çš„æˆå‘˜/å…ƒç´ è®¿é—®ï¼›2) ç›´æ¥è¿”å› bor å‚æ•°ï¼ˆä»¥åŠ this æœ¬èº«ï¼‰
+            // ½öÔÊĞí£º1) ÒÔ this/bor ²ÎÊıÎª¸ùµÄ³ÉÔ±/ÔªËØ·ÃÎÊ£»2) Ö±½Ó·µ»Ø bor ²ÎÊı£¨ÒÔ¼° this ±¾Éí£©
             if(IsBorrowDerivedFromAllowedInput(returnExpr))
                 return;
 
@@ -4538,11 +4880,11 @@ namespace Gizbox.SemanticRule
 
         private bool IsBorrowDerivedFromAllowedInput(SyntaxTree.ExprNode expr)
         {
-            // å…è®¸ return thisï¼ˆç­‰ä»·äºå€Ÿç”¨è°ƒç”¨è€…æŒæœ‰çš„å¯¹è±¡ï¼‰
+            // ÔÊĞí return this£¨µÈ¼ÛÓÚ½èÓÃµ÷ÓÃÕß³ÖÓĞµÄ¶ÔÏó£©
             if(expr is SyntaxTree.ThisNode)
                 return true;
 
-            // return æ ‡è¯†ç¬¦ï¼šå¿…é¡»æ˜¯æ˜¾å¼ bor å‚æ•°
+            // return ±êÊ¶·û£º±ØĞëÊÇÏÔÊ½ bor ²ÎÊı
             if(expr is SyntaxTree.IdentityNode id)
             {
                 var rec = Query(id.FullName);
@@ -4556,41 +4898,41 @@ namespace Gizbox.SemanticRule
                 return model.HasFlag(SymbolTable.RecordFlag.BorrowVar);
             }
 
-            // return æˆå‘˜è®¿é—®ï¼šé€’å½’æ£€æŸ¥å…¶æ ¹ï¼Œå¿…é¡»æ˜¯ this æˆ– bor å‚æ•°
+            // return ³ÉÔ±·ÃÎÊ£ºµİ¹é¼ì²éÆä¸ù£¬±ØĞëÊÇ this »ò bor ²ÎÊı
             if(expr is SyntaxTree.ObjectMemberAccessNode ma)
             {
-                // æ ¹ä¸º this.* æˆ– borParam.* åˆ™å…è®¸
+                // ¸ùÎª this.* »ò borParam.* ÔòÔÊĞí
                 if(IsBorrowDerivedFromAllowedInput(ma.objectNode))
                     return true;
                 return false;
             }
 
-            // return ä¸‹æ ‡è®¿é—®ï¼šä»…å½“å®¹å™¨è¡¨è¾¾å¼æ´¾ç”Ÿè‡ªå…è®¸çš„è¾“å…¥
+            // return ÏÂ±ê·ÃÎÊ£º½öµ±ÈİÆ÷±í´ïÊ½ÅÉÉú×ÔÔÊĞíµÄÊäÈë
             if(expr is SyntaxTree.ElementAccessNode ea)
             {
                 return IsBorrowDerivedFromAllowedInput(ea.containerNode);
             }
 
-            // return castï¼šcast ä¸æ”¹å˜æ‰€æœ‰æƒ/å€Ÿç”¨æ¥æºï¼Œåªé€’å½’æ£€æŸ¥æ“ä½œæ•°
+            // return cast£ºcast ²»¸Ä±äËùÓĞÈ¨/½èÓÃÀ´Ô´£¬Ö»µİ¹é¼ì²é²Ù×÷Êı
             if(expr is SyntaxTree.CastNode c)
             {
                 return IsBorrowDerivedFromAllowedInput(c.factorNode);
             }
 
-            // å…¶ä½™æƒ…å†µéƒ½è§†ä¸ºä¸´æ—¶å€¼/æœªçŸ¥æ¥æº => æ‹’ç»ï¼ˆnew/call/literal/binary/unary ç­‰ï¼‰
+            // ÆäÓàÇé¿ö¶¼ÊÓÎªÁÙÊ±Öµ/Î´ÖªÀ´Ô´ => ¾Ü¾ø£¨new/call/literal/binary/unary µÈ£©
             return false;
         }
 
-        /// <summary> æ‰€æœ‰æƒæ¯”è¾ƒ </summary>
+        /// <summary> ËùÓĞÈ¨±È½Ï </summary>
         private void CheckOwnershipCompare_Core(SyntaxTree.Node errorNode, SymbolTable.RecordFlag lModel, string lname, SyntaxTree.ExprNode rNode, out SymbolTable.RecordFlag rModel)
         {
-            // å˜é‡å³å€¼ï¼šID
+            // ±äÁ¿ÓÒÖµ£ºID
             if(rNode is IdentityNode rvalueVarNode)
             {
                 var rvalueVarRec = Query(rvalueVarNode.FullName);
                 rModel = rvalueVarRec.flags & OwnershipModelMask;
 
-                // manual <- (owner|borrow) ç¦æ­¢
+                // manual <- (owner|borrow) ½ûÖ¹
                 if(lModel == SymbolTable.RecordFlag.ManualVar && rModel != SymbolTable.RecordFlag.ManualVar)
                 {
                     if(rModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
@@ -4599,7 +4941,7 @@ namespace Gizbox.SemanticRule
                         throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignBorrwToManual, errorNode, lname);
                 }
 
-                // owner <- (manual|borrow) ç¦æ­¢
+                // owner <- (manual|borrow) ½ûÖ¹
                 if(lModel == SymbolTable.RecordFlag.OwnerVar && rModel != SymbolTable.RecordFlag.OwnerVar)
                 {
                     if(rModel.HasFlag(SymbolTable.RecordFlag.ManualVar))
@@ -4608,7 +4950,7 @@ namespace Gizbox.SemanticRule
                         throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignBorrowToOwn, errorNode, lname);
                 }
 
-                // borrow <- manual ç¦æ­¢
+                // borrow <- manual ½ûÖ¹
                 if(lModel == SymbolTable.RecordFlag.BorrowVar && rModel == SymbolTable.RecordFlag.ManualVar)
                 {
                     throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignManualToBorrow, errorNode, lname);
@@ -4617,13 +4959,13 @@ namespace Gizbox.SemanticRule
                 return;
             }
 
-            // å³å€¼ï¼šreplace
+            // ÓÒÖµ£ºreplace
             else if(rNode is ReplaceNode replaceNode)
             {
                 if(replaceNode.targetNode is not ObjectMemberAccessNode memAccess)
                     throw new SemanticException(ExceptioName.OwnershipError, errorNode, "replace target must be a field access.");
 
-                if(memAccess.objectNode.attributes.TryGetValue(eAttr.type, out var objTypeObj) == false || objTypeObj is not string objTypeExpr)
+                if(memAccess.objectNode.attributes.TryGetValue(AstAttr.type, out var objTypeObj) == false || objTypeObj is not string objTypeExpr)
                     throw new GizboxException(ExceptioName.Undefine, "member access object type not set.");
 
                 var objClassRec = Query(objTypeExpr);
@@ -4636,7 +4978,7 @@ namespace Gizbox.SemanticRule
 
                 rModel = fieldRec.flags & OwnershipModelMask;
 
-                // manual <- (owner|borrow) ç¦æ­¢
+                // manual <- (owner|borrow) ½ûÖ¹
                 if(lModel == SymbolTable.RecordFlag.ManualVar && rModel != SymbolTable.RecordFlag.ManualVar)
                 {
                     if(rModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
@@ -4645,7 +4987,7 @@ namespace Gizbox.SemanticRule
                         throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignBorrwToManual, errorNode, lname);
                 }
 
-                // owner <- (manual|borrow) ç¦æ­¢
+                // owner <- (manual|borrow) ½ûÖ¹
                 if(lModel == SymbolTable.RecordFlag.OwnerVar && rModel != SymbolTable.RecordFlag.OwnerVar)
                 {
                     if(rModel.HasFlag(SymbolTable.RecordFlag.ManualVar))
@@ -4654,7 +4996,7 @@ namespace Gizbox.SemanticRule
                         throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignBorrowToOwn, errorNode, lname);
                 }
 
-                // borrow <- manual ç¦æ­¢
+                // borrow <- manual ½ûÖ¹
                 if(lModel == SymbolTable.RecordFlag.BorrowVar && rModel == SymbolTable.RecordFlag.ManualVar)
                 {
                     throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignManualToBorrow, errorNode, lname);
@@ -4663,10 +5005,10 @@ namespace Gizbox.SemanticRule
                 return;
             }
 
-            // å³å€¼ï¼šå¯¹è±¡æˆå‘˜è®¿é—® obj.field
+            // ÓÒÖµ£º¶ÔÏó³ÉÔ±·ÃÎÊ obj.field
             else if(rNode is ObjectMemberAccessNode memAccess)
             {
-                if(memAccess.objectNode.attributes.TryGetValue(eAttr.type, out var objTypeObj) == false || objTypeObj is not string objTypeExpr)
+                if(memAccess.objectNode.attributes.TryGetValue(AstAttr.type, out var objTypeObj) == false || objTypeObj is not string objTypeExpr)
                     throw new GizboxException(ExceptioName.Undefine, "member access object type not set.");
 
                 var objClassRec = Query(objTypeExpr);
@@ -4679,7 +5021,7 @@ namespace Gizbox.SemanticRule
 
                 rModel = fieldRec.flags & OwnershipModelMask;
 
-                // manual <- (owner|borrow) ç¦æ­¢
+                // manual <- (owner|borrow) ½ûÖ¹
                 if(lModel == SymbolTable.RecordFlag.ManualVar && rModel != SymbolTable.RecordFlag.ManualVar)
                 {
                     if(rModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
@@ -4688,7 +5030,7 @@ namespace Gizbox.SemanticRule
                         throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignBorrwToManual, errorNode, lname);
                 }
 
-                // owner <- (manual|borrow) ç¦æ­¢
+                // owner <- (manual|borrow) ½ûÖ¹
                 if(lModel == SymbolTable.RecordFlag.OwnerVar && rModel != SymbolTable.RecordFlag.OwnerVar)
                 {
                     if(rModel.HasFlag(SymbolTable.RecordFlag.ManualVar))
@@ -4697,7 +5039,7 @@ namespace Gizbox.SemanticRule
                         throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignBorrowToOwn, errorNode, lname);
                 }
 
-                // borrow <- manual ç¦æ­¢
+                // borrow <- manual ½ûÖ¹
                 if(lModel == SymbolTable.RecordFlag.BorrowVar && rModel == SymbolTable.RecordFlag.ManualVar)
                 {
                     throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignManualToBorrow, errorNode, lname);
@@ -4706,13 +5048,13 @@ namespace Gizbox.SemanticRule
                 return;
             }
 
-            // æ•°ç»„å…ƒç´ è®¿é—®  
+            // Êı×éÔªËØ·ÃÎÊ  
             else if(rNode is ElementAccessNode elementAccessNode)
             {
-                rModel = SymbolTable.RecordFlag.ManualVar;//æ•°ç»„åªèƒ½å­˜æ”¾éownç±»å‹  
+                rModel = SymbolTable.RecordFlag.ManualVar;//Êı×éÖ»ÄÜ´æ·Å·ÇownÀàĞÍ  
             }
 
-            // å­—é¢é‡
+            // ×ÖÃæÁ¿
             else if(rNode is LiteralNode litnode)
             {
                 if(litnode.token.name == "null")
@@ -4736,7 +5078,7 @@ namespace Gizbox.SemanticRule
                 return;
             }
 
-            // ä¸´æ—¶å³å€¼ - new
+            // ÁÙÊ±ÓÒÖµ - new
             else if(rNode is NewObjectNode newobjNode)
             {
                 if(lModel == SymbolTable.RecordFlag.BorrowVar)
@@ -4748,24 +5090,24 @@ namespace Gizbox.SemanticRule
                 return;
             }
 
-            // ä¸´æ—¶å³å€¼ - new[]
+            // ÁÙÊ±ÓÒÖµ - new[]
             else if(rNode is NewArrayNode newarrNode)
             {
                 if(lModel == SymbolTable.RecordFlag.BorrowVar )
                     throw new SemanticException(ExceptioName.OwnershipError_BorrowCanNotFromTemp, errorNode, lname);
 
                 if(lModel == SymbolTable.RecordFlag.OwnerVar)
-                    throw new SemanticException(ExceptioName.OwnershipError, errorNode, "array type cant be owner.");//æ•°ç»„ç±»å‹æš‚æ—¶ä¸èƒ½æ˜¯ownç±»å‹  
+                    throw new SemanticException(ExceptioName.OwnershipError, errorNode, "array type cant be owner.");//Êı×éÀàĞÍÔİÊ±²»ÄÜÊÇownÀàĞÍ  
 
                 rModel = SymbolTable.RecordFlag.ManualVar;
                 return;
             }
 
 
-            // ä¸´æ—¶å³å€¼ - è°ƒç”¨è¿”å›
+            // ÁÙÊ±ÓÒÖµ - µ÷ÓÃ·µ»Ø
             else if(rNode is CallNode callNode)
             {
-                var funcRec = callNode.attributes[eAttr.func_rec] as SymbolTable.Record;
+                var funcRec = callNode.attributes[AstAttr.func_rec] as SymbolTable.Record;
                 rModel = funcRec.flags & OwnershipModelMask;
 
                 if(rModel.HasFlag(SymbolTable.RecordFlag.OwnerVar) && lModel.HasFlag(SymbolTable.RecordFlag.OwnerVar) == false)
@@ -4778,15 +5120,15 @@ namespace Gizbox.SemanticRule
                 return;
             }
 
-            // ä¸´æ—¶å³å€¼ - Cast
+            // ÁÙÊ±ÓÒÖµ - Cast
             else if(rNode is CastNode castNode)
             {
-                //å¯¹å¼•ç”¨ç±»å‹çš„Castæœ¬è´¨éƒ½æ˜¯æŒ‡é’ˆreinterpretï¼Œä¸æ¶‰åŠæ‰€æœ‰æƒè½¬ç§»  
+                //¶ÔÒıÓÃÀàĞÍµÄCast±¾ÖÊ¶¼ÊÇÖ¸Õëreinterpret£¬²»Éæ¼°ËùÓĞÈ¨×ªÒÆ  
                 CheckOwnershipCompare_Core(errorNode, lModel, lname, castNode.factorNode, out rModel);
                 return;
             }
 
-            // å…¶ä»–ä¸´æ—¶å³å€¼
+            // ÆäËûÁÙÊ±ÓÒÖµ
             else
             {
                 if(lModel == SymbolTable.RecordFlag.BorrowVar)
@@ -4798,7 +5140,7 @@ namespace Gizbox.SemanticRule
             
         }
 
-        /// <summary> å˜é‡å®šä¹‰ çš„ æ‰€æœ‰æƒå’Œç”Ÿå‘½å‘¨æœŸæ£€æŸ¥</summary>
+        /// <summary> ±äÁ¿¶¨Òå µÄ ËùÓĞÈ¨ºÍÉúÃüÖÜÆÚ¼ì²é</summary>
         private void CheckOwnershipCompare_VarDecl(VarDeclareNode varDeclNode, SymbolTable.Record varRec, out SymbolTable.RecordFlag lModel, out SymbolTable.RecordFlag rModel)
         {
             lModel = GetOwnershipModel(varDeclNode.flags, varDeclNode.typeNode);
@@ -4807,7 +5149,7 @@ namespace Gizbox.SemanticRule
             CheckOwnershipCompare_Core(varDeclNode, lModel, lname, varDeclNode.initializerNode, out rModel);
         }
 
-        /// <summary> èµ‹å€¼ çš„ æ‰€æœ‰æƒå’Œç”Ÿå‘½å‘¨æœŸæ£€æŸ¥</summary>
+        /// <summary> ¸³Öµ µÄ ËùÓĞÈ¨ºÍÉúÃüÖÜÆÚ¼ì²é</summary>
         private void CheckOwnershipCompare_Assign(AssignNode assignNode, SymbolTable.Record lvarRec, out SymbolTable.RecordFlag lModel, out SymbolTable.RecordFlag rModel)
         {
             if(lvarRec == null)
@@ -4832,7 +5174,7 @@ namespace Gizbox.SemanticRule
             CheckOwnershipCompare_Core(assignNode, lModel, lname, assignNode.rvalueNode, out rModel);
         }
 
-        /// <summary> å‚æ•°ä¼ é€’ çš„ æ‰€æœ‰æƒå’Œç”Ÿå‘½å‘¨æœŸæ£€æŸ¥</summary>
+        /// <summary> ²ÎÊı´«µİ µÄ ËùÓĞÈ¨ºÍÉúÃüÖÜÆÚ¼ì²é</summary>
         private void CheckOwnershipCompare_Param(SymbolTable.Record paramRec, ExprNode argNode, out SymbolTable.RecordFlag paramModel, out SymbolTable.RecordFlag argModel)
         {
             paramModel = paramRec.flags & OwnershipModelMask;
@@ -4841,7 +5183,7 @@ namespace Gizbox.SemanticRule
             CheckOwnershipCompare_Core(argNode, paramModel, lname, argNode, out argModel);
         }
 
-        /// <summary> æ‰€æœ‰æƒå¯ç§»å‡ºæ£€æŸ¥ </summary>
+        /// <summary> ËùÓĞÈ¨¿ÉÒÆ³ö¼ì²é </summary>
         private void CheckOwnershipCanMoveOut(SyntaxTree.ExprNode rvalNode)
         {
             if(rvalNode == null)
@@ -4858,7 +5200,7 @@ namespace Gizbox.SemanticRule
 
 
         /// <summary>
-        /// åˆ†æå˜é‡/å‚æ•°/è¿”å›å€¼çš„æ‰€æœ‰æƒæ¨¡å‹  
+        /// ·ÖÎö±äÁ¿/²ÎÊı/·µ»ØÖµµÄËùÓĞÈ¨Ä£ĞÍ  
         /// </summary>
         private SymbolTable.RecordFlag GetOwnershipModel(VarModifiers explicitModifier, SyntaxTree.TypeNode typeNode)
         {
@@ -4871,11 +5213,11 @@ namespace Gizbox.SemanticRule
 
                 if(explicitModifier.HasFlag(VarModifiers.Own))
                 {
-                    ownerModel = SymbolTable.RecordFlag.OwnerVar;//æ˜¾å¼own
+                    ownerModel = SymbolTable.RecordFlag.OwnerVar;//ÏÔÊ½own
                 }
                 else if(explicitModifier.HasFlag(VarModifiers.Bor))
                 {
-                    ownerModel = SymbolTable.RecordFlag.BorrowVar;//æ˜¾å¼å€Ÿç”¨
+                    ownerModel = SymbolTable.RecordFlag.BorrowVar;//ÏÔÊ½½èÓÃ
                 }
                 else
                 {
@@ -4888,9 +5230,9 @@ namespace Gizbox.SemanticRule
                     }
 
                     if(isOwnershipClass)
-                        ownerModel = SymbolTable.RecordFlag.OwnerVar;//own class ç±»å‹
+                        ownerModel = SymbolTable.RecordFlag.OwnerVar;//own class ÀàĞÍ
                     else
-                        ownerModel = SymbolTable.RecordFlag.ManualVar;//æ‰‹åŠ¨é‡Šæ”¾ç±»å‹
+                        ownerModel = SymbolTable.RecordFlag.ManualVar;//ÊÖ¶¯ÊÍ·ÅÀàĞÍ
                 }
                 return ownerModel;
             }
@@ -4900,13 +5242,13 @@ namespace Gizbox.SemanticRule
 
 
         /// <summary>
-        /// è·å–è¡¨è¾¾å¼çš„ç±»å‹è¡¨è¾¾å¼  
+        /// »ñÈ¡±í´ïÊ½µÄÀàĞÍ±í´ïÊ½  
         /// </summary>
         private string AnalyzeTypeExpression(SyntaxTree.ExprNode exprNode)
         {
             if (exprNode == null) throw new GizboxException(ExceptioName.ExpressionNodeIsNull);
             if (exprNode.attributes == null) throw new SemanticException(ExceptioName.NodeNoInitializationPropertyList, exprNode, "");
-            if (exprNode.attributes.ContainsKey(eAttr.type)) return (string)exprNode.attributes[eAttr.type];
+            if (exprNode.attributes.ContainsKey(AstAttr.type)) return (string)exprNode.attributes[AstAttr.type];
 
             string nodeTypeExprssion = "";
 
@@ -4967,11 +5309,11 @@ namespace Gizbox.SemanticRule
                         var classEnv = classRec.envPtr;
                         if (classEnv == null) throw new SemanticException(ExceptioName.ClassScopeNotFound, accessNode.objectNode, "");
 
-                        var memberRec = classEnv.GetRecordByRawname(accessNode.memberNode.FullName);//ä½¿ç”¨RawNameä»¥é˜²æ‰¾ä¸åˆ°æˆå‘˜ä¸ºå‡½æ•°æ—¶æ‰¾ä¸åˆ°    
+                        var memberRec = classEnv.GetRecordByRawname(accessNode.memberNode.FullName);//Ê¹ÓÃRawNameÒÔ·ÀÕÒ²»µ½³ÉÔ±Îªº¯ÊıÊ±ÕÒ²»µ½    
                         if (memberRec == null) throw new SemanticException(ExceptioName.MemberFieldNotFound, accessNode.objectNode, accessNode.memberNode.FullName);
 
-                        accessNode.attributes[eAttr.klass] = className;//è®°å½•memberAccessèŠ‚ç‚¹çš„ç‚¹å·¦è¾¹ç±»å‹
-                        accessNode.attributes[eAttr.member_name] = accessNode.memberNode.FullName;//è®°å½•memberAccessèŠ‚ç‚¹çš„ç‚¹å³è¾¹åç§°
+                        accessNode.attributes[AstAttr.klass] = className;//¼ÇÂ¼memberAccess½ÚµãµÄµã×ó±ßÀàĞÍ
+                        accessNode.attributes[AstAttr.member_name] = accessNode.memberNode.FullName;//¼ÇÂ¼memberAccess½ÚµãµÄµãÓÒ±ßÃû³Æ
 
                         nodeTypeExprssion = memberRec.typeExpression;
                     }
@@ -5029,7 +5371,7 @@ namespace Gizbox.SemanticRule
                             nodeTypeExprssion = typeExpr.Split(' ').LastOrDefault();
 
 
-                            callNode.attributes[eAttr.mangled_name] = funcMangledName;
+                            callNode.attributes[AstAttr.mangled_name] = funcMangledName;
                         }
                         else
                         {
@@ -5062,11 +5404,11 @@ namespace Gizbox.SemanticRule
 
                             if(isExternFunc)
                             {
-                                callNode.attributes[eAttr.extern_name] = Utils.ToExternFuncName(funcId.FullName);
+                                callNode.attributes[AstAttr.extern_name] = Utils.ToExternFuncName(funcId.FullName);
                             }
                             else
                             {
-                                callNode.attributes[eAttr.mangled_name] = funcMangledName;
+                                callNode.attributes[AstAttr.mangled_name] = funcMangledName;
                             }
                         }
                     }
@@ -5106,14 +5448,14 @@ namespace Gizbox.SemanticRule
                         var typeR = AnalyzeTypeExpression(binaryOp.rightNode);
 
                         string op = binaryOp.op;
-                        //æ¯”è¾ƒè¿ç®—ç¬¦
+                        //±È½ÏÔËËã·û
                         if (op == "<" || op == ">" || op == "<=" || op == ">=" || op == "==" || op == "!=")
                         {
                             if (CheckType_Equal(typeL, typeR) == false) throw new SemanticException(ExceptioName.InconsistentExpressionTypesCannotCompare, binaryOp, "");
 
                             nodeTypeExprssion = "bool";
                         }
-                        //æ™®é€šè¿ç®—ç¬¦  
+                        //ÆÕÍ¨ÔËËã·û  
                         else
                         {
                             if (typeL != typeR) throw new SemanticException(ExceptioName.BinaryOperationTypeMismatch, binaryOp, "");
@@ -5141,13 +5483,13 @@ namespace Gizbox.SemanticRule
                     throw new SemanticException(ExceptioName.CannotAnalyzeExpressionNodeType, exprNode, exprNode.GetType().Name);
             }
 
-            exprNode.attributes[eAttr.type] = nodeTypeExprssion;
+            exprNode.attributes[AstAttr.type] = nodeTypeExprssion;
 
             return nodeTypeExprssion;
         }
 
         /// <summary>
-        /// ç±»å‹æ¨æ–­
+        /// ÀàĞÍÍÆ¶Ï
         /// </summary>
         private string InferType(SyntaxTree.InferTypeNode typeNode, SyntaxTree.ExprNode exprNode)
         {
@@ -5156,12 +5498,12 @@ namespace Gizbox.SemanticRule
             {
                 throw new SemanticException(ExceptioName.SemanticAnalysysError, typeNode, "");
             }
-            typeNode.attributes[eAttr.type] = initializerType;
+            typeNode.attributes[AstAttr.type] = initializerType;
             return initializerType;
         }
 
         /// <summary>
-        /// æ£€æŸ¥ç±»å‹
+        /// ¼ì²éÀàĞÍ
         /// </summary>
         private bool CheckType_Equal(string typeExpr, SyntaxTree.ExprNode exprNode)
         {
@@ -5188,20 +5530,20 @@ namespace Gizbox.SemanticRule
         {
             if(typeExpr1 == typeExpr2) return true;
 
-            //æœ‰è‡³å°‘ä¸€ä¸ªæ˜¯åŸºå…ƒç±»å‹  
+            //ÓĞÖÁÉÙÒ»¸öÊÇ»ùÔªÀàĞÍ  
             if(GType.Parse(typeExpr1).IsPrimitive || GType.Parse(typeExpr2).IsPrimitive)
             {
                 return typeExpr1 == typeExpr2;
             }
-            //å…¨æ˜¯éåŸºå…ƒç±»å‹  
+            //È«ÊÇ·Ç»ùÔªÀàĞÍ  
             else
             {
-                //nullå¯ä»¥æ˜¯ä»»ä½•éåŸºå…ƒç±»å‹çš„å­ç±»  
+                //null¿ÉÒÔÊÇÈÎºÎ·Ç»ùÔªÀàĞÍµÄ×ÓÀà  
                 if(typeExpr1 == "null")
                 {
                     return true;
                 }
-                //ä¸¤ä¸ªéƒ½æ˜¯ç±»ç±»å‹
+                //Á½¸ö¶¼ÊÇÀàÀàĞÍ
                 else if(GType.Parse(typeExpr1).IsClassType && GType.Parse(typeExpr2).IsClassType)
                 {
                     var typeRec1 = Query(typeExpr1);
@@ -5210,10 +5552,10 @@ namespace Gizbox.SemanticRule
                         return true;
                     }
                 }
-                //ä¸¤ä¸ªéƒ½æ˜¯æ•°ç»„ç±»å‹  
+                //Á½¸ö¶¼ÊÇÊı×éÀàĞÍ  
                 else if(GType.Parse(typeExpr1).IsArray && GType.Parse(typeExpr2).IsArray)
                 {
-                    //ä¸æ”¯æŒé€†å˜å’Œåå˜  
+                    //²»Ö§³ÖÄæ±äºÍĞ­±ä  
                 }
             }
 
@@ -5225,7 +5567,7 @@ namespace Gizbox.SemanticRule
         {
             switch(node)
             {
-                //è¯­å¥å—èŠ‚ç‚¹
+                //Óï¾ä¿é½Úµã
                 case SyntaxTree.StatementBlockNode stmtBlockNode:
                     {
                         bool anyReturnStmt = false;
@@ -5234,7 +5576,7 @@ namespace Gizbox.SemanticRule
                             var stmt = stmtBlockNode.statements[i];
                             if(CheckReturnStmt(stmt, returnType))
                             {
-                                anyReturnStmt = true;//ä¸breakï¼Œç¡®ä¿æ‰€æœ‰returnèŠ‚ç‚¹éƒ½è¢«æ£€æŸ¥  
+                                anyReturnStmt = true;//²»break£¬È·±£ËùÓĞreturn½Úµã¶¼±»¼ì²é  
                             }
                         }
                         return anyReturnStmt;
@@ -5253,16 +5595,16 @@ namespace Gizbox.SemanticRule
                         return anyReturnStmt;
                     }
 
-                //åˆ†æ”¯èŠ‚ç‚¹  
+                //·ÖÖ§½Úµã  
                 case SyntaxTree.IfStmtNode ifNode:
                     {
-                        //æ²¡æœ‰elseçš„ifè¯­æ³• ->ä¸é€šè¿‡æ£€æŸ¥  
+                        //Ã»ÓĞelseµÄifÓï·¨ ->²»Í¨¹ı¼ì²é  
                         if(ifNode.elseClause == null)
                         {
                             return false;
                         }
 
-                        //æœ‰elseçš„ifè¯­æ³• ->æ£€æŸ¥æ‰€æœ‰è·¯å¾„æ˜¯å¦èƒ½é€šè¿‡æ£€æŸ¥  
+                        //ÓĞelseµÄifÓï·¨ ->¼ì²éËùÓĞÂ·¾¶ÊÇ·ñÄÜÍ¨¹ı¼ì²é  
                         bool allPathValid = true;
                         if(CheckReturnStmt(ifNode.elseClause.stmt, returnType) == false)
                         {
@@ -5279,26 +5621,45 @@ namespace Gizbox.SemanticRule
                         return allPathValid;
                     }
 
-                //è¿”å›èŠ‚ç‚¹  
+                //·µ»Ø½Úµã  
                 case SyntaxTree.ReturnStmtNode retNode:
                     {
-                        //ç±»å‹æ£€æŸ¥  
+                        //ÀàĞÍ¼ì²é  
                         bool typeValid = CheckType_Equal(returnType, retNode.returnExprNode);
                         if(typeValid == false)
                             throw new SemanticException(ExceptioName.ReturnTypeError, retNode, "");
 
                         return true;
                     }
-                //å…¶ä»–èŠ‚ç‚¹  
+                //ÆäËû½Úµã  
                 default:
                     return false;
             }
         }
 
 
+        /// <summary> ¼ì²é±êÊ¶·ûÃüÃû¿Õ¼äÇ°×º </summary>
+        private void CheckIdentifierFullName(SyntaxTree.IdentityNode idNode)
+        {
+            SyntaxTree.Node curr = idNode;
+            for(int i = 0; i < 10; ++i)
+            {
+                curr = curr.Parent;
+                if(curr == null)
+                {
+                    return;
+                }
+                if(curr is SyntaxTree.NamespaceNode namespaceNode)
+                {
+                    idNode.SetPrefix(namespaceNode.namepsaceNode.FullName);
+                    return;
+                }
+            }
+        }
+
         private SymbolTable.Record Query(string name)
         {
-            //ç¬¦å·è¡¨é“¾æŸ¥æ‰¾  
+            //·ûºÅ±íÁ´²éÕÒ  
             var toList = envStack.AsList();
             for (int i = toList.Count - 1; i > -1; --i)
             {
@@ -5307,7 +5668,7 @@ namespace Gizbox.SemanticRule
                     return toList[i].GetRecord(name);
                 }
             }
-            //åº“ä¾èµ–ä¸­æŸ¥æ‰¾  
+            //¿âÒÀÀµÖĞ²éÕÒ  
             foreach (var lib in this.ilUnit.dependencyLibs)
             {
                 var result = lib.QueryTopSymbol(name);
@@ -5322,7 +5683,7 @@ namespace Gizbox.SemanticRule
 
         private SymbolTable.Record Query_IgnoreMangle(string rawname)
         {
-            //ç¬¦å·è¡¨é“¾æŸ¥æ‰¾  
+            //·ûºÅ±íÁ´²éÕÒ  
             var toList = envStack.AsList();
             for (int i = toList.Count - 1; i > -1; --i)
             {
@@ -5331,7 +5692,7 @@ namespace Gizbox.SemanticRule
                     return toList[i].GetRecordByRawname(rawname);
                 }
             }
-            //åº“ä¾èµ–ä¸­æŸ¥æ‰¾  
+            //¿âÒÀÀµÖĞ²éÕÒ  
             foreach (var lib in this.ilUnit.dependencyLibs)
             {
                 var result = lib.QueryTopSymbol(rawname, ignoreMangle:true);
@@ -5346,16 +5707,16 @@ namespace Gizbox.SemanticRule
 
         private SymbolTable.Record Query_OperatorOverload(string opName, string typeExpr1, string typeExpr2)
         {
-            //é¡¶å±‚ä½œç”¨åŸŸæŸ¥æ‰¾  
+            //¶¥²ã×÷ÓÃÓò²éÕÒ  
             List<SymbolTable.Record> result = new();
             ilUnit.globalScope.env.GetAllRecordByFlag(SymbolTable.RecordFlag.OperatorOverloadFunc, result);
-            //åº“ä¾èµ–ä¸­æŸ¥æ‰¾  
+            //¿âÒÀÀµÖĞ²éÕÒ  
             foreach(var lib in this.ilUnit.dependencyLibs)
             {
                 lib.globalScope.env.GetAllRecordByFlag(SymbolTable.RecordFlag.OperatorOverloadFunc, result);
             }
 
-            //ç­›é€‰
+            //É¸Ñ¡
             string mangledName = Utils.Mangle(opName, typeExpr1, typeExpr2);
             foreach(var opOverload in result)
             {
@@ -5370,13 +5731,13 @@ namespace Gizbox.SemanticRule
 
         private void QueryAll_IgnoreMangle(string rawname, List<SymbolTable.Record> result)
         {
-            //ç¬¦å·è¡¨é“¾æŸ¥æ‰¾  
+            //·ûºÅ±íÁ´²éÕÒ  
             var asList = envStack.AsList();
             for(int i = asList.Count - 1; i > -1; --i)
             {
                 asList[i].GetAllRecordByRawname(rawname, result);
             }
-            //åº“ä¾èµ–ä¸­æŸ¥æ‰¾  
+            //¿âÒÀÀµÖĞ²éÕÒ  
             foreach(var lib in this.ilUnit.dependencyLibs)
             {
                 lib.QueryAndFillTopSymbolsToContainer(rawname, result, ignoreMangle: true);
@@ -5384,14 +5745,14 @@ namespace Gizbox.SemanticRule
         }
         private bool TryQueryIgnoreMangle(string name)
         {
-            //ç¬¦å·è¡¨é“¾æŸ¥æ‰¾  
+            //·ûºÅ±íÁ´²éÕÒ  
             var asList = envStack.AsList();
             for (int i = asList.Count - 1; i > -1; --i)
             {
                 if(asList[i].ContainRecordRawName(name))
                     return true;
             }
-            //åº“ä¾èµ–ä¸­æŸ¥æ‰¾  
+            //¿âÒÀÀµÖĞ²éÕÒ  
             foreach (var lib in this.ilUnit.dependencyLibs)
             {
                 if(lib.QueryTopSymbol(name, ignoreMangle: true) != null)
@@ -5401,7 +5762,7 @@ namespace Gizbox.SemanticRule
             }
 
             if (Compiler.enableLogParser)
-                Log("TryQuery  åº“ä¸­æœªæ‰¾åˆ°:" + name);
+                Log("TryQuery  ¿âÖĞÎ´ÕÒµ½:" + name);
             
             return false;
         }
@@ -5411,7 +5772,7 @@ namespace Gizbox.SemanticRule
         {
             bool found = false;
             string namevalid = null;
-            //åŸåæŸ¥æ‰¾ 
+            //Ô­Ãû²éÕÒ 
             {
                 if (TryQueryIgnoreMangle(idNode.token.attribute))
                 {
@@ -5420,7 +5781,7 @@ namespace Gizbox.SemanticRule
                 }
             }
 
-            //å°è¯•å‘½åç©ºé—´å‰ç¼€   
+            //³¢ÊÔÃüÃû¿Õ¼äÇ°×º   
             foreach (var namespaceUsing in ast.rootNode.usingNamespaceNodes)
             {
                 string newname = namespaceUsing.namespaceNameNode.token.attribute + "::" + idNode.token.attribute;
@@ -5432,7 +5793,7 @@ namespace Gizbox.SemanticRule
                     }
                     found = true;
                     idNode.SetPrefix(namespaceUsing.namespaceNameNode.token.attribute);
-                    if (Compiler.enableLogParser) Log(idNode.token.attribute + "è¡¥å…¨ä¸º" + idNode.FullName);
+                    if (Compiler.enableLogParser) Log(idNode.token.attribute + "²¹È«Îª" + idNode.FullName);
                 }
             }
 
@@ -5448,7 +5809,7 @@ namespace Gizbox.SemanticRule
 
         private void TryCompleteType(SyntaxTree.TypeNode typeNode)
         {
-            if(typeNode.attributes.ContainsKey(eAttr.name_completed))
+            if(typeNode.attributes.ContainsKey(AstAttr.name_completed))
                 return;
 
             switch (typeNode)
@@ -5466,7 +5827,7 @@ namespace Gizbox.SemanticRule
                     }
                     break;
             }
-            typeNode.attributes[eAttr.name_completed] = true;
+            typeNode.attributes[AstAttr.name_completed] = true;
         }
 
         private bool TryQueryAndMatchFunction(string funcRawName, string[] argTypes, string[] outParamTypes, bool isMethod = false, SymbolTable classEnvOfMethod = null)
@@ -5477,13 +5838,13 @@ namespace Gizbox.SemanticRule
             else
                 QueryAll_IgnoreMangle(funcRawName, allFunctions);
 
-            //æœªæ‰¾åˆ°å‡½æ•°å  
+            //Î´ÕÒµ½º¯ÊıÃû  
             if(allFunctions.Count == 0)
             {
                 return false;
             }
 
-            //å®å‚å½¢å‚ç±»å‹åŒ¹é…  
+            //Êµ²ÎĞÎ²ÎÀàĞÍÆ¥Åä  
             SymbolTable.Record targetFunc = null;
             List<SymbolTable.Record> targetFuncParams = null;
             foreach(var funcRec in allFunctions)
@@ -5498,10 +5859,10 @@ namespace Gizbox.SemanticRule
                     paramRecs = funcRec.envPtr.GetByCategory(SymbolTable.RecordCatagory.Param);
                 }
                 
-                //æ— å‚å‡½æ•°  
+                //ÎŞ²Îº¯Êı  
                 if(paramRecs == null)
                 {
-                    //0ä¸ªå®å‚  
+                    //0¸öÊµ²Î  
                     if(argTypes.Length == 0)
                     {
                         targetFunc = funcRec;
@@ -5517,7 +5878,7 @@ namespace Gizbox.SemanticRule
                 {
                     if(paramRecs.Count != argTypes.Length)
                     {
-                        continue;//å‚æ•°ä¸ªæ•°ä¸åŒ¹é…  
+                        continue;//²ÎÊı¸öÊı²»Æ¥Åä  
                     }
                         
 
@@ -5569,7 +5930,7 @@ namespace Gizbox.SemanticRule
             LiteralNode litnode = new LiteralNode()
             {
                 token = new Token(tokenname, PatternType.Literal, strLit, start.line, start.start, start.length),
-                attributes = new Dictionary<eAttr, object>(),
+                attributes = new Dictionary<AstAttr, object>(),
             };
             return litnode;
         }
@@ -5581,6 +5942,8 @@ namespace Gizbox.SemanticRule
         }
     }
 }
+
+
 
 
 

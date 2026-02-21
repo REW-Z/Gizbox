@@ -252,7 +252,9 @@ namespace Gizbox
             "incdec -> ID --",
 
             "call -> ID ( args )",
+            "call -> ID genargs ( args )",
             "call -> memberaccess ( args )",
+            "call -> memberaccess genargs ( args )",
 
             "indexaccess -> idsb",
             "indexaccess -> memberaccess [ aexpr ]",
@@ -298,11 +300,11 @@ namespace Gizbox
             "optidx -> aexpr",
             "optidx -> ε",
 
-            "genparams -> < genparamlist >",
+            "genparams -> GEN_LT genparamlist GEN_GT",
             "genparams -> ε",
             "genparamlist -> TYPE_NAME",
             "genparamlist -> genparamlist , TYPE_NAME",
-            "genargs -> < typearglist >",
+            "genargs -> GEN_LT typearglist GEN_GT",
             "typearglist -> type",
             "typearglist -> typearglist , type",
 

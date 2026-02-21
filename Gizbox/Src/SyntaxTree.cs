@@ -183,7 +183,7 @@ namespace Gizbox
             public int depth = -1;
 
             [IgnoreDataMember]
-            public Dictionary<eAttr, object> attributes = new();
+            public Dictionary<AstAttr, object> attributes = new();
 
 
 
@@ -324,37 +324,58 @@ namespace Gizbox
             private Token endToken;
             public Token StartToken()
             {
-                if(this.attributes != null)
+                if(this.attributes != null && this.attributes.TryGetValue(AstAttr.start, out object startTokenObj))
                 {
-                    this.attributes.TryGetValue(eAttr.start, out object startTokenObj);
                     this.startToken = startTokenObj as Token;
                 }
-                else
+
+                if(this.startToken != null)
+                    return this.startToken;
+
+                if(this is IdentityNode idNode)
+                    return idNode.token;
+                if(this is LiteralNode litNode)
+                    return litNode.token;
+                if(this is ThisNode thisNode)
+                    return thisNode.token;
+                if(this is PrimitiveTypeNode primitiveTypeNode)
+                    return primitiveTypeNode.token;
+
+                for(int i = 0 ; i < ChildCount; i++)
                 {
-                    for(int i = 0 ; i < ChildCount; i++)
-                    {
-                        this.startToken = GetChild(i).StartToken();
-                        if(this.startToken != null) break;
-                    }
+                    this.startToken = GetChild(i).StartToken();
+                    if(this.startToken != null)
+                        break;
                 }
+
                 return this.startToken;
             }
             public Token EndToken()
             {
-                if(this.attributes != null)
+                if(this.attributes != null && this.attributes.TryGetValue(AstAttr.end, out object endTokenObj))
                 {
-                    this.attributes.TryGetValue(eAttr.end, out object endTokenObj);
                     this.endToken = endTokenObj as Token;
                 }
-                else
+
+                if(this.endToken != null)
+                    return this.endToken;
+
+                if(this is IdentityNode idNode)
+                    return idNode.token;
+                if(this is LiteralNode litNode)
+                    return litNode.token;
+                if(this is ThisNode thisNode)
+                    return thisNode.token;
+                if(this is PrimitiveTypeNode primitiveTypeNode)
+                    return primitiveTypeNode.token;
+
+                for(int i = ChildCount - 1; i > -1; i--)
                 {
-                    for(int i = ChildCount - 1; i > -1; i--)
-                    {
-                        this.endToken = GetChild(i).EndToken();
-                        if(this.endToken != null)
-                            break;
-                    }
+                    this.endToken = GetChild(i).EndToken();
+                    if(this.endToken != null)
+                        break;
                 }
+
                 return this.endToken;
             }
 
@@ -419,12 +440,12 @@ namespace Gizbox
             return target;
         }
 
-        private static Dictionary<eAttr, object> CloneAttributes(Dictionary<eAttr, object> attributes, Dictionary<Node, Node> visited)
+        private static Dictionary<AstAttr, object> CloneAttributes(Dictionary<AstAttr, object> attributes, Dictionary<Node, Node> visited)
         {
             if(attributes == null)
                 return null;
 
-            var cloned = new Dictionary<eAttr, object>();
+            var cloned = new Dictionary<AstAttr, object>();
             foreach(var kv in attributes)
             {
                 cloned[kv.Key] = CloneAttributeValue(kv.Value, visited);
@@ -781,6 +802,10 @@ namespace Gizbox
             public FunctionKind funcType;
             [DataMember]
             public VarModifiers returnFlags;
+            [DataMember]
+            public bool isTemplateFunction;
+            [DataMember]
+            public readonly List<IdentityNode> templateParameters = new();
 
             public TypeNode returnTypeNode { get => (TypeNode)children_group_0[0]; set => children_group_0[0] = value; }
             public IdentityNode identifierNode { get => (IdentityNode)children_group_0[1]; set => children_group_0[1] = value; }
@@ -1119,6 +1144,8 @@ namespace Gizbox
         {
             [DataMember]
             public bool isMemberAccessFunction;
+            [DataMember]
+            public readonly List<TypeNode> genericArguments = new();
 
             //id or memberaccesss  
             public ExprNode funcNode { get => (ExprNode)children_group_0[0]; set => children_group_0[0] = value; }
@@ -1313,7 +1340,7 @@ namespace Gizbox
                 if(genericArguments.Count == 0)
                     return classname.FullName;
 
-                return Utils.MangleTypeName(classname.FullName, genericArguments.Select(t => t.TypeExpression()));
+                return Utils.MangleTemplateInstanceName(classname.FullName, genericArguments.Select(t => t.TypeExpression()));
             }
         }
         [DataContract(IsReference = true)]

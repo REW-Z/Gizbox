@@ -107,8 +107,8 @@ namespace Gizbox.IR
                         {
                             Log("KEY:" + key);
                         }
-                        envStackTemp.Push(blockNode.attributes[eAttr.env] as SymbolTable);
-                        EnvBegin(blockNode.attributes[eAttr.env] as SymbolTable);
+                        envStackTemp.Push(blockNode.attributes[AstAttr.env] as SymbolTable);
+                        EnvBegin(blockNode.attributes[AstAttr.env] as SymbolTable);
 
 
                         foreach (var stmt in blockNode.statements)
@@ -118,9 +118,9 @@ namespace Gizbox.IR
 
 
                         // 作用域退出 -> 删除存活的Owner类型  
-                        if(blockNode.attributes.ContainsKey(eAttr.drop_var_exit_env))
+                        if(blockNode.attributes.ContainsKey(AstAttr.drop_var_exit_env))
                         {
-                            var toDelete = blockNode.attributes[eAttr.drop_var_exit_env] as List<(LifetimeInfo.VarStatus status, string varname)>;
+                            var toDelete = blockNode.attributes[AstAttr.drop_var_exit_env] as List<(LifetimeInfo.VarStatus status, string varname)>;
                             if(toDelete != null)
                             {
                                 foreach(var (s, v) in toDelete)
@@ -128,11 +128,11 @@ namespace Gizbox.IR
                                     EmitOwnConditionalDropCode(s, v);
                                 }
                             }
-                            blockNode.attributes.Remove(eAttr.drop_var_exit_env);
+                            blockNode.attributes.Remove(AstAttr.drop_var_exit_env);
                         }
 
                         envStackTemp.Pop();
-                        EnvEnd(blockNode.attributes[eAttr.env] as SymbolTable);
+                        EnvEnd(blockNode.attributes[AstAttr.env] as SymbolTable);
                     }
                     break;
 
@@ -148,8 +148,8 @@ namespace Gizbox.IR
                         string className = classDeclNode.classNameNode.FullName;
                         //GenerateCode("JUMP", "%LABEL:class_end:" + className);//顶级语句重排之后不再需要跳过
 
-                        envStackTemp.Push(classDeclNode.attributes[eAttr.env] as SymbolTable);
-                        EnvBegin(classDeclNode.attributes[eAttr.env] as SymbolTable);
+                        envStackTemp.Push(classDeclNode.attributes[AstAttr.env] as SymbolTable);
+                        EnvBegin(classDeclNode.attributes[AstAttr.env] as SymbolTable);
 
                         EmitCode("").label = "class_begin:" + className;
 
@@ -171,28 +171,31 @@ namespace Gizbox.IR
 
                         EmitCode("").label = "class_end:" + className;
 
-                        EnvEnd(classDeclNode.attributes[eAttr.env] as SymbolTable);
+                        EnvEnd(classDeclNode.attributes[AstAttr.env] as SymbolTable);
                         envStackTemp.Pop();
                     }
                     break;
                 //函数声明
                 case FuncDeclareNode funcDeclNode:
                     {
+                        // skip template function definitions
+                        if (funcDeclNode.isTemplateFunction)
+                            break;
                         //是否是实例成员函数  
                         bool isMethod = envStackTemp.Peek().tableCatagory == SymbolTable.TableCatagory.ClassScope;
 
                         //函数全名(修饰)    
                         string funcFinalName;
                         if (isMethod)
-                            funcFinalName = envStackTemp.Peek().name + "." + (string)funcDeclNode.attributes[eAttr.mangled_name];
+                            funcFinalName = envStackTemp.Peek().name + "." + (string)funcDeclNode.attributes[AstAttr.mangled_name];
                         else
-                            funcFinalName = (string)funcDeclNode.attributes[eAttr.mangled_name];
+                            funcFinalName = (string)funcDeclNode.attributes[AstAttr.mangled_name];
 
 
                         //函数开始    
                         
-                        envStackTemp.Push(funcDeclNode.attributes[eAttr.env] as SymbolTable);
-                        EnvBegin(funcDeclNode.attributes[eAttr.env] as SymbolTable);
+                        envStackTemp.Push(funcDeclNode.attributes[AstAttr.env] as SymbolTable);
+                        EnvBegin(funcDeclNode.attributes[AstAttr.env] as SymbolTable);
 
                         EmitCode("").label = "entry:" + funcFinalName;
 
@@ -212,9 +215,9 @@ namespace Gizbox.IR
                         }
 
                         // 函数正常退出需要回收的 Owner
-                        if(funcDeclNode.attributes.ContainsKey(eAttr.drop_var_exit_env))
+                        if(funcDeclNode.attributes.ContainsKey(AstAttr.drop_var_exit_env))
                         {
-                            var toDelete = funcDeclNode.attributes[eAttr.drop_var_exit_env] as List<(LifetimeInfo.VarStatus, string)>;
+                            var toDelete = funcDeclNode.attributes[AstAttr.drop_var_exit_env] as List<(LifetimeInfo.VarStatus, string)>;
                             if(toDelete != null)
                             {
                                 foreach(var (s, v) in toDelete)
@@ -222,7 +225,7 @@ namespace Gizbox.IR
                                     EmitOwnConditionalDropCode(s, v);
                                 }
                             }
-                            funcDeclNode.attributes.Remove(eAttr.drop_var_exit_env);
+                            funcDeclNode.attributes.Remove(AstAttr.drop_var_exit_env);
                         }
 
 
@@ -239,7 +242,7 @@ namespace Gizbox.IR
 
                         EmitCode("").label = "exit:" + funcFinalName;
 
-                        EnvEnd(funcDeclNode.attributes[eAttr.env] as SymbolTable);
+                        EnvEnd(funcDeclNode.attributes[AstAttr.env] as SymbolTable);
                         envStackTemp.Pop();
                     }
                     break;
@@ -265,9 +268,9 @@ namespace Gizbox.IR
 
 
                         // 被移动变量置NULL  
-                        if(varDeclNode.attributes.ContainsKey(eAttr.set_null_after_stmt))
+                        if(varDeclNode.attributes.ContainsKey(AstAttr.set_null_after_stmt))
                         {
-                            var toNull = varDeclNode.attributes[eAttr.set_null_after_stmt] as List<string>;
+                            var toNull = varDeclNode.attributes[AstAttr.set_null_after_stmt] as List<string>;
                             if(toNull != null)
                             {
                                 foreach(var v in toNull)
@@ -275,13 +278,13 @@ namespace Gizbox.IR
                                     EmitCode("=", v, "%LITNULL:");
                                 }
                             }
-                            varDeclNode.attributes.Remove(eAttr.set_null_after_stmt);
+                            varDeclNode.attributes.Remove(AstAttr.set_null_after_stmt);
                         }
 
                         // 被移动字段置NULL（作为drop-flag）
-                        if(varDeclNode.attributes.ContainsKey(eAttr.set_null_field_after_stmt))
+                        if(varDeclNode.attributes.ContainsKey(AstAttr.set_null_field_after_stmt))
                         {
-                            if(varDeclNode.attributes[eAttr.set_null_field_after_stmt] is SyntaxTree.ObjectMemberAccessNode fieldNode)
+                            if(varDeclNode.attributes[AstAttr.set_null_field_after_stmt] is SyntaxTree.ObjectMemberAccessNode fieldNode)
                             {
                                 // ensure object expr ret exists
                                 GenNode(fieldNode.objectNode);
@@ -289,7 +292,7 @@ namespace Gizbox.IR
                                 string field = fieldNode.memberNode.FullName;
                                 EmitCode("=", obj + "->" + field, "%LITNULL:");
                             }
-                            varDeclNode.attributes.Remove(eAttr.set_null_field_after_stmt);
+                            varDeclNode.attributes.Remove(AstAttr.set_null_field_after_stmt);
                         }
                     }
                     break;
@@ -301,9 +304,9 @@ namespace Gizbox.IR
                         var tac = EmitCode("=", GetRet(captureNode.lIdentifier), GetRet(captureNode.rIdentifier));
 
                         // 被捕获变量置NULL  
-                        if(captureNode.attributes.ContainsKey(eAttr.set_null_after_stmt))
+                        if(captureNode.attributes.ContainsKey(AstAttr.set_null_after_stmt))
                         {
-                            var toNull = captureNode.attributes[eAttr.set_null_after_stmt] as List<string>;
+                            var toNull = captureNode.attributes[AstAttr.set_null_after_stmt] as List<string>;
                             if(toNull != null)
                             {
                                 foreach(var v in toNull)
@@ -311,7 +314,7 @@ namespace Gizbox.IR
                                     EmitCode("=", v, "%LITNULL:");
                                 }
                             }
-                            captureNode.attributes.Remove(eAttr.set_null_after_stmt);
+                            captureNode.attributes.Remove(AstAttr.set_null_after_stmt);
                         }
                     }
                     break;
@@ -323,9 +326,9 @@ namespace Gizbox.IR
                         var tac = EmitCode("=", GetRet(leakNode.lIdentifier), GetRet(leakNode.rIdentifier));
 
                         // 被泄露变量置NULL  
-                        if(leakNode.attributes.ContainsKey(eAttr.set_null_after_stmt))
+                        if(leakNode.attributes.ContainsKey(AstAttr.set_null_after_stmt))
                         {
-                            var toNull = leakNode.attributes[eAttr.set_null_after_stmt] as List<string>;
+                            var toNull = leakNode.attributes[AstAttr.set_null_after_stmt] as List<string>;
                             if(toNull != null)
                             {
                                 foreach(var v in toNull)
@@ -333,7 +336,7 @@ namespace Gizbox.IR
                                     EmitCode("=", v, "%LITNULL:");
                                 }
                             }
-                            leakNode.attributes.Remove(eAttr.set_null_after_stmt);
+                            leakNode.attributes.Remove(AstAttr.set_null_after_stmt);
                         }
                     }
                     break;
@@ -346,22 +349,22 @@ namespace Gizbox.IR
                         }
 
                         // owner-return 的字段 move-out：return 前把字段置NULL（drop-flag）
-                        if(returnNode.attributes.ContainsKey(eAttr.set_null_field_after_stmt))
+                        if(returnNode.attributes.ContainsKey(AstAttr.set_null_field_after_stmt))
                         {
-                            if(returnNode.attributes[eAttr.set_null_field_after_stmt] is SyntaxTree.ObjectMemberAccessNode fieldNode)
+                            if(returnNode.attributes[AstAttr.set_null_field_after_stmt] is SyntaxTree.ObjectMemberAccessNode fieldNode)
                             {
                                 GenNode(fieldNode.objectNode);
                                 string obj = TrimName(GetRet(fieldNode.objectNode));
                                 string field = fieldNode.memberNode.FullName;
                                 EmitCode("=", obj + "->" + field, "%LITNULL:");
                             }
-                            returnNode.attributes.Remove(eAttr.set_null_field_after_stmt);
+                            returnNode.attributes.Remove(AstAttr.set_null_field_after_stmt);
                         }
 
                         // return之前先回收需要回收的Owner类型  
-                        if(returnNode.attributes.ContainsKey(eAttr.drop_var_before_return))
+                        if(returnNode.attributes.ContainsKey(AstAttr.drop_var_before_return))
                         {
-                            var toDelete = returnNode.attributes[eAttr.drop_var_before_return] as List<(LifetimeInfo.VarStatus, string)>;
+                            var toDelete = returnNode.attributes[AstAttr.drop_var_before_return] as List<(LifetimeInfo.VarStatus, string)>;
                             if(toDelete != null)
                             {
                                 foreach(var (s, v) in toDelete)
@@ -369,7 +372,7 @@ namespace Gizbox.IR
                                     EmitOwnConditionalDropCode(s, v);
                                 }
                             }
-                            returnNode.attributes.Remove(eAttr.drop_var_before_return);
+                            returnNode.attributes.Remove(AstAttr.drop_var_before_return);
                         }
 
                         if(returnNode.returnExprNode != null)
@@ -402,9 +405,9 @@ namespace Gizbox.IR
                         GenNode(singleExprNode.exprNode);
 
                         // 语句末尾删除临时的所有权结果
-                        if(singleExprNode.attributes.ContainsKey(eAttr.drop_expr_result_after_stmt))
+                        if(singleExprNode.attributes.ContainsKey(AstAttr.drop_expr_result_after_stmt))
                         {
-                            var exprs = singleExprNode.attributes[eAttr.drop_expr_result_after_stmt] as List<SyntaxTree.ExprNode>;
+                            var exprs = singleExprNode.attributes[AstAttr.drop_expr_result_after_stmt] as List<SyntaxTree.ExprNode>;
                             if(exprs != null)
                             {
                                 foreach(var e in exprs)
@@ -412,14 +415,14 @@ namespace Gizbox.IR
                                     EmitOwnDropCode(GetRet(e));
                                 }
                             }
-                            singleExprNode.attributes.Remove(eAttr.drop_expr_result_after_stmt);
+                            singleExprNode.attributes.Remove(AstAttr.drop_expr_result_after_stmt);
                         }
                     }
                     break;
 
                 case IfStmtNode ifNode:
                     {
-                        int ifCounter = (int)ifNode.attributes[eAttr.uid];
+                        int ifCounter = (int)ifNode.attributes[AstAttr.uid];
 
                         EmitCode("").label = "If_" + ifCounter;
 
@@ -470,7 +473,7 @@ namespace Gizbox.IR
                     break;
                 case WhileStmtNode whileNode:
                     {
-                        int whileCounter = (int)whileNode.attributes[eAttr.uid];
+                        int whileCounter = (int)whileNode.attributes[AstAttr.uid];
 
                         EmitCode("").label = "While_" + whileCounter;
 
@@ -491,10 +494,10 @@ namespace Gizbox.IR
                     break;
                 case ForStmtNode forNode:
                     {
-                        int forCounter = (int)forNode.attributes[eAttr.uid];
+                        int forCounter = (int)forNode.attributes[AstAttr.uid];
 
-                        envStackTemp.Push(forNode.attributes[eAttr.env] as SymbolTable);
-                        EnvBegin(forNode.attributes[eAttr.env] as SymbolTable);
+                        envStackTemp.Push(forNode.attributes[AstAttr.env] as SymbolTable);
+                        EnvBegin(forNode.attributes[AstAttr.env] as SymbolTable);
 
                         //initializer  
                         GenNode(forNode.initializerNode);
@@ -520,7 +523,7 @@ namespace Gizbox.IR
 
                         EmitCode("").label = "EndFor_" + forCounter;
 
-                        EnvEnd(forNode.attributes[eAttr.env] as SymbolTable);
+                        EnvEnd(forNode.attributes[AstAttr.env] as SymbolTable);
                         envStackTemp.Pop();
                     }
                     break;
@@ -588,7 +591,7 @@ namespace Gizbox.IR
                         else
                         {
                             // 右值：读一次到临时变量，返回该临时
-                            string valueType = (string)objMemberAccess.attributes[eAttr.type];
+                            string valueType = (string)objMemberAccess.attributes[AstAttr.type];
                             string tmp = NewTemp(valueType);
                             EmitCode("=", tmp, objExpr + "->" + objMemberAccess.memberNode.FullName);
                             SetRet(objMemberAccess, tmp);
@@ -612,7 +615,7 @@ namespace Gizbox.IR
                         GenNode(binaryOp.leftNode);
                         GenNode(binaryOp.rightNode);
 
-                        if (binaryOp.leftNode.attributes.ContainsKey(eAttr.type) == false)
+                        if (binaryOp.leftNode.attributes.ContainsKey(AstAttr.type) == false)
                             throw new SemanticException(ExceptioName.TypeNotSet, binaryOp.leftNode, "");
 
                         //if (binaryOp.rightNode.attributes.ContainsKey("type") == false)
@@ -625,7 +628,7 @@ namespace Gizbox.IR
                         }
                         else
                         {
-                            SetRet(binaryOp, NewTemp((string)binaryOp.leftNode.attributes[eAttr.type]));
+                            SetRet(binaryOp, NewTemp((string)binaryOp.leftNode.attributes[AstAttr.type]));
                         }
                         
 
@@ -637,9 +640,9 @@ namespace Gizbox.IR
                         GenNode(unaryOp.exprNode);
 
                         //表达式的返回变量  
-                        SetRet(unaryOp, NewTemp((string)unaryOp.exprNode.attributes[eAttr.type]));
+                        SetRet(unaryOp, NewTemp((string)unaryOp.exprNode.attributes[AstAttr.type]));
 
-                        EmitCode(unaryOp.op, GetRet(unaryOp), GetRet(unaryOp));
+                    EmitCode(unaryOp.op, GetRet(unaryOp), GetRet(unaryOp.exprNode));
                     }
                     break;
                 case AssignNode assignNode:
@@ -649,9 +652,9 @@ namespace Gizbox.IR
 
 
                         // 赋值前先删除之前的Owner
-                        if(assignNode.attributes.ContainsKey(eAttr.drop_var_before_assign_stmt))
+                        if(assignNode.attributes.ContainsKey(AstAttr.drop_var_before_assign_stmt))
                         {
-                            var toDelete = assignNode.attributes[eAttr.drop_var_before_assign_stmt] as List<(LifetimeInfo.VarStatus, string)>;
+                            var toDelete = assignNode.attributes[AstAttr.drop_var_before_assign_stmt] as List<(LifetimeInfo.VarStatus, string)>;
                             if(toDelete != null)
                             {
                                 foreach(var (s, v) in toDelete)
@@ -659,17 +662,17 @@ namespace Gizbox.IR
                                     EmitOwnConditionalDropCode(s, v);
                                 }
                             }
-                            assignNode.attributes.Remove(eAttr.drop_var_before_assign_stmt);
+                            assignNode.attributes.Remove(AstAttr.drop_var_before_assign_stmt);
                         }
                         // 成员字段赋值前先条件删除  
-                        if(assignNode.attributes.ContainsKey(eAttr.drop_field_before_assign_stmt))
+                        if(assignNode.attributes.ContainsKey(AstAttr.drop_field_before_assign_stmt))
                         {
                             var accessNode = assignNode.lvalueNode as SyntaxTree.ObjectMemberAccessNode;
                             var obj = GetRet(accessNode.objectNode);
                             var field = accessNode.memberNode.FullName;
                             EmitOwnDropField(obj, field);
 
-                            assignNode.attributes.Remove(eAttr.drop_field_before_assign_stmt);
+                            assignNode.attributes.Remove(AstAttr.drop_field_before_assign_stmt);
                         }
 
                         // 复合赋值表达式的返回变量为左值    
@@ -677,9 +680,9 @@ namespace Gizbox.IR
 
 
                         // 移动源置NULL  
-                        if(assignNode.attributes.ContainsKey(eAttr.set_null_after_stmt))
+                        if(assignNode.attributes.ContainsKey(AstAttr.set_null_after_stmt))
                         {
-                            var toNull = assignNode.attributes[eAttr.set_null_after_stmt] as List<string>;
+                            var toNull = assignNode.attributes[AstAttr.set_null_after_stmt] as List<string>;
                             if(toNull != null)
                             {
                                 foreach(var v in toNull)
@@ -687,20 +690,20 @@ namespace Gizbox.IR
                                     EmitCode("=", v, "%LITNULL:");
                                 }
                             }
-                            assignNode.attributes.Remove(eAttr.set_null_after_stmt);
+                            assignNode.attributes.Remove(AstAttr.set_null_after_stmt);
                         }
 
                         // 被移动字段置NULL（作为drop-flag）
-                        if(assignNode.attributes.ContainsKey(eAttr.set_null_field_after_stmt))
+                        if(assignNode.attributes.ContainsKey(AstAttr.set_null_field_after_stmt))
                         {
-                            if(assignNode.attributes[eAttr.set_null_field_after_stmt] is SyntaxTree.ObjectMemberAccessNode fieldNode)
+                            if(assignNode.attributes[AstAttr.set_null_field_after_stmt] is SyntaxTree.ObjectMemberAccessNode fieldNode)
                             {
                                 GenNode(fieldNode.objectNode);
                                 string obj = TrimName(GetRet(fieldNode.objectNode));
                                 string field = fieldNode.memberNode.FullName;
                                 EmitCode("=", obj + "->" + field, "%LITNULL:");
                             }
-                            assignNode.attributes.Remove(eAttr.set_null_field_after_stmt);
+                            assignNode.attributes.Remove(AstAttr.set_null_field_after_stmt);
                         }
                     }
                     break;
@@ -714,7 +717,7 @@ namespace Gizbox.IR
                         string field = targetAccess.memberNode.FullName;
                         string accessExpr = obj + "->" + field;
 
-                        string returnType = (string)replaceNode.attributes[eAttr.type];
+                        string returnType = (string)replaceNode.attributes[AstAttr.type];
                         string tmp = NewTemp(returnType);
                         EmitCode("=", tmp, accessExpr);
 
@@ -723,9 +726,9 @@ namespace Gizbox.IR
 
                         SetRet(replaceNode, tmp);
 
-                        if(replaceNode.attributes.ContainsKey(eAttr.set_null_after_stmt))
+                        if(replaceNode.attributes.ContainsKey(AstAttr.set_null_after_stmt))
                         {
-                            var toNull = replaceNode.attributes[eAttr.set_null_after_stmt] as List<string>;
+                            var toNull = replaceNode.attributes[AstAttr.set_null_after_stmt] as List<string>;
                             if(toNull != null)
                             {
                                 foreach(var v in toNull)
@@ -733,7 +736,7 @@ namespace Gizbox.IR
                                     EmitCode("=", v, "%LITNULL:");
                                 }
                             }
-                            replaceNode.attributes.Remove(eAttr.set_null_after_stmt);
+                            replaceNode.attributes.Remove(AstAttr.set_null_after_stmt);
                         }
                     }
                     break;
@@ -741,11 +744,11 @@ namespace Gizbox.IR
                     {
                         //函数全名  
                         string fullName;
-                        if(callNode.attributes.TryGetValue(eAttr.mangled_name, out object oMangleName))
+                        if(callNode.attributes.TryGetValue(AstAttr.mangled_name, out object oMangleName))
                         {
                             fullName = (string)oMangleName;
                         }
-                        else if(callNode.attributes.TryGetValue(eAttr.extern_name, out object oExternName))
+                        else if(callNode.attributes.TryGetValue(AstAttr.extern_name, out object oExternName))
                         {
                             fullName= (string)oExternName;
                         }
@@ -756,7 +759,7 @@ namespace Gizbox.IR
 
 
                         //函数返回类型    
-                        string returnType = (string)callNode.attributes[eAttr.type];
+                        string returnType = (string)callNode.attributes[AstAttr.type];
 
                         //是否有返回值且作为右值  
                         bool returnTypeNotVoid = GType.Parse(returnType).Category != GType.Kind.Void;
@@ -764,10 +767,10 @@ namespace Gizbox.IR
 
 
                         //表达式的返回变量  
-                        bool store_result = callNode.attributes.ContainsKey(eAttr.store_expr_result);
+                        bool store_result = callNode.attributes.ContainsKey(AstAttr.store_expr_result);
                         if(store_result)
                         {
-                            callNode.attributes.Remove(eAttr.store_expr_result);
+                            callNode.attributes.Remove(AstAttr.store_expr_result);
                             SetRet(callNode, NewTemp(returnType));
                         }
                         else if(returnTypeNotVoid == true && isSingleExprStmt == false)
@@ -848,9 +851,9 @@ namespace Gizbox.IR
 
 
                         //调用后把moved-from的实参变量置NULL(作为drop-flag)  
-                        if(callNode.attributes.ContainsKey(eAttr.set_null_after_call))
+                        if(callNode.attributes.ContainsKey(AstAttr.set_null_after_call))
                         {
-                            var toNull = callNode.attributes[eAttr.set_null_after_call] as List<string>;
+                            var toNull = callNode.attributes[AstAttr.set_null_after_call] as List<string>;
                             if(toNull != null)
                             {
                                 foreach(var v in toNull)
@@ -858,7 +861,7 @@ namespace Gizbox.IR
                                     EmitCode("=", v, "%LITNULL:");
                                 }
                             }
-                            callNode.attributes.Remove(eAttr.set_null_after_call);
+                            callNode.attributes.Remove(AstAttr.set_null_after_call);
                         }
                     }
                     break;
@@ -883,7 +886,7 @@ namespace Gizbox.IR
                         {
 
                             string accessExpr = container + "[" + index + "]";
-                            string elemType = (string)eleAccessNode.attributes[eAttr.type];
+                            string elemType = (string)eleAccessNode.attributes[AstAttr.type];
                             string tmp = NewTemp(elemType);
                             EmitCode("=", tmp, accessExpr); // tmp = [container[index]]
                             SetRet(eleAccessNode, tmp);
@@ -896,9 +899,9 @@ namespace Gizbox.IR
 
                         //表达式的返回变量 (始终存到临时变量)    
                         SetRet(newObjNode, NewTemp(className));
-                        if(newObjNode.attributes.ContainsKey(eAttr.store_expr_result))
+                        if(newObjNode.attributes.ContainsKey(AstAttr.store_expr_result))
                         {
-                            newObjNode.attributes.Remove(eAttr.store_expr_result);
+                            newObjNode.attributes.Remove(AstAttr.store_expr_result);
                         }
 
                         EmitCode("ALLOC", GetRet(newObjNode), className);
@@ -913,9 +916,9 @@ namespace Gizbox.IR
 
                         //表达式的返回变量 (始终存到临时变量)    
                         SetRet(newArrNode, NewTemp(newArrNode.typeNode.TypeExpression() + "[]"));
-                        if(newArrNode.attributes.ContainsKey(eAttr.store_expr_result))
+                        if(newArrNode.attributes.ContainsKey(AstAttr.store_expr_result))
                         {
-                            newArrNode.attributes.Remove(eAttr.store_expr_result);
+                            newArrNode.attributes.Remove(AstAttr.store_expr_result);
                         }
 
                         EmitCode("ALLOC_ARRAY", GetRet(newArrNode), GetRet(newArrNode.lengthNode));
@@ -949,7 +952,7 @@ namespace Gizbox.IR
 
 
             // 确保所有的临时属性已起效  
-            for(eAttr i = eAttr.__codegen_mark_min + 1; i < eAttr.__codegen_mark_max; ++i)
+            for(AstAttr i = AstAttr.__codegen_mark_min + 1; i < AstAttr.__codegen_mark_max; ++i)
             {
                 if(node.attributes.ContainsKey(i))
                 {
@@ -1351,9 +1354,9 @@ namespace Gizbox.IR
                 return GetRet(exprNode.overrideNode);
             }
 
-            if (exprNode.attributes.ContainsKey(eAttr.ret))
+            if (exprNode.attributes.ContainsKey(AstAttr.ret))
             {
-                return (string)exprNode.attributes[eAttr.ret];
+                return (string)exprNode.attributes[AstAttr.ret];
             }
             else
             {
@@ -1362,7 +1365,7 @@ namespace Gizbox.IR
         }
         private void SetRet(SyntaxTree.Node node, string val)
         {
-            node.attributes[eAttr.ret] = val;
+            node.attributes[AstAttr.ret] = val;
         }
 
         public string NewTemp(string type)
@@ -1395,9 +1398,9 @@ namespace Gizbox.IR
             //表达式的返回变量  
             string operandStr;
 
-            if (literalNode.attributes.ContainsKey(eAttr.type))
+            if (literalNode.attributes.ContainsKey(AstAttr.type))
             {
-                string typeName = (string)literalNode.attributes[eAttr.type];
+                string typeName = (string)literalNode.attributes[AstAttr.type];
 
                 if (typeName != "null")
                 {

@@ -3178,13 +3178,17 @@ namespace Gizbox.Src.Backend
                     using(new RegUsageRange(this, RegisterEnum.R11))
                     {
                         Emit(X64.mov(X64.r11, a, (X64Size)aType.Size));
-                        Emit(X64.cmp(X64.r11, b));
+                        var cmp = X64.cmp(X64.r11, b);
+                        cmp.sizeMark = (X64Size)aType.Size;
+                        Emit(cmp);
                     }
                 }
                 else
                 {
                     // 直接 cmp a,b（mem-mem 会在后续合法化阶段修正）
-                    Emit(X64.cmp(a, b));
+                    var cmp = X64.cmp(a, b);
+                    cmp.sizeMark = (X64Size)aType.Size;
+                    Emit(cmp);
                 }
 
                 switch(op)

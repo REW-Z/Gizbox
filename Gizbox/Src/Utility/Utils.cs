@@ -23,7 +23,7 @@ namespace Gizbox
             return gizFullName.Replace("::", "__");
         }
 
-        public static string MangleTypeName(string baseName, IEnumerable<string> argTypes)
+        public static string MangleTemplateInstanceName(string baseName, IEnumerable<string> argTypes)
         {
             if (argTypes == null)
                 return baseName;

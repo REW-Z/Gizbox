@@ -27,7 +27,7 @@
 引用类型：
 `Core::Object` -及其派生类。      
 `string` -字符串类型。    
-`int[]` -数组  
+`int[]`、`string[]` -数组  
 
 
 ## 类&继承  
@@ -53,6 +53,19 @@ class Human : Creature
 
 ## 模板  
 
+模板会作为ast节点保存在IR文件中。在第一次使用的编译单元中特化。    
+
+#### 函数模板  
+
+```
+public T Add<T>(T a, T b)
+{
+    return a + b;
+}
+```
+
+#### 类模板  
+
 ```
 class Container<T>
 {
@@ -60,8 +73,6 @@ class Container<T>
     //...
 }
 ```
-
-模板会作为ast节点保存在IR文件中。在第一次使用的编译单元中特化。    
 
 
 ## 所有权（Ownership）
