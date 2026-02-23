@@ -101,7 +101,7 @@ namespace Console
 {
 	extern void Print(string text);
 	extern void PrintLn(string text);
-	extern string GetLine();
+	extern string ReadLn();
 }
 
 

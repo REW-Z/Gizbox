@@ -75,4 +75,6 @@ void main()
     Console::PrintLn("n3:" + (string)n3);
 
     Console::PrintLn("Test Finish.");
+
+    Console::ReadLn();
 }

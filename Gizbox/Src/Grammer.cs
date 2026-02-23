@@ -157,6 +157,11 @@ namespace Gizbox
             "declstmt -> class TYPE_NAME genparams inherit { declstatements }",
             "declstmt -> class own TYPE_NAME genparams inherit { declstatements }",
 
+            "declstmt -> vimodif :",
+
+            "vimodif -> public :",
+            "vimodif -> private :",
+
             "tmodf -> own",
             "tmodf -> bor",
 

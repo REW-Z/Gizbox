@@ -53,7 +53,7 @@ void Console__PrintLn(const wchar_t* text)
 }
 
 // 获取一行输入 Unicode 宽字符  
-const wchar_t* Console__GetLine()
+const wchar_t* Console__ReadLn()
 {
     static wchar_t buf[1024];
     if (fgetws(buf, (int)COUNT_OF(buf), stdin) == NULL)
