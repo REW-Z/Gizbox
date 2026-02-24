@@ -35,6 +35,10 @@ namespace Gizbox
             "statementblock",
             "declstatements",
             
+            //访问修饰符  
+            "acmodif",
+
+
             //语句
             "stmt",
             "declstmt",
@@ -157,10 +161,12 @@ namespace Gizbox
             "declstmt -> class TYPE_NAME genparams inherit { declstatements }",
             "declstmt -> class own TYPE_NAME genparams inherit { declstatements }",
 
-            "declstmt -> vimodif :",
+            "declstmt -> acmodif :",
 
-            "vimodif -> public :",
-            "vimodif -> private :",
+            "acmodif -> public",
+            "acmodif -> private",
+
+
 
             "tmodf -> own",
             "tmodf -> bor",

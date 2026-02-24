@@ -946,6 +946,12 @@ namespace Gizbox.IR
                         }
                     }
                     break;
+                case SizeOfNode sizeofNode:
+                    {
+                        GType t = GType.Parse(sizeofNode.typeNode.TypeExpression());
+                        SetRet(sizeofNode, $"%LITINT:{t.Size}");
+                    }
+                    break;
                 default:
                     throw new SemanticException(ExceptioName.Undefine, node, "IR generation not implemtented:" + node.GetType().Name);
             }

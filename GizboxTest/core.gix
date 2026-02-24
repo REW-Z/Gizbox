@@ -9,6 +9,13 @@ namespace Core
 		}
 	}
 	
+	class Type
+	{
+		string name = null;
+	}
+
+
+
 	class Bool
 	{
 		bool value = false;

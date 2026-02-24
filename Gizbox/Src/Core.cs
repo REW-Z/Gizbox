@@ -120,6 +120,14 @@ namespace Gizbox
             BorrowVar = 1 << 14,
         }
 
+        public enum AccessFlag : uint
+        {
+            Public = 0,
+            Private = 1 << 1,
+            Protected = 1 << 2,
+        }
+
+
         [DataContract(IsReference = true)]
         public class Record
         {
@@ -143,11 +151,19 @@ namespace Gizbox
             public SymbolTable envPtr;
             [DataMember]
             public ulong flagsSerialized;
+            [DataMember]
+            public uint accessFlagsSerialized;
 
             public RecordFlag flags
             {
                 get => (RecordFlag)flagsSerialized;
                 set => flagsSerialized = (ulong)value;
+            }
+
+            public AccessFlag accessFlags
+            {
+                get => (AccessFlag)accessFlagsSerialized;
+                set => accessFlagsSerialized = (uint)value;
             }
 
             public object runtimeAdditionalInfo;
@@ -294,6 +310,26 @@ namespace Gizbox
                 }
             }
         }
+
+        public Record Class_GetMemberRecordInChainByRawname(string rawname)
+        {
+            if (this.tableCatagory != TableCatagory.ClassScope)
+                throw new Exception("必须是类的符号表");
+            foreach(var kv in records)
+            {
+                if(kv.Value.rawname == rawname)
+                    return kv.Value;
+            }
+            if(records.ContainsKey("base") == true)
+            {
+                return records["base"].envPtr.Class_GetMemberRecordInChainByRawname(rawname);
+            }
+            else
+            {
+                return null;
+            }
+        }
+
         public void Class_GetAllMemberRecordInChain(string symbolName, List<Record> result)
         {
             if(this.tableCatagory != TableCatagory.ClassScope)
@@ -325,7 +361,6 @@ namespace Gizbox
                 records["base"].envPtr.Class_GetAllMemberRecordInChainByRawname(rawname,result);
             }
         }
-
 
         //获取某类型记录  
         public List<Record> GetByCategory(RecordCatagory catagory)

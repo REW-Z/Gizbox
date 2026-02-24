@@ -125,6 +125,7 @@ namespace Gizbox
         [KnownType(typeof(ExternFuncDeclareNode))]
         [KnownType(typeof(FuncDeclareNode))]
         [KnownType(typeof(ClassDeclareNode))]
+        [KnownType(typeof(AccessLabelNode))]
         [KnownType(typeof(OwnershipLeakStmtNode))]
         [KnownType(typeof(OwnershipCaptureStmtNode))]
         [KnownType(typeof(SingleExprStmtNode))]
@@ -743,7 +744,11 @@ namespace Gizbox
                 children_group_0.Add(null);
             }
         }
-
+        public enum AccessMofifier
+        {
+            Public = 0,
+            Private = 1,
+        }
         public enum VarModifiers
         {
             None = 0,
@@ -820,6 +825,7 @@ namespace Gizbox
 
         }
 
+
         [DataContract(IsReference = true)]
         public class ClassDeclareNode : DeclareNode
         {
@@ -843,6 +849,14 @@ namespace Gizbox
                 memberDelareNodes = new ChildList<DeclareNode>(children_group_1);
             }
 
+        }
+
+
+        [DataContract(IsReference = true)]
+        public class AccessLabelNode : DeclareNode
+        {
+            [DataMember]
+            public AccessMofifier accessMofifier;
         }
 
         [DataContract(IsReference = true)]

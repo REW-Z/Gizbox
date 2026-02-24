@@ -19,7 +19,7 @@ using System.Xml.Linq;
 namespace Gizbox
 {
     /// <summary>
-    /// Óï·¨·ÖÎö½×¶ÎÊôĞÔÃ¶¾Ù
+    /// è¯­æ³•åˆ†æé˜¶æ®µå±æ€§æšä¸¾
     /// </summary>
     public enum ParseAttr
     {
@@ -41,10 +41,12 @@ namespace Gizbox
         primitive,
         generic_params,
         generic_args,
+
+        acmodif,
     }
 
     /// <summary>
-    /// ÓïÒå·ÖÎö½×¶ÎÊôĞÔÃ¶¾Ù
+    /// è¯­ä¹‰åˆ†æé˜¶æ®µå±æ€§æšä¸¾
     /// </summary>
     public enum AstAttr
     {
@@ -55,6 +57,7 @@ namespace Gizbox
         global_env,
         klass,
         member_name,
+        member_access_modifiers,
         uid,
         type,
         mangled_name,
@@ -63,6 +66,7 @@ namespace Gizbox
         var_rec,
         const_rec,
         func_rec,
+        class_rec,
         obj_class_rec,
         not_a_property,
         name_completed,
@@ -89,14 +93,14 @@ namespace Gizbox
 }
 
 /// <summary>
-/// ÓïÒå¹æÔò  
+/// è¯­ä¹‰è§„åˆ™  
 /// </summary>
 namespace Gizbox.SemanticRule
 {
 
 
     /// <summary>
-    /// ÓïÒå¶¯×÷  
+    /// è¯­ä¹‰åŠ¨ä½œ  
     /// </summary>
     public class SemanticAction
     {
@@ -121,28 +125,28 @@ namespace Gizbox.SemanticRule
 
 
     /// <summary>
-    /// ×Ôµ×ÏòÉÏµÄÓï·¨·ÖÎöÊ÷¹¹ÔìÆ÷  
+    /// è‡ªåº•å‘ä¸Šçš„è¯­æ³•åˆ†ææ ‘æ„é€ å™¨  
     /// </summary>
     public class BottomUpParseTreeBuilder
     {
-        // ·ÖÎöÊ÷  
+        // åˆ†ææ ‘  
         public ParseTree resultTree = new ParseTree();
 
-        // ¶¯×÷¹¹½¨  
+        // åŠ¨ä½œæ„å»º  
         public void BuildAction(LRParser parser, Production production)
         {
-            //²úÉúÊ½Í·  
+            //äº§ç”Ÿå¼å¤´  
             ParseTree.Node newNode = (parser.newElement.attributes[ParseAttr.cst_node] = new ParseTree.Node() { isLeaf = false, name = production.head.name }) as ParseTree.Node;
             resultTree.allnodes.Add(newNode);
 
-            //²úÉúÊ½Ìå  
+            //äº§ç”Ÿå¼ä½“  
             for (int i = 0; i < production.body.Length; ++i)
             {
                 int offset = parser.stack.Count - production.body.Length;
                 var ele = parser.stack[offset + i];
                 var symbol = production.body[i];
 
-                //Ò¶×Ó½Úµã£¨ÖÕ½á·û½Úµã£©  
+                //å¶å­èŠ‚ç‚¹ï¼ˆç»ˆç»“ç¬¦èŠ‚ç‚¹ï¼‰  
                 if (symbol is Terminal)
                 {
                     var node = (ele.attributes[ParseAttr.cst_node] = new ParseTree.Node() { isLeaf = true, name = symbol.name + "," + (ele.attributes[ParseAttr.token] as Token).attribute }) as ParseTree.Node;
@@ -152,7 +156,7 @@ namespace Gizbox.SemanticRule
                     node.parent = newNode;
                     newNode.children.Add(node);
                 }
-                //ÄÚ²¿½Úµã£¨·ÇÖÕ½á·û½Úµã£©
+                //å†…éƒ¨èŠ‚ç‚¹ï¼ˆéç»ˆç»“ç¬¦èŠ‚ç‚¹ï¼‰
                 else
                 {
                     var node = ele.attributes[ParseAttr.cst_node] as ParseTree.Node;
@@ -170,22 +174,22 @@ namespace Gizbox.SemanticRule
 
         }
 
-        // Íê³É  
+        // å®Œæˆ  
         public void Accept(LRParser parser)
         {
-            //ÉèÖÃ¸ù½Úµã  
+            //è®¾ç½®æ ¹èŠ‚ç‚¹  
             resultTree.root = parser.newElement.attributes[ParseAttr.cst_node] as ParseTree.Node;
 
-            //Íê³É¹¹½¨ £¨ÉèÖÃÉî¶ÈµÈ²Ù×÷£©  
+            //å®Œæˆæ„å»º ï¼ˆè®¾ç½®æ·±åº¦ç­‰æ“ä½œï¼‰  
             resultTree.CompleteBuild();
 
-            SemanticAnalyzer.Log("¸ù½Úµã:" + resultTree.root.name);
-            SemanticAnalyzer.Log("½ÚµãÊı:" + resultTree.allnodes.Count);
+            SemanticAnalyzer.Log("æ ¹èŠ‚ç‚¹:" + resultTree.root.name);
+            SemanticAnalyzer.Log("èŠ‚ç‚¹æ•°:" + resultTree.allnodes.Count);
         }
     }
 
     /// <summary>
-    /// ÓïÒå¶¯×÷Ö´ĞĞÆ÷  
+    /// è¯­ä¹‰åŠ¨ä½œæ‰§è¡Œå™¨  
     /// </summary>
     public class SematicActionExecutor
     {
@@ -194,29 +198,29 @@ namespace Gizbox.SemanticRule
         public Dictionary<Production, List<SemanticAction>> translateScheme = new Dictionary<Production, List<SemanticAction>>();
 
 
-        // Óï·¨·ÖÎöÊ÷¹¹Ôì    
+        // è¯­æ³•åˆ†ææ ‘æ„é€     
         public BottomUpParseTreeBuilder parseTreeBuilder;
 
-        // ³éÏóÓï·¨Ê÷¹¹Ôì    
+        // æŠ½è±¡è¯­æ³•æ ‘æ„é€     
         public SyntaxTree.ProgramNode syntaxRootNode;
 
-        // ¹¹Ôì  
+        // æ„é€   
         public SematicActionExecutor(LRParser parser)
         {
             this.parserContext = parser;
 
-            //Óï·¨Ê÷¹¹ÔìÆ÷  
+            //è¯­æ³•æ ‘æ„é€ å™¨  
             parseTreeBuilder = new BottomUpParseTreeBuilder();
 
-            //¹¹½¨Óï·¨·ÖÎöÊ÷µÄÓïÒå¶¯×÷    
+            //æ„å»ºè¯­æ³•åˆ†ææ ‘çš„è¯­ä¹‰åŠ¨ä½œ    
             foreach (var p in parserContext.data.grammerSet.productions)
             {
                 this.AddActionAtTail(p, parseTreeBuilder.BuildAction);
             }
 
-            //return; //²»¸½¼ÓÆäËûÓïÒå¹æÔò-½öÓï·¨·ÖÎö
+            //return; //ä¸é™„åŠ å…¶ä»–è¯­ä¹‰è§„åˆ™-ä»…è¯­æ³•åˆ†æ
 
-            //¹¹½¨³éÏóÓï·¨Ê÷(AST)µÄÓïÒå¶¯×÷   
+            //æ„å»ºæŠ½è±¡è¯­æ³•æ ‘(AST)çš„è¯­ä¹‰åŠ¨ä½œ   
             AddActionAtTail("S -> importations namespaceusings statements", (psr, production) =>
             {
                 var n = new SyntaxTree.ProgramNode()
@@ -247,7 +251,7 @@ namespace Gizbox.SemanticRule
                     (SyntaxTree.ImportNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node]
                 ); ;
             });
-            AddActionAtTail("importations -> ¦Å", (psr, production) =>
+            AddActionAtTail("importations -> Îµ", (psr, production) =>
             {
                 psr.newElement.attributes[ParseAttr.import_list] = new List<SyntaxTree.ImportNode>();
             });
@@ -284,7 +288,7 @@ namespace Gizbox.SemanticRule
                     (SyntaxTree.UsingNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node]
                 ); ;
             });
-            AddActionAtTail("namespaceusings -> ¦Å", (psr, production) =>
+            AddActionAtTail("namespaceusings -> Îµ", (psr, production) =>
             {
                 psr.newElement.attributes[ParseAttr.using_list] = new List<SyntaxTree.UsingNode>();
             });
@@ -323,7 +327,7 @@ namespace Gizbox.SemanticRule
 
                 ((SyntaxTree.StatementsNode)psr.newElement.attributes[ParseAttr.ast_node]).statements.Add(newStmt);
             });
-            AddActionAtTail("statements -> ¦Å", (psr, production) => {
+            AddActionAtTail("statements -> Îµ", (psr, production) => {
 
                 psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.StatementsNode()
                 {
@@ -362,21 +366,19 @@ namespace Gizbox.SemanticRule
 
             AddActionAtTail("declstatements -> declstatements declstmt", (psr, production) => {
 
-                var newDeclStmt = (SyntaxTree.DeclareNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
-
                 psr.newElement.attributes[ParseAttr.decl_stmts] = (List<SyntaxTree.DeclareNode>)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.decl_stmts];
 
+                var newDeclStmt = (SyntaxTree.DeclareNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
                 ((List<SyntaxTree.DeclareNode>)psr.newElement.attributes[ParseAttr.decl_stmts]).Add(newDeclStmt);
             });
 
             AddActionAtTail("declstatements -> declstmt", (psr, production) => {
 
                 var newDeclStmt = (SyntaxTree.DeclareNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
-
                 psr.newElement.attributes[ParseAttr.decl_stmts] = new List<SyntaxTree.DeclareNode>() { newDeclStmt };
             });
 
-            AddActionAtTail("declstatements -> ¦Å", (psr, production) => {
+            AddActionAtTail("declstatements -> Îµ", (psr, production) => {
 
                 psr.newElement.attributes[ParseAttr.decl_stmts] = new List<SyntaxTree.DeclareNode>() { };
             });
@@ -826,6 +828,25 @@ namespace Gizbox.SemanticRule
                 );
             });
 
+
+            AddActionAtTail("declstmt -> acmodif :", (psr, production) =>
+            {
+                psr.newElement.attributes[ParseAttr.ast_node] = new AccessLabelNode()
+                {
+                    accessMofifier = (AccessMofifier)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.acmodif],
+                };
+            });
+
+            AddActionAtTail("acmodif -> public", (psr, production) =>
+            {
+                psr.newElement.attributes[ParseAttr.acmodif] = AccessMofifier.Public;
+            });
+            AddActionAtTail("acmodif -> private", (psr, production) =>
+            {
+                psr.newElement.attributes[ParseAttr.acmodif] = AccessMofifier.Private;
+            });
+
+
             AddActionAtTail("tmodf -> own", (psr, production) =>
             {
                 psr.newElement.attributes[ParseAttr.tmodf] = VarModifiers.Own;
@@ -839,7 +860,7 @@ namespace Gizbox.SemanticRule
             {
                 psr.newElement.attributes[ParseAttr.generic_params] = psr.stack[psr.stack.Top - 1].attributes[ParseAttr.generic_params];
             });
-            AddActionAtTail("genparams -> ¦Å", (psr, production) =>
+            AddActionAtTail("genparams -> Îµ", (psr, production) =>
             {
                 psr.newElement.attributes[ParseAttr.generic_params] = new List<SyntaxTree.IdentityNode>();
             });
@@ -890,7 +911,7 @@ namespace Gizbox.SemanticRule
 
 
 
-            AddActionAtTail("elifclauselist -> ¦Å", (psr, production) => {
+            AddActionAtTail("elifclauselist -> Îµ", (psr, production) => {
                 psr.newElement.attributes[ParseAttr.condition_clause_list] = new List<SyntaxTree.ConditionClauseNode>();
             });
 
@@ -920,7 +941,7 @@ namespace Gizbox.SemanticRule
                 };
             });
 
-            AddActionAtTail("elseclause -> ¦Å", (psr, production) => {
+            AddActionAtTail("elseclause -> Îµ", (psr, production) => {
                 psr.newElement.attributes[ParseAttr.ast_node] = null;
             });
 
@@ -1631,7 +1652,7 @@ namespace Gizbox.SemanticRule
                 );
             });
 
-            AddActionAtTail("params -> ¦Å", (psr, production) =>
+            AddActionAtTail("params -> Îµ", (psr, production) =>
             {
                 psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.ParameterListNode()
                 {
@@ -1721,7 +1742,7 @@ namespace Gizbox.SemanticRule
             //});
 
 
-            AddActionAtTail("args -> ¦Å", (psr, production) =>
+            AddActionAtTail("args -> Îµ", (psr, production) =>
             {
                 psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.ArgumentListNode()
                 {};
@@ -1799,7 +1820,7 @@ namespace Gizbox.SemanticRule
             AddActionAtTail("optidx -> aexpr", (psr, production) => {
                 psr.newElement.attributes[ParseAttr.ast_node] = psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
-            AddActionAtTail("optidx -> ¦Å", (psr, production) => {
+            AddActionAtTail("optidx -> Îµ", (psr, production) => {
                 psr.newElement.attributes[ParseAttr.ast_node] = null;
             });
 
@@ -1811,11 +1832,11 @@ namespace Gizbox.SemanticRule
 
                 psr.newElement.attributes[ParseAttr.ast_node] = idNode;
             });
-            AddActionAtTail("inherit -> ¦Å", (psr, production) => {
+            AddActionAtTail("inherit -> Îµ", (psr, production) => {
             });
         }
 
-        // ²åÈëÓïÒå¶¯×÷
+        // æ’å…¥è¯­ä¹‰åŠ¨ä½œ
         public void AddActionAtTail(string productionExpression, System.Action<LRParser, Production> act)
         {
             Production production = parserContext.data.grammerSet.productions.FirstOrDefault(p => p.ToExpression() == productionExpression);
@@ -1837,7 +1858,7 @@ namespace Gizbox.SemanticRule
         }
 
 
-        // Ö´ĞĞÓïÒå¶¯×÷  
+        // æ‰§è¡Œè¯­ä¹‰åŠ¨ä½œ  
         public void ExecuteSemanticAction(Production production)
         {
             if (translateScheme.ContainsKey(production) == false) return;
@@ -1851,9 +1872,9 @@ namespace Gizbox.SemanticRule
 
 
     /// <summary>
-    /// ÓïÒå·ÖÎöÆ÷  
+    /// è¯­ä¹‰åˆ†æå™¨  
     /// </summary>
-    public class SemanticAnalyzer//£¨²¹³äµÄÓïÒå·ÖÎöÆ÷£¬×Ôµ×ÏòÉÏ¹æÔ¼ÒÑ¾­½øĞĞÁË²¿·ÖÓïÒå·ÖÎö£©  
+    public class SemanticAnalyzer//ï¼ˆè¡¥å……çš„è¯­ä¹‰åˆ†æå™¨ï¼Œè‡ªåº•å‘ä¸Šè§„çº¦å·²ç»è¿›è¡Œäº†éƒ¨åˆ†è¯­ä¹‰åˆ†æï¼‰  
     {
         public Compiler compilerContext;
 
@@ -1865,10 +1886,10 @@ namespace Gizbox.SemanticRule
 
 
         //temp  
-        private int blockCounter = 0;//Block×ÔÔö  
-        private int ifCounter = 0;//ifÓï¾ä±êºÅ×ÔÔö  
-        private int whileCounter = 0;//whileÓï¾ä±êºÅ×ÔÔö  
-        private int forCounter = 0;//forÓï¾ä±êºÅ×ÔÔö  
+        private int blockCounter = 0;//Blockè‡ªå¢  
+        private int ifCounter = 0;//ifè¯­å¥æ ‡å·è‡ªå¢  
+        private int whileCounter = 0;//whileè¯­å¥æ ‡å·è‡ªå¢  
+        private int forCounter = 0;//forè¯­å¥æ ‡å·è‡ªå¢  
 
         //temp  
         private string currentNamespace = "";
@@ -1880,7 +1901,7 @@ namespace Gizbox.SemanticRule
 
 
         /// <summary>
-        /// ¹¹Ôì  
+        /// æ„é€   
         /// </summary>
         public SemanticAnalyzer(SyntaxTree ast, IRUnit ilUnit, Compiler compilerContext)
         {
@@ -1892,7 +1913,7 @@ namespace Gizbox.SemanticRule
 
 
         /// <summary>
-        /// ¿ªÊ¼ÓïÒå·ÖÎö  
+        /// å¼€å§‹è¯­ä¹‰åˆ†æ  
         /// </summary>
         public void Analysis()
         {
@@ -1922,7 +1943,7 @@ namespace Gizbox.SemanticRule
             //global env  
             ast.rootNode.attributes[AstAttr.global_env] = ilUnit.globalScope.env;
 
-            //Pass0: Ä£°åÌØ»¯£¨AST²ãÃæ£©
+            //Pass0: æ¨¡æ¿ç‰¹åŒ–ï¼ˆASTå±‚é¢ï¼‰
             SpecializeClassTemplates();
             SpecializeFunctionTemplates();
 
@@ -1939,8 +1960,8 @@ namespace Gizbox.SemanticRule
             if (Compiler.enableLogSemanticAnalyzer)
             {
                 ilUnit.globalScope.env.Print();
-                Log("·ûºÅ±í³õ²½ÊÕ¼¯Íê±Ï");
-                Compiler.Pause("·ûºÅ±í³õ²½ÊÕ¼¯Íê±Ï");
+                Log("ç¬¦å·è¡¨åˆæ­¥æ”¶é›†å®Œæ¯•");
+                Compiler.Pause("ç¬¦å·è¡¨åˆæ­¥æ”¶é›†å®Œæ¯•");
             }
 
             //Pass3
@@ -1948,7 +1969,7 @@ namespace Gizbox.SemanticRule
             envStack.Push(ilUnit.globalScope.env);
             Pass3_AnalysisNode(ast.rootNode);
 
-            //Ó¦ÓÃËùÓĞÊ÷½ÚµãÖØĞ´  
+            //åº”ç”¨æ‰€æœ‰æ ‘èŠ‚ç‚¹é‡å†™  
             ast.ApplyAllOverrides();
 
             //Pass4
@@ -1958,7 +1979,7 @@ namespace Gizbox.SemanticRule
             Pass4_OwnershipLifetime(ast.rootNode);
         }
 
-        //Ä£°åÀàÊµÀıĞÅÏ¢
+        //æ¨¡æ¿ç±»å®ä¾‹ä¿¡æ¯
         private class ClassTemplateInstance
         {
             public string templateName;
@@ -1966,7 +1987,7 @@ namespace Gizbox.SemanticRule
             public List<SyntaxTree.TypeNode> typeArguments;
         }
 
-        //Ä£°åº¯ÊıÊµÀıĞÅÏ¢
+        //æ¨¡æ¿å‡½æ•°å®ä¾‹ä¿¡æ¯
         private class FunctionTemplateInstance
         {
             public string templateName;
@@ -1974,10 +1995,10 @@ namespace Gizbox.SemanticRule
             public List<SyntaxTree.TypeNode> typeArguments;
         }
 
-        //Ä£°åÀàÌØ»¯£¨AST²ãÃæ£©£ºÊÕ¼¯Ä£°å¶¨Òå¡¢ÊµÀı»¯²¢Éú³É×¨ÓÃÀà
+        //æ¨¡æ¿ç±»ç‰¹åŒ–ï¼ˆASTå±‚é¢ï¼‰ï¼šæ”¶é›†æ¨¡æ¿å®šä¹‰ã€å®ä¾‹åŒ–å¹¶ç”Ÿæˆä¸“ç”¨ç±»
         private void SpecializeClassTemplates()
         {
-            //ÊÕ¼¯²¢Éú³ÉÄ£°åÀàÌØ»¯ÊµÀı
+            //æ”¶é›†å¹¶ç”Ÿæˆæ¨¡æ¿ç±»ç‰¹åŒ–å®ä¾‹
             if(ast?.rootNode == null)
                 return;
 
@@ -2022,10 +2043,10 @@ namespace Gizbox.SemanticRule
             }
         }
 
-        // ÊÕ¼¯Ä£°åÀà¶¨Òå
+        // æ”¶é›†æ¨¡æ¿ç±»å®šä¹‰
         private void CollectTemplateClasses(SyntaxTree.Node node, Dictionary<string, SyntaxTree.ClassDeclareNode> templates)
         {
-            //±éÀúÓï·¨Ê÷ÊÕ¼¯Ä£°åÀà¶¨Òå
+            //éå†è¯­æ³•æ ‘æ”¶é›†æ¨¡æ¿ç±»å®šä¹‰
             if(node == null)
                 return;
 
@@ -2041,10 +2062,10 @@ namespace Gizbox.SemanticRule
             }
         }
 
-        // ÊÕ¼¯Ä£°åÀàÊµÀı»¯ĞÅÏ¢
+        // æ”¶é›†æ¨¡æ¿ç±»å®ä¾‹åŒ–ä¿¡æ¯
         private void CollectTemplateInstantiations(SyntaxTree.Node node, Dictionary<string, ClassTemplateInstance> instances, bool inTemplate)
         {
-            //±éÀúÓï·¨Ê÷ÊÕ¼¯Ä£°åÀàÊµÀı
+            //éå†è¯­æ³•æ ‘æ”¶é›†æ¨¡æ¿ç±»å®ä¾‹
             if(node == null)
                 return;
 
@@ -2057,13 +2078,13 @@ namespace Gizbox.SemanticRule
             {
                 if(node is SyntaxTree.ClassTypeNode classType && classType.genericArguments.Count > 0)
                 {
-                    // ¼ÇÂ¼ÀàĞÍÒıÓÃ´¦µÄÄ£°åÊµÀı
+                    // è®°å½•ç±»å‹å¼•ç”¨å¤„çš„æ¨¡æ¿å®ä¾‹
                     RegisterTemplateInstance(classType, instances);
                 }
 
                 if(node is SyntaxTree.NewObjectNode newObjNode && newObjNode.typeNode is SyntaxTree.ClassTypeNode newObjType && newObjType.genericArguments.Count > 0)
                 {
-                    // ¼ÇÂ¼ new ´¦µÄÄ£°åÊµÀı²¢¹æ·¶»¯Ãû³Æ
+                    // è®°å½• new å¤„çš„æ¨¡æ¿å®ä¾‹å¹¶è§„èŒƒåŒ–åç§°
                     RegisterTemplateInstance(newObjType, instances);
                     NormalizeGenericUsage(newObjNode, newObjType);
                 }
@@ -2092,15 +2113,15 @@ namespace Gizbox.SemanticRule
 
             if(!inTemplate && node is SyntaxTree.ClassTypeNode classTypeNode && classTypeNode.genericArguments.Count > 0)
             {
-                //·ÇÄ£°åÌåÖĞÊ¹ÓÃµÄ·ºĞÍÀàĞÍĞèÌæ»»ÎªÊµÀıÃû
+                //éæ¨¡æ¿ä½“ä¸­ä½¿ç”¨çš„æ³›å‹ç±»å‹éœ€æ›¿æ¢ä¸ºå®ä¾‹å
                 NormalizeGenericUsage(classTypeNode);
             }
         }
 
-        //ÌØ»¯º¯ÊıÄ£°å£ºÊÕ¼¯Ä£°å¶¨Òå¡¢ÊµÀı»¯²¢Éú³É×¨ÓÃº¯Êı
+        //ç‰¹åŒ–å‡½æ•°æ¨¡æ¿ï¼šæ”¶é›†æ¨¡æ¿å®šä¹‰ã€å®ä¾‹åŒ–å¹¶ç”Ÿæˆä¸“ç”¨å‡½æ•°
         private void SpecializeFunctionTemplates()
         {
-            //ÊÕ¼¯²¢Éú³ÉÄ£°åº¯ÊıÌØ»¯ÊµÀı
+            //æ”¶é›†å¹¶ç”Ÿæˆæ¨¡æ¿å‡½æ•°ç‰¹åŒ–å®ä¾‹
             var templatesLocal = new Dictionary<string, SyntaxTree.FuncDeclareNode>();
             CollectTemplateFunctions(ast.rootNode, templatesLocal);
 
@@ -2141,10 +2162,10 @@ namespace Gizbox.SemanticRule
             }
         }
 
-        // ÊÕ¼¯Ä£°åº¯Êı¶¨Òå
+        // æ”¶é›†æ¨¡æ¿å‡½æ•°å®šä¹‰
         private void CollectTemplateFunctions(SyntaxTree.Node node, Dictionary<string, SyntaxTree.FuncDeclareNode> templates)
         {
-            //±éÀúÓï·¨Ê÷ÊÕ¼¯Ä£°åº¯Êı¶¨Òå
+            //éå†è¯­æ³•æ ‘æ”¶é›†æ¨¡æ¿å‡½æ•°å®šä¹‰
             if(node == null)
                 return;
 
@@ -2166,10 +2187,10 @@ namespace Gizbox.SemanticRule
 
 
 
-        // ÊÕ¼¯Ä£°åº¯ÊıÊµÀı»¯ĞÅÏ¢
+        // æ”¶é›†æ¨¡æ¿å‡½æ•°å®ä¾‹åŒ–ä¿¡æ¯
         private void CollectFunctionTemplateInstantiations(SyntaxTree.Node node, Dictionary<string, FunctionTemplateInstance> instances, bool inTemplate)
         {
-            //±éÀúÓï·¨Ê÷ÊÕ¼¯Ä£°åº¯ÊıÊµÀı
+            //éå†è¯­æ³•æ ‘æ”¶é›†æ¨¡æ¿å‡½æ•°å®ä¾‹
             if(node == null)
                 return;
 
@@ -2182,7 +2203,7 @@ namespace Gizbox.SemanticRule
             {
                 if(callNode.funcNode is SyntaxTree.IdentityNode funcId)
                 {
-                    //¼ÇÂ¼º¯Êıµ÷ÓÃ´¦µÄÄ£°åÊµÀı
+                    //è®°å½•å‡½æ•°è°ƒç”¨å¤„çš„æ¨¡æ¿å®ä¾‹
                     RegisterFunctionTemplateInstance(funcId, callNode, instances);
                 }
             }
@@ -2193,15 +2214,15 @@ namespace Gizbox.SemanticRule
             }
         }
 
-        //×¢²áº¯ÊıÄ£°åÊµÀı
+        //æ³¨å†Œå‡½æ•°æ¨¡æ¿å®ä¾‹
         private void RegisterFunctionTemplateInstance(SyntaxTree.IdentityNode funcId, SyntaxTree.CallNode callNode, Dictionary<string, FunctionTemplateInstance> instances)
         {
-            //¼ÇÂ¼Ä£°åº¯ÊıÊµÀı²¢¹æ·¶»¯·ºĞÍµ÷ÓÃ
+            //è®°å½•æ¨¡æ¿å‡½æ•°å®ä¾‹å¹¶è§„èŒƒåŒ–æ³›å‹è°ƒç”¨
             var argTypes = callNode.genericArguments.Select(t => t.TypeExpression()).ToArray();
             var mangledBaseName = Utils.MangleTemplateInstanceName(funcId.FullName, argTypes);
             if(instances.ContainsKey(mangledBaseName))
             {
-                // ÒÑ¼ÇÂ¼ÊµÀı£¬ÈÔĞè¹æ·¶»¯µ÷ÓÃ±í´ïÊ½
+                // å·²è®°å½•å®ä¾‹ï¼Œä»éœ€è§„èŒƒåŒ–è°ƒç”¨è¡¨è¾¾å¼
                 NormalizeFunctionGenericUsage(callNode, mangledBaseName);
                 return;
             }
@@ -2216,10 +2237,10 @@ namespace Gizbox.SemanticRule
             NormalizeFunctionGenericUsage(callNode, mangledBaseName);
         }
 
-        //¹æ·¶»¯º¯ÊıÄ£°åÊµÀıµ÷ÓÃ£¨ÇåÀí·ºĞÍ²ÎÊı²¢Ìæ»»º¯ÊıÃû£©
+        //è§„èŒƒåŒ–å‡½æ•°æ¨¡æ¿å®ä¾‹è°ƒç”¨ï¼ˆæ¸…ç†æ³›å‹å‚æ•°å¹¶æ›¿æ¢å‡½æ•°åï¼‰
         private void NormalizeFunctionGenericUsage(SyntaxTree.CallNode callNode, string mangledBaseName)
         {
-            //ÇåÀí·ºĞÍ²ÎÊı²¢Ìæ»»º¯ÊıÃûÎªÊµÀıÃû
+            //æ¸…ç†æ³›å‹å‚æ•°å¹¶æ›¿æ¢å‡½æ•°åä¸ºå®ä¾‹å
             callNode.genericArguments.Clear();
 
             if(callNode.funcNode is SyntaxTree.IdentityNode funcId)
@@ -2272,7 +2293,7 @@ namespace Gizbox.SemanticRule
             string mangledBaseName,
             List<SyntaxTree.TypeNode> typeArguments)
         {
-            //Ìæ»»º¯ÊıÄ£°å²ÎÊı²¢Éú³É¾ßÌåº¯ÊıÉùÃ÷
+            //æ›¿æ¢å‡½æ•°æ¨¡æ¿å‚æ•°å¹¶ç”Ÿæˆå…·ä½“å‡½æ•°å£°æ˜
             var paramList = template.templateParameters;
             if(paramList.Count != typeArguments.Count)
                 throw new SemanticException(ExceptioName.SemanticAnalysysError, template, "template argument count mismatch");
@@ -2294,10 +2315,10 @@ namespace Gizbox.SemanticRule
             ApplyTemplateTypeReplacement(specialized, typeMap);
         }
 
-        //×¢²áÄ£°åÀàÊµÀı
+        //æ³¨å†Œæ¨¡æ¿ç±»å®ä¾‹
         private void RegisterTemplateInstance(SyntaxTree.ClassTypeNode classType, Dictionary<string, ClassTemplateInstance> instances)
         {
-            //¼ÇÂ¼Ä£°åÀàÊµÀı
+            //è®°å½•æ¨¡æ¿ç±»å®ä¾‹
             var mangledName = classType.TypeExpression();
             if(instances.ContainsKey(mangledName))
                 return;
@@ -2310,20 +2331,20 @@ namespace Gizbox.SemanticRule
             };
         }
 
-        //¹æ·¶»¯Ä£°åÀàÀàĞÍÒıÓÃ£¨ÇåÀí·ºĞÍ²ÎÊı²¢Ìæ»»ÀàĞÍÃû£©
+        //è§„èŒƒåŒ–æ¨¡æ¿ç±»ç±»å‹å¼•ç”¨ï¼ˆæ¸…ç†æ³›å‹å‚æ•°å¹¶æ›¿æ¢ç±»å‹åï¼‰
         private void NormalizeGenericUsage(SyntaxTree.ClassTypeNode classType)
         {
-            //ÇåÀí·ºĞÍ²ÎÊı²¢Ìæ»»ÀàĞÍÃûÎªÊµÀıÃû
+            //æ¸…ç†æ³›å‹å‚æ•°å¹¶æ›¿æ¢ç±»å‹åä¸ºå®ä¾‹å
             var mangledName = classType.TypeExpression();
             classType.genericArguments.Clear();
             classType.classname.SetPrefix(null);
             classType.classname.token.attribute = mangledName;
         }
 
-        //¹æ·¶»¯newÓï¾äÖĞµÄÄ£°åÀàĞÍÒıÓÃ
+        //è§„èŒƒåŒ–newè¯­å¥ä¸­çš„æ¨¡æ¿ç±»å‹å¼•ç”¨
         private void NormalizeGenericUsage(SyntaxTree.NewObjectNode newObjNode, SyntaxTree.ClassTypeNode classType)
         {
-            //ÇåÀí·ºĞÍ²ÎÊı²¢Ìæ»»¶ÔÏó´´½¨ÀàĞÍÃûÎªÊµÀıÃû
+            //æ¸…ç†æ³›å‹å‚æ•°å¹¶æ›¿æ¢å¯¹è±¡åˆ›å»ºç±»å‹åä¸ºå®ä¾‹å
             var mangledName = classType.TypeExpression();
             classType.genericArguments.Clear();
             classType.classname.SetPrefix(null);
@@ -2364,13 +2385,13 @@ namespace Gizbox.SemanticRule
             return false;
         }
 
-        //Ó¦ÓÃÀàÄ£°åÌØ»¯£¨Ìæ»»Ä£°å²ÎÊı²¢Éú³É¾ßÌåÀà£©
+        //åº”ç”¨ç±»æ¨¡æ¿ç‰¹åŒ–ï¼ˆæ›¿æ¢æ¨¡æ¿å‚æ•°å¹¶ç”Ÿæˆå…·ä½“ç±»ï¼‰
         private void ApplyTemplateSpecialization(SyntaxTree.ClassDeclareNode template,
             SyntaxTree.ClassDeclareNode specialized,
             string mangledName,
             List<SyntaxTree.TypeNode> typeArguments)
         {
-            //Ìæ»»ÀàÄ£°å²ÎÊı²¢Éú³É¾ßÌåÀàÉùÃ÷
+            //æ›¿æ¢ç±»æ¨¡æ¿å‚æ•°å¹¶ç”Ÿæˆå…·ä½“ç±»å£°æ˜
             var paramList = template.templateParameters;
             if(paramList.Count != typeArguments.Count)
                 throw new SemanticException(ExceptioName.SemanticAnalysysError, template, "template argument count mismatch");
@@ -2484,12 +2505,12 @@ namespace Gizbox.SemanticRule
         }
 
         /// <summary>
-        /// PASS1:µİ¹éÏòÏÂ¶¥²ã¶¨ÒåĞÅÏ¢(¾²Ì¬±äÁ¿¡¢¾²Ì¬º¯ÊıÃû¡¢ÀàÃû)      
+        /// PASS1:é€’å½’å‘ä¸‹é¡¶å±‚å®šä¹‰ä¿¡æ¯(é™æ€å˜é‡ã€é™æ€å‡½æ•°åã€ç±»å)      
         /// </summary>
         private void Pass1_CollectGlobalSymbols(SyntaxTree.Node node)
         {
-            ///ºÜ¶à±àÒëÆ÷´ÓÓï·¨·ÖÎö½×¶ÎÉõÖÁ´Ê·¨·ÖÎö½×¶Î¿ªÊ¼³õÊ¼»¯ºÍ¹ÜÀí·ûºÅ±í    
-            ///ÎªÁË½µµÍ¸´ÔÓĞÔ¡¢ÊµÏÖµÍñîºÏºÍÄ£¿é»¯£¬ÔÚÓïÒå·ÖÎö½×¶ÎºÍÖĞ¼ä´úÂëÉú³É½×¶Î¹ÜÀí·ûºÅ±í  
+            ///å¾ˆå¤šç¼–è¯‘å™¨ä»è¯­æ³•åˆ†æé˜¶æ®µç”šè‡³è¯æ³•åˆ†æé˜¶æ®µå¼€å§‹åˆå§‹åŒ–å’Œç®¡ç†ç¬¦å·è¡¨    
+            ///ä¸ºäº†é™ä½å¤æ‚æ€§ã€å®ç°ä½è€¦åˆå’Œæ¨¡å—åŒ–ï¼Œåœ¨è¯­ä¹‰åˆ†æé˜¶æ®µå’Œä¸­é—´ä»£ç ç”Ÿæˆé˜¶æ®µç®¡ç†ç¬¦å·è¡¨  
 
             bool isTopLevelAtNamespace = false;
             if (node.Parent != null && node.Parent.Parent != null)
@@ -2526,16 +2547,16 @@ namespace Gizbox.SemanticRule
                         currentNamespace = "";
                     }
                     break;
-                //¶¥¼¶³£Á¿ÉùÃ÷Óï¾ä  
+                //é¡¶çº§å¸¸é‡å£°æ˜è¯­å¥  
                 case SyntaxTree.ConstantDeclareNode constDeclNode:
                     {
                         if (isGlobalOrTopNamespace)
                         {
-                            //¸½¼ÓÃüÃû¿Õ¼äÃû  
+                            //é™„åŠ å‘½åç©ºé—´å  
                             if (isTopLevelAtNamespace)
                                 constDeclNode.identifierNode.SetPrefix(currentNamespace);
 
-                            //ĞÂ½¨·ûºÅ±íÌõÄ¿  
+                            //æ–°å»ºç¬¦å·è¡¨æ¡ç›®  
                             var newRec = envStack.Peek().NewRecord(
                                 constDeclNode.identifierNode.FullName,
                                 SymbolTable.RecordCatagory.Constant,
@@ -2547,30 +2568,30 @@ namespace Gizbox.SemanticRule
                         }
                     }
                     break;
-                //¶¥¼¶±äÁ¿ÉùÃ÷Óï¾ä
+                //é¡¶çº§å˜é‡å£°æ˜è¯­å¥
                 case SyntaxTree.VarDeclareNode varDeclNode:
                     {
                         if (isGlobalOrTopNamespace)
                         {
-                            //È«¾Ö±äÁ¿²»ÔÊĞíÓĞËùÓĞÈ¨ĞŞÊÎ·û
+                            //å…¨å±€å˜é‡ä¸å…è®¸æœ‰æ‰€æœ‰æƒä¿®é¥°ç¬¦
                             if(varDeclNode.flags.HasFlag(VarModifiers.Own) || varDeclNode.flags.HasFlag(VarModifiers.Bor))
                                 throw new SemanticException(ExceptioName.OwnershipError, varDeclNode, "global variable can not have ownership modifiers");
 
-                            //¸½¼ÓÃüÃû¿Õ¼äÃû  
+                            //é™„åŠ å‘½åç©ºé—´å  
                             if (isTopLevelAtNamespace)
                                 varDeclNode.identifierNode.SetPrefix(currentNamespace);
 
-                            //²¹È«ÀàĞÍÃû  
+                            //è¡¥å…¨ç±»å‹å  
                             TryCompleteType(varDeclNode.typeNode);
 
-                            //ÊÇ·ñ³õÊ¼ÖµÊÇ³£Á¿
+                            //æ˜¯å¦åˆå§‹å€¼æ˜¯å¸¸é‡
                             string initVal = string.Empty;
                             if(varDeclNode.initializerNode is LiteralNode lit)
                             {
                                 initVal = lit.token.attribute;
                             }
 
-                            //ĞÂ½¨·ûºÅ±íÌõÄ¿  
+                            //æ–°å»ºç¬¦å·è¡¨æ¡ç›®  
                             var newRec = envStack.Peek().NewRecord(
                                 varDeclNode.identifierNode.FullName,
                                 SymbolTable.RecordCatagory.Variable,
@@ -2581,30 +2602,30 @@ namespace Gizbox.SemanticRule
                         }
                     }
                     break;
-                //ËùÓĞÈ¨CaptureÓï¾ä
+                //æ‰€æœ‰æƒCaptureè¯­å¥
                 case SyntaxTree.OwnershipCaptureStmtNode captureNode:
                     {
                         if(isGlobalOrTopNamespace)
                         {
-                            //ËùÓĞÈ¨captureÓï¾ä²»ÄÜÔÚÈ«¾Ö×÷ÓÃÓòÊ¹ÓÃ¡£Ö»ÄÜÔÚ¾Ö²¿×÷ÓÃÓòÊ¹ÓÃ¡£  
+                            //æ‰€æœ‰æƒcaptureè¯­å¥ä¸èƒ½åœ¨å…¨å±€ä½œç”¨åŸŸä½¿ç”¨ã€‚åªèƒ½åœ¨å±€éƒ¨ä½œç”¨åŸŸä½¿ç”¨ã€‚  
                             throw new SemanticException(ExceptioName.OwnershipError, captureNode, "ownership capture stmt can not be used in global scope");
                         }
                     }
                     break;
-                //ËùÓĞÈ¨LeakÓï¾ä  
+                //æ‰€æœ‰æƒLeakè¯­å¥  
                 case SyntaxTree.OwnershipLeakStmtNode leakNode:
                     {
                         if(isGlobalOrTopNamespace)
                         {
-                            //ËùÓĞÈ¨leakÓï¾ä²»ÄÜÔÚÈ«¾Ö×÷ÓÃÓòÊ¹ÓÃ¡£Ö»ÄÜÔÚ¾Ö²¿×÷ÓÃÓòÊ¹ÓÃ¡£
+                            //æ‰€æœ‰æƒleakè¯­å¥ä¸èƒ½åœ¨å…¨å±€ä½œç”¨åŸŸä½¿ç”¨ã€‚åªèƒ½åœ¨å±€éƒ¨ä½œç”¨åŸŸä½¿ç”¨ã€‚
                             throw new SemanticException(ExceptioName.OwnershipError, leakNode, "ownership leak stmt can not be used in global scope");
                         }
                     }
                     break;
-                //¶¥¼¶º¯ÊıÉùÃ÷Óï¾ä
+                //é¡¶çº§å‡½æ•°å£°æ˜è¯­å¥
                 case SyntaxTree.FuncDeclareNode funcDeclNode:
                     {
-                        //£¨¾²Ì¬º¯Êı£©    
+                        //ï¼ˆé™æ€å‡½æ•°ï¼‰    
                         // skip template function declarations during passes
                         if(funcDeclNode.isTemplateFunction)
                             break;
@@ -2612,22 +2633,22 @@ namespace Gizbox.SemanticRule
                         {
 
                             bool isMethod = envStack.Peek().tableCatagory == SymbolTable.TableCatagory.ClassScope;
-                            if (isMethod) throw new Exception();//¶¥²ãº¯Êı²»¿ÉÄÜÊÇ·½·¨
+                            if (isMethod) throw new Exception();//é¡¶å±‚å‡½æ•°ä¸å¯èƒ½æ˜¯æ–¹æ³•
 
-                            //¸½¼ÓÃüÃû¿Õ¼äÃû  
+                            //é™„åŠ å‘½åç©ºé—´å  
                             if (isTopLevelAtNamespace)
                                 funcDeclNode.identifierNode.SetPrefix(currentNamespace);
 
 
-                            //ĞÎ²ÎÀàĞÍ²¹È«  
+                            //å½¢å‚ç±»å‹è¡¥å…¨  
                             foreach (var p in funcDeclNode.parametersNode.parameterNodes)
                             {
                                 TryCompleteType(p.typeNode);
                             }
-                            //·µ»ØÀàĞÍ²¹È«
+                            //è¿”å›ç±»å‹è¡¥å…¨
                             TryCompleteType(funcDeclNode.returnTypeNode);
 
-                            //·ûºÅµÄÀàĞÍ±í´ïÊ½  
+                            //ç¬¦å·çš„ç±»å‹è¡¨è¾¾å¼  
                             string typeExpr = "";
                             for (int i = 0; i < funcDeclNode.parametersNode.parameterNodes.Count; ++i)
                             {
@@ -2638,7 +2659,7 @@ namespace Gizbox.SemanticRule
                             typeExpr += (" => " + funcDeclNode.returnTypeNode.TypeExpression());
 
 
-                            //º¯ÊıĞŞÊÎÃû³Æ  
+                            //å‡½æ•°ä¿®é¥°åç§°  
                             var paramTypeArr = funcDeclNode.parametersNode.parameterNodes.Select(n => n.typeNode.TypeExpression()).ToArray();
                             var funcMangledName = funcDeclNode.identifierNode.FullName;
                             if(funcMangledName != "main")
@@ -2649,14 +2670,14 @@ namespace Gizbox.SemanticRule
 
                             funcDeclNode.attributes[AstAttr.mangled_name] = funcMangledName;
 
-                            //ĞÂµÄ×÷ÓÃÓò  
+                            //æ–°çš„ä½œç”¨åŸŸ  
                             string envName = isMethod ? envStack.Peek().name + "." + funcMangledName : funcMangledName;
 
                             var newEnv = new SymbolTable(envName, SymbolTable.TableCatagory.FuncScope, envStack.Peek());
                             funcDeclNode.attributes[AstAttr.env] = newEnv;
 
 
-                            //Ìí¼ÓÌõÄ¿  
+                            //æ·»åŠ æ¡ç›®  
                             var newRec = envStack.Peek().NewRecord(
                                 funcMangledName,
                                 SymbolTable.RecordCatagory.Function,
@@ -2667,7 +2688,7 @@ namespace Gizbox.SemanticRule
 
                             funcDeclNode.attributes[AstAttr.func_rec] = newRec;
 
-                            //ÖØÔØº¯Êı  
+                            //é‡è½½å‡½æ•°  
                             if(funcDeclNode.funcType == FunctionKind.OperatorOverload)
                             {
                                 newRec.flags |= SymbolTable.RecordFlag.OperatorOverloadFunc;
@@ -2675,26 +2696,26 @@ namespace Gizbox.SemanticRule
                         }
                     }
                     break;
-                //Íâ²¿º¯ÊıÉùÃ÷  
+                //å¤–éƒ¨å‡½æ•°å£°æ˜  
                 case SyntaxTree.ExternFuncDeclareNode externFuncDeclNode:
                     {
-                        //¸½¼ÓÃüÃû¿Õ¼äÃû³Æ    
+                        //é™„åŠ å‘½åç©ºé—´åç§°    
                         if (isGlobalOrTopNamespace)
                         {
-                            //¸½¼ÓÃüÃû¿Õ¼ä  
+                            //é™„åŠ å‘½åç©ºé—´  
                             if (isTopLevelAtNamespace)
                                 externFuncDeclNode.identifierNode.SetPrefix(currentNamespace);
 
 
-                            //ĞÎ²ÎÀàĞÍ²¹È«  
+                            //å½¢å‚ç±»å‹è¡¥å…¨  
                             foreach (var p in externFuncDeclNode.parametersNode.parameterNodes)
                             {
                                 TryCompleteType(p.typeNode);
                             }
-                            //·µ»ØÀàĞÍ²¹È«  
+                            //è¿”å›ç±»å‹è¡¥å…¨  
                             TryCompleteType(externFuncDeclNode.returnTypeNode);
 
-                            //·ûºÅµÄÀàĞÍ±í´ïÊ½  
+                            //ç¬¦å·çš„ç±»å‹è¡¨è¾¾å¼  
                             string typeExpr = "";
                             for (int i = 0; i < externFuncDeclNode.parametersNode.parameterNodes.Count; ++i)
                             {
@@ -2704,20 +2725,20 @@ namespace Gizbox.SemanticRule
                             }
                             typeExpr += (" => " + externFuncDeclNode.returnTypeNode.TypeExpression());
 
-                            //º¯ÊıĞŞÊÎÃû³Æ  
+                            //å‡½æ•°ä¿®é¥°åç§°  
                             var paramTypeArr = externFuncDeclNode.parametersNode.parameterNodes.Select(n => n.typeNode.TypeExpression()).ToArray();
                             //var funcFullName = Utils.Mangle(externFuncDeclNode.identifierNode.FullName, paramTypeArr);
                             var funcFullName = Utils.ToExternFuncName(externFuncDeclNode.identifierNode.FullName);
                             externFuncDeclNode.attributes[AstAttr.extern_name] = funcFullName;
 
-                            //ĞÂµÄ×÷ÓÃÓò  
+                            //æ–°çš„ä½œç”¨åŸŸ  
                             string envName = funcFullName;
 
                             var newEnv = new SymbolTable(envName, SymbolTable.TableCatagory.FuncScope, envStack.Peek());
                             externFuncDeclNode.attributes[AstAttr.env] = newEnv;
 
 
-                            //Ìí¼ÓÌõÄ¿  
+                            //æ·»åŠ æ¡ç›®  
                             var newRec = envStack.Peek().NewRecord(
                                 funcFullName,
                                 SymbolTable.RecordCatagory.Function,
@@ -2734,13 +2755,13 @@ namespace Gizbox.SemanticRule
                         }
                     }
                     break;
-
+                //ç±»å£°æ˜  
                 case SyntaxTree.ClassDeclareNode classDeclNode:
                     {
                         if(classDeclNode.isTemplateClass)
                             break;
 
-                        //¸½¼ÓÃüÃû¿Õ¼äÃû³Æ    
+                        //é™„åŠ å‘½åç©ºé—´åç§°    
                         if (isGlobalOrTopNamespace)
                         {
                             if (isTopLevelAtNamespace)
@@ -2754,20 +2775,20 @@ namespace Gizbox.SemanticRule
                                 }
                             }
 
-                            //ĞÂµÄ×÷ÓÃÓò  
+                            //æ–°çš„ä½œç”¨åŸŸ  
                             var newEnv = new SymbolTable(classDeclNode.classNameNode.FullName, SymbolTable.TableCatagory.ClassScope, envStack.Peek());
                             classDeclNode.attributes[AstAttr.env] = newEnv;
 
-                            //Ìí¼ÓÌõÄ¿-ÀàÃû    
+                            //æ·»åŠ æ¡ç›®-ç±»å    
                             var newRec = envStack.Peek().NewRecord(
                                 classDeclNode.classNameNode.FullName,
                                 SymbolTable.RecordCatagory.Class,
                                 "",
                                 newEnv
                                 );
+                            classDeclNode.attributes[AstAttr.class_rec] = newRec;
 
-
-                            //ËùÓĞÈ¨Ä£ĞÍ  
+                            //æ‰€æœ‰æƒæ¨¡å‹  
                             if(classDeclNode.flags.HasFlag(TypeModifiers.Own))
                                 newRec.flags |= SymbolTable.RecordFlag.OwnershipClass;
                             else
@@ -2779,6 +2800,11 @@ namespace Gizbox.SemanticRule
                         }
                     }
                     break;
+                case SyntaxTree.AccessLabelNode accessLabelNode:
+                    {
+                        throw new SemanticException(ExceptioName.SemanticAnalysysError, accessLabelNode, "access label node can only declare in class scope.");
+                    }
+                    break;
                 default:
                     break;
             }
@@ -2786,7 +2812,7 @@ namespace Gizbox.SemanticRule
         }
 
         /// <summary>
-        /// PASS2:µİ¹éÏòÏÂÊÕ¼¯ÆäËû·ûºÅĞÅÏ¢    
+        /// PASS2:é€’å½’å‘ä¸‹æ”¶é›†å…¶ä»–ç¬¦å·ä¿¡æ¯    
         /// </summary>
         private void Pass2_CollectOtherSymbols(SyntaxTree.Node node)
         {
@@ -2830,7 +2856,7 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.StatementBlockNode stmtBlockNode:
                     {
-                        //½øÈë×÷ÓÃÓò  
+                        //è¿›å…¥ä½œç”¨åŸŸ  
                         var newEnv = new SymbolTable("stmtblock" + (this.blockCounter++), SymbolTable.TableCatagory.StmtBlockScope, envStack.Peek());
                         stmtBlockNode.attributes[AstAttr.env] = newEnv;
                         envStack.Push(newEnv);
@@ -2840,7 +2866,7 @@ namespace Gizbox.SemanticRule
                             Pass2_CollectOtherSymbols(stmtNode);
                         }
 
-                        //Àë¿ª×÷ÓÃÓò  
+                        //ç¦»å¼€ä½œç”¨åŸŸ  
                         envStack.Pop();
                     }
                     break;
@@ -2849,7 +2875,7 @@ namespace Gizbox.SemanticRule
                         //Id at env
                         constDeclNode.identifierNode.attributes[AstAttr.def_at_env] = envStack.Peek();
 
-                        //£¨·ÇÈ«¾Ö£©²»Ö§³Ö³ÉÔ±³£Á¿  
+                        //ï¼ˆéå…¨å±€ï¼‰ä¸æ”¯æŒæˆå‘˜å¸¸é‡  
                         if (isGlobalOrTopAtNamespace == false)
                         {
                             throw new SemanticException(ExceptioName.ConstantGlobalOrNamespaceOnly, constDeclNode, "");
@@ -2862,51 +2888,56 @@ namespace Gizbox.SemanticRule
                         varDeclNode.identifierNode.attributes[AstAttr.def_at_env] = envStack.Peek();
 
 
-                        //£¨·ÇÈ«¾Ö±äÁ¿£©³ÉÔ±×Ö¶Î»òÕß¾Ö²¿±äÁ¿  
+                        //ï¼ˆéå…¨å±€å˜é‡ï¼‰æˆå‘˜å­—æ®µæˆ–è€…å±€éƒ¨å˜é‡  
                         if (isGlobalOrTopAtNamespace == false)
                         {
-                            //Ê¹ÓÃÔ­Ãû  
+                            //ä½¿ç”¨åŸå  
                             varDeclNode.identifierNode.SetPrefix(null);
 
-                            //²¹È«ÀàĞÍ  
+                            //è¡¥å…¨ç±»å‹  
                             TryCompleteType(varDeclNode.typeNode);
 
-                            //ĞÂ½¨·ûºÅ±íÌõÄ¿  
+                            //è®¿é—®æ§åˆ¶ä¿®é¥°ç¬¦  
+                            bool isPrivate = (varDeclNode.attributes.TryGetValue(AstAttr.member_access_modifiers, out object accessmodif) && (AccessMofifier)accessmodif == AccessMofifier.Private);
+
+                            //æ–°å»ºç¬¦å·è¡¨æ¡ç›®  
                             var newRec = envStack.Peek().NewRecord(
                                 varDeclNode.identifierNode.FullName,
                                 SymbolTable.RecordCatagory.Variable,
                                 varDeclNode.typeNode.TypeExpression()
                                 );
+                            newRec.accessFlags = isPrivate ? SymbolTable.AccessFlag.Private : SymbolTable.AccessFlag.Public;
+                            
                             varDeclNode.attributes[AstAttr.var_rec] = newRec;
 
-                            //ÊÇ³ÉÔ±×Ö¶Î¶¨Òå -> Ô¤ÏÈ¶ÁÈ¡ËùÓĞÈ¨Ä£ĞÍ  
+                            //æ˜¯æˆå‘˜å­—æ®µå®šä¹‰ -> é¢„å…ˆè¯»å–æ‰€æœ‰æƒæ¨¡å‹  
                             if(envStack.Peek().tableCatagory == SymbolTable.TableCatagory.ClassScope)
                             {
                                 var ownershipModel = GetOwnershipModel(varDeclNode.flags, varDeclNode.typeNode);
                                 newRec.flags |= ownershipModel;
 
-                                if(ownershipModel.HasFlag(SymbolTable.RecordFlag.BorrowVar))//³ÉÔ±×Ö¶Î²»ÄÜÊÇ½èÓÃÀàĞÍ  
+                                if(ownershipModel.HasFlag(SymbolTable.RecordFlag.BorrowVar))//æˆå‘˜å­—æ®µä¸èƒ½æ˜¯å€Ÿç”¨ç±»å‹  
                                     throw new SemanticException(ExceptioName.OwnershipError_MemberVarCannotBeBorrow, varDeclNode, newRec.name);
                             }
                         }
                     }
                     break;
-                //ËùÓĞÈ¨CaptureÓï¾ä
+                //æ‰€æœ‰æƒCaptureè¯­å¥
                 case SyntaxTree.OwnershipCaptureStmtNode captureNode:
                     {
                         //Id at env
                         captureNode.lIdentifier.attributes[AstAttr.def_at_env] = envStack.Peek();
 
-                        //£¨·ÇÈ«¾Ö±äÁ¿£©³ÉÔ±×Ö¶Î»òÕß¾Ö²¿±äÁ¿  
+                        //ï¼ˆéå…¨å±€å˜é‡ï¼‰æˆå‘˜å­—æ®µæˆ–è€…å±€éƒ¨å˜é‡  
                         if(isGlobalOrTopAtNamespace == false)
                         {
-                            //Ê¹ÓÃÔ­Ãû  
+                            //ä½¿ç”¨åŸå  
                             captureNode.lIdentifier.SetPrefix(null);
 
-                            //²¹È«ÀàĞÍ  
+                            //è¡¥å…¨ç±»å‹  
                             TryCompleteType(captureNode.typeNode);
 
-                            //ĞÂ½¨·ûºÅ±íÌõÄ¿  
+                            //æ–°å»ºç¬¦å·è¡¨æ¡ç›®  
                             var newRec = envStack.Peek().NewRecord(
                                 captureNode.lIdentifier.FullName,
                                 SymbolTable.RecordCatagory.Variable,
@@ -2916,22 +2947,22 @@ namespace Gizbox.SemanticRule
                         }
                     }
                     break;
-                //ËùÓĞÈ¨LeakÓï¾ä  
+                //æ‰€æœ‰æƒLeakè¯­å¥  
                 case SyntaxTree.OwnershipLeakStmtNode leakNode:
                     {
                         //Id at env
                         leakNode.lIdentifier.attributes[AstAttr.def_at_env] = envStack.Peek();
 
-                        //£¨·ÇÈ«¾Ö±äÁ¿£©³ÉÔ±×Ö¶Î»òÕß¾Ö²¿±äÁ¿  
+                        //ï¼ˆéå…¨å±€å˜é‡ï¼‰æˆå‘˜å­—æ®µæˆ–è€…å±€éƒ¨å˜é‡  
                         if(isGlobalOrTopAtNamespace == false)
                         {
-                            //Ê¹ÓÃÔ­Ãû  
+                            //ä½¿ç”¨åŸå  
                             leakNode.lIdentifier.SetPrefix(null);
 
-                            //²¹È«ÀàĞÍ  
+                            //è¡¥å…¨ç±»å‹  
                             TryCompleteType(leakNode.typeNode);
 
-                            //ĞÂ½¨·ûºÅ±íÌõÄ¿  
+                            //æ–°å»ºç¬¦å·è¡¨æ¡ç›®  
                             var newRec = envStack.Peek().NewRecord(
                                 leakNode.lIdentifier.FullName,
                                 SymbolTable.RecordCatagory.Variable,
@@ -2950,33 +2981,33 @@ namespace Gizbox.SemanticRule
                         funcDeclNode.identifierNode.attributes[AstAttr.def_at_env] = envStack.Peek();
 
 
-                        //ÊÇ·ñÊÇÊµÀı³ÉÔ±º¯Êı  
+                        //æ˜¯å¦æ˜¯å®ä¾‹æˆå‘˜å‡½æ•°  
                         bool isMethod = envStack.Peek().tableCatagory == SymbolTable.TableCatagory.ClassScope;
                         string className = null;
                         if (isMethod) className = envStack.Peek().name;
                         if (isMethod && isGlobalOrTopAtNamespace) throw new SemanticException(ExceptioName.NamespaceTopLevelNonMemberFunctionOnly, funcDeclNode, "");
 
 
-                        //Èç¹ûÊÇ³ÉÔ±º¯Êı - ¼ÓÈë·ûºÅ±í  
+                        //å¦‚æœæ˜¯æˆå‘˜å‡½æ•° - åŠ å…¥ç¬¦å·è¡¨  
                         if (isGlobalOrTopAtNamespace == false && isMethod == true)
                         {
-                            //Ê¹ÓÃÔ­Ãû£¨³ÉÔ±º¯Êı£©  
+                            //ä½¿ç”¨åŸåï¼ˆæˆå‘˜å‡½æ•°ï¼‰  
                             funcDeclNode.identifierNode.SetPrefix(null);
 
 
-                            //ĞÎ²ÎÀàĞÍ²¹È«  
+                            //å½¢å‚ç±»å‹è¡¥å…¨  
                             foreach (var p in funcDeclNode.parametersNode.parameterNodes)
                             {
                                 TryCompleteType(p.typeNode);
                             }
-                            //·µ»ØÖµÀàĞÍ²¹È«    
+                            //è¿”å›å€¼ç±»å‹è¡¥å…¨    
                             TryCompleteType(funcDeclNode.returnTypeNode);
 
-                            //ĞÎ²ÎÁĞ±í £¨³ÉÔ±º¯Êı£©(²»°üº¬thisÀàĞÍ)  
+                            //å½¢å‚åˆ—è¡¨ ï¼ˆæˆå‘˜å‡½æ•°ï¼‰(ä¸åŒ…å«thisç±»å‹)  
                             var paramTypeArr = funcDeclNode.parametersNode.parameterNodes.Select(n => n.typeNode.TypeExpression()).ToArray();
 
 
-                            //·ûºÅµÄÀàĞÍ±í´ïÊ½£¨³ÉÔ±º¯Êı£©  
+                            //ç¬¦å·çš„ç±»å‹è¡¨è¾¾å¼ï¼ˆæˆå‘˜å‡½æ•°ï¼‰  
                             string typeExpr = "";
                             for (int i = 0; i < paramTypeArr.Length; ++i)
                             {
@@ -2985,28 +3016,30 @@ namespace Gizbox.SemanticRule
                             }
                             typeExpr += (" => " + funcDeclNode.returnTypeNode.TypeExpression());
 
-                            //º¯ÊıĞŞÊÎÃû³Æ£¨³ÉÔ±º¯Êı£©(Òª¼ÓÉÏthis»ùÀàĞÍ)  
+                            //å‡½æ•°ä¿®é¥°åç§°ï¼ˆæˆå‘˜å‡½æ•°ï¼‰(è¦åŠ ä¸ŠthisåŸºç±»å‹)  
                             var funcMangledName = Utils.Mangle(funcDeclNode.identifierNode.FullName, paramTypeArr);
                             funcDeclNode.attributes[AstAttr.mangled_name] = funcMangledName;
 
 
-                            //ĞÂµÄ×÷ÓÃÓò£¨³ÉÔ±º¯Êı£©  
+                            //æ–°çš„ä½œç”¨åŸŸï¼ˆæˆå‘˜å‡½æ•°ï¼‰  
                             string envName = isMethod ? envStack.Peek().name + "." + funcMangledName : funcMangledName;
 
                             var newEnv = new SymbolTable(envName, SymbolTable.TableCatagory.FuncScope, envStack.Peek());
                             funcDeclNode.attributes[AstAttr.env] = newEnv;
 
-                            //Àà·ûºÅ±íÍ¬Ãû·½·¨È¥ÖØ£¨³ÉÔ±º¯Êı£©    
+                            //ç±»ç¬¦å·è¡¨åŒåæ–¹æ³•å»é‡ï¼ˆæˆå‘˜å‡½æ•°ï¼‰    
                             if (envStack.Peek().ContainRecordName(funcMangledName))
                             {
                                 envStack.Peek().records.Remove(funcMangledName);
                             }
 
-                            //Ìí¼Óµ½Ğéº¯Êı±í£¨³ÉÔ±º¯Êı£©    
+                            //æ·»åŠ åˆ°è™šå‡½æ•°è¡¨ï¼ˆæˆå‘˜å‡½æ•°ï¼‰    
                             this.ilUnit.vtables[className].NewRecord(funcMangledName, className);
 
+                            //æˆå‘˜è®¿é—®æ§åˆ¶ä¿®é¥°ç¬¦  
+                            bool isPrivate = (funcDeclNode.attributes.TryGetValue(AstAttr.member_access_modifiers, out object accessmodif) && (AccessMofifier)accessmodif == AccessMofifier.Private);
 
-                            //Ìí¼ÓÌõÄ¿£¨³ÉÔ±º¯Êı£©  
+                            //æ·»åŠ æ¡ç›®ï¼ˆæˆå‘˜å‡½æ•°ï¼‰  
                             var newRec = envStack.Peek().NewRecord(
                                 funcMangledName,
                                 SymbolTable.RecordCatagory.Function,
@@ -3014,6 +3047,7 @@ namespace Gizbox.SemanticRule
                                 newEnv
                                 );
                             newRec.rawname = funcDeclNode.identifierNode.FullName;
+                            newRec.accessFlags = isPrivate ? SymbolTable.AccessFlag.Private : SymbolTable.AccessFlag.Public;
 
                             funcDeclNode.attributes[AstAttr.func_rec] = newRec;
                         }
@@ -3025,30 +3059,30 @@ namespace Gizbox.SemanticRule
                         {
                             SymbolTable funcEnv = (SymbolTable)funcDeclNode.attributes[AstAttr.env];
 
-                            //½øÈëº¯Êı×÷ÓÃÓò  
+                            //è¿›å…¥å‡½æ•°ä½œç”¨åŸŸ  
                             envStack.Push(funcEnv);
 
 
 
-                            //Òş²ØµÄthis²ÎÊı¼ÓÈë·ûºÅ±í    
+                            //éšè—çš„thiså‚æ•°åŠ å…¥ç¬¦å·è¡¨    
                             if(isMethod)
                             {
                                 funcEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, className);
                             }
 
-                            //ĞÎ²Î¼ÓÈë·ûºÅ±í  
+                            //å½¢å‚åŠ å…¥ç¬¦å·è¡¨  
                             foreach (var paramNode in funcDeclNode.parametersNode.parameterNodes)
                             {
                                 Pass2_CollectOtherSymbols(paramNode);
                             }
 
-                            //¾Ö²¿±äÁ¿¼ÓÈë·ûºÅ±í    
+                            //å±€éƒ¨å˜é‡åŠ å…¥ç¬¦å·è¡¨    
                             foreach (var stmtNode in funcDeclNode.statementsNode.statements)
                             {
                                 Pass2_CollectOtherSymbols(stmtNode);
                             }
 
-                            //Àë¿ªº¯Êı×÷ÓÃÓò  
+                            //ç¦»å¼€å‡½æ•°ä½œç”¨åŸŸ  
                             envStack.Pop();
                         }
                     }
@@ -3060,21 +3094,21 @@ namespace Gizbox.SemanticRule
                         externFuncDeclNode.identifierNode.attributes[AstAttr.def_at_env] = envStack.Peek();
 
 
-                        //PASS1Ö¹ÓÚÌí¼Ó·ûºÅÌõÄ¿  
+                        //PASS1æ­¢äºæ·»åŠ ç¬¦å·æ¡ç›®  
 
                         //Env  
                         var funcEnv = (SymbolTable)externFuncDeclNode.attributes[AstAttr.env];
 
-                        //½øÈëº¯Êı×÷ÓÃÓò  
+                        //è¿›å…¥å‡½æ•°ä½œç”¨åŸŸ  
                         envStack.Push(funcEnv);
 
 
-                        //ĞÎ²Î¼ÓÈë·ûºÅ±í    
+                        //å½¢å‚åŠ å…¥ç¬¦å·è¡¨    
                         foreach (var paramNode in externFuncDeclNode.parametersNode.parameterNodes)
                         {
                             Pass2_CollectOtherSymbols(paramNode);
                         }
-                        //Àë¿ªº¯Êı×÷ÓÃÓò  
+                        //ç¦»å¼€å‡½æ•°ä½œç”¨åŸŸ  
                         envStack.Pop();
                     }
                     break;
@@ -3084,10 +3118,10 @@ namespace Gizbox.SemanticRule
                         //Id at env
                         paramNode.identifierNode.attributes[AstAttr.def_at_env] = envStack.Peek();
 
-                        //²ÎÊıÀàĞÍ²¹È«    
+                        //å‚æ•°ç±»å‹è¡¥å…¨    
                         TryCompleteType(paramNode.typeNode);
 
-                        //ĞÎ²Î¼ÓÈëº¯Êı×÷ÓÃÓòµÄ·ûºÅ±í  
+                        //å½¢å‚åŠ å…¥å‡½æ•°ä½œç”¨åŸŸçš„ç¬¦å·è¡¨  
                         var newRec = envStack.Peek().NewRecord(
                             paramNode.identifierNode.FullName,
                             SymbolTable.RecordCatagory.Param,
@@ -3105,32 +3139,32 @@ namespace Gizbox.SemanticRule
                         classDeclNode.classNameNode.attributes[AstAttr.def_at_env] = envStack.Peek();
 
 
-                        //PASS1Ö¹ÓÚÌí¼Ó·ûºÅÌõÄ¿  
+                        //PASS1æ­¢äºæ·»åŠ ç¬¦å·æ¡ç›®  
 
                         //ENV  
                         var newEnv = (SymbolTable)classDeclNode.attributes[AstAttr.env];
 
 
-                        //²¹È«¼Ì³Ğ»ùÀàµÄÀàÃû    
+                        //è¡¥å…¨ç»§æ‰¿åŸºç±»çš„ç±»å    
                         if (classDeclNode.baseClassNameNode != null)
                             TryCompleteIdenfier(classDeclNode.baseClassNameNode);
 
-                        //ĞÂ½¨Ğéº¯Êı±í  
+                        //æ–°å»ºè™šå‡½æ•°è¡¨  
                         string classFullName = classDeclNode.classNameNode.FullName;
                         var vtable = ilUnit.vtables[classFullName] = new VTable(classFullName);
-                        Log("ĞÂµÄĞéº¯Êı±í£º" + classFullName);
+                        Log("æ–°çš„è™šå‡½æ•°è¡¨ï¼š" + classFullName);
 
-                        //½øÈëÀà×÷ÓÃÓò  
+                        //è¿›å…¥ç±»ä½œç”¨åŸŸ  
                         envStack.Push(newEnv);
 
-                        //ÓĞ»ùÀà  
+                        //æœ‰åŸºç±»  
                         if (classDeclNode.classNameNode.FullName != "Core::Object")
                         {
-                            //»ùÀàÃû    
+                            //åŸºç±»å    
                             string baseClassFullName;
                             if (classDeclNode.baseClassNameNode != null)
                             {
-                                //³¢ÊÔ²¹È«»ùÀà±ê¼Ç  
+                                //å°è¯•è¡¥å…¨åŸºç±»æ ‡è®°  
                                 TryCompleteIdenfier(classDeclNode.baseClassNameNode);
                                 baseClassFullName = classDeclNode.baseClassNameNode.FullName;
                             }
@@ -3145,7 +3179,7 @@ namespace Gizbox.SemanticRule
                             newEnv.NewRecord("base", SymbolTable.RecordCatagory.Other, "(inherit)", baseEnv);
 
 
-                            //»ùÀà·ûºÅ±íÌõÄ¿²¢Èë//½ö×Ö¶Î  
+                            //åŸºç±»ç¬¦å·è¡¨æ¡ç›®å¹¶å…¥//ä»…å­—æ®µ  
                             foreach (var reckv in baseEnv.records)
                             {
                                 if (reckv.Value.category == SymbolTable.RecordCatagory.Variable)
@@ -3153,25 +3187,38 @@ namespace Gizbox.SemanticRule
                                     newEnv.AddRecord(reckv.Key, reckv.Value);
                                 }
                             }
-                            //Ğéº¯Êı±í¿ËÂ¡  
+                            //è™šå‡½æ•°è¡¨å…‹éš†  
                             var baseVTable = this.ilUnit.QueryVTable(baseClassFullName);
                             if (baseVTable == null) throw new SemanticException(ExceptioName.BaseClassNotFound, classDeclNode.baseClassNameNode, baseClassFullName);
                             baseVTable.CloneDataTo(vtable);
                         }
 
 
-                        //ĞÂ¶¨ÒåµÄ³ÉÔ±×Ö¶Î¼ÓÈë·ûºÅ±í
+                        //æ–°å®šä¹‰çš„æˆå‘˜å­—æ®µè®¾å®šè®¿é—®æ§åˆ¶(é»˜è®¤public)  
+                        AccessMofifier currentAccessModif = AccessMofifier.Public;
+                        foreach(var declNode in classDeclNode.memberDelareNodes)
+                        {
+                            if(declNode is AccessLabelNode accessLabelNode)
+                            {
+                                currentAccessModif = accessLabelNode.accessMofifier;
+                                continue;
+                            }
+
+                            declNode.attributes[AstAttr.member_access_modifiers] = currentAccessModif;
+                        }
+
+                        //æ–°å®šä¹‰çš„æˆå‘˜å­—æ®µåŠ å…¥ç¬¦å·è¡¨
                         foreach (var declNode in classDeclNode.memberDelareNodes)
                         {
                             Pass2_CollectOtherSymbols(declNode);
                         }
 
-                        //¹¹Ôìº¯Êı  
+                        //æ„é€ å‡½æ•°  
                         {
-                            //Ä¬ÈÏÒşÊ½¹¹Ôìº¯ÊıµÄ·ûºÅ±í  
+                            //é»˜è®¤éšå¼æ„é€ å‡½æ•°çš„ç¬¦å·è¡¨  
                             var ctorEnv = new SymbolTable(classDeclNode.classNameNode.FullName + "::ctor", SymbolTable.TableCatagory.FuncScope, newEnv);
                             ctorEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, classDeclNode.classNameNode.FullName);
-                            //Ìí¼ÓÌõÄ¿-¹¹Ôìº¯Êı    
+                            //æ·»åŠ æ¡ç›®-æ„é€ å‡½æ•°    
                             var ctorRec = newEnv.NewRecord(
                                 classDeclNode.classNameNode.FullName + "::ctor",
                                 SymbolTable.RecordCatagory.Function,
@@ -3182,12 +3229,12 @@ namespace Gizbox.SemanticRule
                             ctorRec.flags |= SymbolTable.RecordFlag.Ctor;
                         }
 
-                        //Îö¹¹º¯Êı  
+                        //ææ„å‡½æ•°  
                         {
-                            //Ä¬ÈÏÒşÊ½Îö¹¹º¯ÊıµÄ·ûºÅ±í  
+                            //é»˜è®¤éšå¼ææ„å‡½æ•°çš„ç¬¦å·è¡¨  
                             var dtorEnv = new SymbolTable(classDeclNode.classNameNode.FullName + "::dtor", SymbolTable.TableCatagory.FuncScope, newEnv);
                             dtorEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, classDeclNode.classNameNode.FullName);
-                            //Ìí¼ÓÌõÄ¿-Îö¹¹º¯Êı
+                            //æ·»åŠ æ¡ç›®-ææ„å‡½æ•°
                             var dtorRec = newEnv.NewRecord(
                                 classDeclNode.classNameNode.FullName + "::dtor",
                                 SymbolTable.RecordCatagory.Function,
@@ -3198,9 +3245,11 @@ namespace Gizbox.SemanticRule
                             dtorRec.flags |= SymbolTable.RecordFlag.Dtor;
                         }
 
+                        //ç”Ÿæˆç±»çš„å†…å­˜å¸ƒå±€  
+                        GenClassLayoutInfo(classDeclNode.attributes[AstAttr.class_rec] as SymbolTable.Record);
 
 
-                        //Àë¿ªÀà×÷ÓÃÓò  
+                        //ç¦»å¼€ç±»ä½œç”¨åŸŸ  
                         envStack.Pop();
                     }
                     break;
@@ -3229,20 +3278,20 @@ namespace Gizbox.SemanticRule
                     {
                         forNode.attributes[AstAttr.uid] = forCounter++;
 
-                        //ĞÂµÄ×÷ÓÃÓò  
+                        //æ–°çš„ä½œç”¨åŸŸ  
                         var newEnv = new SymbolTable("ForLoop" + (int)forNode.attributes[AstAttr.uid], SymbolTable.TableCatagory.LoopScope, envStack.Peek());
                         forNode.attributes[AstAttr.env] = newEnv;
 
-                        //½øÈëFORÑ­»·×÷ÓÃÓò  
+                        //è¿›å…¥FORå¾ªç¯ä½œç”¨åŸŸ  
                         envStack.Push(newEnv);
 
-                        //ÊÕ¼¯³õÊ¼»¯Óï¾äÖĞµÄ·ûºÅ  
+                        //æ”¶é›†åˆå§‹åŒ–è¯­å¥ä¸­çš„ç¬¦å·  
                         Pass2_CollectOtherSymbols(forNode.initializerNode);
 
-                        //ÊÕ¼¯Óï¾äÖĞ·ûºÅ  
+                        //æ”¶é›†è¯­å¥ä¸­ç¬¦å·  
                         Pass2_CollectOtherSymbols(forNode.stmtNode);
 
-                        //Àë¿ªFORÑ­»·×÷ÓÃÓò  
+                        //ç¦»å¼€FORå¾ªç¯ä½œç”¨åŸŸ  
                         envStack.Pop();
                     }
                     break;
@@ -3253,7 +3302,7 @@ namespace Gizbox.SemanticRule
         }
 
         /// <summary>
-        /// PASS3:ÓïÒå·ÖÎö£¨ÀàĞÍ¼ì²é¡¢Ê÷½ÚµãÖØĞ´µÈ£©      
+        /// PASS3:è¯­ä¹‰åˆ†æï¼ˆç±»å‹æ£€æŸ¥ã€æ ‘èŠ‚ç‚¹é‡å†™ç­‰ï¼‰      
         /// </summary>
         private void Pass3_AnalysisNode(SyntaxTree.Node node)
         {
@@ -3294,29 +3343,29 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.StatementBlockNode stmtBlockNode:
                     {
-                        //½øÈë×÷ÓÃÓò 
+                        //è¿›å…¥ä½œç”¨åŸŸ 
                         envStack.Push(stmtBlockNode.attributes[AstAttr.env] as SymbolTable);
 
                         foreach (var stmtNode in stmtBlockNode.statements)
                         {
-                            //·ÖÎö¿éÖĞµÄÓï¾ä  
+                            //åˆ†æå—ä¸­çš„è¯­å¥  
                             Pass3_AnalysisNode(stmtNode);
                         }
 
-                        //Àë¿ª×÷ÓÃÓò  
+                        //ç¦»å¼€ä½œç”¨åŸŸ  
                         envStack.Pop();
                     }
                     break;
                 case SyntaxTree.ConstantDeclareNode constDeclNode:
                     {
-                        //·ÖÎö³£Á¿×ÖÃæÖµ
+                        //åˆ†æå¸¸é‡å­—é¢å€¼
                         Pass3_AnalysisNode(constDeclNode.litValNode);
 
-                        //³£Á¿ÀàĞÍ²»Ö§³ÖÍÆ¶Ï  
+                        //å¸¸é‡ç±»å‹ä¸æ”¯æŒæ¨æ–­  
                         if (constDeclNode.typeNode is SyntaxTree.InferTypeNode)
                             throw new SemanticException(ExceptioName.SemanticAnalysysError, constDeclNode.typeNode, "");
 
-                        //ÀàĞÍ¼ì²é£¨³õÊ¼Öµ£©  
+                        //ç±»å‹æ£€æŸ¥ï¼ˆåˆå§‹å€¼ï¼‰  
                         bool valid = CheckType_Equal(constDeclNode.typeNode.TypeExpression(), AnalyzeTypeExpression(constDeclNode.litValNode));
                         if (!valid)
                             throw new SemanticException(ExceptioName.ConstantTypeDeclarationError, constDeclNode, "type:" + constDeclNode.typeNode.TypeExpression() + "  value type:" + AnalyzeTypeExpression(constDeclNode.litValNode));
@@ -3324,17 +3373,17 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.VarDeclareNode varDeclNode:
                     {
-                        //·ÖÎö³õÊ¼»¯±í´ïÊ½  
+                        //åˆ†æåˆå§‹åŒ–è¡¨è¾¾å¼  
                         Pass3_AnalysisNode(varDeclNode.initializerNode);
 
-                        //ÀàĞÍÍÆ¶Ï  
+                        //ç±»å‹æ¨æ–­  
                         if (varDeclNode.typeNode is InferTypeNode typeNode)
                         {
                             var typeExpr = InferType(typeNode, varDeclNode.initializerNode);
                             var record = envStack.Peek().GetRecord(varDeclNode.identifierNode.FullName);
                             record.typeExpression = typeExpr;
                         }
-                        //ÀàĞÍ¼ì²é£¨³õÊ¼Öµ£©  
+                        //ç±»å‹æ£€æŸ¥ï¼ˆåˆå§‹å€¼ï¼‰  
                         else
                         {
                             bool valid = CheckType_Equal(varDeclNode.typeNode.TypeExpression(), varDeclNode.initializerNode);
@@ -3350,17 +3399,17 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.OwnershipCaptureStmtNode captureNode:
                     {
-                        //·ÖÎöÓÒ±ß±äÁ¿ 
+                        //åˆ†æå³è¾¹å˜é‡ 
                         Pass3_AnalysisNode(captureNode.rIdentifier);
 
-                        //ÀàĞÍÍÆ¶Ï  
+                        //ç±»å‹æ¨æ–­  
                         if(captureNode.typeNode is InferTypeNode typeNode)
                         {
                             var typeExpr = InferType(typeNode, captureNode.rIdentifier);
                             var record = envStack.Peek().GetRecord(captureNode.lIdentifier.FullName);
                             record.typeExpression = typeExpr;
                         }
-                        //ÀàĞÍ¼ì²é£¨³õÊ¼Öµ£©  
+                        //ç±»å‹æ£€æŸ¥ï¼ˆåˆå§‹å€¼ï¼‰  
                         else
                         {
                             bool valid = CheckType_Equal(captureNode.typeNode.TypeExpression(), captureNode.rIdentifier);
@@ -3373,11 +3422,11 @@ namespace Gizbox.SemanticRule
 
                         }
 
-                        //capture×ó±ß±ØĞëÊÇownÉùÃ÷  
+                        //captureå·¦è¾¹å¿…é¡»æ˜¯ownå£°æ˜  
                         if(captureNode.flags.HasFlag(VarModifiers.Own) == false)
                             throw new SemanticException(ExceptioName.OwnershipError, captureNode, "capture left identifier must be declared as own");
 
-                        //capture²»ÄÜÓÃÓÚÖµÀàĞÍ  
+                        //captureä¸èƒ½ç”¨äºå€¼ç±»å‹  
                         GType gtype = GType.Parse(captureNode.typeNode.TypeExpression());
                         if(gtype.IsReferenceType == false)
                         {
@@ -3387,16 +3436,16 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.OwnershipLeakStmtNode leakNode:
                     {
-                        //·ÖÎöÓÒ±ß±äÁ¿ 
+                        //åˆ†æå³è¾¹å˜é‡ 
                         Pass3_AnalysisNode(leakNode.rIdentifier);
-                        //ÀàĞÍÍÆ¶Ï  
+                        //ç±»å‹æ¨æ–­  
                         if(leakNode.typeNode is InferTypeNode typeNode)
                         {
                             var typeExpr = InferType(typeNode, leakNode.rIdentifier);
                             var record = envStack.Peek().GetRecord(leakNode.lIdentifier.FullName);
                             record.typeExpression = typeExpr;
                         }
-                        //ÀàĞÍ¼ì²é£¨³õÊ¼Öµ£©  
+                        //ç±»å‹æ£€æŸ¥ï¼ˆåˆå§‹å€¼ï¼‰  
                         else
                         {
                             bool valid = CheckType_Equal(leakNode.typeNode.TypeExpression(), leakNode.rIdentifier);
@@ -3408,7 +3457,7 @@ namespace Gizbox.SemanticRule
                             }
                         }
 
-                        //leak²»ÄÜÓÃÓÚÖµÀàĞÍ  
+                        //leakä¸èƒ½ç”¨äºå€¼ç±»å‹  
                         GType gtype = GType.Parse(leakNode.typeNode.TypeExpression());
                         if(gtype.IsReferenceType == false)
                         {
@@ -3421,36 +3470,36 @@ namespace Gizbox.SemanticRule
                         if(funcDeclNode.isTemplateFunction)
                             break;
 
-                        //½øÈë×÷ÓÃÓò    
+                        //è¿›å…¥ä½œç”¨åŸŸ    
                         envStack.Push(funcDeclNode.attributes[AstAttr.env] as SymbolTable);
 
 
-                        //·ÖÎöĞÎ²Î¶¨Òå  
+                        //åˆ†æå½¢å‚å®šä¹‰  
                         foreach (var paramNode in funcDeclNode.parametersNode.parameterNodes)
                         {
                             Pass3_AnalysisNode(paramNode);
                         }
 
-                        //·ÖÎö¾Ö²¿Óï¾ä  
+                        //åˆ†æå±€éƒ¨è¯­å¥  
                         foreach (var stmtNode in funcDeclNode.statementsNode.statements)
                         {
                             Pass3_AnalysisNode(stmtNode);
                         }
 
-                        //·µ»ØÀàĞÍ²»Ö§³ÖÍÆ¶Ï  
+                        //è¿”å›ç±»å‹ä¸æ”¯æŒæ¨æ–­  
                         if(funcDeclNode.returnTypeNode is SyntaxTree.InferTypeNode)
                             throw new SemanticException(ExceptioName.SemanticAnalysysError, funcDeclNode.returnTypeNode, "");
 
-                        //·µ»ØÖµÀàĞÍ¼ì²é£¨½öÏŞ·ÇvoidµÄº¯Êı£©  
+                        //è¿”å›å€¼ç±»å‹æ£€æŸ¥ï¼ˆä»…é™évoidçš„å‡½æ•°ï¼‰  
                         if (!(funcDeclNode.returnTypeNode is SyntaxTree.PrimitiveTypeNode && (funcDeclNode.returnTypeNode as SyntaxTree.PrimitiveTypeNode).token.name == "void"))
                         {
-                            ////¼ì²é·µ»ØÓï¾äºÍ·µ»Ø±í´ïÊ½    
+                            ////æ£€æŸ¥è¿”å›è¯­å¥å’Œè¿”å›è¡¨è¾¾å¼    
                             if (CheckReturnStmt(funcDeclNode.statementsNode, funcDeclNode.returnTypeNode.TypeExpression()) == false)
                             {
                                 throw new SemanticException(ExceptioName.MissingReturnStatement, funcDeclNode, "");
                             }
 
-                            ////¼ì²é·µ»ØÓï¾äºÍ·µ»Ø±í´ïÊ½£¨ÁÙÊ±£©    
+                            ////æ£€æŸ¥è¿”å›è¯­å¥å’Œè¿”å›è¡¨è¾¾å¼ï¼ˆä¸´æ—¶ï¼‰    
                             //var returnStmt = funcDeclNode.statementsNode.statements.FirstOrDefault(s => s is SyntaxTree.ReturnStmtNode);
                             //if (returnStmt == null) throw new SemanticException(ExceptioName.MissingReturnStatement, funcDeclNode, "");
 
@@ -3460,28 +3509,28 @@ namespace Gizbox.SemanticRule
 
 
 
-                        //Àë¿ª×÷ÓÃÓò  
+                        //ç¦»å¼€ä½œç”¨åŸŸ  
                         envStack.Pop();
                     }
                     break;
                 case SyntaxTree.ExternFuncDeclareNode externFuncDeclNode:
                     {
-                        //½øÈë×÷ÓÃÓò    
+                        //è¿›å…¥ä½œç”¨åŸŸ    
                         envStack.Push(externFuncDeclNode.attributes[AstAttr.env] as SymbolTable);
 
-                        //·ÖÎöĞÎ²Î¶¨Òå
+                        //åˆ†æå½¢å‚å®šä¹‰
                         foreach (var paramNode in externFuncDeclNode.parametersNode.parameterNodes)
                         {
                             Pass3_AnalysisNode(paramNode);
                         }
 
 
-                        //·µ»ØÀàĞÍ²»Ö§³ÖÍÆ¶Ï  
+                        //è¿”å›ç±»å‹ä¸æ”¯æŒæ¨æ–­  
                         if(externFuncDeclNode.returnTypeNode is SyntaxTree.InferTypeNode)
                             throw new SemanticException(ExceptioName.SemanticAnalysysError, externFuncDeclNode.returnTypeNode, "");
 
 
-                        //Àë¿ª×÷ÓÃÓò  
+                        //ç¦»å¼€ä½œç”¨åŸŸ  
                         envStack.Pop();
                     }
                     break;
@@ -3490,22 +3539,22 @@ namespace Gizbox.SemanticRule
                         if(classdeclNode.isTemplateClass)
                             break;
 
-                        //½øÈë×÷ÓÃÓò    
+                        //è¿›å…¥ä½œç”¨åŸŸ    
                         envStack.Push(classdeclNode.attributes[AstAttr.env] as SymbolTable);
 
-                        //³ÉÔ±·ÖÎö  
+                        //æˆå‘˜åˆ†æ  
                         foreach (var declNode in classdeclNode.memberDelareNodes)
                         {
                             Pass3_AnalysisNode(declNode);
                         }
 
-                        //Àë¿ª×÷ÓÃÓò  
+                        //ç¦»å¼€ä½œç”¨åŸŸ  
                         envStack.Pop();
                     }
                     break;
                 case SyntaxTree.SingleExprStmtNode singleStmtNode:
                     {
-                        //µ¥Óï¾äÓïÒå·ÖÎö  
+                        //å•è¯­å¥è¯­ä¹‰åˆ†æ  
                         Pass3_AnalysisNode(singleStmtNode.exprNode);
                     }
                     break;
@@ -3513,53 +3562,53 @@ namespace Gizbox.SemanticRule
                     {
                         foreach (var clause in ifNode.conditionClauseList)
                         {
-                            //¼ì²éÌõ¼şÊÇ·ñÎª²¼¶ûÀàĞÍ  
+                            //æ£€æŸ¥æ¡ä»¶æ˜¯å¦ä¸ºå¸ƒå°”ç±»å‹  
                             CheckType_Equal("bool", clause.conditionNode);
-                            //¼ì²éÓï¾ä½Úµã  
+                            //æ£€æŸ¥è¯­å¥èŠ‚ç‚¹  
                             Pass3_AnalysisNode(clause.thenNode);
                         }
 
-                        //¼ì²éÓï¾ä  
+                        //æ£€æŸ¥è¯­å¥  
                         if (ifNode.elseClause != null) Pass3_AnalysisNode(ifNode.elseClause.stmt);
                     }
                     break;
                 case SyntaxTree.WhileStmtNode whileNode:
                     {
-                        //¼ì²éÌõ¼şÊÇ·ñÎª²¼¶ûÀàĞÍ    
+                        //æ£€æŸ¥æ¡ä»¶æ˜¯å¦ä¸ºå¸ƒå°”ç±»å‹    
                         CheckType_Equal("bool", whileNode.conditionNode);
 
-                        //¼ì²éÓï¾ä½Úµã  
+                        //æ£€æŸ¥è¯­å¥èŠ‚ç‚¹  
                         Pass3_AnalysisNode(whileNode.stmtNode);
                     }
                     break;
                 case SyntaxTree.ForStmtNode forNode:
                     {
-                        //½øÈëFOR×÷ÓÃÓò    
+                        //è¿›å…¥FORä½œç”¨åŸŸ    
                         envStack.Push(forNode.attributes[AstAttr.env] as SymbolTable);
 
-                        //¼ì²é³õÊ¼»¯Æ÷ºÍµü´úÆ÷  
+                        //æ£€æŸ¥åˆå§‹åŒ–å™¨å’Œè¿­ä»£å™¨  
                         Pass3_AnalysisNode(forNode.initializerNode);
                         AnalyzeTypeExpression(forNode.iteratorNode);
 
-                        //¼ì²éÌõ¼şÊÇ·ñÎª²¼¶ûÀàĞÍ    
+                        //æ£€æŸ¥æ¡ä»¶æ˜¯å¦ä¸ºå¸ƒå°”ç±»å‹    
                         CheckType_Equal("bool", forNode.conditionNode);
 
-                        //¼ì²éÓï¾ä½Úµã  
+                        //æ£€æŸ¥è¯­å¥èŠ‚ç‚¹  
                         Pass3_AnalysisNode(forNode.stmtNode);
 
-                        //Àë¿ªFORÑ­»·×÷ÓÃÓò  
+                        //ç¦»å¼€FORå¾ªç¯ä½œç”¨åŸŸ  
                         envStack.Pop();
                     }
                     break;
                 case SyntaxTree.ReturnStmtNode retNode:
                     {
-                        //¼ì²é·µ»ØÖµ  
+                        //æ£€æŸ¥è¿”å›å€¼  
                         Pass3_AnalysisNode(retNode.returnExprNode);
                     }
                     break;
                 case SyntaxTree.DeleteStmtNode delNode:
                     {
-                        //¼ì²éÒªÉ¾³ıµÄ¶ÔÏó    
+                        //æ£€æŸ¥è¦åˆ é™¤çš„å¯¹è±¡    
                         Pass3_AnalysisNode(delNode.objToDelete);
 
                         string objTypeExpr = (string)delNode.objToDelete.attributes[AstAttr.type];
@@ -3584,10 +3633,10 @@ namespace Gizbox.SemanticRule
                     }
                     break;
 
-                // ********************* ÆäËû½Úµã¼ì²é *********************************
+                // ********************* å…¶ä»–èŠ‚ç‚¹æ£€æŸ¥ *********************************
 
 
-                // ********************* ±í´ïÊ½¼ì²é *********************************
+                // ********************* è¡¨è¾¾å¼æ£€æŸ¥ *********************************
 
 
                 case SyntaxTree.IdentityNode idNode:
@@ -3598,7 +3647,7 @@ namespace Gizbox.SemanticRule
                         if (rec == null)
                             throw new SemanticException(ExceptioName.IdentifierNotFound, idNode, (idNode?.FullName ?? "???"));
 
-                        //³£Á¿Ìæ»»  
+                        //å¸¸é‡æ›¿æ¢  
                         if (rec.category == SymbolTable.RecordCatagory.Constant)
                         {
                             idNode.overrideNode = new SyntaxTree.LiteralNode
@@ -3640,7 +3689,7 @@ namespace Gizbox.SemanticRule
                         var typeL = GType.Parse(typeExprL);
                         var typeR = GType.Parse(typeExprR);
 
-                        // !! ²Ù×÷·ûÖØÔØ
+                        // !! æ“ä½œç¬¦é‡è½½
                         if(typeL.IsNumberType == false || typeR.IsNumberType == false)
                         {
                             var operatorRec = Query_OperatorOverload(binaryNode.GetOpName(), typeExprL, typeExprR);
@@ -3684,7 +3733,7 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.CastNode castNode:
                     {
-                        // !!ÌØÊâµÄ×ª»»ĞèÒªÖØĞ´Îªº¯Êıµ÷ÓÃ
+                        // !!ç‰¹æ®Šçš„è½¬æ¢éœ€è¦é‡å†™ä¸ºå‡½æ•°è°ƒç”¨
                         AnalyzeTypeExpression(castNode.factorNode);
                         var srcType = GType.Parse((string)castNode.factorNode.attributes[AstAttr.type]);
                         var targetType = GType.Parse(castNode.typeNode.TypeExpression());
@@ -3751,30 +3800,30 @@ namespace Gizbox.SemanticRule
                             break;
                         }
 
-                        //Êµ²Î·ÖÎö  
+                        //å®å‚åˆ†æ  
                         foreach (var argNode in callNode.argumantsNode.arguments)
                         {
                             Pass3_AnalysisNode(argNode);
                         }
 
-                        //Ãû³Æ·ÖÎö²¹È«£¨ÊÇ²»ÊÇ²»Ó¦¸Ã·ÅÔÚPass3 ??£©  
+                        //åç§°åˆ†æè¡¥å…¨ï¼ˆæ˜¯ä¸æ˜¯ä¸åº”è¯¥æ”¾åœ¨Pass3 ??ï¼‰  
                         if (callNode.isMemberAccessFunction == false && callNode.funcNode is SyntaxTree.IdentityNode)
                         {
                             TryCompleteIdenfier((callNode.funcNode as SyntaxTree.IdentityNode));
                         }
 
-                        //º¯Êı·ÖÎö(ĞèÒªÏÈ²¹È«Ãû³Æ)  
+                        //å‡½æ•°åˆ†æ(éœ€è¦å…ˆè¡¥å…¨åç§°)  
                         
-                        callNode.funcNode.attributes[AstAttr.not_a_property] = null;//·ÀÖ¹±»µ±×÷ÊôĞÔÌæ»»  
+                        callNode.funcNode.attributes[AstAttr.not_a_property] = null;//é˜²æ­¢è¢«å½“ä½œå±æ€§æ›¿æ¢  
                         Pass3_AnalysisNode(callNode.funcNode);
 
 
-                        //Func·ÖÎö  
+                        //Funcåˆ†æ  
                         AnalyzeTypeExpression(callNode);
 
-                        //²ÎÊı¸öÊı¼ì²éÔİÎŞ...
+                        //å‚æ•°ä¸ªæ•°æ£€æŸ¥æš‚æ— ...
 
-                        //²ÎÊıÖØÔØ¶ÔÓ¦¼ì²éÔİÎŞ...
+                        //å‚æ•°é‡è½½å¯¹åº”æ£€æŸ¥æš‚æ— ...
                     }
                     break;
                 case SyntaxTree.ReplaceNode replaceNode:
@@ -3794,7 +3843,7 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.AssignNode assignNode:
                     {
-                        //!!setterÊôĞÔÌæ»»  
+                        //!!setterå±æ€§æ›¿æ¢  
                         if (assignNode.lvalueNode is SyntaxTree.ObjectMemberAccessNode)
                         {
                             var memberAccess = assignNode.lvalueNode as SyntaxTree.ObjectMemberAccessNode;
@@ -3809,14 +3858,14 @@ namespace Gizbox.SemanticRule
                             var memberName = memberAccess.memberNode.FullName;
 
                             var memberRec = classEnv.Class_GetMemberRecordInChain(memberName);
-                            if (memberRec == null) //²»´æÔÚÍ¬Ãû×Ö¶Î  
+                            if (memberRec == null) //ä¸å­˜åœ¨åŒåå­—æ®µ  
                             {
                                 var rvalType = AnalyzeTypeExpression(assignNode.rvalueNode);
 
                                 var setterMethod = classEnv.Class_GetMemberRecordInChain(Utils.Mangle(memberName, rvalType));
-                                if (setterMethod != null)//´æÔÚsetterº¯Êı  
+                                if (setterMethod != null)//å­˜åœ¨setterå‡½æ•°  
                                 {
-                                    //Ìæ»»½Úµã  
+                                    //æ›¿æ¢èŠ‚ç‚¹  
                                     var overrideNode = new SyntaxTree.CallNode()
                                     {
 
@@ -3839,7 +3888,7 @@ namespace Gizbox.SemanticRule
                         }
 
 
-                        //ÀàĞÍ¼ì²é£¨¸³Öµ£©  
+                        //ç±»å‹æ£€æŸ¥ï¼ˆèµ‹å€¼ï¼‰  
                         {
                             Pass3_AnalysisNode(assignNode.lvalueNode);
                             Pass3_AnalysisNode(assignNode.rvalueNode);
@@ -3851,29 +3900,27 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.ObjectMemberAccessNode objMemberAccessNode:
                     {
-                        //!!getterÊôĞÔÌæ»»  
-                        if (objMemberAccessNode.attributes.ContainsKey(AstAttr.not_a_property) == false)
+                        Pass3_AnalysisNode(objMemberAccessNode.objectNode);
+
+                        var className = AnalyzeTypeExpression(objMemberAccessNode.objectNode);
+                        var classRec = Query(className);
+                        if(classRec == null) throw new SemanticException(ExceptioName.ClassSymbolTableNotFound, objMemberAccessNode, className);
+                        var classEnv = classRec.envPtr;
+
+                        //!!getterå±æ€§æ›¿æ¢  
+                        if(objMemberAccessNode.attributes.ContainsKey(AstAttr.not_a_property) == false)
                         {
-                            var className = AnalyzeTypeExpression(objMemberAccessNode.objectNode);
-
-                            var classRec = Query(className);
-                            if (classRec == null) throw new SemanticException(ExceptioName.ClassSymbolTableNotFound, objMemberAccessNode, className);
-
-                            var classEnv = classRec.envPtr;
-
-                            var memberName = objMemberAccessNode.memberNode.FullName;
-
-                            var memberRec = classEnv.Class_GetMemberRecordInChain(memberName);
-                            if (memberRec == null) //²»´æÔÚÍ¬Ãû×Ö¶Î  
+                            var fieldName = objMemberAccessNode.memberNode.FullName;
+                            var fieldRec = classEnv.Class_GetMemberRecordInChain(fieldName);
+                            if(fieldRec == null)
                             {
-                                var getterRec = classEnv.Class_GetMemberRecordInChain(Utils.Mangle(memberName));
-                                if (getterRec != null)//´æÔÚgetterº¯Êı  
+                                var getterRec = classEnv.Class_GetMemberRecordInChain(Utils.Mangle(fieldName));
+                                if(getterRec != null)//å­˜åœ¨getterå‡½æ•°  
                                 {
 
-                                    //Ìæ»»½Úµã  
+                                    //æ›¿æ¢èŠ‚ç‚¹  
                                     objMemberAccessNode.overrideNode = new SyntaxTree.CallNode()
                                     {
-
                                         isMemberAccessFunction = true,
                                         funcNode = objMemberAccessNode,
                                         argumantsNode = new SyntaxTree.ArgumentListNode()
@@ -3889,15 +3936,17 @@ namespace Gizbox.SemanticRule
                             }
                         }
 
-                        Pass3_AnalysisNode(objMemberAccessNode.objectNode);
 
-                        var objClassName = AnalyzeTypeExpression(objMemberAccessNode.objectNode);
-                        var objClassRec = Query(objClassName);
-                        objMemberAccessNode.attributes[AstAttr.obj_class_rec] = objClassRec;
+                        //æˆå‘˜è®¿é—®æ§åˆ¶  
+                        var currClassEnv = TryGetClassEnv();
+                        var memberName = objMemberAccessNode.memberNode.FullName;
+                        var memberRec = classEnv.Class_GetMemberRecordInChainByRawname(memberName);
+                        if(currClassEnv != classEnv && memberRec.accessFlags.HasFlag(SymbolTable.AccessFlag.Private))
+                        {
+                            throw new SemanticException(ExceptioName.SemanticAnalysysError, objMemberAccessNode, "can not access private member:" + memberName);
+                        }
 
-                        //²»ÄÜ·ÖÎö³ÉÔ±Ãû³Æ£¬µ±Ç°×÷ÓÃÓò»áÕÒ²»µ½±êÊ¶·û¡£      
-                        //Debug.Log("·ÖÎö£º" + objMemberAccessNode.memberNode.FirstToken().ToString());
-                        //Pass3_AnalysisNode(objMemberAccessNode.memberNode);
+                        objMemberAccessNode.attributes[AstAttr.obj_class_rec] = classRec;
 
                         AnalyzeTypeExpression(objMemberAccessNode);
                     }
@@ -3909,7 +3958,7 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.SizeOfNode sizeofNode:
                     {
-                        throw new SemanticException(ExceptioName.Undefine, sizeofNode, "sizeof operator is not supported yet.");
+                        AnalyzeTypeExpression(sizeofNode);
                     }
                     break;
                 case SyntaxTree.TypeOfNode typeofNode:
@@ -3930,10 +3979,10 @@ namespace Gizbox.SemanticRule
                         Pass3_AnalysisNode(newArrNode.lengthNode);
                     }
                     break;
-                //ÆäËû½Úµã     
+                //å…¶ä»–èŠ‚ç‚¹     
                 default:
                     {
-                        //ÀàĞÍ½Úµã  --> ²¹È«ÀàĞÍ
+                        //ç±»å‹èŠ‚ç‚¹  --> è¡¥å…¨ç±»å‹
                         if (node is SyntaxTree.TypeNode)
                         {
                             TryCompleteType(node as SyntaxTree.TypeNode);
@@ -3946,7 +3995,7 @@ namespace Gizbox.SemanticRule
                         //}
                         //else
                         //{
-                        //    throw new Exception("Î´ÊµÏÖ½Úµã·ÖÎö£º" + node.GetType().Name);
+                        //    throw new Exception("æœªå®ç°èŠ‚ç‚¹åˆ†æï¼š" + node.GetType().Name);
                         //}
                     }
                     break;
@@ -3954,7 +4003,7 @@ namespace Gizbox.SemanticRule
         }
 
         /// <summary>
-        /// PASS4:ËùÓĞÈ¨ÓëÉúÃüÖÜÆÚ·ÖÎö  
+        /// PASS4:æ‰€æœ‰æƒä¸ç”Ÿå‘½å‘¨æœŸåˆ†æ  
         /// </summary>
         private void Pass4_OwnershipLifetime(SyntaxTree.Node node)
         {
@@ -4001,7 +4050,7 @@ namespace Gizbox.SemanticRule
                     }
                 case SyntaxTree.StatementBlockNode blockNode:
                     {
-                        // ½øÈëblock×÷ÓÃÓò  
+                        // è¿›å…¥blockä½œç”¨åŸŸ  
                         envStack.Push(blockNode.attributes[AstAttr.env] as SymbolTable);
                         lifeTimeInfo.currBranch.scopeStack.Push(new LifetimeInfo.ScopeInfo());
 
@@ -4010,7 +4059,7 @@ namespace Gizbox.SemanticRule
                             Pass4_OwnershipLifetime(s);
                         }
 
-                        // ×÷ÓÃÓòÍË³öĞèÒªÉ¾³ıµÄOwner±äÁ¿
+                        // ä½œç”¨åŸŸé€€å‡ºéœ€è¦åˆ é™¤çš„Ownerå˜é‡
                         var toDelete = new List<(LifetimeInfo.VarStatus status, string varname)>();
                         foreach(var (varname, varstatus) in lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict)
                         {
@@ -4029,7 +4078,7 @@ namespace Gizbox.SemanticRule
                     }
                 case SyntaxTree.ForStmtNode forNode:
                     {
-                        // ÈëÑ­»·×÷ÓÃÓò
+                        // å…¥å¾ªç¯ä½œç”¨åŸŸ
                         envStack.Push(forNode.attributes[AstAttr.env] as SymbolTable);
                         lifeTimeInfo.currBranch.scopeStack.Push(new LifetimeInfo.ScopeInfo());
 
@@ -4037,10 +4086,10 @@ namespace Gizbox.SemanticRule
                         Pass4_OwnershipLifetime(forNode.initializerNode);
                         Pass4_OwnershipLifetime(forNode.conditionNode);
                         Pass4_OwnershipLifetime(forNode.iteratorNode);
-                        //for×÷ÓÃÓòÄÚinitializerNode/conditionNode/iteratorNode²»²úÉúOwner±äÁ¿£¬Ö»ÓĞbodyÄÚ¿ÉÄÜ²úÉú    
+                        //forä½œç”¨åŸŸå†…initializerNode/conditionNode/iteratorNodeä¸äº§ç”ŸOwnerå˜é‡ï¼Œåªæœ‰bodyå†…å¯èƒ½äº§ç”Ÿ    
 
 
-                        // ±£´æÈë¿Ú×´Ì¬£¨»áÔÚºÏ²¢ÖĞ±»¾ÍµØ¸üĞÂ£©  
+                        // ä¿å­˜å…¥å£çŠ¶æ€ï¼ˆä¼šåœ¨åˆå¹¶ä¸­è¢«å°±åœ°æ›´æ–°ï¼‰  
                         var saved = lifeTimeInfo.currBranch;
 
                         int itCount = 0;
@@ -4049,18 +4098,18 @@ namespace Gizbox.SemanticRule
                             if(itCount++ > 99)
                                 throw new GizboxException(ExceptioName.OwnershipError, "lifetime analysis not converge.");
                             
-                            // ÅÜÒ»ÂÖÑ­»·Ìå  
+                            // è·‘ä¸€è½®å¾ªç¯ä½“  
                             var loopBranch = lifeTimeInfo.NewBranch(saved);
                             lifeTimeInfo.currBranch = loopBranch;
                             Pass4_OwnershipLifetime(forNode.stmtNode);
 
-                            // ºÏ²¢·ÖÖ§ ->Èç¹ûÊÕÁ²ÔòÍË³ö·ñÔò¼ÌĞøµü´ú  
+                            // åˆå¹¶åˆ†æ”¯ ->å¦‚æœæ”¶æ•›åˆ™é€€å‡ºå¦åˆ™ç»§ç»­è¿­ä»£  
                             lifeTimeInfo.currBranch = saved;
                             bool isConverged = lifeTimeInfo.MergeBranchesTo(saved, new List<LifetimeInfo.Branch> { loopBranch });
                             if(isConverged)
                                 break;
                         }
-                        // »Ö¸´currBranch  
+                        // æ¢å¤currBranch  
                         lifeTimeInfo.currBranch = saved;
 
 
@@ -4072,7 +4121,7 @@ namespace Gizbox.SemanticRule
                     {
                         Pass4_OwnershipLifetime(whileNode.conditionNode);
 
-                        // ±£´æÈë¿Ú×´Ì¬£¨»áÔÚºÏ²¢ÖĞ±»¾ÍµØ¸üĞÂ£©  
+                        // ä¿å­˜å…¥å£çŠ¶æ€ï¼ˆä¼šåœ¨åˆå¹¶ä¸­è¢«å°±åœ°æ›´æ–°ï¼‰  
                         var saved = lifeTimeInfo.currBranch;
 
                         if(saved.scopeStack.Count == 0)
@@ -4084,19 +4133,19 @@ namespace Gizbox.SemanticRule
                             if(itCount++ > 99)
                                 throw new GizboxException(ExceptioName.OwnershipError, "lifetime analysis not converge.");
 
-                            // ÅÜÒ»ÂÖÑ­»·Ìå  
+                            // è·‘ä¸€è½®å¾ªç¯ä½“  
                             var loopBranch = lifeTimeInfo.NewBranch(saved);//bug
                             lifeTimeInfo.currBranch = loopBranch;
                             Pass4_OwnershipLifetime(whileNode.stmtNode);
 
-                            // ºÏ²¢·ÖÖ§ ->Èç¹ûÊÕÁ²ÔòÍË³ö·ñÔò¼ÌĞøµü´ú  
+                            // åˆå¹¶åˆ†æ”¯ ->å¦‚æœæ”¶æ•›åˆ™é€€å‡ºå¦åˆ™ç»§ç»­è¿­ä»£  
                             lifeTimeInfo.currBranch = saved;
                             bool isConverged = lifeTimeInfo.MergeBranchesTo(saved, new List<LifetimeInfo.Branch> { loopBranch });
                             if(isConverged)
                                 break;
                         }
 
-                        // »Ö¸´currBranch  
+                        // æ¢å¤currBranch  
                         lifeTimeInfo.currBranch = saved;
                         break;
                     }
@@ -4110,7 +4159,7 @@ namespace Gizbox.SemanticRule
                         {
                             Pass4_OwnershipLifetime(c.conditionNode);
 
-                            //Ìõ¼ş·ÖÖ§  
+                            //æ¡ä»¶åˆ†æ”¯  
                             var condBranch = lifeTimeInfo.NewBranch(lastCurrTemp);
                             lifeTimeInfo.currBranch = condBranch;
                             Pass4_OwnershipLifetime(c.thenNode);
@@ -4119,7 +4168,7 @@ namespace Gizbox.SemanticRule
                         }
                         if(ifNode.elseClause != null)
                         {
-                            //Ìõ¼ş·ÖÖ§  
+                            //æ¡ä»¶åˆ†æ”¯  
                             var condBranch = lifeTimeInfo.NewBranch(lastCurrTemp);
                             lifeTimeInfo.currBranch = condBranch;
                             Pass4_OwnershipLifetime(ifNode.elseClause.stmt);
@@ -4127,7 +4176,7 @@ namespace Gizbox.SemanticRule
                             branches.Add(condBranch);
                         }
 
-                        //»Ø¹éÖ÷·ÖÖ§  
+                        //å›å½’ä¸»åˆ†æ”¯  
                         lifeTimeInfo.currBranch = lastCurrTemp;
                         lifeTimeInfo.MergeBranchesTo(lastCurrTemp, branches);
 
@@ -4138,12 +4187,12 @@ namespace Gizbox.SemanticRule
                         if(classDecl.isTemplateClass)
                             break;
 
-                        // Àà×÷ÓÃÓò³ÉÔ±×Ö¶ÎµÄ³õÊ¼»¯±í´ïÊ½×öËùÓĞÈ¨ºÏ·¨ĞÔ¼ì²é
+                        // ç±»ä½œç”¨åŸŸæˆå‘˜å­—æ®µçš„åˆå§‹åŒ–è¡¨è¾¾å¼åšæ‰€æœ‰æƒåˆæ³•æ€§æ£€æŸ¥
                         foreach(var decl in classDecl.memberDelareNodes)
                         {
                             if(decl is VarDeclareNode fvar)
                             {
-                                // ³ÉÔ±×Ö¶Î³õÊ¼»¯  
+                                // æˆå‘˜å­—æ®µåˆå§‹åŒ–  
                                 var rec = fvar.attributes[AstAttr.var_rec] as SymbolTable.Record;
                                 if(rec != null)
                                 {
@@ -4153,7 +4202,7 @@ namespace Gizbox.SemanticRule
                             }
                             else if(decl is FuncDeclareNode fdecl)
                             {
-                                // º¯Êı³ÉÔ±µÄËùÓĞÈ¨¼ì²éµİ¹é
+                                // å‡½æ•°æˆå‘˜çš„æ‰€æœ‰æƒæ£€æŸ¥é€’å½’
                                 Pass4_OwnershipLifetime(decl);
                             }
                         }
@@ -4164,33 +4213,33 @@ namespace Gizbox.SemanticRule
                         if(funcDecl.isTemplateFunction)
                             break;
 
-                        // ½øÈëº¯Êı×÷ÓÃÓò
+                        // è¿›å…¥å‡½æ•°ä½œç”¨åŸŸ
                         envStack.Push(funcDecl.attributes[AstAttr.env] as SymbolTable);
                         lifeTimeInfo.currBranch.scopeStack.Push(new LifetimeInfo.ScopeInfo());
 
-                        // º¯Êı²ÎÊıËùÓĞÈ¨Ä£ĞÍ  
+                        // å‡½æ•°å‚æ•°æ‰€æœ‰æƒæ¨¡å‹  
                         foreach(var paramNode in funcDecl.parametersNode.parameterNodes)
                         {
                             Pass4_OwnershipLifetime(paramNode);
                         }
 
-                        // º¯Êı·µ»ØÖµËùÓĞÈ¨Ä£ĞÍ  
+                        // å‡½æ•°è¿”å›å€¼æ‰€æœ‰æƒæ¨¡å‹  
                         if(funcDecl.attributes.ContainsKey(AstAttr.func_rec) == false)
                             throw new GizboxException(ExceptioName.Undefine, "func record not found.");
                         var frec = funcDecl.attributes[AstAttr.func_rec] as SymbolTable.Record;
                         frec.flags |= GetOwnershipModel(funcDecl.returnFlags, funcDecl.returnTypeNode);
 
-                    // NOTE: ÔÊĞí½èÓÃ·µ»ØÖµ¡£½¡È«ĞÔ(safety)ĞèÒªÍ¨¹ıÌÓÒİ/ÉúÃüÖÜÆÚ¼ì²é±£Ö¤¡£
+                    // NOTE: å…è®¸å€Ÿç”¨è¿”å›å€¼ã€‚å¥å…¨æ€§(safety)éœ€è¦é€šè¿‡é€ƒé€¸/ç”Ÿå‘½å‘¨æœŸæ£€æŸ¥ä¿è¯ã€‚
 
 
-                        // ¸üĞÂµ±Ç°º¯Êı·µ»ØÖµĞÅÏ¢  
+                        // æ›´æ–°å½“å‰å‡½æ•°è¿”å›å€¼ä¿¡æ¯  
                         lifeTimeInfo.currentFuncReturnFlag = SymbolTable.RecordFlag.None;
                         lifeTimeInfo.currentFuncParams = null;
 
                         lifeTimeInfo.currentFuncReturnFlag =
                             frec.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.ManualVar | SymbolTable.RecordFlag.BorrowVar);
 
-                        // ½«ĞÎ²Î¼ÓÈëµ±Ç°×÷ÓÃÓò¸ú×Ù£¨½öOwnerĞèÒªÊÍ·Å£©
+                        // å°†å½¢å‚åŠ å…¥å½“å‰ä½œç”¨åŸŸè·Ÿè¸ªï¼ˆä»…Owneréœ€è¦é‡Šæ”¾ï¼‰
                         var funcEnv = envStack.Peek();
                         var paramRecs = funcEnv.GetByCategory(SymbolTable.RecordCatagory.Param);
                         lifeTimeInfo.currentFuncParams = paramRecs;
@@ -4199,19 +4248,19 @@ namespace Gizbox.SemanticRule
                             foreach(var p in paramRecs)
                             {
                                 if(p.name == "this")
-                                    continue; // this ²»ÍĞ¹Ü
+                                    continue; // this ä¸æ‰˜ç®¡
                                 if(p.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                                     lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict[p.name] = LifetimeInfo.VarStatus.Alive;
                             }
                         }
 
-                        // µİ¹éÓï¾äÌå
+                        // é€’å½’è¯­å¥ä½“
                         foreach(var s in funcDecl.statementsNode.statements)
                         {
                             Pass4_OwnershipLifetime(s);
                         }
 
-                        // º¯ÊıÕı³£ÍË³öĞèÒª»ØÊÕµÄ Owner
+                        // å‡½æ•°æ­£å¸¸é€€å‡ºéœ€è¦å›æ”¶çš„ Owner
                         var exitDel = new List<(LifetimeInfo.VarStatus status, string varname)>();
                         foreach(var (varname, varstatus) in lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict)
                         {
@@ -4229,7 +4278,7 @@ namespace Gizbox.SemanticRule
                         break;
                     }
                 case SyntaxTree.ExternFuncDeclareNode _:
-                    // ÎŞĞè´¦Àí(Íâ²¿º¯Êı²»Ó¦¸ÃÊ¹ÓÃËùÓĞÈ¨)
+                    // æ— éœ€å¤„ç†(å¤–éƒ¨å‡½æ•°ä¸åº”è¯¥ä½¿ç”¨æ‰€æœ‰æƒ)
                     break;
                 case SyntaxTree.ParameterNode paramNode:
                     {
@@ -4237,7 +4286,7 @@ namespace Gizbox.SemanticRule
                         if(prec == null)
                             throw new GizboxException(ExceptioName.Undefine, "param record not found.");
                         
-                        //ËùÓĞÈ¨Ä£ĞÍ
+                        //æ‰€æœ‰æƒæ¨¡å‹
                         var model = GetOwnershipModel(paramNode.flags, paramNode.typeNode);
                         prec.flags |= model;
 
@@ -4245,61 +4294,61 @@ namespace Gizbox.SemanticRule
                     }
                 case SyntaxTree.VarDeclareNode varDecl:
                     {
-                        // ÏÈ´¦ÀíÓÒÖµÖĞµÄµ÷ÓÃ/²ÎÊı£¨¿ÉÄÜ´¥·¢move£©
+                        // å…ˆå¤„ç†å³å€¼ä¸­çš„è°ƒç”¨/å‚æ•°ï¼ˆå¯èƒ½è§¦å‘moveï¼‰
                         Pass4_OwnershipLifetime(varDecl.initializerNode);
 
                         var rec = varDecl.attributes[AstAttr.var_rec] as SymbolTable.Record;// Query(varDecl.identifierNode.FullName);
                         if(rec == null)
                             throw new GizboxException(ExceptioName.Undefine, "var record not found.");
 
-                        // ÖµÀàĞÍ²»ÓÃ´¦ÀíËùÓĞÈ¨
+                        // å€¼ç±»å‹ä¸ç”¨å¤„ç†æ‰€æœ‰æƒ
                         if(GType.Parse(rec.typeExpression).IsReferenceType == false)
                             break;
 
 
-                        // ¼ì²é£º±äÁ¿×óÖµºÍ³õÊ¼ÖµµÄËùÓĞÈ¨Ä£ĞÍ¶Ô±È  
+                        // æ£€æŸ¥ï¼šå˜é‡å·¦å€¼å’Œåˆå§‹å€¼çš„æ‰€æœ‰æƒæ¨¡å‹å¯¹æ¯”  
                         CheckOwnershipCompare_VarDecl(varDecl, rec, out var lmodel, out var rmodel);
 
-                        // ¼ÇÂ¼±äÁ¿µÄËùÓĞÈ¨Ä£ĞÍ  
+                        // è®°å½•å˜é‡çš„æ‰€æœ‰æƒæ¨¡å‹  
                         rec.flags |= lmodel;
 
 
-                        // ¼ì²é£ºÈ«¾Ö±äÁ¿²»ÄÜ¶¨ÒåÎªown/borrowÀàĞÍ  
+                        // æ£€æŸ¥ï¼šå…¨å±€å˜é‡ä¸èƒ½å®šä¹‰ä¸ºown/borrowç±»å‹  
                         if(isGlobalOrTopAtNamespace && lmodel != SymbolTable.RecordFlag.ManualVar)
                             throw new SemanticException(ExceptioName.OwnershipError_GlobalVarMustBeManual, varDecl, string.Empty);
 
-                        // ¼ì²é£ºµÈºÅÓÒ±ßÄÜ·ñmoveout
+                        // æ£€æŸ¥ï¼šç­‰å·å³è¾¹èƒ½å¦moveout
                         if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             CheckOwnershipCanMoveOut(varDecl.initializerNode);
 
-                        // ¼ÇÂ¼ownerÀàĞÍµÄ¾Ö²¿±äÁ¿  
+                        // è®°å½•ownerç±»å‹çš„å±€éƒ¨å˜é‡  
                         if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict[rec.name] = LifetimeInfo.VarStatus.Alive;
 
-                        // ËùÓĞÈ¨ownÀàĞÍ³õÊ¼»¯´¦Àí  
+                        // æ‰€æœ‰æƒownç±»å‹åˆå§‹åŒ–å¤„ç†  
                         if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                         {
-                            //moveÔ´£ºÁÙÊ±¶ÔÏó - New   
+                            //moveæºï¼šä¸´æ—¶å¯¹è±¡ - New   
                             if(varDecl.initializerNode is NewObjectNode newobjNode)
                             {
-                                //ÎŞĞè´¦Àí  
+                                //æ— éœ€å¤„ç†  
                             }
-                            //moveÔ´£ºÁÙÊ±¶ÔÏó - º¯Êı·µ»Ø(owner)
+                            //moveæºï¼šä¸´æ—¶å¯¹è±¡ - å‡½æ•°è¿”å›(owner)
                             else if(varDecl.initializerNode is CallNode callnode)
                             {
-                                //ÎŞĞè´¦Àí  
+                                //æ— éœ€å¤„ç†  
                             }
-                            //moveÔ´£º±äÁ¿
+                            //moveæºï¼šå˜é‡
                             else if(varDecl.initializerNode is IdentityNode idrvalue)
                             {
-                                //±ê¼ÇÎªDead  
+                                //æ ‡è®°ä¸ºDead  
                                 var rrec = Query(idrvalue.FullName);
                                 lifeTimeInfo.currBranch.SetVarStatus(rrec.name, LifetimeInfo.VarStatus.Dead);
 
-                                //ĞèÒª²åÈëNullÓï¾ä  
+                                //éœ€è¦æ’å…¥Nullè¯­å¥  
                                 varDecl.attributes[AstAttr.set_null_after_stmt] = new List<string> { rrec.name };
                             }
-                            //moveÔ´£º×Ö¶Î
+                            //moveæºï¼šå­—æ®µ
                             else if(varDecl.initializerNode is ObjectMemberAccessNode fieldRvalue)
                             {
                                 varDecl.attributes[AstAttr.set_null_field_after_stmt] = fieldRvalue;
@@ -4307,17 +4356,17 @@ namespace Gizbox.SemanticRule
 
                         }
 
-                        // ËùÓĞÈ¨½èÓÃÀàĞÍ      
+                        // æ‰€æœ‰æƒå€Ÿç”¨ç±»å‹      
                         if(lmodel.HasFlag(SymbolTable.RecordFlag.BorrowVar))
                         {
-                            //ÎŞĞè´¦Àí  
+                            //æ— éœ€å¤„ç†  
                         }
 
                         break;
                     }
                 case SyntaxTree.OwnershipCaptureStmtNode captureNode:
                     {
-                        //¼ì²é£º±äÁ¿×óÖµºÍ³õÊ¼ÖµµÄËùÓĞÈ¨Ä£ĞÍ¶Ô±È£¨±ØĞëown <- manual£© 
+                        //æ£€æŸ¥ï¼šå˜é‡å·¦å€¼å’Œåˆå§‹å€¼çš„æ‰€æœ‰æƒæ¨¡å‹å¯¹æ¯”ï¼ˆå¿…é¡»own <- manualï¼‰ 
                         var recL = captureNode.attributes[AstAttr.var_rec] as SymbolTable.Record;
                         var recR = Query(captureNode.rIdentifier.FullName);
                         var lModel = GetOwnershipModel(VarModifiers.Own, captureNode.typeNode);
@@ -4331,16 +4380,16 @@ namespace Gizbox.SemanticRule
                             throw new SemanticException(ExceptioName.OwnershipError, captureNode, "capture right side must be manual type.");
 
 
-                        //¼ÇÂ¼ownerÀàĞÍµÄ¾Ö²¿±äÁ¿   
+                        //è®°å½•ownerç±»å‹çš„å±€éƒ¨å˜é‡   
                         lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict[recL.name] = LifetimeInfo.VarStatus.Alive;
 
-                        //ĞèÒª²åÈëNullÓï¾ä£¨Ô­±äÁ¿²»¿ÉÔÙÓÃ£©  
+                        //éœ€è¦æ’å…¥Nullè¯­å¥ï¼ˆåŸå˜é‡ä¸å¯å†ç”¨ï¼‰  
                         captureNode.attributes[AstAttr.set_null_after_stmt] = new List<string> { recR.name };
                     }
                     break;
                 case SyntaxTree.OwnershipLeakStmtNode leakNode:
                     {
-                        //ËùÓĞÈ¨Ä£ĞÍ¼ì²é£¨±ØĞëÊÇmanual <- own£©
+                        //æ‰€æœ‰æƒæ¨¡å‹æ£€æŸ¥ï¼ˆå¿…é¡»æ˜¯manual <- ownï¼‰
                         var recL = leakNode.attributes[AstAttr.var_rec] as SymbolTable.Record;
                         var recR = Query(leakNode.rIdentifier.FullName);
                         var lModel = GetOwnershipModel(VarModifiers.None, leakNode.typeNode);
@@ -4353,33 +4402,33 @@ namespace Gizbox.SemanticRule
                         if(rModel != SymbolTable.RecordFlag.OwnerVar)
                             throw new SemanticException(ExceptioName.OwnershipError, leakNode, "leak right side must be own type.");
 
-                        //ÓÒ±ß±äÁ¿±ê¼ÇÎªDead  
+                        //å³è¾¹å˜é‡æ ‡è®°ä¸ºDead  
                         lifeTimeInfo.currBranch.SetVarStatus(recR.name, LifetimeInfo.VarStatus.Dead);
 
-                        //ĞèÒª²åÈëNullÓï¾ä£¨Ô­±äÁ¿²»¿ÉÔÙÓÃ£©  
+                        //éœ€è¦æ’å…¥Nullè¯­å¥ï¼ˆåŸå˜é‡ä¸å¯å†ç”¨ï¼‰  
                         leakNode.attributes[AstAttr.set_null_after_stmt] = new List<string> { recR.name };
                     }
                     break;
                 case SyntaxTree.AssignNode assignNode:
                     {
-                        // ÏÈ´¦ÀíÓÒÖµÖĞµÄµ÷ÓÃ/²ÎÊı£¨¿ÉÄÜ´¥·¢move£©
+                        // å…ˆå¤„ç†å³å€¼ä¸­çš„è°ƒç”¨/å‚æ•°ï¼ˆå¯èƒ½è§¦å‘moveï¼‰
                         Pass4_OwnershipLifetime(assignNode.rvalueNode);
 
-                        // ±äÁ¿±»¸³Öµ  
+                        // å˜é‡è¢«èµ‹å€¼  
                         if(assignNode.lvalueNode is SyntaxTree.IdentityNode lid)
                         {
                             var lrec = Query(lid.FullName);
                             if(lrec == null)
                                 throw new GizboxException(ExceptioName.Undefine, "var record not found.");
 
-                            // ÖµÀàĞÍ²»ÓÃ´¦ÀíËùÓĞÈ¨
+                            // å€¼ç±»å‹ä¸ç”¨å¤„ç†æ‰€æœ‰æƒ
                             if(GType.Parse(lrec.typeExpression).IsReferenceType == false)
                                 break;
 
-                            // ¼ì²é£º±äÁ¿×óÖµºÍ³õÊ¼ÖµµÄËùÓĞÈ¨Ä£ĞÍ¶Ô±È  
+                            // æ£€æŸ¥ï¼šå˜é‡å·¦å€¼å’Œåˆå§‹å€¼çš„æ‰€æœ‰æƒæ¨¡å‹å¯¹æ¯”  
                             CheckOwnershipCompare_Assign(assignNode, lrec, out var lmodel, out var rmodel);
 
-                            // ¼ì²é£º³ÉÔ±ËùÓĞÈ¨²»ÄÜ±» moveout
+                            // æ£€æŸ¥ï¼šæˆå‘˜æ‰€æœ‰æƒä¸èƒ½è¢« moveout
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
                                 CheckOwnershipCanMoveOut(assignNode.rvalueNode);
@@ -4390,7 +4439,7 @@ namespace Gizbox.SemanticRule
                             }
                                 
 
-                            // Èç¹ûÄ¿±êÊÇownerÇÒ²»ÎªDead£¬ÔòÏÈÉ¾£¬È»ºóÉèÖÃÎªAlive  
+                            // å¦‚æœç›®æ ‡æ˜¯ownerä¸”ä¸ä¸ºDeadï¼Œåˆ™å…ˆåˆ ï¼Œç„¶åè®¾ç½®ä¸ºAlive  
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
                                 LifetimeInfo.VarStatus alive = LifetimeInfo.VarStatus.Dead;
@@ -4412,47 +4461,47 @@ namespace Gizbox.SemanticRule
                                     lifeTimeInfo.currBranch.SetVarStatus(lrec.name, LifetimeInfo.VarStatus.Dead);
                                 }
 
-                                // ±»¸³ÖµµÄown±äÁ¿ÉèÖÃÎªAlive  
+                                // è¢«èµ‹å€¼çš„ownå˜é‡è®¾ç½®ä¸ºAlive  
                                 lifeTimeInfo.currBranch.scopeStack.Peek().localVariableStatusDict[lrec.name] = LifetimeInfo.VarStatus.Alive;
                             }
 
-                            // ËùÓĞÈ¨ownÀàĞÍ¸³Öµ´¦Àí  
+                            // æ‰€æœ‰æƒownç±»å‹èµ‹å€¼å¤„ç†  
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
-                                //moveÔ´£ºÁÙÊ±¶ÔÏó - New  
+                                //moveæºï¼šä¸´æ—¶å¯¹è±¡ - New  
                                 if(assignNode.rvalueNode is SyntaxTree.NewObjectNode newobjNode)
                                 {
-                                    //ÎŞĞè´¦Àí  
+                                    //æ— éœ€å¤„ç†  
                                 }
-                                //moveÔ´£ºÁÙÊ±¶ÔÏó - º¯Êı·µ»Ø(owner)
+                                //moveæºï¼šä¸´æ—¶å¯¹è±¡ - å‡½æ•°è¿”å›(owner)
                                 else if(assignNode.rvalueNode is SyntaxTree.CallNode callnode)
                                 {
-                                    //ÎŞĞè´¦Àí  
+                                    //æ— éœ€å¤„ç†  
                                 }
-                                //moveÔ´£º±äÁ¿  
+                                //moveæºï¼šå˜é‡  
                                 else if(assignNode.rvalueNode is SyntaxTree.IdentityNode idrvalueNode)
                                 {
-                                    //¼ÓÈëmoved  
+                                    //åŠ å…¥moved  
                                     var rrec = Query(idrvalueNode.FullName);
                                     lifeTimeInfo.currBranch.SetVarStatus(rrec.name, LifetimeInfo.VarStatus.Dead);
 
-                                    //ĞèÒª²åÈëNullÓï¾ä
+                                    //éœ€è¦æ’å…¥Nullè¯­å¥
                                     assignNode.attributes[AstAttr.set_null_after_stmt] = new List<string> { rrec.name };
                                 }
-                                //moveÔ´£º×Ö¶Î
+                                //moveæºï¼šå­—æ®µ
                                 else if(assignNode.rvalueNode is ObjectMemberAccessNode fieldRvalue)
                                 {
                                     assignNode.attributes[AstAttr.set_null_field_after_stmt] = fieldRvalue;
                                 }
                             }
 
-                            // ËùÓĞÈ¨½èÓÃÀàĞÍ      
+                            // æ‰€æœ‰æƒå€Ÿç”¨ç±»å‹      
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.BorrowVar))
                             {
-                                //ÎŞĞè´¦Àí  
+                                //æ— éœ€å¤„ç†  
                             }
                         }
-                        // ³ÉÔ±×Ö¶Î±»¸³Öµ  
+                        // æˆå‘˜å­—æ®µè¢«èµ‹å€¼  
                         else if(assignNode.lvalueNode is ObjectMemberAccessNode laccess)
                         {
                             var objClassRec = (SymbolTable.Record)laccess.attributes[AstAttr.obj_class_rec];
@@ -4460,64 +4509,64 @@ namespace Gizbox.SemanticRule
                             if(lrec == null)
                                 throw new GizboxException(ExceptioName.Undefine, $"field record {laccess.memberNode.FullName} not found.");
 
-                            // ÖµÀàĞÍ²»ÓÃ´¦ÀíËùÓĞÈ¨
+                            // å€¼ç±»å‹ä¸ç”¨å¤„ç†æ‰€æœ‰æƒ
                             if(GType.Parse(lrec.typeExpression).IsReferenceType == false)
                                 break;
                             
-                            // ¼ì²é£º±äÁ¿×óÖµºÍ³õÊ¼ÖµµÄËùÓĞÈ¨Ä£ĞÍ¶Ô±È  
+                            // æ£€æŸ¥ï¼šå˜é‡å·¦å€¼å’Œåˆå§‹å€¼çš„æ‰€æœ‰æƒæ¨¡å‹å¯¹æ¯”  
                             CheckOwnershipCompare_Assign(assignNode, lrec, out var lmodel, out var rmodel);
 
-                            // ¼ì²é£º³ÉÔ±ËùÓĞÈ¨²»ÄÜ±» moveout
+                            // æ£€æŸ¥ï¼šæˆå‘˜æ‰€æœ‰æƒä¸èƒ½è¢« moveout
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                                 CheckOwnershipCanMoveOut(assignNode.rvalueNode);
 
 
-                            // Èç¹û×Ö¶ÎÊÇownerÇÒ²»Îªnull£¬ÔòÏÈÉ¾
+                            // å¦‚æœå­—æ®µæ˜¯ownerä¸”ä¸ä¸ºnullï¼Œåˆ™å…ˆåˆ 
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
                                 assignNode.attributes[AstAttr.drop_field_before_assign_stmt] = 0;
                             }
 
 
-                            // ËùÓĞÈ¨ownÀàĞÍ¸³Öµ´¦Àí  
+                            // æ‰€æœ‰æƒownç±»å‹èµ‹å€¼å¤„ç†  
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
-                                //moveÔ´£ºÁÙÊ±¶ÔÏó - New  
+                                //moveæºï¼šä¸´æ—¶å¯¹è±¡ - New  
                                 if(assignNode.rvalueNode is SyntaxTree.NewObjectNode newobjNode)
                                 {
-                                    //ÎŞĞè´¦Àí  
+                                    //æ— éœ€å¤„ç†  
                                 }
-                                //moveÔ´£ºÁÙÊ±¶ÔÏó - º¯Êı·µ»Ø(owner)
+                                //moveæºï¼šä¸´æ—¶å¯¹è±¡ - å‡½æ•°è¿”å›(owner)
                                 else if(assignNode.rvalueNode is SyntaxTree.CallNode callnode)
                                 {
-                                    //ÎŞĞè´¦Àí  
+                                    //æ— éœ€å¤„ç†  
                                 }
-                                //moveÔ´£º±äÁ¿  
+                                //moveæºï¼šå˜é‡  
                                 else if(assignNode.rvalueNode is SyntaxTree.IdentityNode idrvalueNode)
                                 {
-                                    //¼ÓÈëmoved  
+                                    //åŠ å…¥moved  
                                     var rrec = Query(idrvalueNode.FullName);
                                     lifeTimeInfo.currBranch.SetVarStatus(rrec.name, LifetimeInfo.VarStatus.Dead);
 
-                                    //ĞèÒª²åÈëNullÓï¾ä
+                                    //éœ€è¦æ’å…¥Nullè¯­å¥
                                     assignNode.attributes[AstAttr.set_null_after_stmt] = new List<string> { rrec.name };
                                 }
-                                //moveÔ´£º×Ö¶Î
+                                //moveæºï¼šå­—æ®µ
                                 else if(assignNode.rvalueNode is ObjectMemberAccessNode fieldRvalue)
                                 {
                                     assignNode.attributes[AstAttr.set_null_field_after_stmt] = fieldRvalue;
                                 }
                             }
 
-                            // ËùÓĞÈ¨½èÓÃÀàĞÍ      
+                            // æ‰€æœ‰æƒå€Ÿç”¨ç±»å‹      
                             if(lmodel.HasFlag(SymbolTable.RecordFlag.BorrowVar))
                             {
-                                //ÎŞĞè´¦Àí  
+                                //æ— éœ€å¤„ç†  
                             }
                         }
                         else
                         {
-                            // ¼ÌĞøµİ¹é×Ó½Úµã£¬±ÜÃâÒÅÂ©
+                            // ç»§ç»­é€’å½’å­èŠ‚ç‚¹ï¼Œé¿å…é—æ¼
                             Pass4_OwnershipLifetime(assignNode.lvalueNode);
                         }
                         break;
@@ -4526,7 +4575,7 @@ namespace Gizbox.SemanticRule
                     {  
                         if(del.isArrayDelete == false && del.objToDelete != null)
                         {
-                            // ¼ì²é£º½ûÖ¹É¾³ı·ÇManualÀàĞÍ±äÁ¿  
+                            // æ£€æŸ¥ï¼šç¦æ­¢åˆ é™¤éManualç±»å‹å˜é‡  
                             if(del.objToDelete is SyntaxTree.IdentityNode dId)
                             {
                                 var drec = Query(dId.FullName);
@@ -4538,7 +4587,7 @@ namespace Gizbox.SemanticRule
                                 }
                             }
 
-                            // ¼ì²é£º½ûÖ¹ÊÍ·ÅownÀàĞÍ³ÉÔ±×Ö¶Î  
+                            // æ£€æŸ¥ï¼šç¦æ­¢é‡Šæ”¾ownç±»å‹æˆå‘˜å­—æ®µ  
                             else if(del.objToDelete is SyntaxTree.ObjectMemberAccessNode dAccess)
                             {
                                 var objTypeExpr = (string)dAccess.objectNode.attributes[AstAttr.type];
@@ -4560,7 +4609,7 @@ namespace Gizbox.SemanticRule
                     }
                 case SyntaxTree.ReturnStmtNode ret:
                     {
-                        // ÏÈµİ¹é£¬È·±£ÄÚ²ãµ÷ÓÃµÄmoveÒÑ´¦Àí
+                        // å…ˆé€’å½’ï¼Œç¡®ä¿å†…å±‚è°ƒç”¨çš„moveå·²å¤„ç†
                         Pass4_OwnershipLifetime(ret.returnExprNode);
 
                         // borrow-return escape check: returned borrow must be derived from `this` or a borrow parameter
@@ -4569,7 +4618,7 @@ namespace Gizbox.SemanticRule
                             CheckBorrowReturnEscape(ret, ret.returnExprNode);
                         }
 
-                        // Èç¹û·µ»ØµÄÊÇowner£¬ÇÒ·µ»Ø±äÁ¿ÊÇIdentity£¬Ôò½«Æä±ê¼ÇÎªmoved£¬±ÜÃâ±»É¾³ı
+                        // å¦‚æœè¿”å›çš„æ˜¯ownerï¼Œä¸”è¿”å›å˜é‡æ˜¯Identityï¼Œåˆ™å°†å…¶æ ‡è®°ä¸ºmovedï¼Œé¿å…è¢«åˆ é™¤
                         string returnedName = null;
                         if(lifeTimeInfo.currentFuncReturnFlag.HasFlag(SymbolTable.RecordFlag.OwnerVar) && ret.returnExprNode is SyntaxTree.IdentityNode rid)
                         {
@@ -4581,13 +4630,13 @@ namespace Gizbox.SemanticRule
                             }
                         }
 
-                        // ¼ì²é:¶ÔÏó³ÉÔ±²»¿ÉÒÔMoveOut  
+                        // æ£€æŸ¥:å¯¹è±¡æˆå‘˜ä¸å¯ä»¥MoveOut  
                         if(lifeTimeInfo.currentFuncReturnFlag.HasFlag(SymbolTable.RecordFlag.OwnerVar) && ret.returnExprNode is SyntaxTree.ObjectMemberAccessNode)
                         {
                             throw new SemanticException(ExceptioName.OwnershipError_CanNotMoveOutClassField, ret, "returning owner field is not allowed; use replace.");
                         }
 
-                        // »ã×Üµ±Ç°ËùÓĞ»îÔ¾Owner£¨ËùÓĞÕ»Ö¡£©£¬returnÇ°É¾³ı£¨ÅÅ³ı±»·µ»ØÕß£©
+                        // æ±‡æ€»å½“å‰æ‰€æœ‰æ´»è·ƒOwnerï¼ˆæ‰€æœ‰æ ˆå¸§ï¼‰ï¼Œreturnå‰åˆ é™¤ï¼ˆæ’é™¤è¢«è¿”å›è€…ï¼‰
                         var delList = new List<(LifetimeInfo.VarStatus status, string varname)>();
                         HashSet<string> varnameSet = new();
                         foreach(var scope in lifeTimeInfo.currBranch.scopeStack)
@@ -4614,13 +4663,13 @@ namespace Gizbox.SemanticRule
                     }
                 case SyntaxTree.SingleExprStmtNode sstmt:
                     {
-                        // ±í´ïÊ½×÷ÎªÓï¾ä£ºÈônew»òcall·µ»Øowner£¬Óï¾äÄ©É¾³ı
+                        // è¡¨è¾¾å¼ä½œä¸ºè¯­å¥ï¼šè‹¥newæˆ–callè¿”å›ownerï¼Œè¯­å¥æœ«åˆ é™¤
                         Pass4_OwnershipLifetime(sstmt.exprNode);
 
                         var delExprs = new List<SyntaxTree.ExprNode>();
                         if(sstmt.exprNode is SyntaxTree.NewObjectNode)
                         {
-                            // ÊÓÎªÁÙÊ±ËùÓĞÈ¨£¬ĞèÉ¾³ı
+                            // è§†ä¸ºä¸´æ—¶æ‰€æœ‰æƒï¼Œéœ€åˆ é™¤
                             delExprs.Add(sstmt.exprNode);
                             sstmt.exprNode.attributes[AstAttr.store_expr_result] = true;
                         }
@@ -4630,7 +4679,7 @@ namespace Gizbox.SemanticRule
 
                             if(f.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
-                                // ÊÓÎªÁÙÊ±ËùÓĞÈ¨£¬ĞèÉ¾³ı
+                                // è§†ä¸ºä¸´æ—¶æ‰€æœ‰æƒï¼Œéœ€åˆ é™¤
                                 delExprs.Add(sstmt.exprNode);
                                 sstmt.exprNode.attributes[AstAttr.store_expr_result] = true;
                             }
@@ -4695,10 +4744,10 @@ namespace Gizbox.SemanticRule
                         break;
                     }
 
-                //Ö»´¦Àí´«²ÎµÄËùÓĞÈ¨×ªÒÆ£¬·µ»ØÖµµÄËùÓĞÈ¨×ªÒÆÔÙSingleStmt/Assign/VarDecl½Úµã´¦Àí  
+                //åªå¤„ç†ä¼ å‚çš„æ‰€æœ‰æƒè½¬ç§»ï¼Œè¿”å›å€¼çš„æ‰€æœ‰æƒè½¬ç§»å†SingleStmt/Assign/VarDeclèŠ‚ç‚¹å¤„ç†  
                 case SyntaxTree.CallNode callNode:  
                     {
-                        // *** ÏÈ´¦ÀíËùÓĞÊµ²Î£¨µİ¹é£©***
+                        // *** å…ˆå¤„ç†æ‰€æœ‰å®å‚ï¼ˆé€’å½’ï¼‰***
                         foreach(var a in callNode.argumantsNode.arguments)
                         {
 
@@ -4716,7 +4765,7 @@ namespace Gizbox.SemanticRule
                         }
                      
 
-                        // *** »ñÈ¡º¯ÊıµÄ·ûºÅ±í¼ÇÂ¼ ***  
+                        // *** è·å–å‡½æ•°çš„ç¬¦å·è¡¨è®°å½• ***  
                         SymbolTable.Record funcRec = null;
                         if(callNode.isMemberAccessFunction == false)
                         {
@@ -4748,15 +4797,15 @@ namespace Gizbox.SemanticRule
                         }
 
 
-                        // *** ¸ù¾İ±»µ÷º¯ÊıÇ©Ãû¶ÔÊµ²Î×ömove/Ğ£Ñé ***
+                        // *** æ ¹æ®è¢«è°ƒå‡½æ•°ç­¾åå¯¹å®å‚åšmove/æ ¡éªŒ ***
 
                         var allParams = funcRec.envPtr.GetByCategory(SymbolTable.RecordCatagory.Param) ?? new List<SymbolTable.Record>();
-                        // ³ÉÔ±º¯ÊıĞÎ²Î±íº¬this£¬·Ç³ÉÔ±²»º¬
+                        // æˆå‘˜å‡½æ•°å½¢å‚è¡¨å«thisï¼Œéæˆå‘˜ä¸å«
                         int offset = 0;
                         if(callNode.isMemberAccessFunction && allParams.Count > 0 && allParams[0].name == "this")
                             offset = 1;
 
-                        // Êµ²Î·ÖÎö  
+                        // å®å‚åˆ†æ  
                         for(int i = 0; i < callNode.argumantsNode.arguments.Count; ++i)
                         {
                             if(i + offset >= allParams.Count)
@@ -4766,21 +4815,21 @@ namespace Gizbox.SemanticRule
                             var arg = callNode.argumantsNode.arguments[i];
                             var type = GType.Parse(pr.typeExpression);
 
-                            // ÖµÀàĞÍ²ÎÊı²»ÓÃ´¦ÀíËùÓĞÈ¨ÓïÒå  
+                            // å€¼ç±»å‹å‚æ•°ä¸ç”¨å¤„ç†æ‰€æœ‰æƒè¯­ä¹‰  
                             if(type.IsReferenceType == false)
                                 continue;
 
-                            // ËùÓĞÈ¨±È½Ï  
+                            // æ‰€æœ‰æƒæ¯”è¾ƒ  
                             CheckOwnershipCompare_Param(pr, arg, out var paramModel, out var argModel);
 
-                            // ¼ì²éownÄ£ĞÍÊµ²ÎÄÜ·ñMoveOut
+                            // æ£€æŸ¥ownæ¨¡å‹å®å‚èƒ½å¦MoveOut
                             if(paramModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
                                 CheckOwnershipCanMoveOut(arg);
                             }
 
 
-                            // ËùÓĞÈ¨×ªÒÆ  
+                            // æ‰€æœ‰æƒè½¬ç§»  
                             if(pflag.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
                                 if(arg is SyntaxTree.IdentityNode argIdNode && argModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
@@ -4789,7 +4838,7 @@ namespace Gizbox.SemanticRule
                                     lifeTimeInfo.currBranch.SetVarStatus(argRec.name, LifetimeInfo.VarStatus.Dead);
 
 
-                                    // Óï¾ä½áÊøÊµ²Î¸³ÖµNULL£¬×÷Îªdrop-flag  
+                                    // è¯­å¥ç»“æŸå®å‚èµ‹å€¼NULLï¼Œä½œä¸ºdrop-flag  
                                     if(callNode.attributes.TryGetValue(AstAttr.set_null_after_call, out var v) == false || v is not List<string>)
                                     {
                                         callNode.attributes[AstAttr.set_null_after_call] = new List<string>();
@@ -4808,7 +4857,7 @@ namespace Gizbox.SemanticRule
                     }
                 case SyntaxTree.IdentityNode id:
                     {
-                        // Ò»°ã×÷ÎªrvalueÊ¹ÓÃ£º½ûÖ¹Ê¹ÓÃÒÑmoveµÄowner±äÁ¿
+                        // ä¸€èˆ¬ä½œä¸ºrvalueä½¿ç”¨ï¼šç¦æ­¢ä½¿ç”¨å·²moveçš„ownerå˜é‡
                         var rec = Query(id.FullName);
                         if(rec != null && rec.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                         {
@@ -4822,7 +4871,7 @@ namespace Gizbox.SemanticRule
                         break;
                     }
 
-                // ÆäËû±í´ïÊ½½öµİ¹éÆä×Ó½Úµã£¬±ÜÃâÒÅÂ©
+                // å…¶ä»–è¡¨è¾¾å¼ä»…é€’å½’å…¶å­èŠ‚ç‚¹ï¼Œé¿å…é—æ¼
                 case SyntaxTree.BinaryOpNode b:
                     Pass4_OwnershipLifetime(b.leftNode);
                     Pass4_OwnershipLifetime(b.rightNode);
@@ -4848,11 +4897,11 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.ThisNode _:
                 case SyntaxTree.SizeOfNode _:
                 case SyntaxTree.TypeOfNode _:
-                    // ÎŞĞè´¦Àí
+                    // æ— éœ€å¤„ç†
                     break;
 
                 default:
-                    // ÀàĞÍ/²ÎÊı/Êµ²ÎÓëÆäËü½Úµã£¬¶Ô×ÓÊ÷µİ¹é
+                    // ç±»å‹/å‚æ•°/å®å‚ä¸å…¶å®ƒèŠ‚ç‚¹ï¼Œå¯¹å­æ ‘é€’å½’
                     foreach(var n in node.Children())
                     {
                         Pass4_OwnershipLifetime(n);
@@ -4871,7 +4920,7 @@ namespace Gizbox.SemanticRule
             if(returnExpr == null)
                 throw new SemanticException(ExceptioName.OwnershipError, retNode, "borrow return must have expression.");
 
-            // ½öÔÊĞí£º1) ÒÔ this/bor ²ÎÊıÎª¸ùµÄ³ÉÔ±/ÔªËØ·ÃÎÊ£»2) Ö±½Ó·µ»Ø bor ²ÎÊı£¨ÒÔ¼° this ±¾Éí£©
+            // ä»…å…è®¸ï¼š1) ä»¥ this/bor å‚æ•°ä¸ºæ ¹çš„æˆå‘˜/å…ƒç´ è®¿é—®ï¼›2) ç›´æ¥è¿”å› bor å‚æ•°ï¼ˆä»¥åŠ this æœ¬èº«ï¼‰
             if(IsBorrowDerivedFromAllowedInput(returnExpr))
                 return;
 
@@ -4880,11 +4929,11 @@ namespace Gizbox.SemanticRule
 
         private bool IsBorrowDerivedFromAllowedInput(SyntaxTree.ExprNode expr)
         {
-            // ÔÊĞí return this£¨µÈ¼ÛÓÚ½èÓÃµ÷ÓÃÕß³ÖÓĞµÄ¶ÔÏó£©
+            // å…è®¸ return thisï¼ˆç­‰ä»·äºå€Ÿç”¨è°ƒç”¨è€…æŒæœ‰çš„å¯¹è±¡ï¼‰
             if(expr is SyntaxTree.ThisNode)
                 return true;
 
-            // return ±êÊ¶·û£º±ØĞëÊÇÏÔÊ½ bor ²ÎÊı
+            // return æ ‡è¯†ç¬¦ï¼šå¿…é¡»æ˜¯æ˜¾å¼ bor å‚æ•°
             if(expr is SyntaxTree.IdentityNode id)
             {
                 var rec = Query(id.FullName);
@@ -4898,41 +4947,41 @@ namespace Gizbox.SemanticRule
                 return model.HasFlag(SymbolTable.RecordFlag.BorrowVar);
             }
 
-            // return ³ÉÔ±·ÃÎÊ£ºµİ¹é¼ì²éÆä¸ù£¬±ØĞëÊÇ this »ò bor ²ÎÊı
+            // return æˆå‘˜è®¿é—®ï¼šé€’å½’æ£€æŸ¥å…¶æ ¹ï¼Œå¿…é¡»æ˜¯ this æˆ– bor å‚æ•°
             if(expr is SyntaxTree.ObjectMemberAccessNode ma)
             {
-                // ¸ùÎª this.* »ò borParam.* ÔòÔÊĞí
+                // æ ¹ä¸º this.* æˆ– borParam.* åˆ™å…è®¸
                 if(IsBorrowDerivedFromAllowedInput(ma.objectNode))
                     return true;
                 return false;
             }
 
-            // return ÏÂ±ê·ÃÎÊ£º½öµ±ÈİÆ÷±í´ïÊ½ÅÉÉú×ÔÔÊĞíµÄÊäÈë
+            // return ä¸‹æ ‡è®¿é—®ï¼šä»…å½“å®¹å™¨è¡¨è¾¾å¼æ´¾ç”Ÿè‡ªå…è®¸çš„è¾“å…¥
             if(expr is SyntaxTree.ElementAccessNode ea)
             {
                 return IsBorrowDerivedFromAllowedInput(ea.containerNode);
             }
 
-            // return cast£ºcast ²»¸Ä±äËùÓĞÈ¨/½èÓÃÀ´Ô´£¬Ö»µİ¹é¼ì²é²Ù×÷Êı
+            // return castï¼šcast ä¸æ”¹å˜æ‰€æœ‰æƒ/å€Ÿç”¨æ¥æºï¼Œåªé€’å½’æ£€æŸ¥æ“ä½œæ•°
             if(expr is SyntaxTree.CastNode c)
             {
                 return IsBorrowDerivedFromAllowedInput(c.factorNode);
             }
 
-            // ÆäÓàÇé¿ö¶¼ÊÓÎªÁÙÊ±Öµ/Î´ÖªÀ´Ô´ => ¾Ü¾ø£¨new/call/literal/binary/unary µÈ£©
+            // å…¶ä½™æƒ…å†µéƒ½è§†ä¸ºä¸´æ—¶å€¼/æœªçŸ¥æ¥æº => æ‹’ç»ï¼ˆnew/call/literal/binary/unary ç­‰ï¼‰
             return false;
         }
 
-        /// <summary> ËùÓĞÈ¨±È½Ï </summary>
+        /// <summary> æ‰€æœ‰æƒæ¯”è¾ƒ </summary>
         private void CheckOwnershipCompare_Core(SyntaxTree.Node errorNode, SymbolTable.RecordFlag lModel, string lname, SyntaxTree.ExprNode rNode, out SymbolTable.RecordFlag rModel)
         {
-            // ±äÁ¿ÓÒÖµ£ºID
+            // å˜é‡å³å€¼ï¼šID
             if(rNode is IdentityNode rvalueVarNode)
             {
                 var rvalueVarRec = Query(rvalueVarNode.FullName);
                 rModel = rvalueVarRec.flags & OwnershipModelMask;
 
-                // manual <- (owner|borrow) ½ûÖ¹
+                // manual <- (owner|borrow) ç¦æ­¢
                 if(lModel == SymbolTable.RecordFlag.ManualVar && rModel != SymbolTable.RecordFlag.ManualVar)
                 {
                     if(rModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
@@ -4941,7 +4990,7 @@ namespace Gizbox.SemanticRule
                         throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignBorrwToManual, errorNode, lname);
                 }
 
-                // owner <- (manual|borrow) ½ûÖ¹
+                // owner <- (manual|borrow) ç¦æ­¢
                 if(lModel == SymbolTable.RecordFlag.OwnerVar && rModel != SymbolTable.RecordFlag.OwnerVar)
                 {
                     if(rModel.HasFlag(SymbolTable.RecordFlag.ManualVar))
@@ -4950,7 +4999,7 @@ namespace Gizbox.SemanticRule
                         throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignBorrowToOwn, errorNode, lname);
                 }
 
-                // borrow <- manual ½ûÖ¹
+                // borrow <- manual ç¦æ­¢
                 if(lModel == SymbolTable.RecordFlag.BorrowVar && rModel == SymbolTable.RecordFlag.ManualVar)
                 {
                     throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignManualToBorrow, errorNode, lname);
@@ -4959,7 +5008,7 @@ namespace Gizbox.SemanticRule
                 return;
             }
 
-            // ÓÒÖµ£ºreplace
+            // å³å€¼ï¼šreplace
             else if(rNode is ReplaceNode replaceNode)
             {
                 if(replaceNode.targetNode is not ObjectMemberAccessNode memAccess)
@@ -4978,7 +5027,7 @@ namespace Gizbox.SemanticRule
 
                 rModel = fieldRec.flags & OwnershipModelMask;
 
-                // manual <- (owner|borrow) ½ûÖ¹
+                // manual <- (owner|borrow) ç¦æ­¢
                 if(lModel == SymbolTable.RecordFlag.ManualVar && rModel != SymbolTable.RecordFlag.ManualVar)
                 {
                     if(rModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
@@ -4987,7 +5036,7 @@ namespace Gizbox.SemanticRule
                         throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignBorrwToManual, errorNode, lname);
                 }
 
-                // owner <- (manual|borrow) ½ûÖ¹
+                // owner <- (manual|borrow) ç¦æ­¢
                 if(lModel == SymbolTable.RecordFlag.OwnerVar && rModel != SymbolTable.RecordFlag.OwnerVar)
                 {
                     if(rModel.HasFlag(SymbolTable.RecordFlag.ManualVar))
@@ -4996,7 +5045,7 @@ namespace Gizbox.SemanticRule
                         throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignBorrowToOwn, errorNode, lname);
                 }
 
-                // borrow <- manual ½ûÖ¹
+                // borrow <- manual ç¦æ­¢
                 if(lModel == SymbolTable.RecordFlag.BorrowVar && rModel == SymbolTable.RecordFlag.ManualVar)
                 {
                     throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignManualToBorrow, errorNode, lname);
@@ -5005,7 +5054,7 @@ namespace Gizbox.SemanticRule
                 return;
             }
 
-            // ÓÒÖµ£º¶ÔÏó³ÉÔ±·ÃÎÊ obj.field
+            // å³å€¼ï¼šå¯¹è±¡æˆå‘˜è®¿é—® obj.field
             else if(rNode is ObjectMemberAccessNode memAccess)
             {
                 if(memAccess.objectNode.attributes.TryGetValue(AstAttr.type, out var objTypeObj) == false || objTypeObj is not string objTypeExpr)
@@ -5021,7 +5070,7 @@ namespace Gizbox.SemanticRule
 
                 rModel = fieldRec.flags & OwnershipModelMask;
 
-                // manual <- (owner|borrow) ½ûÖ¹
+                // manual <- (owner|borrow) ç¦æ­¢
                 if(lModel == SymbolTable.RecordFlag.ManualVar && rModel != SymbolTable.RecordFlag.ManualVar)
                 {
                     if(rModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
@@ -5030,7 +5079,7 @@ namespace Gizbox.SemanticRule
                         throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignBorrwToManual, errorNode, lname);
                 }
 
-                // owner <- (manual|borrow) ½ûÖ¹
+                // owner <- (manual|borrow) ç¦æ­¢
                 if(lModel == SymbolTable.RecordFlag.OwnerVar && rModel != SymbolTable.RecordFlag.OwnerVar)
                 {
                     if(rModel.HasFlag(SymbolTable.RecordFlag.ManualVar))
@@ -5039,7 +5088,7 @@ namespace Gizbox.SemanticRule
                         throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignBorrowToOwn, errorNode, lname);
                 }
 
-                // borrow <- manual ½ûÖ¹
+                // borrow <- manual ç¦æ­¢
                 if(lModel == SymbolTable.RecordFlag.BorrowVar && rModel == SymbolTable.RecordFlag.ManualVar)
                 {
                     throw new SemanticException(ExceptioName.OwnershipError_CanNotAssignManualToBorrow, errorNode, lname);
@@ -5048,13 +5097,13 @@ namespace Gizbox.SemanticRule
                 return;
             }
 
-            // Êı×éÔªËØ·ÃÎÊ  
+            // æ•°ç»„å…ƒç´ è®¿é—®  
             else if(rNode is ElementAccessNode elementAccessNode)
             {
-                rModel = SymbolTable.RecordFlag.ManualVar;//Êı×éÖ»ÄÜ´æ·Å·ÇownÀàĞÍ  
+                rModel = SymbolTable.RecordFlag.ManualVar;//æ•°ç»„åªèƒ½å­˜æ”¾éownç±»å‹  
             }
 
-            // ×ÖÃæÁ¿
+            // å­—é¢é‡
             else if(rNode is LiteralNode litnode)
             {
                 if(litnode.token.name == "null")
@@ -5078,7 +5127,7 @@ namespace Gizbox.SemanticRule
                 return;
             }
 
-            // ÁÙÊ±ÓÒÖµ - new
+            // ä¸´æ—¶å³å€¼ - new
             else if(rNode is NewObjectNode newobjNode)
             {
                 if(lModel == SymbolTable.RecordFlag.BorrowVar)
@@ -5090,21 +5139,21 @@ namespace Gizbox.SemanticRule
                 return;
             }
 
-            // ÁÙÊ±ÓÒÖµ - new[]
+            // ä¸´æ—¶å³å€¼ - new[]
             else if(rNode is NewArrayNode newarrNode)
             {
                 if(lModel == SymbolTable.RecordFlag.BorrowVar )
                     throw new SemanticException(ExceptioName.OwnershipError_BorrowCanNotFromTemp, errorNode, lname);
 
                 if(lModel == SymbolTable.RecordFlag.OwnerVar)
-                    throw new SemanticException(ExceptioName.OwnershipError, errorNode, "array type cant be owner.");//Êı×éÀàĞÍÔİÊ±²»ÄÜÊÇownÀàĞÍ  
+                    throw new SemanticException(ExceptioName.OwnershipError, errorNode, "array type cant be owner.");//æ•°ç»„ç±»å‹æš‚æ—¶ä¸èƒ½æ˜¯ownç±»å‹  
 
                 rModel = SymbolTable.RecordFlag.ManualVar;
                 return;
             }
 
 
-            // ÁÙÊ±ÓÒÖµ - µ÷ÓÃ·µ»Ø
+            // ä¸´æ—¶å³å€¼ - è°ƒç”¨è¿”å›
             else if(rNode is CallNode callNode)
             {
                 var funcRec = callNode.attributes[AstAttr.func_rec] as SymbolTable.Record;
@@ -5120,15 +5169,15 @@ namespace Gizbox.SemanticRule
                 return;
             }
 
-            // ÁÙÊ±ÓÒÖµ - Cast
+            // ä¸´æ—¶å³å€¼ - Cast
             else if(rNode is CastNode castNode)
             {
-                //¶ÔÒıÓÃÀàĞÍµÄCast±¾ÖÊ¶¼ÊÇÖ¸Õëreinterpret£¬²»Éæ¼°ËùÓĞÈ¨×ªÒÆ  
+                //å¯¹å¼•ç”¨ç±»å‹çš„Castæœ¬è´¨éƒ½æ˜¯æŒ‡é’ˆreinterpretï¼Œä¸æ¶‰åŠæ‰€æœ‰æƒè½¬ç§»  
                 CheckOwnershipCompare_Core(errorNode, lModel, lname, castNode.factorNode, out rModel);
                 return;
             }
 
-            // ÆäËûÁÙÊ±ÓÒÖµ
+            // å…¶ä»–ä¸´æ—¶å³å€¼
             else
             {
                 if(lModel == SymbolTable.RecordFlag.BorrowVar)
@@ -5140,7 +5189,7 @@ namespace Gizbox.SemanticRule
             
         }
 
-        /// <summary> ±äÁ¿¶¨Òå µÄ ËùÓĞÈ¨ºÍÉúÃüÖÜÆÚ¼ì²é</summary>
+        /// <summary> å˜é‡å®šä¹‰ çš„ æ‰€æœ‰æƒå’Œç”Ÿå‘½å‘¨æœŸæ£€æŸ¥</summary>
         private void CheckOwnershipCompare_VarDecl(VarDeclareNode varDeclNode, SymbolTable.Record varRec, out SymbolTable.RecordFlag lModel, out SymbolTable.RecordFlag rModel)
         {
             lModel = GetOwnershipModel(varDeclNode.flags, varDeclNode.typeNode);
@@ -5149,7 +5198,7 @@ namespace Gizbox.SemanticRule
             CheckOwnershipCompare_Core(varDeclNode, lModel, lname, varDeclNode.initializerNode, out rModel);
         }
 
-        /// <summary> ¸³Öµ µÄ ËùÓĞÈ¨ºÍÉúÃüÖÜÆÚ¼ì²é</summary>
+        /// <summary> èµ‹å€¼ çš„ æ‰€æœ‰æƒå’Œç”Ÿå‘½å‘¨æœŸæ£€æŸ¥</summary>
         private void CheckOwnershipCompare_Assign(AssignNode assignNode, SymbolTable.Record lvarRec, out SymbolTable.RecordFlag lModel, out SymbolTable.RecordFlag rModel)
         {
             if(lvarRec == null)
@@ -5174,7 +5223,7 @@ namespace Gizbox.SemanticRule
             CheckOwnershipCompare_Core(assignNode, lModel, lname, assignNode.rvalueNode, out rModel);
         }
 
-        /// <summary> ²ÎÊı´«µİ µÄ ËùÓĞÈ¨ºÍÉúÃüÖÜÆÚ¼ì²é</summary>
+        /// <summary> å‚æ•°ä¼ é€’ çš„ æ‰€æœ‰æƒå’Œç”Ÿå‘½å‘¨æœŸæ£€æŸ¥</summary>
         private void CheckOwnershipCompare_Param(SymbolTable.Record paramRec, ExprNode argNode, out SymbolTable.RecordFlag paramModel, out SymbolTable.RecordFlag argModel)
         {
             paramModel = paramRec.flags & OwnershipModelMask;
@@ -5183,7 +5232,7 @@ namespace Gizbox.SemanticRule
             CheckOwnershipCompare_Core(argNode, paramModel, lname, argNode, out argModel);
         }
 
-        /// <summary> ËùÓĞÈ¨¿ÉÒÆ³ö¼ì²é </summary>
+        /// <summary> æ‰€æœ‰æƒå¯ç§»å‡ºæ£€æŸ¥ </summary>
         private void CheckOwnershipCanMoveOut(SyntaxTree.ExprNode rvalNode)
         {
             if(rvalNode == null)
@@ -5200,7 +5249,7 @@ namespace Gizbox.SemanticRule
 
 
         /// <summary>
-        /// ·ÖÎö±äÁ¿/²ÎÊı/·µ»ØÖµµÄËùÓĞÈ¨Ä£ĞÍ  
+        /// åˆ†æå˜é‡/å‚æ•°/è¿”å›å€¼çš„æ‰€æœ‰æƒæ¨¡å‹  
         /// </summary>
         private SymbolTable.RecordFlag GetOwnershipModel(VarModifiers explicitModifier, SyntaxTree.TypeNode typeNode)
         {
@@ -5213,11 +5262,11 @@ namespace Gizbox.SemanticRule
 
                 if(explicitModifier.HasFlag(VarModifiers.Own))
                 {
-                    ownerModel = SymbolTable.RecordFlag.OwnerVar;//ÏÔÊ½own
+                    ownerModel = SymbolTable.RecordFlag.OwnerVar;//æ˜¾å¼own
                 }
                 else if(explicitModifier.HasFlag(VarModifiers.Bor))
                 {
-                    ownerModel = SymbolTable.RecordFlag.BorrowVar;//ÏÔÊ½½èÓÃ
+                    ownerModel = SymbolTable.RecordFlag.BorrowVar;//æ˜¾å¼å€Ÿç”¨
                 }
                 else
                 {
@@ -5230,9 +5279,9 @@ namespace Gizbox.SemanticRule
                     }
 
                     if(isOwnershipClass)
-                        ownerModel = SymbolTable.RecordFlag.OwnerVar;//own class ÀàĞÍ
+                        ownerModel = SymbolTable.RecordFlag.OwnerVar;//own class ç±»å‹
                     else
-                        ownerModel = SymbolTable.RecordFlag.ManualVar;//ÊÖ¶¯ÊÍ·ÅÀàĞÍ
+                        ownerModel = SymbolTable.RecordFlag.ManualVar;//æ‰‹åŠ¨é‡Šæ”¾ç±»å‹
                 }
                 return ownerModel;
             }
@@ -5242,7 +5291,7 @@ namespace Gizbox.SemanticRule
 
 
         /// <summary>
-        /// »ñÈ¡±í´ïÊ½µÄÀàĞÍ±í´ïÊ½  
+        /// è·å–è¡¨è¾¾å¼çš„ç±»å‹è¡¨è¾¾å¼  
         /// </summary>
         private string AnalyzeTypeExpression(SyntaxTree.ExprNode exprNode)
         {
@@ -5309,11 +5358,11 @@ namespace Gizbox.SemanticRule
                         var classEnv = classRec.envPtr;
                         if (classEnv == null) throw new SemanticException(ExceptioName.ClassScopeNotFound, accessNode.objectNode, "");
 
-                        var memberRec = classEnv.GetRecordByRawname(accessNode.memberNode.FullName);//Ê¹ÓÃRawNameÒÔ·ÀÕÒ²»µ½³ÉÔ±Îªº¯ÊıÊ±ÕÒ²»µ½    
+                        var memberRec = classEnv.GetRecordByRawname(accessNode.memberNode.FullName);//ä½¿ç”¨RawNameä»¥é˜²æ‰¾ä¸åˆ°æˆå‘˜ä¸ºå‡½æ•°æ—¶æ‰¾ä¸åˆ°    
                         if (memberRec == null) throw new SemanticException(ExceptioName.MemberFieldNotFound, accessNode.objectNode, accessNode.memberNode.FullName);
 
-                        accessNode.attributes[AstAttr.klass] = className;//¼ÇÂ¼memberAccess½ÚµãµÄµã×ó±ßÀàĞÍ
-                        accessNode.attributes[AstAttr.member_name] = accessNode.memberNode.FullName;//¼ÇÂ¼memberAccess½ÚµãµÄµãÓÒ±ßÃû³Æ
+                        accessNode.attributes[AstAttr.klass] = className;//è®°å½•memberAccessèŠ‚ç‚¹çš„ç‚¹å·¦è¾¹ç±»å‹
+                        accessNode.attributes[AstAttr.member_name] = accessNode.memberNode.FullName;//è®°å½•memberAccessèŠ‚ç‚¹çš„ç‚¹å³è¾¹åç§°
 
                         nodeTypeExprssion = memberRec.typeExpression;
                     }
@@ -5448,14 +5497,14 @@ namespace Gizbox.SemanticRule
                         var typeR = AnalyzeTypeExpression(binaryOp.rightNode);
 
                         string op = binaryOp.op;
-                        //±È½ÏÔËËã·û
+                        //æ¯”è¾ƒè¿ç®—ç¬¦
                         if (op == "<" || op == ">" || op == "<=" || op == ">=" || op == "==" || op == "!=")
                         {
                             if (CheckType_Equal(typeL, typeR) == false) throw new SemanticException(ExceptioName.InconsistentExpressionTypesCannotCompare, binaryOp, "");
 
                             nodeTypeExprssion = "bool";
                         }
-                        //ÆÕÍ¨ÔËËã·û  
+                        //æ™®é€šè¿ç®—ç¬¦  
                         else
                         {
                             if (typeL != typeR) throw new SemanticException(ExceptioName.BinaryOperationTypeMismatch, binaryOp, "");
@@ -5479,6 +5528,11 @@ namespace Gizbox.SemanticRule
                         nodeTypeExprssion = castNode.typeNode.TypeExpression();
                     }
                     break;
+                case SyntaxTree.SizeOfNode sizeofNode:
+                    {
+                        nodeTypeExprssion = "int";
+                    }
+                    break;
                 default:
                     throw new SemanticException(ExceptioName.CannotAnalyzeExpressionNodeType, exprNode, exprNode.GetType().Name);
             }
@@ -5489,7 +5543,7 @@ namespace Gizbox.SemanticRule
         }
 
         /// <summary>
-        /// ÀàĞÍÍÆ¶Ï
+        /// ç±»å‹æ¨æ–­
         /// </summary>
         private string InferType(SyntaxTree.InferTypeNode typeNode, SyntaxTree.ExprNode exprNode)
         {
@@ -5503,7 +5557,7 @@ namespace Gizbox.SemanticRule
         }
 
         /// <summary>
-        /// ¼ì²éÀàĞÍ
+        /// æ£€æŸ¥ç±»å‹
         /// </summary>
         private bool CheckType_Equal(string typeExpr, SyntaxTree.ExprNode exprNode)
         {
@@ -5530,20 +5584,20 @@ namespace Gizbox.SemanticRule
         {
             if(typeExpr1 == typeExpr2) return true;
 
-            //ÓĞÖÁÉÙÒ»¸öÊÇ»ùÔªÀàĞÍ  
+            //æœ‰è‡³å°‘ä¸€ä¸ªæ˜¯åŸºå…ƒç±»å‹  
             if(GType.Parse(typeExpr1).IsPrimitive || GType.Parse(typeExpr2).IsPrimitive)
             {
                 return typeExpr1 == typeExpr2;
             }
-            //È«ÊÇ·Ç»ùÔªÀàĞÍ  
+            //å…¨æ˜¯éåŸºå…ƒç±»å‹  
             else
             {
-                //null¿ÉÒÔÊÇÈÎºÎ·Ç»ùÔªÀàĞÍµÄ×ÓÀà  
+                //nullå¯ä»¥æ˜¯ä»»ä½•éåŸºå…ƒç±»å‹çš„å­ç±»  
                 if(typeExpr1 == "null")
                 {
                     return true;
                 }
-                //Á½¸ö¶¼ÊÇÀàÀàĞÍ
+                //ä¸¤ä¸ªéƒ½æ˜¯ç±»ç±»å‹
                 else if(GType.Parse(typeExpr1).IsClassType && GType.Parse(typeExpr2).IsClassType)
                 {
                     var typeRec1 = Query(typeExpr1);
@@ -5552,10 +5606,10 @@ namespace Gizbox.SemanticRule
                         return true;
                     }
                 }
-                //Á½¸ö¶¼ÊÇÊı×éÀàĞÍ  
+                //ä¸¤ä¸ªéƒ½æ˜¯æ•°ç»„ç±»å‹  
                 else if(GType.Parse(typeExpr1).IsArray && GType.Parse(typeExpr2).IsArray)
                 {
-                    //²»Ö§³ÖÄæ±äºÍĞ­±ä  
+                    //ä¸æ”¯æŒé€†å˜å’Œåå˜  
                 }
             }
 
@@ -5567,7 +5621,7 @@ namespace Gizbox.SemanticRule
         {
             switch(node)
             {
-                //Óï¾ä¿é½Úµã
+                //è¯­å¥å—èŠ‚ç‚¹
                 case SyntaxTree.StatementBlockNode stmtBlockNode:
                     {
                         bool anyReturnStmt = false;
@@ -5576,7 +5630,7 @@ namespace Gizbox.SemanticRule
                             var stmt = stmtBlockNode.statements[i];
                             if(CheckReturnStmt(stmt, returnType))
                             {
-                                anyReturnStmt = true;//²»break£¬È·±£ËùÓĞreturn½Úµã¶¼±»¼ì²é  
+                                anyReturnStmt = true;//ä¸breakï¼Œç¡®ä¿æ‰€æœ‰returnèŠ‚ç‚¹éƒ½è¢«æ£€æŸ¥  
                             }
                         }
                         return anyReturnStmt;
@@ -5595,16 +5649,16 @@ namespace Gizbox.SemanticRule
                         return anyReturnStmt;
                     }
 
-                //·ÖÖ§½Úµã  
+                //åˆ†æ”¯èŠ‚ç‚¹  
                 case SyntaxTree.IfStmtNode ifNode:
                     {
-                        //Ã»ÓĞelseµÄifÓï·¨ ->²»Í¨¹ı¼ì²é  
+                        //æ²¡æœ‰elseçš„ifè¯­æ³• ->ä¸é€šè¿‡æ£€æŸ¥  
                         if(ifNode.elseClause == null)
                         {
                             return false;
                         }
 
-                        //ÓĞelseµÄifÓï·¨ ->¼ì²éËùÓĞÂ·¾¶ÊÇ·ñÄÜÍ¨¹ı¼ì²é  
+                        //æœ‰elseçš„ifè¯­æ³• ->æ£€æŸ¥æ‰€æœ‰è·¯å¾„æ˜¯å¦èƒ½é€šè¿‡æ£€æŸ¥  
                         bool allPathValid = true;
                         if(CheckReturnStmt(ifNode.elseClause.stmt, returnType) == false)
                         {
@@ -5621,24 +5675,24 @@ namespace Gizbox.SemanticRule
                         return allPathValid;
                     }
 
-                //·µ»Ø½Úµã  
+                //è¿”å›èŠ‚ç‚¹  
                 case SyntaxTree.ReturnStmtNode retNode:
                     {
-                        //ÀàĞÍ¼ì²é  
+                        //ç±»å‹æ£€æŸ¥  
                         bool typeValid = CheckType_Equal(returnType, retNode.returnExprNode);
                         if(typeValid == false)
                             throw new SemanticException(ExceptioName.ReturnTypeError, retNode, "");
 
                         return true;
                     }
-                //ÆäËû½Úµã  
+                //å…¶ä»–èŠ‚ç‚¹  
                 default:
                     return false;
             }
         }
 
 
-        /// <summary> ¼ì²é±êÊ¶·ûÃüÃû¿Õ¼äÇ°×º </summary>
+        /// <summary> æ£€æŸ¥æ ‡è¯†ç¬¦å‘½åç©ºé—´å‰ç¼€ </summary>
         private void CheckIdentifierFullName(SyntaxTree.IdentityNode idNode)
         {
             SyntaxTree.Node curr = idNode;
@@ -5659,7 +5713,7 @@ namespace Gizbox.SemanticRule
 
         private SymbolTable.Record Query(string name)
         {
-            //·ûºÅ±íÁ´²éÕÒ  
+            //ç¬¦å·è¡¨é“¾æŸ¥æ‰¾  
             var toList = envStack.AsList();
             for (int i = toList.Count - 1; i > -1; --i)
             {
@@ -5668,7 +5722,7 @@ namespace Gizbox.SemanticRule
                     return toList[i].GetRecord(name);
                 }
             }
-            //¿âÒÀÀµÖĞ²éÕÒ  
+            //åº“ä¾èµ–ä¸­æŸ¥æ‰¾  
             foreach (var lib in this.ilUnit.dependencyLibs)
             {
                 var result = lib.QueryTopSymbol(name);
@@ -5683,7 +5737,7 @@ namespace Gizbox.SemanticRule
 
         private SymbolTable.Record Query_IgnoreMangle(string rawname)
         {
-            //·ûºÅ±íÁ´²éÕÒ  
+            //ç¬¦å·è¡¨é“¾æŸ¥æ‰¾  
             var toList = envStack.AsList();
             for (int i = toList.Count - 1; i > -1; --i)
             {
@@ -5692,7 +5746,7 @@ namespace Gizbox.SemanticRule
                     return toList[i].GetRecordByRawname(rawname);
                 }
             }
-            //¿âÒÀÀµÖĞ²éÕÒ  
+            //åº“ä¾èµ–ä¸­æŸ¥æ‰¾  
             foreach (var lib in this.ilUnit.dependencyLibs)
             {
                 var result = lib.QueryTopSymbol(rawname, ignoreMangle:true);
@@ -5707,16 +5761,16 @@ namespace Gizbox.SemanticRule
 
         private SymbolTable.Record Query_OperatorOverload(string opName, string typeExpr1, string typeExpr2)
         {
-            //¶¥²ã×÷ÓÃÓò²éÕÒ  
+            //é¡¶å±‚ä½œç”¨åŸŸæŸ¥æ‰¾  
             List<SymbolTable.Record> result = new();
             ilUnit.globalScope.env.GetAllRecordByFlag(SymbolTable.RecordFlag.OperatorOverloadFunc, result);
-            //¿âÒÀÀµÖĞ²éÕÒ  
+            //åº“ä¾èµ–ä¸­æŸ¥æ‰¾  
             foreach(var lib in this.ilUnit.dependencyLibs)
             {
                 lib.globalScope.env.GetAllRecordByFlag(SymbolTable.RecordFlag.OperatorOverloadFunc, result);
             }
 
-            //É¸Ñ¡
+            //ç­›é€‰
             string mangledName = Utils.Mangle(opName, typeExpr1, typeExpr2);
             foreach(var opOverload in result)
             {
@@ -5731,13 +5785,13 @@ namespace Gizbox.SemanticRule
 
         private void QueryAll_IgnoreMangle(string rawname, List<SymbolTable.Record> result)
         {
-            //·ûºÅ±íÁ´²éÕÒ  
+            //ç¬¦å·è¡¨é“¾æŸ¥æ‰¾  
             var asList = envStack.AsList();
             for(int i = asList.Count - 1; i > -1; --i)
             {
                 asList[i].GetAllRecordByRawname(rawname, result);
             }
-            //¿âÒÀÀµÖĞ²éÕÒ  
+            //åº“ä¾èµ–ä¸­æŸ¥æ‰¾  
             foreach(var lib in this.ilUnit.dependencyLibs)
             {
                 lib.QueryAndFillTopSymbolsToContainer(rawname, result, ignoreMangle: true);
@@ -5745,14 +5799,14 @@ namespace Gizbox.SemanticRule
         }
         private bool TryQueryIgnoreMangle(string name)
         {
-            //·ûºÅ±íÁ´²éÕÒ  
+            //ç¬¦å·è¡¨é“¾æŸ¥æ‰¾  
             var asList = envStack.AsList();
             for (int i = asList.Count - 1; i > -1; --i)
             {
                 if(asList[i].ContainRecordRawName(name))
                     return true;
             }
-            //¿âÒÀÀµÖĞ²éÕÒ  
+            //åº“ä¾èµ–ä¸­æŸ¥æ‰¾  
             foreach (var lib in this.ilUnit.dependencyLibs)
             {
                 if(lib.QueryTopSymbol(name, ignoreMangle: true) != null)
@@ -5762,17 +5816,30 @@ namespace Gizbox.SemanticRule
             }
 
             if (Compiler.enableLogParser)
-                Log("TryQuery  ¿âÖĞÎ´ÕÒµ½:" + name);
+                Log("TryQuery  åº“ä¸­æœªæ‰¾åˆ°:" + name);
             
             return false;
         }
 
+        private SymbolTable TryGetClassEnv()
+        {
+            //ç¬¦å·è¡¨é“¾æŸ¥æ‰¾  
+            var toList = envStack.AsList();
+            for(int i = toList.Count - 1; i > -1; --i)
+            {
+                if(toList[i].tableCatagory == SymbolTable.TableCatagory.ClassScope)
+                {
+                    return toList[i];
+                }
+            }
+            return null;
+        }
 
         private bool TryCompleteIdenfier(SyntaxTree.IdentityNode idNode)
         {
             bool found = false;
             string namevalid = null;
-            //Ô­Ãû²éÕÒ 
+            //åŸåæŸ¥æ‰¾ 
             {
                 if (TryQueryIgnoreMangle(idNode.token.attribute))
                 {
@@ -5781,7 +5848,7 @@ namespace Gizbox.SemanticRule
                 }
             }
 
-            //³¢ÊÔÃüÃû¿Õ¼äÇ°×º   
+            //å°è¯•å‘½åç©ºé—´å‰ç¼€   
             foreach (var namespaceUsing in ast.rootNode.usingNamespaceNodes)
             {
                 string newname = namespaceUsing.namespaceNameNode.token.attribute + "::" + idNode.token.attribute;
@@ -5793,7 +5860,7 @@ namespace Gizbox.SemanticRule
                     }
                     found = true;
                     idNode.SetPrefix(namespaceUsing.namespaceNameNode.token.attribute);
-                    if (Compiler.enableLogParser) Log(idNode.token.attribute + "²¹È«Îª" + idNode.FullName);
+                    if (Compiler.enableLogParser) Log(idNode.token.attribute + "è¡¥å…¨ä¸º" + idNode.FullName);
                 }
             }
 
@@ -5838,13 +5905,13 @@ namespace Gizbox.SemanticRule
             else
                 QueryAll_IgnoreMangle(funcRawName, allFunctions);
 
-            //Î´ÕÒµ½º¯ÊıÃû  
+            //æœªæ‰¾åˆ°å‡½æ•°å  
             if(allFunctions.Count == 0)
             {
                 return false;
             }
 
-            //Êµ²ÎĞÎ²ÎÀàĞÍÆ¥Åä  
+            //å®å‚å½¢å‚ç±»å‹åŒ¹é…  
             SymbolTable.Record targetFunc = null;
             List<SymbolTable.Record> targetFuncParams = null;
             foreach(var funcRec in allFunctions)
@@ -5859,10 +5926,10 @@ namespace Gizbox.SemanticRule
                     paramRecs = funcRec.envPtr.GetByCategory(SymbolTable.RecordCatagory.Param);
                 }
                 
-                //ÎŞ²Îº¯Êı  
+                //æ— å‚å‡½æ•°  
                 if(paramRecs == null)
                 {
-                    //0¸öÊµ²Î  
+                    //0ä¸ªå®å‚  
                     if(argTypes.Length == 0)
                     {
                         targetFunc = funcRec;
@@ -5878,7 +5945,7 @@ namespace Gizbox.SemanticRule
                 {
                     if(paramRecs.Count != argTypes.Length)
                     {
-                        continue;//²ÎÊı¸öÊı²»Æ¥Åä  
+                        continue;//å‚æ•°ä¸ªæ•°ä¸åŒ¹é…  
                     }
                         
 
@@ -5933,6 +6000,36 @@ namespace Gizbox.SemanticRule
                 attributes = new Dictionary<AstAttr, object>(),
             };
             return litnode;
+        }
+
+
+        private void GenClassLayoutInfo(SymbolTable.Record classRec)
+        {
+            var classEnv = classRec.envPtr;
+            List<SymbolTable.Record> fieldRecs = new();
+            foreach(var (memberName, memberRec) in classEnv.records)
+            {
+                if(memberRec.category != SymbolTable.RecordCatagory.Variable)
+                    continue;
+                fieldRecs.Add(memberRec);
+            }
+            (int size, int align)[] fieldSizeAndAlignArr = new (int size, int align)[fieldRecs.Count];
+            //å¯¹è±¡å¤´æ˜¯è™šå‡½æ•°è¡¨æŒ‡é’ˆ  
+            for(int i = 0; i < fieldRecs.Count; i++)
+            {
+                string typeExpress = fieldRecs[i].typeExpression;
+                var size = MemUtility.GetGizboxTypeSize(typeExpress);
+                var align = MemUtility.GetGizboxTypeSize(typeExpress);
+                fieldRecs[i].size = size;
+                fieldSizeAndAlignArr[i] = (size, align);
+            }
+            long classSize = MemUtility.ClassLayout(8, fieldSizeAndAlignArr, out var allocAddrs);
+            for(int i = 0; i < fieldRecs.Count; i++)
+            {
+                fieldRecs[i].addr = allocAddrs[i];
+            }
+
+            classRec.size = classSize;
         }
 
         public static void Log(object content)

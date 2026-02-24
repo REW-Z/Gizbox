@@ -47,6 +47,7 @@ while(cmdIdx < 0)
 Console.ForegroundColor = ConsoleColor.White;
 
 
+
 switch(cmdIdx)
 {
     case 0:
@@ -55,7 +56,7 @@ switch(cmdIdx)
             Console.WriteLine("测试生成互操作Wrap代码");
             InteropWrapGenerator generator = new InteropWrapGenerator();
             generator.IncludeTypes(new Type[] {
-                typeof(TestClass),
+                //typeof(TestClass),
                 });
             foreach(var t in generator.closure)
             {
@@ -127,10 +128,6 @@ switch(cmdIdx)
             {
                 Compiler.Run("test", "", System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
             }
-            else
-            {
-            }
-            
         }
         break;
         case 9:
@@ -190,48 +187,6 @@ namespace GizboxTest
             Console.WriteLine(targetDir.FullName);
             return targetDir.FullName;
         }
-    }
-    public class TestExternCalls
-    {
-        public static void Console__Print(string text)
-        {
-            Console.Write(text);
-        }
-        public static void Console__PrintLn(string text)
-        {
-            Console.WriteLine(text);
-        }
 
-        public static TestClass[] GetObjects()
-        {
-            var objs = new TestClass[1];
-            objs[0] = new TestClass();
-            objs[0].id = 233;
-            return objs;
-        }
-        public static TestClass GetObject(int id)
-        {
-            return new TestClass() { id = id };
-        }
-        public static System.Int32 GizboxTest__TestClass_get_id(GizboxTest.TestClass obj)
-        {
-            return obj.id;
-        }
-        public static void GizboxTest__TestClass_set_id(GizboxTest.TestClass obj, System.Int32 newv)
-        {
-            obj.id = newv;
-        }
-    }
-
-    public class TestClass
-    {
-        public int id = 0;
-    }
-
-    public struct MyStruct
-    {
-        public int id;
-        public double _a;
-        public double _b;
     }
 }

@@ -61,9 +61,12 @@ namespace Collections
 	class List
 	{
 		Core::Object[] data = new Core::Object[10];
+
+		private:
 		int opacity = 10;
 		int count = 0;
 
+		public:
 		void Add(Core::Object v)
 		{
 			if(this.count >= this.opacity)
@@ -95,9 +98,13 @@ namespace Collections
 	class List<T>
 	{
 		T[] data = new T[10];
+		
+		private:
 		int opacity = 10;
 		int count = 0;
 
+		
+		public:
 		void Add(T v)
 		{
 			if(this.count >= this.opacity)

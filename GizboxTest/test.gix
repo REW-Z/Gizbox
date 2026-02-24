@@ -62,4 +62,9 @@ void main()
 	test_global_var();
 	test_reg_alloc();
 	test_call();
+
+	int sizeofint = sizeof(int);
+		Console::PrintLn("sizeof(int):" + (string)sizeofint);
+
+	Console::ReadLn();
 }

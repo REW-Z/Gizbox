@@ -62,9 +62,10 @@ void foo()
 # TODO  
 
 
-### SizeOf和TypeOf实现  
+### RTTI  
 
-SizeOf返回类型的字节大小。TypeOf返回类型信息对象（静态对象）。  
+汇编中生成类对象常量。  
+TypeOf返回类型信息对象（静态对象）。  
 
 ### 私有成员和公有成员  
 

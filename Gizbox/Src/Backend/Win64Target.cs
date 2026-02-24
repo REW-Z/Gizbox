@@ -342,8 +342,8 @@ namespace Gizbox.Src.Backend
                 {
                     case SymbolTable.RecordCatagory.Class:
                         {
-                            //类对象布局（Vptr在对象头占8字节）  
-                            GenClassLayoutInfo(r);
+                            //类对象布局
+                            //(已在语义分析器中生成)  
 
                             //虚函数表布局
                             GenClassInfo(r);
@@ -1369,7 +1369,7 @@ namespace Gizbox.Src.Backend
             }
         }
 
-        // <summary> 寄存器分配 </summary>
+        /// <summary> 寄存器分配 </summary>
         private void Pass4()
         {
             //栈上参数/全局变量的虚拟寄存器用固定的物理寄存器中转  
@@ -1895,35 +1895,6 @@ namespace Gizbox.Src.Backend
 
         #region PASS0
 
-        private void GenClassLayoutInfo(SymbolTable.Record classRec)
-        {
-            var classEnv = classRec.envPtr;
-            Win64Target.Log("---------" + classEnv.name + "----------");
-            List<SymbolTable.Record> fieldRecs = new();
-            foreach(var (memberName, memberRec) in classEnv.records)
-            {
-                if(memberRec.category != SymbolTable.RecordCatagory.Variable)
-                    continue;
-                fieldRecs.Add(memberRec);
-            }
-            (int size, int align)[] fieldSizeAndAlignArr = new (int size, int align)[fieldRecs.Count];
-            //对象头是虚函数表指针  
-            for(int i = 0; i < fieldRecs.Count; i++)
-            {
-                string typeExpress = fieldRecs[i].typeExpression;
-                var size = MemUtility.GetGizboxTypeSize(typeExpress);
-                var align = MemUtility.GetGizboxTypeSize(typeExpress);
-                fieldRecs[i].size = size;
-                fieldSizeAndAlignArr[i] = (size, align);
-            }
-            long classSize = MemUtility.ClassLayout(8, fieldSizeAndAlignArr, out var allocAddrs);
-            for(int i = 0; i < fieldRecs.Count; i++)
-            {
-                fieldRecs[i].addr = allocAddrs[i];
-            }
-
-            classRec.size = classSize;
-        }
 
         private void GenClassInfo(SymbolTable.Record classRec)
         {
@@ -4642,8 +4613,9 @@ namespace Gizbox.Src.Backend
             return false;
         }
 
-        public static bool IsConstAddrSemantic(SymbolRecord rec)// 地址即值的全局静态常量（目前只有字符串全局常量）（使用lea指令加载地址） 
+        public static bool IsConstAddrSemantic(SymbolRecord rec)// 地址即值的全局静态常量（即常量引用类型）（使用lea指令加载地址） 
         {
+            //（字符串常量）  
             if(rec.GetAdditionInf().isGlobal && GType.Parse(rec.typeExpression).Category == GType.Kind.String)
                 return true;
             else
