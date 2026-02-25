@@ -493,7 +493,7 @@ namespace Collections
 
 		int HashKey(TKey key)
 		{
-			int h = key.GetHashCode();
+			int h = hashof(key);
 			if(h < 0)
 				h = -h;
 			return h;

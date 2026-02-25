@@ -2020,14 +2020,18 @@ namespace Gizbox.SemanticRule
 
             var newSpecializations = new List<SyntaxTree.ClassDeclareNode>();
 
+
             foreach(var inst in instances.Values)
             {
+                Console.WriteLine("需求模板实例：" + inst.templateName + " -->" + inst.mangledName);
+
                 if(IsSpecializationAvailable(inst.mangledName))
                     continue;
 
                 var templateNode = FindTemplateClass(inst.templateName, templatesLocal, templatesDeps);
                 if(templateNode == null)
                     continue;
+
 
                 var specialized = (SyntaxTree.ClassDeclareNode)templateNode.DeepClone();
                 ApplyTemplateSpecialization(templateNode, specialized, inst.mangledName, inst.typeArguments);
@@ -2043,7 +2047,7 @@ namespace Gizbox.SemanticRule
             }
         }
 
-        // 收集模板类定义
+        //收集模板类定义
         private void CollectTemplateClasses(SyntaxTree.Node node, Dictionary<string, SyntaxTree.ClassDeclareNode> templates)
         {
             //遍历语法树收集模板类定义
@@ -2062,7 +2066,7 @@ namespace Gizbox.SemanticRule
             }
         }
 
-        // 收集模板类实例化信息
+        //收集模板类实例化信息
         private void CollectTemplateInstantiations(SyntaxTree.Node node, Dictionary<string, ClassTemplateInstance> instances, bool inTemplate)
         {
             //遍历语法树收集模板类实例
@@ -2162,7 +2166,7 @@ namespace Gizbox.SemanticRule
             }
         }
 
-        // 收集模板函数定义
+        //收集模板函数定义
         private void CollectTemplateFunctions(SyntaxTree.Node node, Dictionary<string, SyntaxTree.FuncDeclareNode> templates)
         {
             //遍历语法树收集模板函数定义
@@ -2187,7 +2191,7 @@ namespace Gizbox.SemanticRule
 
 
 
-        // 收集模板函数实例化信息
+        //收集模板函数实例化信息
         private void CollectFunctionTemplateInstantiations(SyntaxTree.Node node, Dictionary<string, FunctionTemplateInstance> instances, bool inTemplate)
         {
             //遍历语法树收集模板函数实例
@@ -2504,6 +2508,8 @@ namespace Gizbox.SemanticRule
             }
         }
 
+
+
         /// <summary>
         /// PASS1:递归向下顶层定义信息(静态变量、静态函数名、类名)      
         /// </summary>
@@ -2624,11 +2630,23 @@ namespace Gizbox.SemanticRule
                     break;
                 //顶级函数声明语句
                 case SyntaxTree.FuncDeclareNode funcDeclNode:
-                    {
-                        //（静态函数）    
-                        // skip template function declarations during passes
+                    {  
+                        //函数模板  
                         if(funcDeclNode.isTemplateFunction)
+                        {
+                            //附加命名空间名  
+                            if(isTopLevelAtNamespace == false)
+                            {
+                                throw new SemanticException(ExceptioName.SemanticAnalysysError, funcDeclNode, "template function can only declare at global env.");
+                            }
+
+                            funcDeclNode.identifierNode.SetPrefix(currentNamespace);
+                            ilUnit.templateFunctions.Add(funcDeclNode.identifierNode.FullName);
                             break;
+                        }
+                            
+
+
                         if (isGlobalOrTopNamespace)
                         {
 
@@ -2758,8 +2776,15 @@ namespace Gizbox.SemanticRule
                 //类声明  
                 case SyntaxTree.ClassDeclareNode classDeclNode:
                     {
+                        //类模板  
                         if(classDeclNode.isTemplateClass)
+                        {
+                            //附加命名空间名  
+                            if(isTopLevelAtNamespace)
+                                classDeclNode.classNameNode.SetPrefix(currentNamespace);
+                            ilUnit.templateClasses.Add(classDeclNode.classNameNode.FullName);
                             break;
+                        }
 
                         //附加命名空间名称    
                         if (isGlobalOrTopNamespace)
@@ -3780,22 +3805,8 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.CallNode callNode:
                     {
-                        if(callNode.isMemberAccessFunction == false
-                            && callNode.funcNode is SyntaxTree.IdentityNode replaceId
-                            && (replaceId.FullName == "replace" || replaceId.token?.attribute == "replace"))
+                        if(CheckIntrinsicCall(callNode, out var replaceNode))
                         {
-                            if(callNode.argumantsNode.arguments.Count != 2)
-                                throw new SemanticException(ExceptioName.SemanticAnalysysError, callNode, "replace expects 2 arguments.");
-
-                            var replaceNode = new SyntaxTree.ReplaceNode()
-                            {
-                                targetNode = callNode.argumantsNode.arguments[0],
-                                newValueNode = callNode.argumantsNode.arguments[1],
-                                attributes = callNode.attributes,
-                            };
-                            replaceNode.Parent = callNode.Parent;
-                            callNode.overrideNode = replaceNode;
-
                             Pass3_AnalysisNode(replaceNode);
                             break;
                         }
@@ -5822,6 +5833,26 @@ namespace Gizbox.SemanticRule
             return false;
         }
 
+        private bool HasTemplate(string name)
+        {
+            if(ilUnit.templateClasses.Contains(name))
+                return true;
+            if(ilUnit.templateFunctions.Contains(name))
+                return true;
+
+
+            //库依赖中查找  
+            foreach(var lib in this.ilUnit.dependencyLibs)
+            {
+                if(lib.templateClasses.Contains(name))
+                    return true;
+                if(lib.templateFunctions.Contains(name))
+                    return true;
+            }
+
+            return false;
+        }
+
         private SymbolTable TryGetClassEnv()
         {
             //符号表链查找  
@@ -5852,16 +5883,33 @@ namespace Gizbox.SemanticRule
             //尝试命名空间前缀   
             foreach (var namespaceUsing in ast.rootNode.usingNamespaceNodes)
             {
-                string newname = namespaceUsing.namespaceNameNode.token.attribute + "::" + idNode.token.attribute;
-                if (TryQueryIgnoreMangle(newname))
+                string name = idNode.token.attribute;
+                if(name.Contains('^'))
                 {
-                    if (found == true)
+                    name = name.Substring(0, name.IndexOf('^'));
+                    string nameToQuery = namespaceUsing.namespaceNameNode.token.attribute + "::" + name;
+                    if(HasTemplate(nameToQuery))
                     {
-                        throw new SemanticException(ExceptioName.IdentifierAmbiguousBetweenNamespaces, idNode, newname + " vs " + namevalid);
+                        if(found == true)
+                        {
+                            throw new SemanticException(ExceptioName.IdentifierAmbiguousBetweenNamespaces, idNode, nameToQuery + " vs " + namevalid);
+                        }
+                        found = true;
+                        idNode.SetPrefix(namespaceUsing.namespaceNameNode.token.attribute);
                     }
-                    found = true;
-                    idNode.SetPrefix(namespaceUsing.namespaceNameNode.token.attribute);
-                    if (Compiler.enableLogParser) Log(idNode.token.attribute + "补全为" + idNode.FullName);
+                }
+                else
+                {
+                    string nameToQuery = namespaceUsing.namespaceNameNode.token.attribute + "::" + name;
+                    if(TryQueryIgnoreMangle(nameToQuery))
+                    {
+                        if(found == true)
+                        {
+                            throw new SemanticException(ExceptioName.IdentifierAmbiguousBetweenNamespaces, idNode, nameToQuery + " vs " + namevalid);
+                        }
+                        found = true;
+                        idNode.SetPrefix(namespaceUsing.namespaceNameNode.token.attribute);
+                    }
                 }
             }
 
@@ -6004,8 +6052,56 @@ namespace Gizbox.SemanticRule
         }
 
 
-        private void CheckIntrinsicCall(SyntaxTree.CallNode callnode, string name)
+        private bool CheckIntrinsicCall(SyntaxTree.CallNode callNode, out SyntaxTree.Node replace)
         {
+            if(callNode.isMemberAccessFunction == false
+                && callNode.funcNode is SyntaxTree.IdentityNode funcId)
+            {
+                if(funcId.token?.attribute == "replace")
+                {
+                    if(callNode.argumantsNode.arguments.Count != 2)
+                        throw new SemanticException(ExceptioName.SemanticAnalysysError, callNode, "replace expects 2 arguments.");
+
+                    var replaceNode = new SyntaxTree.ReplaceNode()
+                    {
+                        targetNode = callNode.argumantsNode.arguments[0],
+                        newValueNode = callNode.argumantsNode.arguments[1],
+                        attributes = callNode.attributes,
+                    };
+                    replaceNode.Parent = callNode.Parent;
+                    callNode.overrideNode = replaceNode;
+
+                    replace = replaceNode;
+                    return true;
+                }
+                else if(funcId.token?.attribute == "hashof")
+                {
+                    if(callNode.argumantsNode.arguments.Count != 1)
+                        throw new SemanticException(ExceptioName.SemanticAnalysysError, callNode, "hashof expects 1 argument.");
+
+                    var replaceNode = new SyntaxTree.CallNode()
+                    {
+                        isMemberAccessFunction = false,
+                        funcNode = new SyntaxTree.IdentityNode()
+                        {
+                            token = new Token("ID", PatternType.Id, "Core::Hash::GetHashCode", funcId.token.line, funcId.token.start, funcId.token.length),
+                            identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
+                        },
+                        argumantsNode = new SyntaxTree.ArgumentListNode(),
+                    };
+                    replaceNode.argumantsNode.arguments.Add(callNode.argumantsNode.arguments[0]);
+                    replaceNode.Parent = callNode.Parent;
+                    callNode.overrideNode = replaceNode;
+
+                    replace = replaceNode;
+                    return true;
+                }
+            }
+
+
+
+            replace = null;
+            return false;
         }
 
         private void GenClassLayoutInfo(SymbolTable.Record classRec)

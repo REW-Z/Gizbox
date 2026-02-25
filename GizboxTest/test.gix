@@ -65,7 +65,8 @@ void test_sizeof()
 // ----------------- Dic ------------------
 void test_dic()
 {
-	Dictionary<int, int> dict = new Dictionary<string, int>();
+	var list = new List<int>();
+	//var dict = new HashMap<int, int>();
 }
 
 // ----------------- Main ------------------

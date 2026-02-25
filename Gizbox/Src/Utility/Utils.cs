@@ -32,7 +32,7 @@ namespace Gizbox
             if (args.Length == 0)
                 return baseName;
 
-            return baseName + "_" + string.Join("_", args);
+            return baseName + "^" + string.Join("^", args);
         }
 
         private static string SanitizeTypeName(string name)

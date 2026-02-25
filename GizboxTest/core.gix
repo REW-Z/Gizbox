@@ -136,3 +136,43 @@ namespace Core::IntrinsicOperatorOverloads
 		return Core::Extern::Concat(a, b);
 	}
 }
+
+namespace Core::Hash
+{
+	int GetHashCode(int val)
+	{
+		return val;
+	}
+	int GetHashCode(long val)
+	{
+		return (int)(val % 2147483647L);
+	}
+	int GetHashCode(float val)
+	{
+		return (int)(val * 1000.0f);
+	}
+	int GetHashCode(double val)
+	{
+		return (int)(val * 1000.0d);
+	}
+	int GetHashCode(bool val)
+	{
+		if(val == true)
+			return 1;
+		else
+			return 0;
+	}
+	int GetHashCode(char val)
+	{
+		return (int)val;
+	}
+	int GetHashCode(string val)
+	{
+		int hash = 0;
+		for(int i = 0; i < Core::Extern::StringLength(val); i++)
+		{
+			hash = hash * 31 + Core::Extern::StringIndexOfChar(val, (char)i);
+		}
+		return hash;
+	}
+}

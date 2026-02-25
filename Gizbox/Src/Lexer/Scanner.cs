@@ -386,7 +386,13 @@ namespace Gizbox
                         else
                         {
                             tokenName = identifierPattern.tokenName;
+                            if(identifierName == "HashMap")
+                            {
+                                Console.WriteLine(typeNameSet.Count);
+                            }
                         }
+
+                        
                     }
 
                     Token token = new Token(tokenName, PatternType.Id, identifierName, currLine, lexemBegin - currLineStart, identifierName.Length);

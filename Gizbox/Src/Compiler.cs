@@ -460,6 +460,11 @@ namespace Gizbox
             if (lib == null)
                 return;
 
+            foreach(var templateClass in lib.templateClasses)
+            {
+                AddTypeName(result, templateClass);
+            }
+
             foreach (var record in lib.globalScope.env.records.Values)
             {
                 if (record.category != SymbolTable.RecordCatagory.Class)

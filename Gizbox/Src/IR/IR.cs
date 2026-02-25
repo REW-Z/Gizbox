@@ -142,6 +142,12 @@ namespace Gizbox.IR
         [DataMember]
         public SyntaxTree.ProgramNode astRoot;
 
+        //模板列表  
+        [DataMember]
+        public List<string> templateClasses = new();
+        //模板列表  
+        [DataMember]
+        public List<string> templateFunctions = new();
 
         //(不序列化) 临时载入的依赖      
         public List<IRUnit> dependencyLibs = new List<IRUnit>();
