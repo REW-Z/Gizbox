@@ -54,17 +54,28 @@ void test_call()
 	Console::PrintLn((string)num4);
 }
 
-// ----------------- 变量字符串打印 ------------------
+// ----------------- SizeOf ------------------
 
+void test_sizeof()
+{
+	int sizeofint = sizeof(int);
+	Console::PrintLn("sizeof(int):" + (string)sizeofint);
+}
 
+// ----------------- Dic ------------------
+void test_dic()
+{
+	Dictionary<int, int> dict = new Dictionary<string, int>();
+}
+
+// ----------------- Main ------------------
 void main()
 {
 	test_global_var();
 	test_reg_alloc();
 	test_call();
-
-	int sizeofint = sizeof(int);
-		Console::PrintLn("sizeof(int):" + (string)sizeofint);
+	test_sizeof();
+	test_dic();
 
 	Console::ReadLn();
 }

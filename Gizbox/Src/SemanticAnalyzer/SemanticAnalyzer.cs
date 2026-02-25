@@ -5274,6 +5274,7 @@ namespace Gizbox.SemanticRule
                     if(typeNode is ClassTypeNode classTypeNode)
                     {
                         var classRec = Query(classTypeNode.classname.FullName);
+
                         if(classRec.flags.HasFlag(SymbolTable.RecordFlag.OwnershipClass))
                             isOwnershipClass = true;
                     }
@@ -6002,6 +6003,10 @@ namespace Gizbox.SemanticRule
             return litnode;
         }
 
+
+        private void CheckIntrinsicCall(SyntaxTree.CallNode callnode, string name)
+        {
+        }
 
         private void GenClassLayoutInfo(SymbolTable.Record classRec)
         {

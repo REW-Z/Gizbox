@@ -43,8 +43,8 @@ namespace Gizbox
         private readonly HashSet<string> typeNameSet = new HashSet<string>(StringComparer.Ordinal);
         private static readonly HashSet<string> typeLikeTokenNames = new HashSet<string>(StringComparer.Ordinal)
         {
+            //"ID",
             "TYPE_NAME",
-            "ID",
             "void",
             "bool",
             "int",
@@ -54,6 +54,29 @@ namespace Gizbox
             "char",
             "string",
             "var",
+        };
+
+        private static readonly HashSet<string> genericSearchStopTokens = new HashSet<string>(StringComparer.Ordinal)
+        {
+            ";",
+            ")",
+            "]",
+            "}",
+            "{",
+            "=",
+            "+",
+            "-",
+            "*",
+            "/",
+            "%",
+            "&&",
+            "||",
+            "==",
+            "!=",
+            "<=",
+            ">=",
+            "?",
+            ":",
         };
 
 
@@ -344,8 +367,28 @@ namespace Gizbox
                     string identifierName = seg.Substring(0, seg.Length - identifierPattern.back);
                     if (Compiler.enableLogScanner) Log("\n>>>>> identifier:" + identifierName + "\n\n");
 
-                    //int idx = globalSymbolTable.AddIdentifier(identifierName);//词法分析阶段最好不创建符号表条目（编译原理p53）  
-                    string tokenName = typeNameSet.Contains(identifierName) ? "TYPE_NAME" : identifierPattern.tokenName;
+                    string tokenName;
+                    if(tokens.Last().name == "namespace")
+                    {
+                        tokenName = identifierPattern.tokenName;
+                    }
+                    else
+                    {
+                        string typenameIf = identifierName;
+                        if(identifierName.Contains("::"))
+                            typenameIf = identifierName.Substring(identifierName.LastIndexOf(':') + 1);
+                        bool isTypeName = typeNameSet.Contains(typenameIf);
+
+                        if(isTypeName)
+                        {
+                            tokenName = "TYPE_NAME";
+                        }
+                        else
+                        {
+                            tokenName = identifierPattern.tokenName;
+                        }
+                    }
+
                     Token token = new Token(tokenName, PatternType.Id, identifierName, currLine, lexemBegin - currLineStart, identifierName.Length);
                     tokens.Add(token);
 
@@ -414,6 +457,9 @@ namespace Gizbox
             for(int i = start; i < tokens.Count; i++)
             {
                 var t = tokens[i];
+                if(i > start && IsGenericSearchStopToken(t))
+                    return false;
+
                 if(t.name == "<")
                 {
                     depth++;
@@ -431,7 +477,13 @@ namespace Gizbox
 
             return false;
         }
+        private static bool IsGenericSearchStopToken(Token token)
+        {
+            if(token == null)
+                return true;
 
+            return genericSearchStopTokens.Contains(token.name);
+        }
         private static void ReclassifyGenericBrackets(List<Token> tokens)
         {
             for(int i = 0; i < tokens.Count; i++)
