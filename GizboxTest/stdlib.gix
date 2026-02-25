@@ -46,12 +46,237 @@ namespace Math
 		return guess;
 	}
 
+	int Abs(int number)
+	{
+		int result = number;
+		if(number < 0)
+			result = -number;
+		return result;
+	}
+
+	float Clamp(float value, float minValue, float maxValue)
+	{
+		if(value < minValue)
+			return minValue;
+		if(value > maxValue)
+			return maxValue;
+		return value;
+	}
+
+	int Clamp(int value, int minValue, int maxValue)
+	{
+		if(value < minValue)
+			return minValue;
+		if(value > maxValue)
+			return maxValue;
+		return value;
+	}
+
+	float Max(float a, float b)
+	{
+		return a > b ? a : b;
+	}
+
+	int Max(int a, int b)
+	{
+		return a > b ? a : b;
+	}
+
+	float Min(float a, float b)
+	{
+		return a < b ? a : b;
+	}
+
+	int Min(int a, int b)
+	{
+		return a < b ? a : b;
+	}
+
+	float Sin(float v)
+	{
+		return Core::Extern::Sin(v);
+	}
+
+	float Cos(float v)
+	{
+		return Core::Extern::Cos(v);
+	}
+
 	T Abs<T>(T number)
 	{
 		T result = number;
 		if(number < default(T))
 			result = -number;
 		return result;
+	}
+}
+
+
+namespace String
+{
+	int Length(string v)
+	{
+		return Core::Extern::StringLength(v);
+	}
+
+	int Compare(string a, string b)
+	{
+		return Core::Extern::StringCompare(a, b);
+	}
+
+	string Copy(string v)
+	{
+		return Core::Extern::StringClone(v);
+	}
+
+	string Concat(string a, string b)
+	{
+		return Core::Extern::StringConcatNew(a, b);
+	}
+
+	string Substring(string v, int start, int length)
+	{
+		return Core::Extern::StringSubstr(v, start, length);
+	}
+
+	int IndexOf(string v, string target)
+	{
+		return Core::Extern::StringIndexOf(v, target);
+	}
+
+	int IndexOfChar(string v, char target)
+	{
+		return Core::Extern::StringIndexOfChar(v, target);
+	}
+
+	class own OString
+	{
+		own string value = null;
+
+		static OString Create(string v)
+		{
+			OString result = new OString();
+			result.value = Core::Extern::StringClone(v);
+			return result;
+		}
+
+		string Get()
+		{
+			return this.value;
+		}
+
+		void Set(string v)
+		{
+			if(this.value != null)
+				Core::Extern::StringFree(this.value);
+			this.value = Core::Extern::StringClone(v);
+		}
+
+		int Length()
+		{
+			return Core::Extern::StringLength(this.value);
+		}
+
+		OString Concat(string v)
+		{
+			OString result = new OString();
+			result.value = Core::Extern::StringConcatNew(this.value, v);
+			return result;
+		}
+
+		string ToString()
+		{
+			return this.value;
+		}
+	}
+}
+
+
+namespace IO
+{
+	extern bool FileWriteAllText(string path, string text);
+	extern string FileReadAllText(string path);
+	extern bool FileWriteAllBytes(string path, string data);
+	extern string FileReadAllBytes(string path);
+
+	extern long FileOpen(string path, string mode);
+	extern void FileClose(long handle);
+	extern void FileFlush(long handle);
+	extern int FileWrite(long handle, string text);
+	extern string FileReadLine(long handle);
+	extern string FileReadAll(long handle);
+
+	bool WriteAllText(string path, string text)
+	{
+		return IO::FileWriteAllText(path, text);
+	}
+
+	string ReadAllText(string path)
+	{
+		return IO::FileReadAllText(path);
+	}
+
+	bool WriteAllBytes(string path, string data)
+	{
+		return IO::FileWriteAllBytes(path, data);
+	}
+
+	string ReadAllBytes(string path)
+	{
+		return IO::FileReadAllBytes(path);
+	}
+
+	class FileStream
+	{
+		long handle = 0L;
+
+		static FileStream OpenRead(string path)
+		{
+			FileStream stream = new FileStream();
+			stream.handle = IO::FileOpen(path, "rb");
+			return stream;
+		}
+
+		static FileStream OpenWrite(string path)
+		{
+			FileStream stream = new FileStream();
+			stream.handle = IO::FileOpen(path, "wb");
+			return stream;
+		}
+
+		void Write(string text)
+		{
+			IO::FileWrite(this.handle, text);
+		}
+
+		void WriteLine(string text)
+		{
+			IO::FileWrite(this.handle, text + "\n");
+		}
+
+		string ReadLine()
+		{
+			return IO::FileReadLine(this.handle);
+		}
+
+		string ReadToEnd()
+		{
+			return IO::FileReadAll(this.handle);
+		}
+
+		void Flush()
+		{
+			IO::FileFlush(this.handle);
+		}
+
+		void Close()
+		{
+			if(this.handle != 0L)
+			{
+				IO::FileClose(this.handle);
+				this.handle = 0L;
+			}
+		}
 	}
 }
 
@@ -81,6 +306,32 @@ namespace Collections
 		Core::Object Get(int idx)
 		{
 			return this.data[idx];
+		}
+
+		void Set(int idx, Core::Object v)
+		{
+			this.data[idx] = v;
+		}
+
+		int Count()
+		{
+			return this.count;
+		}
+
+		Core::Object RemoveAt(int idx)
+		{
+			Core::Object value = this.data[idx];
+			for(int i = idx + 1; i < this.count; ++i)
+			{
+				this.data[i - 1] = this.data[i];
+			}
+			this.count -= 1;
+			return value;
+		}
+
+		void Clear()
+		{
+			this.count = 0;
 		}
 
 		void Resize()
@@ -121,6 +372,32 @@ namespace Collections
 			return this.data[idx];
 		}
 
+		void Set(int idx, T v)
+		{
+			this.data[idx] = v;
+		}
+
+		int Count()
+		{
+			return this.count;
+		}
+
+		T RemoveAt(int idx)
+		{
+			T value = this.data[idx];
+			for(int i = idx + 1; i < this.count; ++i)
+			{
+				this.data[i - 1] = this.data[i];
+			}
+			this.count -= 1;
+			return value;
+		}
+
+		void Clear()
+		{
+			this.count = 0;
+		}
+
 		void Resize()
 		{
 			T[] newdata = new T[this.opacity * 2];
@@ -130,6 +407,571 @@ namespace Collections
 			}
 			this.data = newdata;
 			this.opacity *= 2;
+		}
+	}
+
+	class LinkedListNode
+	{
+		Core::Object value = null;
+		LinkedListNode next = null;
+		LinkedListNode prev = null;
+	}
+
+	class LinkedList
+	{
+		LinkedListNode head = null;
+		LinkedListNode tail = null;
+		int count = 0;
+
+		void AddFirst(Core::Object v)
+		{
+			LinkedListNode node = new LinkedListNode();
+			node.value = v;
+			node.next = this.head;
+			if(this.head != null)
+				this.head.prev = node;
+			this.head = node;
+			if(this.tail == null)
+				this.tail = node;
+			this.count += 1;
+		}
+
+		void AddLast(Core::Object v)
+		{
+			LinkedListNode node = new LinkedListNode();
+			node.value = v;
+			node.prev = this.tail;
+			if(this.tail != null)
+				this.tail.next = node;
+			this.tail = node;
+			if(this.head == null)
+				this.head = node;
+			this.count += 1;
+		}
+
+		Core::Object RemoveFirst()
+		{
+			if(this.head == null)
+				return null;
+			LinkedListNode node = this.head;
+			this.head = node.next;
+			if(this.head != null)
+				this.head.prev = null;
+			else
+				this.tail = null;
+			this.count -= 1;
+			return node.value;
+		}
+
+		Core::Object RemoveLast()
+		{
+			if(this.tail == null)
+				return null;
+			LinkedListNode node = this.tail;
+			this.tail = node.prev;
+			if(this.tail != null)
+				this.tail.next = null;
+			else
+				this.head = null;
+			this.count -= 1;
+			return node.value;
+		}
+
+		int Count()
+		{
+			return this.count;
+		}
+	}
+
+	class LinkedListNode<T>
+	{
+		T value = default(T);
+		LinkedListNode<T> next = null;
+		LinkedListNode<T> prev = null;
+	}
+
+	class LinkedList<T>
+	{
+		LinkedListNode<T> head = null;
+		LinkedListNode<T> tail = null;
+		int count = 0;
+
+		void AddFirst(T v)
+		{
+			LinkedListNode<T> node = new LinkedListNode<T>();
+			node.value = v;
+			node.next = this.head;
+			if(this.head != null)
+				this.head.prev = node;
+			this.head = node;
+			if(this.tail == null)
+				this.tail = node;
+			this.count += 1;
+		}
+
+		void AddLast(T v)
+		{
+			LinkedListNode<T> node = new LinkedListNode<T>();
+			node.value = v;
+			node.prev = this.tail;
+			if(this.tail != null)
+				this.tail.next = node;
+			this.tail = node;
+			if(this.head == null)
+				this.head = node;
+			this.count += 1;
+		}
+
+		T RemoveFirst()
+		{
+			if(this.head == null)
+				return default(T);
+			LinkedListNode<T> node = this.head;
+			this.head = node.next;
+			if(this.head != null)
+				this.head.prev = null;
+			else
+				this.tail = null;
+			this.count -= 1;
+			return node.value;
+		}
+
+		T RemoveLast()
+		{
+			if(this.tail == null)
+				return default(T);
+			LinkedListNode<T> node = this.tail;
+			this.tail = node.prev;
+			if(this.tail != null)
+				this.tail.next = null;
+			else
+				this.head = null;
+			this.count -= 1;
+			return node.value;
+		}
+
+		int Count()
+		{
+			return this.count;
+		}
+	}
+
+	class Stack
+	{
+		Core::Object[] data = new Core::Object[10];
+		int opacity = 10;
+		int count = 0;
+
+		void Push(Core::Object v)
+		{
+			if(this.count >= this.opacity)
+				this.Resize();
+			this.data[this.count] = v;
+			this.count += 1;
+		}
+
+		Core::Object Pop()
+		{
+			if(this.count == 0)
+				return null;
+			this.count -= 1;
+			return this.data[this.count];
+		}
+
+		Core::Object Peek()
+		{
+			if(this.count == 0)
+				return null;
+			return this.data[this.count - 1];
+		}
+
+		int Count()
+		{
+			return this.count;
+		}
+
+		void Resize()
+		{
+			Core::Object[] newdata = new Core::Object[this.opacity * 2];
+			for(int i = 0; i < this.opacity; ++i)
+			{
+				newdata[i] = this.data[i];
+			}
+			this.data = newdata;
+			this.opacity *= 2;
+		}
+	}
+
+	class Stack<T>
+	{
+		T[] data = new T[10];
+		int opacity = 10;
+		int count = 0;
+
+		void Push(T v)
+		{
+			if(this.count >= this.opacity)
+				this.Resize();
+			this.data[this.count] = v;
+			this.count += 1;
+		}
+
+		T Pop()
+		{
+			if(this.count == 0)
+				return default(T);
+			this.count -= 1;
+			return this.data[this.count];
+		}
+
+		T Peek()
+		{
+			if(this.count == 0)
+				return default(T);
+			return this.data[this.count - 1];
+		}
+
+		int Count()
+		{
+			return this.count;
+		}
+
+		void Resize()
+		{
+			T[] newdata = new T[this.opacity * 2];
+			for(int i = 0; i < this.opacity; ++i)
+			{
+				newdata[i] = this.data[i];
+			}
+			this.data = newdata;
+			this.opacity *= 2;
+		}
+	}
+
+	class Queue
+	{
+		Core::Object[] data = new Core::Object[10];
+		int opacity = 10;
+		int head = 0;
+		int tail = 0;
+		int count = 0;
+
+		void Enqueue(Core::Object v)
+		{
+			if(this.count >= this.opacity)
+				this.Resize();
+			this.data[this.tail] = v;
+			this.tail += 1;
+			if(this.tail >= this.opacity)
+				this.tail = 0;
+			this.count += 1;
+		}
+
+		Core::Object Dequeue()
+		{
+			if(this.count == 0)
+				return null;
+			Core::Object value = this.data[this.head];
+			this.head += 1;
+			if(this.head >= this.opacity)
+				this.head = 0;
+			this.count -= 1;
+			return value;
+		}
+
+		int Count()
+		{
+			return this.count;
+		}
+
+		void Resize()
+		{
+			Core::Object[] newdata = new Core::Object[this.opacity * 2];
+			for(int i = 0; i < this.count; ++i)
+			{
+				int idx = this.head + i;
+				if(idx >= this.opacity)
+					idx -= this.opacity;
+				newdata[i] = this.data[idx];
+			}
+			this.data = newdata;
+			this.opacity *= 2;
+			this.head = 0;
+			this.tail = this.count;
+		}
+	}
+
+	class Queue<T>
+	{
+		T[] data = new T[10];
+		int opacity = 10;
+		int head = 0;
+		int tail = 0;
+		int count = 0;
+
+		void Enqueue(T v)
+		{
+			if(this.count >= this.opacity)
+				this.Resize();
+			this.data[this.tail] = v;
+			this.tail += 1;
+			if(this.tail >= this.opacity)
+				this.tail = 0;
+			this.count += 1;
+		}
+
+		T Dequeue()
+		{
+			if(this.count == 0)
+				return default(T);
+			T value = this.data[this.head];
+			this.head += 1;
+			if(this.head >= this.opacity)
+				this.head = 0;
+			this.count -= 1;
+			return value;
+		}
+
+		int Count()
+		{
+			return this.count;
+		}
+
+		void Resize()
+		{
+			T[] newdata = new T[this.opacity * 2];
+			for(int i = 0; i < this.count; ++i)
+			{
+				int idx = this.head + i;
+				if(idx >= this.opacity)
+					idx -= this.opacity;
+				newdata[i] = this.data[idx];
+			}
+			this.data = newdata;
+			this.opacity *= 2;
+			this.head = 0;
+			this.tail = this.count;
+		}
+	}
+
+	class Dictionary
+	{
+		Core::Object[] keys = new Core::Object[16];
+		Core::Object[] values = new Core::Object[16];
+		int[] states = new int[16];
+		int opacity = 16;
+		int count = 0;
+
+		int HashKey(Core::Object key)
+		{
+			if(key == null)
+				return 0;
+			int h = key.GetHashCode();
+			if(h < 0)
+				h = -h;
+			return h;
+		}
+
+		void Add(Core::Object key, Core::Object value)
+		{
+			if(this.count * 10 >= this.opacity * 7)
+				this.Resize();
+
+			int idx = this.FindSlot(key);
+			if(this.states[idx] != 1)
+			{
+				this.keys[idx] = key;
+				this.values[idx] = value;
+				this.states[idx] = 1;
+				this.count += 1;
+			}
+			else
+			{
+				this.values[idx] = value;
+			}
+		}
+
+		Core::Object Get(Core::Object key)
+		{
+			int idx = this.FindSlot(key);
+			if(this.states[idx] == 1)
+				return this.values[idx];
+			return null;
+		}
+
+		bool ContainsKey(Core::Object key)
+		{
+			int idx = this.FindSlot(key);
+			return this.states[idx] == 1;
+		}
+
+		bool Remove(Core::Object key)
+		{
+			int idx = this.FindSlot(key);
+			if(this.states[idx] != 1)
+				return false;
+			this.states[idx] = 2;
+			this.count -= 1;
+			return true;
+		}
+
+		int Count()
+		{
+			return this.count;
+		}
+
+		int FindSlot(Core::Object key)
+		{
+			int hash = this.HashKey(key);
+			int idx = hash % this.opacity;
+			int firstRemoved = -1;
+			while(true)
+			{
+				int state = this.states[idx];
+				if(state == 0)
+				{
+					if(firstRemoved >= 0)
+						return firstRemoved;
+					return idx;
+				}
+				if(state == 2 && firstRemoved < 0)
+					firstRemoved = idx;
+				if(state == 1 && this.keys[idx] == key)
+					return idx;
+				idx += 1;
+				if(idx >= this.opacity)
+					idx = 0;
+			}
+			return 0;
+		}
+
+		void Resize()
+		{
+			Core::Object[] oldKeys = this.keys;
+			Core::Object[] oldValues = this.values;
+			int[] oldStates = this.states;
+			int oldOpacity = this.opacity;
+
+			this.opacity *= 2;
+			this.keys = new Core::Object[this.opacity];
+			this.values = new Core::Object[this.opacity];
+			this.states = new int[this.opacity];
+			this.count = 0;
+
+			for(int i = 0; i < oldOpacity; ++i)
+			{
+				if(oldStates[i] == 1)
+					this.Add(oldKeys[i], oldValues[i]);
+			}
+		}
+	}
+
+	class Dictionary<TKey, TValue>
+	{
+		TKey[] keys = new TKey[16];
+		TValue[] values = new TValue[16];
+		int[] states = new int[16];
+		int opacity = 16;
+		int count = 0;
+
+		int HashKey(TKey key)
+		{
+			int h = key.GetHashCode();
+			if(h < 0)
+				h = -h;
+			return h;
+		}
+
+		void Add(TKey key, TValue value)
+		{
+			if(this.count * 10 >= this.opacity * 7)
+				this.Resize();
+
+			int idx = this.FindSlot(key);
+			if(this.states[idx] != 1)
+			{
+				this.keys[idx] = key;
+				this.values[idx] = value;
+				this.states[idx] = 1;
+				this.count += 1;
+			}
+			else
+			{
+				this.values[idx] = value;
+			}
+		}
+
+		TValue Get(TKey key)
+		{
+			int idx = this.FindSlot(key);
+			if(this.states[idx] == 1)
+				return this.values[idx];
+			return default(TValue);
+		}
+
+		bool ContainsKey(TKey key)
+		{
+			int idx = this.FindSlot(key);
+			return this.states[idx] == 1;
+		}
+
+		bool Remove(TKey key)
+		{
+			int idx = this.FindSlot(key);
+			if(this.states[idx] != 1)
+				return false;
+			this.states[idx] = 2;
+			this.count -= 1;
+			return true;
+		}
+
+		int Count()
+		{
+			return this.count;
+		}
+
+		int FindSlot(TKey key)
+		{
+			int hash = this.HashKey(key);
+			int idx = hash % this.opacity;
+			int firstRemoved = -1;
+			while(true)
+			{
+				int state = this.states[idx];
+				if(state == 0)
+				{
+					if(firstRemoved >= 0)
+						return firstRemoved;
+					return idx;
+				}
+				if(state == 2 && firstRemoved < 0)
+					firstRemoved = idx;
+				if(state == 1 && this.keys[idx] == key)
+					return idx;
+				idx += 1;
+				if(idx >= this.opacity)
+					idx = 0;
+			}
+			return 0;
+		}
+
+		void Resize()
+		{
+			TKey[] oldKeys = this.keys;
+			TValue[] oldValues = this.values;
+			int[] oldStates = this.states;
+			int oldOpacity = this.opacity;
+
+			this.opacity *= 2;
+			this.keys = new TKey[this.opacity];
+			this.values = new TValue[this.opacity];
+			this.states = new int[this.opacity];
+			this.count = 0;
+			for(int i = 0; i < oldOpacity; ++i)
+			{
+				if(oldStates[i] == 1)
+					this.Add(oldKeys[i], oldValues[i]);
+			}
 		}
 	}
 }

@@ -7,6 +7,11 @@ namespace Core
 		{
 			return "Object";
 		}
+
+		int GetHashCode()
+		{
+			return 0;
+		}
 	}
 	
 	class Type
@@ -83,6 +88,18 @@ namespace Core::Extern
 	extern string DoubleToString(double v);
 
 	extern string Concat(string a, string b);
+
+	extern int StringLength(string v);
+	extern int StringCompare(string a, string b);
+	extern string StringClone(string v);
+	extern void StringFree(string v);
+	extern string StringConcatNew(string a, string b);
+	extern string StringSubstr(string v, int start, int length);
+	extern int StringIndexOf(string v, string target);
+	extern int StringIndexOfChar(string v, char target);
+
+	extern float Sin(float v);
+	extern float Cos(float v);
 }
 
 
