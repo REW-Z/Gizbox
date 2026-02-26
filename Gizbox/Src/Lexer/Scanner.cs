@@ -190,18 +190,18 @@ namespace Gizbox
             literals = new List<TokenPattern>();
 
             literals.Add(new TokenPattern("LITBOOL", "(true|false)[^a-zA-Z]", 1));
-            literals.Add(new TokenPattern("LITULONG", "[0-9]+([U|u][L|l]|[L|l][U|u])\\D", 1));
-            literals.Add(new TokenPattern("LITUINT", "[0-9]+[U|u]\\D", 1));
+            literals.Add(new TokenPattern("LITULONG", "[0-9]+([Uu][Ll]|[Ll][Uu])\\D", 1));
+            literals.Add(new TokenPattern("LITUINT", "[0-9]+[Uu]\\D", 1));
             literals.Add(new TokenPattern("LITINT", "[0-9]+[^\\d\\.Ll]", 1));
-            literals.Add(new TokenPattern("LITLONG", "[0-9]+[L|l]\\D", 1));
-            literals.Add(new TokenPattern("LITFLOAT", "[0-9]+\\.[0-9]+[F|f]\\D", 1));
-            literals.Add(new TokenPattern("LITDOUBLE", "[0-9]+\\.[0-9]+[D|d]\\D", 1));
+            literals.Add(new TokenPattern("LITLONG", "[0-9]+[Ll]\\D", 1));
+            literals.Add(new TokenPattern("LITFLOAT", "[0-9]+\\.[0-9]+[Ff]\\D", 1));
+            literals.Add(new TokenPattern("LITDOUBLE", "[0-9]+\\.[0-9]+[Dd]\\D", 1));
             literals.Add(new TokenPattern("LITCHAR", "\\\'[^\\\']\\\'[^\\\']", 1));
             literals.Add(new TokenPattern("LITSTRING", "\\\"[^\\\"]*\\\"[^\\\"]", 1));
 
             identifierPattern = new TokenPattern("ID", "[A-Za-z_][A-Za-z0-9_]*(\\:\\:[A-Za-z_][A-Za-z0-9_]*)*[^A-Za-z0-9_\\:]", 1);
 
-            whitespace = new TokenPattern("space", "[\\n|\\s|\\t]+");
+            whitespace = new TokenPattern("space", "\\s+");
 
             comment = new TokenPattern("comment", "//.*\\n", 1);
         }

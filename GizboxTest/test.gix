@@ -90,11 +90,10 @@ void test_bitwise()
 	int a = 5; // 0101
 	int b = 3; // 0011
 	int andResult = a & b; // 0001 -> 1
-	int orResult = a | b;  // 0111 -> 7
+	int orResult =  a | b;  // 0111 -> 7
 	int notResult = ~a;    // 1010 (取反) -> -6  
 	Console::PrintLn("Bitwise AND: " + (string)andResult);
 	Console::PrintLn("Bitwise OR: " + (string)orResult);
-	Console::PrintLn("Bitwise XOR: " + (string)xorResult);
 	Console::PrintLn("Bitwise NOT: " + (string)notResult);
 }
 

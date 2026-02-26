@@ -280,8 +280,9 @@ namespace Gizbox.LRParse
                         }
                     //报错  
                     case ACTION_TYPE.Error:
-                        throw new ParseException(ExceptioName.SyntaxAnalysisError, remainingInput.Peek(), "error action. line: " + remainingInput.Peek().line + "\ncurrent symbol :" + currentToken.name + "\ncurrent state:\n" + stack.Peek().state.set.ToExpression());
-
+                        {
+                            throw new ParseException(ExceptioName.SyntaxAnalysisError, remainingInput.Peek(), "error action. line: " + remainingInput.Peek().line + "\ncurrent symbol :" + currentToken.name + "\ncurrent state:\n" + stack.Peek().state.set.ToExpression());
+                        }
                 }
             }
 

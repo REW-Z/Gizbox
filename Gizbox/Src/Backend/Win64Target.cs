@@ -1090,6 +1090,10 @@ namespace Gizbox.Src.Backend
                     case "*":
                     case "/":
                     case "%":
+                    case "<<":
+                    case ">>":
+                    case "&":
+                    case "|":
                         {
                             var dst = ParseOperand(tacInf.oprand0);
                             var a = ParseOperand(tacInf.oprand1);
@@ -1262,19 +1266,19 @@ namespace Gizbox.Src.Backend
                                 isUsingR11 = true;
                             }
 
-                            //相同类型
+                            // 相同类型
                             if(srcType.ToString() == targetType.ToString())
                             {
                                 if(castDst != castSrc)
                                     Emit(X64.mov(castDst, castSrc, (X64Size)sizeDst));
                                 break;
                             }
-                            //指针类型转换 -> 指针直接赋值  
+                            // 指针类型转换 -> 指针直接赋值
                             else if(srcType.IsReferenceType && targetType.IsReferenceType)
                             {
                                 Emit(X64.mov(castDst, castSrc, X64Size.qword));
                             }
-                            //浮点数 -> 浮点数
+                            // 浮点数 -> 浮点数
                             else if(srcType.IsSSE && targetType.IsSSE)
                             {
                                 if(srcType.Size == 4 && targetType.Size == 8)
@@ -1282,7 +1286,7 @@ namespace Gizbox.Src.Backend
                                 else if(srcType.Size == 8 && targetType.Size == 4)
                                     Emit(X64.cvtsd2ss(castDst, castSrc));
                             }
-                            //字符->整数（char 视为无符号16位）
+                            // 字符 -> 整数（char 视为无符号16位）
                             else if(srcType.Category == GType.Kind.Char && targetType.IsInteger)
                             {
                                 if(castDst is X64Reg)
@@ -1298,21 +1302,21 @@ namespace Gizbox.Src.Backend
                                     }
                                 }
                             }
-                            //整数 -> 字符（截断到低16位）
+                            // 整数 -> 字符（截断到低16位）
                             else if(srcType.IsInteger && targetType.Category == GType.Kind.Char)
                             {
                                 Emit(X64.mov(castDst, castSrc, X64Size.word));
                             }
-                            //整数 -> 整数  
+                            // 整数 -> 整数（按源类型是否有符号决定扩展方式）
                             else if(srcType.IsInteger && targetType.IsInteger)
                             {
                                 if(srcType.Size == targetType.Size)
                                 {
                                     Emit(X64.mov(castDst, castSrc, (X64Size)sizeDst));
                                 }
-                                else if(srcType.Size < targetType.Size)//扩展
+                                else if(srcType.Size < targetType.Size) // 扩展
                                 {
-                                    if(castSrc is not X64Immediate srcimm && castDst is X64Reg dstreg)
+                                    if(castDst is X64Reg)
                                     {
                                         if(srcType.IsSigned)
                                             Emit(X64.movsx(castDst, castSrc, (X64Size)sizeDst, (X64Size)sizeSrc));
@@ -1323,42 +1327,97 @@ namespace Gizbox.Src.Backend
                                     {
                                         using(new RegUsageRange(this, RegisterEnum.R10))
                                         {
-                                            var tsrc = castSrc;
-                                            var tdst = castDst;
-                                            if(tdst is not X64Reg)
-                                            {
-                                                tdst = X64.r10;
-                                            }
-
                                             if(srcType.IsSigned)
-                                                Emit(X64.movsx(tdst, tsrc, (X64Size)sizeDst, (X64Size)sizeSrc));
+                                                Emit(X64.movsx(X64.r10, castSrc, (X64Size)sizeDst, (X64Size)sizeSrc));
                                             else
-                                                Emit(X64.movzx(tdst, tsrc, (X64Size)sizeDst, (X64Size)sizeSrc));
+                                                Emit(X64.movzx(X64.r10, castSrc, (X64Size)sizeDst, (X64Size)sizeSrc));
 
-                                            if(tdst is not X64Reg)
-                                            {
-                                                Emit(X64.mov(castDst, tdst, (X64Size)sizeDst));
-                                            }
+                                            Emit(X64.mov(castDst, X64.r10, (X64Size)sizeDst));
                                         }
                                     }
                                 }
-                                else //截断
+                                else // 截断
                                 {
                                     Emit(X64.mov(castDst, castSrc, (X64Size)sizeDst));
                                 }
                             }
-
-                            //整数->浮点数
+                            // 整数 -> 浮点数
                             else if(srcType.IsInteger && targetType.IsSSE)
                             {
-                                if(targetType.Size == 4)
-                                    Emit(X64.cvtsi2ss(castDst, castSrc, srcIntSize:(X64Size)sizeSrc));
-                                else 
-                                    Emit(X64.cvtsi2sd(castDst, castSrc, srcIntSize: (X64Size)sizeSrc));
+                                bool toF32 = targetType.Size == 4;
+
+                                // 目标若不是XMM寄存器，先算到xmm0再回写
+                                bool needStoreBack = !(castDst is X64Reg dstReg && dstReg.IsXXM());
+                                X64Operand workDst = needStoreBack ? (X64Operand)X64.xmm0 : castDst;
+
+                                // 有符号整数：可直接转换
+                                if(srcType.IsSigned)
+                                {
+                                    if(toF32)
+                                        Emit(X64.cvtsi2ss(workDst, castSrc, srcIntSize: (X64Size)sizeSrc));
+                                    else
+                                        Emit(X64.cvtsi2sd(workDst, castSrc, srcIntSize: (X64Size)sizeSrc));
+                                }
+                                else
+                                {
+                                    // 无符号整数
+                                    if(sizeSrc < 8)
+                                    {
+                                        // uint/byte/char: 先零扩展到64位，再按有符号64位转换（值域安全）
+                                        using(new RegUsageRange(this, RegisterEnum.R10))
+                                        {
+                                            Emit(X64.movzx(X64.r10, castSrc, X64Size.qword, (X64Size)sizeSrc));
+                                            if(toF32)
+                                                Emit(X64.cvtsi2ss(workDst, X64.r10, srcIntSize: X64Size.qword));
+                                            else
+                                                Emit(X64.cvtsi2sd(workDst, X64.r10, srcIntSize: X64Size.qword));
+                                        }
+                                    }
+                                    else
+                                    {
+                                        // ulong -> float/double
+                                        // 使用恒等式：x = ((x >> 1) * 2) + (x & 1)
+                                        // 其中 (x >> 1) 落在 [0, 2^63-1]，可安全走有符号64位转换
+                                        using(new RegUsageRange(this, RegisterEnum.R10))
+                                        using(new RegUsageRange(this, RegisterEnum.R11))
+                                        using(new RegUsageRange(this, RegisterEnum.XMM4))
+                                        {
+                                            Emit(X64.mov(X64.r10, castSrc, X64Size.qword));            // r10 = x
+                                            Emit(X64.mov(X64.r11, X64.r10, X64Size.qword));           // r11 = x
+                                            Emit(X64.and(X64.r11, X64.imm(1), X64Size.qword));        // r11 = x & 1
+                                            Emit(X64.shr(X64.r10, X64.imm(1), X64Size.qword));        // r10 = x >> 1
+
+                                            if(toF32)
+                                            {
+                                                Emit(X64.cvtsi2ss(workDst, X64.r10, srcIntSize: X64Size.qword));
+                                                Emit(X64.addss(workDst, workDst));                     // *2
+                                                Emit(X64.cvtsi2ss(X64.xmm4, X64.r11, srcIntSize: X64Size.qword));
+                                                Emit(X64.addss(workDst, X64.xmm4));                    // + (x&1)
+                                            }
+                                            else
+                                            {
+                                                Emit(X64.cvtsi2sd(workDst, X64.r10, srcIntSize: X64Size.qword));
+                                                Emit(X64.addsd(workDst, workDst));                     // *2
+                                                Emit(X64.cvtsi2sd(X64.xmm4, X64.r11, srcIntSize: X64Size.qword));
+                                                Emit(X64.addsd(workDst, X64.xmm4));                    // + (x&1)
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if(needStoreBack)
+                                {
+                                    if(toF32)
+                                        Emit(X64.movss(castDst, workDst));
+                                    else
+                                        Emit(X64.movsd(castDst, workDst));
+                                }
                             }
-                            //浮点 -> 整数 (截断)
+                            // 浮点 -> 整数 (截断)
                             else if(srcType.IsSSE && targetType.IsInteger)
                             {
+                                // 这里保留现有语义：有符号路径
+                                // 若后续需要严格支持 float/double -> uint/ulong 的全范围转换，可再补专门逻辑
                                 if(srcType.Size == 4)
                                 {
                                     Emit(X64.cvttss2si(castDst, castSrc, dstInstSize: (X64Size)targetType.Size));
@@ -1373,14 +1432,12 @@ namespace Gizbox.Src.Backend
                                 throw new GizboxException(ExceptioName.CodeGen, $"cast not support:{srcType.ToString()}->{targetType.ToString()}");
                             }
 
-
-                            //标记R11中转  
+                            // 标记R11中转
                             var newlast = instructions.Last;
                             if(isUsingR11)
                             {
                                 UseScratchRegister(last.Next, newlast, RegisterEnum.R11);
                             }
-
                         }
                         break;
                     default:

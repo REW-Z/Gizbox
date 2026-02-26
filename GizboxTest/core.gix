@@ -80,7 +80,7 @@ namespace Core
 
 namespace Core::Extern
 {
-	extern long AddrOfClassObject(Core::Object obj);
+	extern ulong AddrOfClassObject(Core::Object obj);
 
 	extern string BoolToString(bool v);
 	extern string CharToString(char v);

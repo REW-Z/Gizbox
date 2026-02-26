@@ -1105,6 +1105,46 @@ namespace Gizbox.SemanticRule
                     attributes = new Dictionary<AstAttr, object>(),
                 };
             });
+            AddActionAtTail("aexpr -> aexpr << term", (psr, production) => {
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.BinaryOpNode()
+                {
+                    op = "<<",
+                    leftNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node],
+                    rightNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
+
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+            });
+            AddActionAtTail("aexpr -> aexpr >> term", (psr, production) => {
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.BinaryOpNode()
+                {
+                    op = ">>",
+                    leftNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node],
+                    rightNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
+
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+            });
+            AddActionAtTail("aexpr -> aexpr & term", (psr, production) => {
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.BinaryOpNode()
+                {
+                    op = "&",
+                    leftNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node],
+                    rightNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
+
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+            });
+            AddActionAtTail("aexpr -> aexpr | term", (psr, production) => {
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.BinaryOpNode()
+                {
+                    op = "|",
+                    leftNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node],
+                    rightNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
+
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+            });
             AddActionAtTail("aexpr -> term", (psr, production) => {
                 psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
@@ -1152,6 +1192,16 @@ namespace Gizbox.SemanticRule
                 psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.UnaryOpNode()
                 {
                     op = "!",
+                    exprNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
+
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+            });
+
+            AddActionAtTail("factor -> ~ factor", (psr, production) => {
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.UnaryOpNode()
+                {
+                    op = "~",
                     exprNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
 
                     attributes = new Dictionary<AstAttr, object>(),
@@ -1583,87 +1633,6 @@ namespace Gizbox.SemanticRule
                     attributes = new Dictionary<AstAttr, object>(),
                 };
             });
-
-            //AddActionAtTail("params -> type ID", (psr, production) => {
-            //    var node = new SyntaxTree.ParameterListNode()
-            //    {
-            //        attributes = new Dictionary<AstAttr, object>(),
-            //    };
-
-            //    node.parameterNodes.Add(new SyntaxTree.ParameterNode()
-            //    {
-            //        flags = VarModifiers.None,
-            //        typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
-            //        identifierNode = new SyntaxTree.IdentityNode()
-            //        {
-            //            attributes = new Dictionary<AstAttr, object>(),
-            //            token = psr.stack[psr.stack.Top].attributes[ParseAttr.token] as Token,
-            //            identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
-            //        },
-            //        attributes = new(),
-            //    });
-
-            //    psr.newElement.attributes[ParseAttr.ast_node] = node;
-
-            //});
-            //AddActionAtTail("params -> tmodf type ID", (psr, production) => {
-            //    var node = new SyntaxTree.ParameterListNode()
-            //    {
-            //        attributes = new Dictionary<AstAttr, object>(),
-            //    };
-
-            //    node.parameterNodes.Add(new SyntaxTree.ParameterNode()
-            //    {
-            //        flags = (VarModifiers)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.tmodf],
-            //        typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
-            //        identifierNode = new SyntaxTree.IdentityNode()
-            //        {
-            //            attributes = new Dictionary<AstAttr, object>(),
-            //            token = psr.stack[psr.stack.Top].attributes[ParseAttr.token] as Token,
-            //            identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
-            //        },
-            //        attributes = new(),
-            //    });
-
-            //    psr.newElement.attributes[ParseAttr.ast_node] = node;
-            //});
-
-            //AddActionAtTail("params -> params , type ID", (psr, production) => {
-            //    psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 3].attributes[ParseAttr.ast_node];
-
-            //    ((SyntaxTree.ParameterListNode)psr.newElement.attributes[ParseAttr.ast_node]).parameterNodes.Add(
-            //        new SyntaxTree.ParameterNode()
-            //        {
-            //            flags = VarModifiers.None,
-            //            typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
-            //            identifierNode = new SyntaxTree.IdentityNode()
-            //            {
-            //                attributes = new Dictionary<AstAttr, object>(),
-            //                token = psr.stack[psr.stack.Top].attributes[ParseAttr.token] as Token,
-            //                identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
-            //            },
-            //            attributes = new(),
-            //        }
-            //    );
-            //});
-            //AddActionAtTail("params -> params , tmodf type ID", (psr, production) => {
-            //    psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes[ParseAttr.ast_node];
-
-            //    ((SyntaxTree.ParameterListNode)psr.newElement.attributes[ParseAttr.ast_node]).parameterNodes.Add(
-            //        new SyntaxTree.ParameterNode()
-            //        {
-            //            flags = (VarModifiers)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.tmodf],
-            //            typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
-            //            identifierNode = new SyntaxTree.IdentityNode()
-            //            {
-            //                attributes = new Dictionary<AstAttr, object>(),
-            //                token = psr.stack[psr.stack.Top].attributes[ParseAttr.token] as Token,
-            //                identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField
-            //            },
-            //            attributes = new(),
-            //        }
-            //    );
-            //});
 
 
             AddActionAtTail("args -> ε", (psr, production) =>

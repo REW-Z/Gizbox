@@ -47,9 +47,9 @@ const wchar_t* Console__ReadLn()
 }
 
 // Object -> Int64地址
-const int64_t Core__Extern__AddrOfClassObject(void* value)
+const uint64_t Core__Extern__AddrOfClassObject(void* value)
 {
-	return (int64_t)(intptr_t)value;
+	return (uint64_t)(intptr_t)value;
 }
 
 // Int32 -> 字符串
