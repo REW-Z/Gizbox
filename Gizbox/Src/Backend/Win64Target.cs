@@ -226,6 +226,7 @@ namespace Gizbox.Src.Backend
                     }
                 }
             }
+
         }
 
         public void StartCodeGen()
@@ -952,6 +953,29 @@ namespace Gizbox.Src.Backend
                             }
                         }
                         break;
+                    case "~":
+                        {
+                            var dst = ParseOperand(tacInf.oprand0);
+                            var src = ParseOperand(tacInf.oprand1);
+                            var size = tacInf.oprand0.typeExpr.Size;
+
+                            // 若目标为内存，使用 r11 作为临时
+                            if(dst is not X64Reg)
+                            {
+                                using(new RegUsageRange(this, RegisterEnum.R11))
+                                {
+                                    Emit(X64.mov(X64.r11, src, (X64Size)size));
+                                    Emit(X64.not(X64.r11, (X64Size)size));
+                                    EmitMov(dst, X64.r11, tacInf.oprand0.typeExpr);
+                                }
+                            }
+                            else
+                            {
+                                Emit(X64.mov(dst, src, (X64Size)size));
+                                Emit(X64.not(dst, (X64Size)size));
+                            }
+                        }
+                        break;
                     case "ALLOC_ARRAY":
                         {
                             var target = ParseOperand(tacInf.oprand0);
@@ -1169,6 +1193,37 @@ namespace Gizbox.Src.Backend
                             EmitCompare(tacInf, tac.op);
                         }
                         break;
+                    case "&&":
+                    case "||":
+                        {
+                            var dst = ParseOperand(tacInf.oprand0);
+                            var a = ParseOperand(tacInf.oprand1);
+                            var b = ParseOperand(tacInf.oprand2);
+
+                            using(new RegUsageRange(this, RegisterEnum.R11))
+                            using(new RegUsageRange(this, RegisterEnum.R10))
+                            {
+                                // r11 = (a != 0)
+                                Emit(X64.mov(X64.r11, a, X64Size.qword));
+                                Emit(X64.test(X64.r11, X64.r11));
+                                Emit(X64.setne(X64.r11));
+                                Emit(X64.movzx(X64.r11, X64.r11, X64Size.qword, X64Size.@byte));
+
+                                // r10 = (b != 0)
+                                Emit(X64.mov(X64.r10, b, X64Size.qword));
+                                Emit(X64.test(X64.r10, X64.r10));
+                                Emit(X64.setne(X64.r10));
+                                Emit(X64.movzx(X64.r10, X64.r10, X64Size.qword, X64Size.@byte));
+
+                                if(tac.op == "&&")
+                                    Emit(X64.and(X64.r11, X64.r10));
+                                else
+                                    Emit(X64.or(X64.r11, X64.r10));
+
+                                EmitMov(dst, X64.r11, tacInf.oprand0.typeExpr);
+                            }
+                        }
+                        break;
                     case "++":
                         {
                             var dst = ParseOperand(tacInf.oprand0);
@@ -1227,7 +1282,28 @@ namespace Gizbox.Src.Backend
                                 else if(srcType.Size == 8 && targetType.Size == 4)
                                     Emit(X64.cvtsd2ss(castDst, castSrc));
                             }
-                            //整数->整数  
+                            //字符->整数（char 视为无符号16位）
+                            else if(srcType.Category == GType.Kind.Char && targetType.IsInteger)
+                            {
+                                if(castDst is X64Reg)
+                                {
+                                    Emit(X64.movzx(castDst, castSrc, (X64Size)sizeDst, X64Size.word));
+                                }
+                                else
+                                {
+                                    using(new RegUsageRange(this, RegisterEnum.R10))
+                                    {
+                                        Emit(X64.movzx(X64.r10, castSrc, (X64Size)sizeDst, X64Size.word));
+                                        Emit(X64.mov(castDst, X64.r10, (X64Size)sizeDst));
+                                    }
+                                }
+                            }
+                            //整数 -> 字符（截断到低16位）
+                            else if(srcType.IsInteger && targetType.Category == GType.Kind.Char)
+                            {
+                                Emit(X64.mov(castDst, castSrc, X64Size.word));
+                            }
+                            //整数 -> 整数  
                             else if(srcType.IsInteger && targetType.IsInteger)
                             {
                                 if(srcType.Size == targetType.Size)
@@ -1271,6 +1347,7 @@ namespace Gizbox.Src.Backend
                                     Emit(X64.mov(castDst, castSrc, (X64Size)sizeDst));
                                 }
                             }
+
                             //整数->浮点数
                             else if(srcType.IsInteger && targetType.IsSSE)
                             {
@@ -1279,7 +1356,7 @@ namespace Gizbox.Src.Backend
                                 else 
                                     Emit(X64.cvtsi2sd(castDst, castSrc, srcIntSize: (X64Size)sizeSrc));
                             }
-                            // 浮点 -> 整数 (截断)
+                            //浮点 -> 整数 (截断)
                             else if(srcType.IsSSE && targetType.IsInteger)
                             {
                                 if(srcType.Size == 4)
@@ -1295,6 +1372,7 @@ namespace Gizbox.Src.Backend
                             {
                                 throw new GizboxException(ExceptioName.CodeGen, $"cast not support:{srcType.ToString()}->{targetType.ToString()}");
                             }
+
 
                             //标记R11中转  
                             var newlast = instructions.Last;
@@ -2033,6 +2111,10 @@ namespace Gizbox.Src.Backend
                 case "*":
                 case "/":
                 case "%":
+                case "<<":
+                case ">>":
+                case "&":
+                case "|":
                 case "<":
                 case "<=":
                 case ">":
@@ -2295,10 +2377,24 @@ namespace Gizbox.Src.Backend
                                     return X64.imm(value);
                                 }
                                 break;
+                            case "%LITUINT":
+                                {
+                                    var lit = UtilsW64.GLitToW64Lit(irOperand.typeExpr, iroperandExpr.segments[1]);
+                                    var value = uint.Parse(lit);
+                                    return X64.imm(unchecked((long)value));
+                                }
+                                break;
                             case "%LITLONG":
                                 {
                                     var value = long.Parse(UtilsW64.GLitToW64Lit(irOperand.typeExpr, iroperandExpr.segments[1])); //long.Parse(iroperandExpr.segments[1]);
                                     return X64.imm(value);
+                                }
+                                break;
+                            case "%LITULONG":
+                                {
+                                    var lit = UtilsW64.GLitToW64Lit(irOperand.typeExpr, iroperandExpr.segments[1]);
+                                    var value = ulong.Parse(lit);
+                                    return X64.imm(unchecked((long)value));
                                 }
                                 break;
                             case "%LITCHAR":
@@ -2897,7 +2993,7 @@ namespace Gizbox.Src.Backend
             return newNode;
         }
 
-        // Mov  
+        //Mov  
         private void EmitMov(X64Operand dst, X64Operand src, GType type)
         {
             EmitMov(dst, src, (X64Size)type.Size, type.IsSSE);
@@ -2947,6 +3043,40 @@ namespace Gizbox.Src.Backend
                 {
                     Emit(X64.mov(dst, src, size));
                 }
+            }
+        }
+
+        //idiv  
+        private void EmitIDiv(X64Operand divisor, X64Size size)
+        {
+            //合法化立即数  
+            if(divisor is X64Immediate imm)
+            {
+                using(new RegUsageRange(this, RegisterEnum.R11))
+                {
+                    Emit(X64.mov(X64.r11, imm, size));
+                    Emit(X64.idiv(X64.r11, size));
+                }
+            }
+            else
+            {
+                Emit(X64.idiv(divisor, size));
+            }
+        }
+
+        private void EmitUDiv(X64Operand divisor, X64Size size)
+        {
+            if(divisor is X64Immediate imm)
+            {
+                using(new RegUsageRange(this, RegisterEnum.R11))
+                {
+                    Emit(X64.mov(X64.r11, imm, size));
+                    Emit(X64.div(X64.r11, size));
+                }
+            }
+            else
+            {
+                Emit(X64.div(divisor, size));
             }
         }
 
@@ -3013,8 +3143,16 @@ namespace Gizbox.Src.Backend
                 {
                     // rdx:rax / b
                     Emit(X64.mov(X64.rax, a, size));
-                    Emit(X64.cqo());
-                    Emit(X64.idiv(b, size));
+                    if(type.IsSigned)
+                    {
+                        Emit(X64.cqo());
+                        EmitIDiv(b, size);
+                    }
+                    else
+                    {
+                        Emit(X64.xor(X64.rdx, X64.rdx, X64Size.qword));
+                        EmitUDiv(b, size);
+                    }
                     EmitMov(dst, op == "/" ? (X64Operand)X64.rax : X64.rdx, type);
                     return;
                 }
@@ -3029,8 +3167,92 @@ namespace Gizbox.Src.Backend
                             return X64.sub(d, s, size);
                         case "*":
                             return X64.imul_2(d, s, size);
+                        case "&":
+                            return X64.and(d, s, size);
+                        case "|":
+                            return X64.or(d, s, size);
                     }
                     throw new GizboxException(ExceptioName.CodeGen, $"未知操作符: {o}");
+                }
+
+                if(op == "<<" || op == ">>")
+                {
+                    X64Operand target = dst;
+                    bool needStoreBack = false;
+
+                    if(IsRegOrVReg(target) == false)
+                    {
+                        using(new RegUsageRange(this, RegisterEnum.R11))
+                        {
+                            Emit(X64.mov(X64.r11, a, size));
+                            target = X64.r11;
+                            needStoreBack = true;
+
+                            if(b is X64Immediate)
+                            {
+                                if(op == "<<")
+                                {
+                                    Emit(X64.shl(target, b, size));
+                                }
+                                else
+                                {
+                                    Emit(type.IsSigned ? X64.sar(target, b, size) : X64.shr(target, b, size));
+                                }
+                            }
+                            else
+                            {
+                                using(new RegUsageRange(this, RegisterEnum.RCX))
+                                {
+                                    Emit(X64.mov(X64.rcx, b, X64Size.qword));
+                                    if(op == "<<")
+                                    {
+                                        Emit(X64.shl(target, X64.rcx, size));
+                                    }
+                                    else
+                                    {
+                                        Emit(type.IsSigned ? X64.sar(target, X64.rcx, size) : X64.shr(target, X64.rcx, size));
+                                    }
+                                }
+                            }
+
+                            if(needStoreBack)
+                                EmitMov(dst, target, type);
+                        }
+                        return;
+                    }
+                    else
+                    {
+                        if(!Equals(target, a))
+                            Emit(X64.mov(target, a, size));
+                    }
+
+                    if(b is X64Immediate)
+                    {
+                        if(op == "<<")
+                        {
+                            Emit(X64.shl(target, b, size));
+                        }
+                        else
+                        {
+                            Emit(type.IsSigned ? X64.sar(target, b, size) : X64.shr(target, b, size));
+                        }
+                    }
+                    else
+                    {
+                        using(new RegUsageRange(this, RegisterEnum.RCX))
+                        {
+                            Emit(X64.mov(X64.rcx, b, X64Size.qword));
+                            if(op == "<<")
+                            {
+                                Emit(X64.shl(target, X64.rcx, size));
+                            }
+                            else
+                            {
+                                Emit(type.IsSigned ? X64.sar(target, X64.rcx, size) : X64.shr(target, X64.rcx, size));
+                            }
+                        }
+                    }
+                    return;
                 }
 
                 if(IsRegOrVReg(dst))
@@ -3261,8 +3483,16 @@ namespace Gizbox.Src.Backend
                             using(new RegUsageRange(this, RegisterEnum.RAX))
                             {
                                 Emit(X64.mov(X64.rax, dst, size));
-                                Emit(X64.cqo());
-                                Emit(X64.idiv(rhs, size));
+                                if(type.IsSigned)
+                                {
+                                    Emit(X64.cqo());
+                                    EmitIDiv(rhs, size);
+                                }
+                                else
+                                {
+                                    Emit(X64.xor(X64.rdx, X64.rdx, X64Size.qword));
+                                    EmitUDiv(rhs, size);
+                                }
                                 EmitMov(dst, X64.rax, type);
                                 break;
                             }
@@ -3272,10 +3502,20 @@ namespace Gizbox.Src.Backend
                             using(new RegUsageRange(this, RegisterEnum.RAX))
                             {
                                 Emit(X64.mov(X64.rax, dst, size));
-                                Emit(X64.cqo());
+                                if(type.IsSigned)
+                                {
+                                    Emit(X64.cqo());
+                                }
+                                else
+                                {
+                                    Emit(X64.xor(X64.rdx, X64.rdx, X64Size.qword));
+                                }
                                 using(new RegUsageRange(this, RegisterEnum.RDX))
                                 {
-                                    Emit(X64.idiv(rhs, size));
+                                    if(type.IsSigned)
+                                        EmitIDiv(rhs, size);
+                                    else
+                                        EmitUDiv(rhs, size);
                                     EmitMov(dst, X64.rdx, type);
                                 }
                             }
@@ -3777,7 +4017,7 @@ namespace Gizbox.Src.Backend
         
         private SymbolTable.Record QueryMember(SymbolTable.Record classRec, string memberName)
         {
-            return classRec.envPtr.GetRecord(memberName);
+            return classRec.envPtr.Class_GetMemberRecordInChain(memberName);
         }
 
         public SymbolTable.Record Query(string name, int line)
@@ -4269,7 +4509,8 @@ namespace Gizbox.Src.Backend
             if(input is null)
                 return null;
             var result = input.Replace("::", "__");
-            result = input.Replace(":", "_");
+            result = result.Replace(":", "_");
+            result = result.Replace('^', '_');
             return result;
         }
 
@@ -4279,8 +4520,12 @@ namespace Gizbox.Src.Backend
             {
                 case "%LITINT":
                     return "int";
+                case "%LITUINT":
+                    return "uint";
                 case "%LITLONG":
                     return "long";
+                case "%LITULONG":
+                    return "ulong";
                 case "%LITFLOAT":
                     return "float";
                 case "%LITDOUBLE":
@@ -4305,14 +4550,31 @@ namespace Gizbox.Src.Backend
                     return bool.Parse(gLiterial) ? "1" : "0";
                 case GType.Kind.Char:
                     return gLiterial;
+                case GType.Kind.Byte:
+                    return gLiterial;
                 case GType.Kind.Int:
                     {
+                        return gLiterial;
+                    }
+                case GType.Kind.UInt:
+                    {
+                        if(gLiterial.EndsWith("U") || gLiterial.EndsWith("u"))
+                            gLiterial = gLiterial.Substring(0, gLiterial.Length - 1);
                         return gLiterial;
                     }
                 case GType.Kind.Long:
                     {
                         if(gLiterial.EndsWith("L") || gLiterial.EndsWith("l"))
                             gLiterial = gLiterial.Substring(0, gLiterial.Length - 1);
+                        return gLiterial;
+                    }
+                case GType.Kind.ULong:
+                    {
+                        if(gLiterial.EndsWith("UL") || gLiterial.EndsWith("Ul") || gLiterial.EndsWith("uL") || gLiterial.EndsWith("ul")
+                            || gLiterial.EndsWith("LU") || gLiterial.EndsWith("Lu") || gLiterial.EndsWith("lU") || gLiterial.EndsWith("lu"))
+                        {
+                            gLiterial = gLiterial.Substring(0, gLiterial.Length - 2);
+                        }
                         return gLiterial;
                     }
                 case GType.Kind.Float:
@@ -4477,6 +4739,7 @@ namespace Gizbox.Src.Backend
             {
                 case GType.Kind.Void:
                 case GType.Kind.Bool:
+                case GType.Kind.Byte:
                     x64DefineType = (X64DefSize)1;
                     break;
                 case GType.Kind.String://字符串常量  
@@ -4486,10 +4749,12 @@ namespace Gizbox.Src.Backend
                     x64DefineType = (X64DefSize)2;
                     break;
                 case GType.Kind.Int:
+                case GType.Kind.UInt:
                 case GType.Kind.Float:
                     x64DefineType = (X64DefSize)4;
                     break;
                 case GType.Kind.Long:
+                case GType.Kind.ULong:
                 case GType.Kind.Double:
                     x64DefineType = (X64DefSize)8;
                     break;
@@ -4511,16 +4776,19 @@ namespace Gizbox.Src.Backend
             {
                 case GType.Kind.Void:
                 case GType.Kind.Bool:
+                case GType.Kind.Byte:
                     resSize =(X64ResSize)1;
                     break;
                 case GType.Kind.Char://字符串常量  
                     resSize = (X64ResSize)2;
                     break;
                 case GType.Kind.Int:
+                case GType.Kind.UInt:
                 case GType.Kind.Float:
                     resSize = (X64ResSize)4;
                     break;
                 case GType.Kind.Long:
+                case GType.Kind.ULong:
                 case GType.Kind.Double:
                     resSize = (X64ResSize)8;
                     break;

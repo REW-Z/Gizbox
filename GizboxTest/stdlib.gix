@@ -4,17 +4,17 @@ namespace Math
 {
 	const float Pi = 3.14159265358979323846f;
 
-	float Abs(float number)
+	T Abs<T>(T number)
 	{
-		float result = number;
-		if(number < 0.0f)
+		T result = number;
+		if(number < ((T)0.0f))
 			result = -number;
 		return result;
 	}
 
-	float Pow(float bs, int exp)
+	T Pow<T>(T bs, int exp)
 	{
-		float result = 1.0f;
+		T result = 1.0f;
 		bool isNegativeExponent = (exp < 0);
 		if (isNegativeExponent) {
 		    exp = -exp;
@@ -25,45 +25,29 @@ namespace Math
 		}
 
 		if (isNegativeExponent) {
-		    result = 1.0f / result;
+		    result = ((T)1.0f) / result;
 		}
 
 		return result;
 	}
 
-	float Sqrt(float number) 
+	T Sqrt<T>(T number) 
 	{
-		if (number < 0.0f) 
+		if (number < ((T)0)) 
 		{
-			return 0.0f;
+			return default(T);
 		}
-		float precision = 0.0000001f;
-		float guess = number / 2.0f;
+		T precision = (T)0.0000001f;
+		T guess = number / ((T)2.0f);
 		while (Math::Abs(guess * guess - number) > precision) 
 		{
-		    guess = (guess + (number / guess)) / 2.0f;
+		    guess = (guess + (number / guess)) / ((T)2.0f);
 		}
 		return guess;
 	}
 
-	int Abs(int number)
-	{
-		int result = number;
-		if(number < 0)
-			result = -number;
-		return result;
-	}
 
-	float Clamp(float value, float minValue, float maxValue)
-	{
-		if(value < minValue)
-			return minValue;
-		if(value > maxValue)
-			return maxValue;
-		return value;
-	}
-
-	int Clamp(int value, int minValue, int maxValue)
+	T Clamp<T>(T value, T minValue, T maxValue)
 	{
 		if(value < minValue)
 			return minValue;
@@ -88,15 +72,6 @@ namespace Math
 			return b;
 	}
 
-	T Abs<T>(T number)
-	{
-		T result = number;
-		if(number < default(T))
-			result = -number;
-		return result;
-	}
-}
-
 	float Sin(float v)
 	{
 		return Core::Extern::Sin(v);
@@ -107,6 +82,7 @@ namespace Math
 		return Core::Extern::Cos(v);
 	}
 
+}
 
 namespace String
 {
@@ -246,14 +222,24 @@ namespace Collections
 {
 	class List<T>
 	{
+	private:
 		T[] data = new T[10];
-		
-		private:
 		int opacity = 10;
 		int count = 0;
-
 		
-		public:
+
+		void Resize()
+		{
+			T[] newdata = new T[this.opacity * 2];
+			for(int i = 0; i < this.opacity; ++i)
+			{
+				newdata[i] = this.data[i];
+			}
+			this.data = newdata;
+			this.opacity *= 2;
+		}
+		
+	public:
 		void Add(T v)
 		{
 			if(this.count >= this.opacity)
@@ -295,17 +281,6 @@ namespace Collections
 		{
 			this.count = 0;
 		}
-
-		void Resize()
-		{
-			T[] newdata = new T[this.opacity * 2];
-			for(int i = 0; i < this.opacity; ++i)
-			{
-				newdata[i] = this.data[i];
-			}
-			this.data = newdata;
-			this.opacity *= 2;
-		}
 	}
 
 
@@ -318,10 +293,11 @@ namespace Collections
 
 	class LinkedList<T>
 	{
+	private:
+		int count = 0;
 		Collections::LinkedListNode<T> head = null;
 		Collections::LinkedListNode<T> tail = null;
-		int count = 0;
-
+	public:
 		void AddFirst(T v)
 		{
 			Collections::LinkedListNode<T> node = new Collections::LinkedListNode<T>();
@@ -385,10 +361,24 @@ namespace Collections
 
 	class Stack<T>
 	{
+	private:
 		T[] data = new T[10];
 		int opacity = 10;
 		int count = 0;
+		
 
+		void Resize()
+		{
+			T[] newdata = new T[this.opacity * 2];
+			for(int i = 0; i < this.opacity; ++i)
+			{
+				newdata[i] = this.data[i];
+			}
+			this.data = newdata;
+			this.opacity *= 2;
+		}
+
+	public:
 		void Push(T v)
 		{
 			if(this.count >= this.opacity)
@@ -416,28 +406,35 @@ namespace Collections
 		{
 			return this.count;
 		}
-
-		void Resize()
-		{
-			T[] newdata = new T[this.opacity * 2];
-			for(int i = 0; i < this.opacity; ++i)
-			{
-				newdata[i] = this.data[i];
-			}
-			this.data = newdata;
-			this.opacity *= 2;
-		}
 	}
 
 
 	class Queue<T>
 	{
+	private:
 		T[] data = new T[10];
 		int opacity = 10;
 		int head = 0;
 		int tail = 0;
 		int count = 0;
+		
 
+		void Resize()
+		{
+			T[] newdata = new T[this.opacity * 2];
+			for(int i = 0; i < this.count; ++i)
+			{
+				int idx = this.head + i;
+				if(idx >= this.opacity)
+					idx -= this.opacity;
+				newdata[i] = this.data[idx];
+			}
+			this.data = newdata;
+			this.opacity *= 2;
+			this.head = 0;
+			this.tail = this.count;
+		}
+	public:
 		void Enqueue(T v)
 		{
 			if(this.count >= this.opacity)
@@ -465,32 +462,17 @@ namespace Collections
 		{
 			return this.count;
 		}
-
-		void Resize()
-		{
-			T[] newdata = new T[this.opacity * 2];
-			for(int i = 0; i < this.count; ++i)
-			{
-				int idx = this.head + i;
-				if(idx >= this.opacity)
-					idx -= this.opacity;
-				newdata[i] = this.data[idx];
-			}
-			this.data = newdata;
-			this.opacity *= 2;
-			this.head = 0;
-			this.tail = this.count;
-		}
 	}
 
 	class HashMap<TKey, TValue>
 	{
+	private:
 		TKey[] keys = new TKey[16];
 		TValue[] values = new TValue[16];
 		int[] states = new int[16];
 		int opacity = 16;
 		int count = 0;
-
+	
 		int HashKey(TKey key)
 		{
 			int h = hashof(key);
@@ -499,11 +481,58 @@ namespace Collections
 			return h;
 		}
 
+		int FindSlot(TKey key)
+		{
+			int hash = this.HashKey(key);
+			int idx = hash % this.opacity;
+			int firstRemoved = -1;
+			for(int i = 0 ; i < 10; ++i)
+			{
+				int state = this.states[idx];
+				if(state == 0)
+				{
+					if(firstRemoved >= 0)
+						return firstRemoved;
+					return idx;
+				}
+				if(state == 2 && firstRemoved < 0)
+					firstRemoved = idx;
+				if(state == 1 && this.keys[idx] == key)
+					return idx;
+				idx += 1;
+				if(idx >= this.opacity)
+					idx = 0;
+			}
+
+			Console::PrintLn("HashMap is too full.");
+			return 0;
+		}
+
+		void Resize()
+		{
+			TKey[] oldKeys = this.keys;
+			TValue[] oldValues = this.values;
+			int[] oldStates = this.states;
+			int oldOpacity = this.opacity;
+
+			this.opacity *= 2;
+			this.keys = new TKey[this.opacity];
+			this.values = new TValue[this.opacity];
+			this.states = new int[this.opacity];
+			this.count = 0;
+			for(int i = 0; i < oldOpacity; ++i)
+			{
+				if(oldStates[i] == 1)
+					this.Add(oldKeys[i], oldValues[i]);
+			}
+		}
+
+	public:
 		void Add(TKey key, TValue value)
 		{
 			if(this.count * 10 >= this.opacity * 7)
 				this.Resize();
-
+				
 			int idx = this.FindSlot(key);
 			if(this.states[idx] != 1)
 			{
@@ -545,50 +574,6 @@ namespace Collections
 		int Count()
 		{
 			return this.count;
-		}
-
-		int FindSlot(TKey key)
-		{
-			int hash = this.HashKey(key);
-			int idx = hash % this.opacity;
-			int firstRemoved = -1;
-			while(true)
-			{
-				int state = this.states[idx];
-				if(state == 0)
-				{
-					if(firstRemoved >= 0)
-						return firstRemoved;
-					return idx;
-				}
-				if(state == 2 && firstRemoved < 0)
-					firstRemoved = idx;
-				if(state == 1 && this.keys[idx] == key)
-					return idx;
-				idx += 1;
-				if(idx >= this.opacity)
-					idx = 0;
-			}
-			return 0;
-		}
-
-		void Resize()
-		{
-			TKey[] oldKeys = this.keys;
-			TValue[] oldValues = this.values;
-			int[] oldStates = this.states;
-			int oldOpacity = this.opacity;
-
-			this.opacity *= 2;
-			this.keys = new TKey[this.opacity];
-			this.values = new TValue[this.opacity];
-			this.states = new int[this.opacity];
-			this.count = 0;
-			for(int i = 0; i < oldOpacity; ++i)
-			{
-				if(oldStates[i] == 1)
-					this.Add(oldKeys[i], oldValues[i]);
-			}
 		}
 	}
 }

@@ -1455,10 +1455,16 @@ namespace Gizbox.IR
                     return "%LITBOOL:false";
                 case "char":
                     return "%LITCHAR:'\\0'";
+                case "byte":
+                    return "%LITINT:0";
+                case "uint":
+                    return "%LITUINT:0u";
                 case "float":
                     return "%LITFLOAT:0.0f";
                 case "double":
                     return "%LITDOUBLE:0.0d";
+                case "ulong":
+                    return "%LITULONG:0ul";
                 case "long":
                     return "%LITLONG:0L";
                 case "int":

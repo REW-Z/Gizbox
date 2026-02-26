@@ -36,12 +36,20 @@ public partial class SemanticAnalyzer
         public List<SyntaxTree.TypeNode> typeArguments;
     }
 
+    //标识符可能全名列表的映射(ShortName -> [FullName])  
+    private Dictionary<string, HashSet<string>> templateFullNameDict = new();
+
+
+
+
+
     //模板类特化（AST层面）：收集模板定义、实例化并生成专用类
     private void SpecializeClassTemplates()
     {
         if(ast?.rootNode == null)
             return;
 
+        //收集当前模块的模板类定义
         var templatesLocal = new Dictionary<string, SyntaxTree.ClassDeclareNode>();
         CollectClassTemplates(ast.rootNode, templatesLocal);
 
@@ -55,6 +63,33 @@ public partial class SemanticAnalyzer
             CollectClassTemplates(dep.ast.rootNode, templatesDeps);
         }
 
+        //生成ShortName ->  [FullName]映射（辅助命名空间匹配）  
+        foreach(var t in templatesLocal)
+        {
+            var shortname = t.Value.classNameNode.token.attribute;
+            var fullname = t.Value.classNameNode.FullName;
+            if(templateFullNameDict.TryGetValue(shortname, out var list) == false)
+            {
+                list = new();
+                templateFullNameDict[shortname] = list;
+            }
+            list.Add(fullname);
+        }
+        foreach (var t in templatesDeps)
+        {
+            var shortname = t.Value.classNameNode.token.attribute;
+            var fullname = t.Value.classNameNode.FullName;
+            if (templateFullNameDict.TryGetValue(shortname, out var list) == false)
+            {
+                list = new();
+                templateFullNameDict[shortname] = list;
+            }
+            list.Add(fullname);
+        }
+
+
+
+        //记录所有模板实例化信息（类型引用和new表达式）
         var instances = new Dictionary<string, ClassTemplateInstance>();
         CollectClassTemplateInstantiations(ast.rootNode, instances, inTemplate: false);
 
@@ -161,6 +196,7 @@ public partial class SemanticAnalyzer
     //特化函数模板：收集模板定义、实例化并生成专用函数
     private void SpecializeFunctionTemplates()
     {
+        //收集函数模板定义  
         var templatesLocal = new Dictionary<string, SyntaxTree.FuncDeclareNode>();
         CollectTemplateFunctions(ast.rootNode, templatesLocal);
 
@@ -174,6 +210,33 @@ public partial class SemanticAnalyzer
             CollectTemplateFunctions(dep.ast.rootNode, templatesDeps);
         }
 
+        //生成ShortName ->  [FullName]映射（辅助命名空间匹配）  
+        foreach(var t in templatesLocal)
+        {
+            var shortname = t.Value.identifierNode.token.attribute;
+            var fullname = t.Value.identifierNode.FullName;
+            if(templateFullNameDict.TryGetValue(shortname, out var list) == false)
+            {
+                list = new();
+                templateFullNameDict[shortname] = list;
+            }
+            list.Add(fullname);
+        }
+        foreach(var t in templatesDeps)
+        {
+            var shortname = t.Value.identifierNode.token.attribute;
+            var fullname = t.Value.identifierNode.FullName;
+            if(templateFullNameDict.TryGetValue(shortname, out var list) == false)
+            {
+                list = new();
+                templateFullNameDict[shortname] = list;
+            }
+            list.Add(fullname);
+        }
+
+
+
+        //记录所有函数模板特化信息  
         var instances = new Dictionary<string, FunctionTemplateInstance>();
         CollectFunctionTemplateInstantiations(ast.rootNode, instances, inTemplate: false);
 
@@ -541,7 +604,7 @@ public partial class SemanticAnalyzer
     private void TemplateCompleteDefineFullName(SyntaxTree.IdentityNode idNode)
     {
         SyntaxTree.Node curr = idNode;
-        for(int i = 0; i < 10; ++i)
+        for(int i = 0; i < 99; ++i)
         {
             curr = curr.Parent;
             if(curr == null)
@@ -557,10 +620,50 @@ public partial class SemanticAnalyzer
     }
 
     //检查补全模板实例处的命名空间前缀  
-    private void TemplateTryMatchNamespace(SyntaxTree.IdentityNode classNameNode)
+    private void TemplateTryMatchNamespace(SyntaxTree.IdentityNode templateNameNode)
     {
-        //classTypeNode.classname.SetPrefix(???);
+        //不存在模板  
+        if(templateFullNameDict.TryGetValue(templateNameNode.token.attribute, out var fullnameList) == false)
+        {
+            throw new SemanticException(ExceptioName.SemanticAnalysysError, templateNameNode, $"template not exist:{templateNameNode.FullName}");
+        }
 
-        //查找ast节点？查找模板列表缓存？    
+        //优先使用不带名称空间的模板  
+        if(fullnameList.Contains(templateNameNode.token.attribute))
+        {
+            templateNameNode.SetPrefix(null);
+        }
+        //匹配命名空间  
+        else
+        {
+            int match = 0;
+            string matchNamespace = null;
+            foreach(var prefix in availableNamespacePrefixList)
+            {
+                string possibleFullName = prefix + templateNameNode.token.attribute;
+                if(fullnameList.Contains(possibleFullName))
+                {
+                    match++;
+                    matchNamespace = prefix.Substring(0, prefix.Length - 2);//去掉`::`
+                }
+                if(match > 1)
+                {
+                    //命名空间歧义  
+                    throw new SemanticException(ExceptioName.IdentifierAmbiguousBetweenNamespaces, templateNameNode, string.Empty);
+                }
+            }
+
+
+            if(match == 0)
+            {
+                //需要引用命名空间  
+                throw new SemanticException(ExceptioName.SemanticAnalysysError, templateNameNode, "need using namespace.");
+            }
+            else
+            {
+                templateNameNode.SetPrefix(matchNamespace);
+            }
+        }
     }
+
 }

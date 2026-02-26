@@ -557,8 +557,11 @@ namespace Gizbox
         {
             Other,
             Void,
+            Byte,
             Int,
+            UInt,
             Long,
+            ULong,
             Float,
             Double,
             Bool,
@@ -621,14 +624,23 @@ namespace Gizbox
                     case "bool":
                         type._Kind = Kind.Bool;
                         break;
+                    case "byte":
+                        type._Kind = Kind.Byte;
+                        break;
                     case "char":
                         type._Kind = Kind.Char;
                         break;
                     case "int":
                         type._Kind = Kind.Int;
                         break;
+                    case "uint":
+                        type._Kind = Kind.UInt;
+                        break;
                     case "long":
                         type._Kind = Kind.Long;
+                        break;
+                    case "ulong":
+                        type._Kind = Kind.ULong;
                         break;
                     case "float":
                         type._Kind = Kind.Float;
@@ -682,8 +694,11 @@ namespace Gizbox
                 return _Kind switch
                 {
                     Kind.Void => 0,
+                    Kind.Byte => 1,
                     Kind.Int => 4,
+                    Kind.UInt => 4,
                     Kind.Long => 8,
+                    Kind.ULong => 8,
                     Kind.Float => 4,
                     Kind.Double => 8,
                     Kind.Bool => 1,
@@ -704,8 +719,11 @@ namespace Gizbox
                 return _Kind switch
                 {
                     Kind.Void => 0,
+                    Kind.Byte => 1,
                     Kind.Int => 4,
+                    Kind.UInt => 4,
                     Kind.Long => 8,
+                    Kind.ULong => 8,
                     Kind.Float => 4,
                     Kind.Double => 8,
                     Kind.Bool => 1,
@@ -719,14 +737,17 @@ namespace Gizbox
             }
         }
 
-        public bool IsPrimitive
+        public bool IsValuePrimitive
         {
             get
             {
                 return _Kind switch
                 {
+                    Kind.Byte => true,
                     Kind.Int => true,
+                    Kind.UInt => true,
                     Kind.Long => true,
+                    Kind.ULong => true,
                     Kind.Float => true,
                     Kind.Double => true,
                     Kind.Bool => true,
@@ -735,14 +756,38 @@ namespace Gizbox
                 };
             }
         }
+        public bool IsPrimitive
+        {
+            get
+            {
+                return _Kind switch
+                {
+                    Kind.Byte => true,
+                    Kind.Int => true,
+                    Kind.UInt => true,
+                    Kind.Long => true,
+                    Kind.ULong => true,
+                    Kind.Float => true,
+                    Kind.Double => true,
+                    Kind.Bool => true,
+                    Kind.Char => true,
+                    Kind.String => true,//string是内置引用类型
+                    _ => false,
+                };
+            }
+        }
+
         public bool IsNumberType
         {
             get
             {
                 return _Kind switch
                 {
+                    Kind.Byte => true,
                     Kind.Int => true,
+                    Kind.UInt => true,
                     Kind.Long => true,
+                    Kind.ULong => true,
                     Kind.Float => true,
                     Kind.Double => true,
                     _ => false,
@@ -779,7 +824,7 @@ namespace Gizbox
         {
             get
             {
-                return _Kind == Kind.Int || _Kind == Kind.Long;
+                return _Kind == Kind.Byte || _Kind == Kind.Int || _Kind == Kind.UInt || _Kind == Kind.Long || _Kind == Kind.ULong;
             }
         }
 
@@ -882,6 +927,10 @@ namespace Gizbox
                     return "null";
                 case "LITBOOL":
                     return "bool";
+                case "LITUINT":
+                    return "uint";
+                case "LITULONG":
+                    return "ulong";
                 case "LITINT":
                     return "int";
                 case "LITLONG":
@@ -902,8 +951,11 @@ namespace Gizbox
         {
             return type switch
             {
+                "byte" => "0",
                 "int" => "0",
+                "uint" => "0u",
                 "long" => "0L",
+                "ulong" => "0ul",
                 "float" => "0f",
                 "double" => "0d",
                 "bool" => "false",
@@ -916,6 +968,9 @@ namespace Gizbox
         {
             return type switch
             {
+                "byte" => "LITINT",
+                "uint" => "LITUINT",
+                "ulong" => "LITULONG",
                 "int" => "LITINT",
                 "long" => "LITLONG",
                 "float" => "LITFLOAT",

@@ -169,6 +169,9 @@ namespace Gizbox.Src.Backend
         and,              // 按位与（整数/位运算，不改变操作数宽度）
         or,               // 按位或（整数/位运算，不改变操作数宽度）
         xor,              // 按位异或（整数/位运算，不改变操作数宽度）
+        shl,              // 逻辑左移（按 sizeMark 宽度）
+        shr,              // 逻辑右移（按 sizeMark 宽度）
+        sar,              // 算术右移（按 sizeMark 宽度）
 
         cmp,              // 比较：op1 - op2，只影响标志位（不写回结果）
         test,             // 按位测试：op1 & op2，只影响标志位（不写回结果）
@@ -667,6 +670,12 @@ namespace Gizbox.Src.Backend
         public static X64Instruction and(X64Operand dest, X64Operand src) => new() { type = InstructionKind.and, operand0 = dest, operand1 = src };
         public static X64Instruction or(X64Operand dest, X64Operand src) => new() { type = InstructionKind.or, operand0 = dest, operand1 = src };
         public static X64Instruction xor(X64Operand dest, X64Operand src) => new() { type = InstructionKind.xor, operand0 = dest, operand1 = src };
+        public static X64Instruction and(X64Operand dest, X64Operand src, X64Size size) => new() { type = InstructionKind.and, operand0 = dest, operand1 = src, sizeMark = size };
+        public static X64Instruction or(X64Operand dest, X64Operand src, X64Size size) => new() { type = InstructionKind.or, operand0 = dest, operand1 = src, sizeMark = size };
+        public static X64Instruction xor(X64Operand dest, X64Operand src, X64Size size) => new() { type = InstructionKind.xor, operand0 = dest, operand1 = src, sizeMark = size };
+        public static X64Instruction shl(X64Operand dest, X64Operand src, X64Size size) => new() { type = InstructionKind.shl, operand0 = dest, operand1 = src, sizeMark = size, sizeMarkSrc = X64Size.@byte };
+        public static X64Instruction shr(X64Operand dest, X64Operand src, X64Size size) => new() { type = InstructionKind.shr, operand0 = dest, operand1 = src, sizeMark = size, sizeMarkSrc = X64Size.@byte };
+        public static X64Instruction sar(X64Operand dest, X64Operand src, X64Size size) => new() { type = InstructionKind.sar, operand0 = dest, operand1 = src, sizeMark = size, sizeMarkSrc = X64Size.@byte };
 
         // 比较和测试
         public static X64Instruction cmp(X64Operand op1, X64Operand op2) => new() { type = InstructionKind.cmp, operand0 = op1, operand1 = op2 };

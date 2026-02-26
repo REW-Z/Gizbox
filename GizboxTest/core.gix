@@ -10,7 +10,7 @@ namespace Core
 
 		int GetHashCode()
 		{
-			return 0;
+			return (int)Core::Extern::AddrOfClassObject(this);
 		}
 	}
 	
@@ -80,6 +80,8 @@ namespace Core
 
 namespace Core::Extern
 {
+	extern long AddrOfClassObject(Core::Object obj);
+
 	extern string BoolToString(bool v);
 	extern string CharToString(char v);
 	extern string IntToString(int v);

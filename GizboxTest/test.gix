@@ -63,10 +63,39 @@ void test_sizeof()
 }
 
 // ----------------- Dic ------------------
+class OOO{}
 void test_dic()
 {
-	var list = new List<int>();
-	//var dict = new HashMap<int, int>();
+	HashMap<int, int> dict = new HashMap<int, int>();
+	dict.Add(1, 10);
+	int result = dict.Get(1);
+	Console::PrintLn("Dic1 result:" + (string)result);
+
+	var dict2 = new HashMap<string, string>();
+	dict2.Add("key", "value");
+	string result2 = dict2.Get("key");
+	Console::PrintLn("Dic2 result:" + result2);
+
+	var dict3 = new HashMap<OOO, int>();
+	OOO o = new OOO();
+	dict3.Add(o, 123);
+	int result3 = dict3.Get(o);
+	Console::PrintLn("OOO addr :" + (string)(hashof(o)));
+	Console::PrintLn("Dic3 result:" + (string)result3);
+}
+
+// ----------------- 位运算 -----------------
+void test_bitwise()
+{
+	int a = 5; // 0101
+	int b = 3; // 0011
+	int andResult = a & b; // 0001 -> 1
+	int orResult = a | b;  // 0111 -> 7
+	int notResult = ~a;    // 1010 (取反) -> -6  
+	Console::PrintLn("Bitwise AND: " + (string)andResult);
+	Console::PrintLn("Bitwise OR: " + (string)orResult);
+	Console::PrintLn("Bitwise XOR: " + (string)xorResult);
+	Console::PrintLn("Bitwise NOT: " + (string)notResult);
 }
 
 // ----------------- Main ------------------
@@ -77,6 +106,8 @@ void main()
 	test_call();
 	test_sizeof();
 	test_dic();
+	test_bitwise();
 
+	Console::PrintLn("Test finished!");
 	Console::ReadLn();
 }

@@ -200,8 +200,11 @@ namespace Gizbox
             "namedtype -> TYPE_NAME genargs",
             "primitive -> void",
             "primitive -> bool",
+            "primitive -> byte",
             "primitive -> int",
+            "primitive -> uint",
             "primitive -> long",
+            "primitive -> ulong",
             "primitive -> float",
             "primitive -> double",
             "primitive -> char",
@@ -232,6 +235,10 @@ namespace Gizbox
 
             "aexpr -> aexpr + term",
             "aexpr -> aexpr - term",
+            "aexpr -> aexpr << term",
+            "aexpr -> aexpr >> term",
+            "aexpr -> aexpr & term",
+            "aexpr -> aexpr | term",
             "aexpr -> term",
 
             "term -> term * factor",
@@ -241,6 +248,7 @@ namespace Gizbox
             
             "factor -> incdec",
             "factor -> ! factor",
+            "factor -> ~ factor",
             "factor -> - factor",
             "factor -> cast",
             "factor -> primary",
@@ -283,6 +291,8 @@ namespace Gizbox
             "kwexpr -> default ( type )",
 
             "lit -> LITBOOL",
+            "lit -> LITUINT",
+            "lit -> LITULONG",
             "lit -> LITINT",
             "lit -> LITLONG",
             "lit -> LITFLOAT",

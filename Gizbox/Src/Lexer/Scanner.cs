@@ -47,8 +47,11 @@ namespace Gizbox
             "TYPE_NAME",
             "void",
             "bool",
+            "byte",
             "int",
+            "uint",
             "long",
+            "ulong",
             "float",
             "double",
             "char",
@@ -71,10 +74,14 @@ namespace Gizbox
             "%",
             "&&",
             "||",
+            "&",
+            "|",
             "==",
             "!=",
             "<=",
             ">=",
+            "<<",
+            ">>",
             "?",
             ":",
         };
@@ -102,8 +109,11 @@ namespace Gizbox
             keywords.Add(new TokenPattern("class", "class\\W", 1));
             keywords.Add(new TokenPattern("void", "void\\W", 1));
             keywords.Add(new TokenPattern("bool", "bool\\W", 1));
+            keywords.Add(new TokenPattern("byte", "byte\\W", 1));
             keywords.Add(new TokenPattern("int", "int\\W", 1));
+            keywords.Add(new TokenPattern("uint", "uint\\W", 1));
             keywords.Add(new TokenPattern("long", "long\\W", 1));
+            keywords.Add(new TokenPattern("ulong", "ulong\\W", 1));
             keywords.Add(new TokenPattern("float", "float\\W", 1));
             keywords.Add(new TokenPattern("double", "double\\W", 1));
             keywords.Add(new TokenPattern("char", "char\\W", 1));
@@ -152,6 +162,8 @@ namespace Gizbox
             operators.Add(new TokenPattern("!=", "!="));
             operators.Add(new TokenPattern("<=", "<="));
             operators.Add(new TokenPattern(">=", ">="));
+            operators.Add(new TokenPattern("<<", "<<"));
+            operators.Add(new TokenPattern(">>", ">>"));
             operators.Add(new TokenPattern(">", ">[^=>]", 1));
             operators.Add(new TokenPattern("<", "<[^=<]", 1));
             operators.Add(new TokenPattern("+", "\\+[^=\\+]", 1));
@@ -162,8 +174,12 @@ namespace Gizbox
 
             operators.Add(new TokenPattern("||", "\\|\\|"));
             operators.Add(new TokenPattern("&&", "\\&\\&"));
+            operators.Add(new TokenPattern("|", "\\|[^\\|]", 1));
+            operators.Add(new TokenPattern("&", "\\&[^\\&]", 1));
 
             operators.Add(new TokenPattern("!", "![^=]", 1));
+
+            operators.Add(new TokenPattern("~", "~"));
 
             operators.Add(new TokenPattern(":", "\\:[^\\:]", 1));
 
@@ -174,6 +190,8 @@ namespace Gizbox
             literals = new List<TokenPattern>();
 
             literals.Add(new TokenPattern("LITBOOL", "(true|false)[^a-zA-Z]", 1));
+            literals.Add(new TokenPattern("LITULONG", "[0-9]+([U|u][L|l]|[L|l][U|u])\\D", 1));
+            literals.Add(new TokenPattern("LITUINT", "[0-9]+[U|u]\\D", 1));
             literals.Add(new TokenPattern("LITINT", "[0-9]+[^\\d\\.Ll]", 1));
             literals.Add(new TokenPattern("LITLONG", "[0-9]+[L|l]\\D", 1));
             literals.Add(new TokenPattern("LITFLOAT", "[0-9]+\\.[0-9]+[F|f]\\D", 1));
