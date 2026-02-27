@@ -116,6 +116,13 @@ void test_rtti()
 	Console::PrintLn("GetType v2: " + t5.name);
 }
 
+// ----------------- IO --------------------
+void test_fileio()
+{
+	var path = "C:\\Users\\saus\\Desktop\\test_file.txt";
+	IO::FileWriteAllText(path, "Hello World!");
+	Console::PrintLn("File written:" + path);
+}
 
 // ----------------- Main ------------------
 void main()
@@ -127,6 +134,7 @@ void main()
 	test_dic();
 	test_bitwise();
 	test_rtti();
+	test_fileio();
 
 	Console::PrintLn("Test finished!");
 	Console::ReadLn();

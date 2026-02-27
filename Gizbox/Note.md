@@ -1,12 +1,8 @@
 ﻿
 # Optimize  
 
-优化外部函数调用效率。使用CreateDelegate？  
-使用哈希表优化LALR生成算法。  
-
 局部临时变量的栈内存分配。不同live区间的temp共用同一块栈内存。  
 具名的局部变量可以不做这个优化，用于debug模式下访问每个变量的值。    
-
 
 
 # 踩坑    
@@ -37,7 +33,6 @@ void foo()
 内置并发支持（Built-in Concurrency Support）  
 可选链（Optional Chaining）  
 函数式编程(惰性求值（Lazy Evaluation）、无副作用函数)  
-函数头等公民    
 元编程和宏（类似Lisp和Rust的宏）    
 响应式编程原生支持    
 借鉴（Haskell、LISP、Prolog、Rust）    
@@ -59,6 +54,11 @@ void foo()
 
 
 
+# 近期更新
+
+哈希、泛型模板、RTTI    
+
+
 # TODO  
 
 
@@ -66,3 +66,10 @@ void foo()
 
 函数指针  
 闭包  
+
+
+### 显式析构函数    
+
+
+### 显式构造函数  
+
