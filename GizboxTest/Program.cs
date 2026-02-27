@@ -90,7 +90,7 @@ switch(cmdIdx)
             Gizbox.Compiler compilerTest = new Compiler();
             compilerTest.ConfigParserDataSource(hardcode: false);
             compilerTest.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
-            compilerTest.InsertParserHardcodeToSourceFile(Path.Combine(Utility.RepoPath, "Src\\Parser\\ParserHardcoder.cs"));
+            compilerTest.InsertParserHardcodeToSourceFile(Path.Combine(Utility.CoreProjPath, "Src\\Parser\\ParserHardcoder.cs"));
             Console.WriteLine("生成硬编码完成");
             return;
         }
@@ -108,43 +108,40 @@ switch(cmdIdx)
         {
             Console.WriteLine("测试x64目标代码生成");
 
+            var projpath = Path.Combine(Utility.RepoPath, "GizboxTest");
+            DirectoryInfo projDir = new DirectoryInfo(projpath);
+            var gixFiles = projDir.GetFiles("*.gix");
 
-            //测试脚本Test  
-            Console.WriteLine("测试脚本Test");
-            string source = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\test.gix");
-            Gizbox.Compiler compiler = new Compiler();
-            compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
-            compiler.ConfigParserDataSource(hardcode: true);
-            //compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
-            var il = compiler.CompileToIR(source, isMainUnit: true, "test");
 
-            il.Print();
-
-            compiler.CompileIRToExe(il, System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
-
-            //执行测试  
-            Console.WriteLine("按E执行，按其他退出");
-            if(Console.ReadKey().Key == ConsoleKey.E)
+            Console.ForegroundColor = ConsoleColor.DarkBlue;
+            Console.BackgroundColor = ConsoleColor.Yellow;
+            for(int i = 0; i < gixFiles.Length; i++)
             {
-                Compiler.Run("test", "", System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
+                Console.WriteLine($"{i} : {gixFiles[i].Name}");
             }
-        }
-        break;
-        case 9:
-        {
-            //测试脚本Test  
-            Console.WriteLine("测试-模板");
-            string source = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\test_template.gix");
-            Gizbox.Compiler compiler = new Compiler();
-            compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
-            compiler.ConfigParserDataSource(hardcode: true);
-            //compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
-            var il = compiler.CompileToIR(source, isMainUnit: true, "test");
-            Compiler.Pause("Compile End");
+            Console.ResetColor();
 
-            il.Print();
+            var key = Console.ReadKey();
+            if(int.TryParse(key.KeyChar.ToString(), out int idx))
+            {
+                var path = gixFiles[idx].FullName;
 
-            compiler.CompileIRToExe(il, System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
+                //测试脚本Test  
+                string source = System.IO.File.ReadAllText(path);
+                Gizbox.Compiler compiler = new Compiler();
+                compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
+                compiler.ConfigParserDataSource(hardcode: true);
+                //compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
+                var il = compiler.CompileToIR(source, isMainUnit: true, "test");
+
+                il.Print();
+
+                compiler.CompileIRToExe(il, System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
+            }
+            else
+            {
+                Console.WriteLine("无效数字");
+            }
         }
         break;
 }
@@ -158,35 +155,53 @@ namespace GizboxTest
     public static class Utility
     {
         private static string repoPath = null;
+
         public static string RepoPath
         {
             get
             {
                 if(repoPath == null)
                 {
-                    repoPath = GetRepoPath();
+                    DirectoryInfo dir = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+                    while(dir != null)
+                    {
+                        if(dir.Name == "Gizbox")
+                        {
+                            break;
+                        }
+                        dir = dir.Parent;
+                    }
+                    repoPath = dir.FullName;
                 }
                 return repoPath;
             }
         }
-        private static string GetRepoPath()
+
+        private static string coreProjPath = null;
+        public static string CoreProjPath
         {
-            DirectoryInfo dir = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
-            while(dir != null)
+            get
             {
-                if(dir.Name == "Gizbox")
+                if(coreProjPath == null)
                 {
-                    break;
+                    DirectoryInfo dir = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+                    while(dir != null)
+                    {
+                        if(dir.Name == "Gizbox")
+                        {
+                            break;
+                        }
+                        dir = dir.Parent;
+                    }
+
+                    var subDirs = dir.GetDirectories();
+                    var targetDir = subDirs.FirstOrDefault(d => d.Name == "Gizbox");
+
+                    coreProjPath = targetDir.FullName;
                 }
-                dir = dir.Parent;
+
+                return coreProjPath;
             }
-
-            var subDirs = dir.GetDirectories();
-            var targetDir = subDirs.FirstOrDefault(d => d.Name == "Gizbox");
-
-            Console.WriteLine(targetDir.FullName);
-            return targetDir.FullName;
         }
-
     }
 }
