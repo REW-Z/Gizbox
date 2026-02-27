@@ -7,10 +7,15 @@
 命名空间导入`using XXX`在`import`语句之后、顶层语句之前。   
 
 
+
+
 ## 顶层语句和全局作用域    
 
 所有顶层语句隐式放在一个`main`函数中。  
 显式定义的顶层变量视作全局变量，存储在静态数据区。顶层临时变量视为局部变量。     
+
+
+
 
 
 ## 库  
@@ -19,15 +24,20 @@
 在编译过程中，主编译单元通过`import`导入库文件，编译时库文件和主编译单元各自编译为obj文件，然后链接为可执行文件。  
 
 
+
+
+
 ## 类型    
 
 基础类型：  
-`void`、`bool`、`char`、`int`、`long`、`float`、`double`    
+`void`、`bool`、`char`、`int`、`long`、`uint`、`ulong`、`float`、`double`    
 
 引用类型：
-`Core::Object` -及其派生类。      
-`string` -字符串类型。    
-`int[]`、`string[]` -数组  
+示例：`MyClass` -`Core::Object`及其派生类。      
+示例：`string` -字符串类型。    
+示例：`int[]`、`string[]` -数组  
+
+
 
 
 ## 类&继承  
@@ -37,6 +47,7 @@
   - 所有成员函数都是虚函数。  
   - 通过`private:`和`public:`标注成员访问权限。如果不标注默认为public。  
   - 类中只能有非静态成员。    
+  - 所有类都隐式继承自`Core::Object`。  
 
 示例：  
 ```
@@ -51,6 +62,11 @@ class Human : Creature
 }
 ```
 
+
+
+
+
+
 ## 模板  
 
 模板会作为ast节点保存在IR文件中。在第一次使用的编译单元中特化。    
@@ -58,7 +74,7 @@ class Human : Creature
 #### 函数模板  
 
 ```
-public T Add<T>(T a, T b)
+T Add<T>(T a, T b)
 {
     return a + b;
 }
@@ -69,10 +85,19 @@ public T Add<T>(T a, T b)
 ```
 class Container<T>
 {
+private:
     T[] data;
-    //...
+public:
+    void Add(T value)
+    {
+        //...
+    }
 }
 ```
+
+
+
+
 
 
 ## 所有权（Ownership）
@@ -90,8 +115,6 @@ class Container<T>
 1.赋值  
 2.作为函数参数传递（参数类型是own的）  
 3.作为函数返回值传递（返回值类型是own的）  
-
-
 
 #### 所有权托管的class    
 
@@ -162,6 +185,14 @@ own T old = replace(obj.field, new T());
 
 不允许"所有权机制管理(own或者bor类型)的变量"与"手动管理释放的变量"互相赋值。  
 只有自定义的引用类型（class）支持所有权语义，基础类型不支持（包括string也不支持）。    
+
+
+
+
+
+
+
+
 
 
 ## 在Windows64平台的栈帧结构    

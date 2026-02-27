@@ -571,7 +571,20 @@ namespace Gizbox
             Array, //数组类型
             Function, //函数类型
         }
-
+        public static HashSet<string> primitiveTypenames = new HashSet<string>
+        {
+            "void",
+            "byte",
+            "int",
+            "uint",
+            "long",
+            "ulong",
+            "float",
+            "double",
+            "bool",
+            "char",
+            "string",
+        };
 
         public static GType Parse(string typeExpression)
         {

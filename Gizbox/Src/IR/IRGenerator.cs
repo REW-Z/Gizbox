@@ -952,6 +952,11 @@ namespace Gizbox.IR
                         SetRet(sizeofNode, $"%LITINT:{t.Size}");
                     }
                     break;
+                case TypeOfNode typeofNode:
+                    {
+                        SetRet(typeofNode, $"%CONSTTYPE:{typeofNode.typeNode.TypeExpression()}");
+                    }
+                    break;
                 default:
                     throw new SemanticException(ExceptioName.Undefine, node, "IR generation not implemtented:" + node.GetType().Name);
             }

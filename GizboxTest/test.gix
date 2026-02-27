@@ -97,6 +97,18 @@ void test_bitwise()
 	Console::PrintLn("Bitwise NOT: " + (string)notResult);
 }
 
+// ----------------- RTTI ------------------
+void test_rtti()
+{
+	var t1 = typeof(Core::Object);
+	var t2 = typeof(Core::Int);
+	var t3 = typeof(int);
+	Console::PrintLn("Type of Core::Object: " + t1.name);
+	Console::PrintLn("Type of Core::Int: " + t2.name);
+	Console::PrintLn("Type of int: " + t3.name);
+}
+
+
 // ----------------- Main ------------------
 void main()
 {
@@ -106,6 +118,7 @@ void main()
 	test_sizeof();
 	test_dic();
 	test_bitwise();
+	test_rtti();
 
 	Console::PrintLn("Test finished!");
 	Console::ReadLn();

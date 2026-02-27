@@ -1689,7 +1689,9 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.TypeOfNode typeofNode:
                     {
-                        throw new SemanticException(ExceptioName.Undefine, typeofNode, "typeof operator is not supported yet.");
+                        TryCompleteType(typeofNode.typeNode);
+                        Pass3_AnalysisNode(typeofNode.typeNode);
+                        AnalyzeTypeExpression(typeofNode);
                     }
                     break;
                 case SyntaxTree.NewObjectNode newobjNode:
@@ -2933,6 +2935,13 @@ namespace Gizbox.SemanticRule
                 return;
             }
 
+            //临时右值 - SizeOf/TypeOf
+            else if(rNode is SizeOfNode || rNode is TypeOfNode)
+            {
+                rModel = SymbolTable.RecordFlag.None;
+                return;
+            }
+
             // 其他临时右值
             else
             {
@@ -3288,6 +3297,14 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.SizeOfNode sizeofNode:
                     {
                         nodeTypeExprssion = "int";
+                    }
+                    break;
+                case SyntaxTree.TypeOfNode typeofNode:
+                    {
+                        if(Query("Core::Type") == null)
+                            throw new SemanticException(ExceptioName.ClassDefinitionNotFound, typeofNode, "Core::Type");
+
+                        nodeTypeExprssion = "Core::Type";
                     }
                     break;
                 default:

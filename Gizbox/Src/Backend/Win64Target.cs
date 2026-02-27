@@ -133,6 +133,10 @@ namespace Gizbox.Src.Backend
 
         // 类名-虚函数表roKey
         public Dictionary<string, string> vtableRoKeys = new();
+        // 类型表达式-Type对象roKey
+        public Dictionary<string, string> typeObjRWKeys = new();
+        // 类型表达式-Type.name字符串roKey
+        public Dictionary<string, string> typeNameRWKeys = new();
         
         
         // 所有虚拟寄存器  
@@ -157,6 +161,9 @@ namespace Gizbox.Src.Backend
         private const bool debugLogTacInfos = true;
         private const bool debugLogBlockInfos = false;
         private const bool debugLogAsmInfos = true;
+
+        // 是否是core单元  
+        public bool IsCoreUnit => (ir.name == "core");
 
 
         public Win64CodeGenContext(Compiler compiler, IRUnit ir, bool isMainUnit, CompileOptions options)
@@ -242,7 +249,6 @@ namespace Gizbox.Src.Backend
             return UtilityNASM.Emit(this, instructions, section_data, section_rdata, section_bss);
         }
 
-
         /// <summary> 静态信息补充 </summary>
         private void Pass1()
         {
@@ -277,14 +283,19 @@ namespace Gizbox.Src.Backend
                             string rokey = $"vtable_{r.name}";
                             vtableRoKeys.Add(r.name, rokey);
 
+                            string typeObjRokey = GetTypeObjectSymbol(r.name);
+                            typeObjRWKeys[r.name] = typeObjRokey;
+
                             if(unit == ir)
                             {
                                 globalVarInfos.Add(rokey);
+                                globalVarInfos.Add(typeObjRokey);
                             }
                             //是其他单元的类
                             else
                             {
                                 externVars.Add(rokey);
+                                externVars.Add(typeObjRokey);
                             }
                             break;
                         case SymbolTable.RecordCatagory.Function:
@@ -292,8 +303,24 @@ namespace Gizbox.Src.Backend
                             break;
                     }
                 }
+
             }
 
+
+            //本编译单元：基元类型的Type常量对象  
+            foreach(var primitivename in GType.primitiveTypenames)
+            {
+                RequireTypeObjectData(primitivename);
+            }
+            //本编译单元：Type对象常量数据（需要先完成所有类收集）
+            foreach(var (_, rec) in ir.globalScope.env.records)
+            {
+                //自定义类型的Type对象
+                if(rec.category == SymbolTable.RecordCatagory.Class)
+                {
+                    RequireTypeObjectData(rec.name);
+                }
+            }
 
             //本编译单元：收集全局函数和全局变量信息    
             var genv = ir.globalScope.env;
@@ -2031,6 +2058,179 @@ namespace Gizbox.Src.Backend
         #region PASS0
 
 
+
+        //尝试生成Type对象数据（如果是当前单元的类型则放到data段，否则放到extern变量里）
+        private void RequireTypeObjectData(string typeExpr)
+        {
+            var exists = GetTypeObjectKey(typeExpr);
+
+            bool isCurrentUnitType = true;
+            //自定义类型
+            if(GType.primitiveTypenames.Contains(typeExpr) == false)
+            {
+                if(classDict.TryGetValue(typeExpr, out var typeRec))
+                {
+                    isCurrentUnitType = typeRec.GetAdditionInf().table == ir.globalScope.env;
+                }
+            }
+            //基元类型  
+            else
+            {
+                isCurrentUnitType = IsCoreUnit;
+            }
+
+            //如果不是当前单元的类型 -> 放到extern变量里
+            if(isCurrentUnitType == false)
+            {
+                externVars.Add(exists);
+                return;
+            }
+
+            globalVarInfos.Add(exists);
+
+            if(section_data.ContainsKey(exists) == false)
+            {
+                EmitTypeObjectData(typeExpr, exists);
+            }
+        }
+
+        //获取Type对象的data段key  
+        private string GetTypeObjectKey(string typeExpr)
+        {
+            if(typeObjRWKeys.TryGetValue(typeExpr, out var exists) == false)
+            {
+                exists = GetTypeObjectSymbol(typeExpr);
+                typeObjRWKeys[typeExpr] = exists;
+            }
+
+            if(exists == null)
+                throw new Exception();
+            return exists;
+        }
+
+
+        private string EncodeTypeKey(string typeExpr)
+        {
+            StringBuilder strb = new();
+            foreach(var ch in typeExpr)
+            {
+                if(char.IsLetterOrDigit(ch) || ch == '_')
+                {
+                    strb.Append(ch);
+                }
+                else
+                {
+                    strb.Append('_');
+                    strb.Append(((int)ch).ToString("X2"));
+                }
+            }
+            return strb.ToString();
+        }
+
+        private string GetTypeObjectSymbol(string typeExpr)
+        {
+            return $"typeobj_{EncodeTypeKey(typeExpr)}";
+        }
+
+        private string GetTypeNameSymbol(string typeExpr)
+        {
+            return $"typename_{EncodeTypeKey(typeExpr)}";
+        }
+
+
+        //生成Type对象常量数据  
+        private void EmitTypeObjectData(string typeExpr, string typeObjRokey)
+        {
+            if(classDict.TryGetValue("Core::Type", out var typeClassRec) == false)
+                throw new GizboxException(ExceptioName.CodeGen, "Core::Type class not found for typeof serialization.");
+
+            var typeNameRokey = GetTypeNameSymbol(typeExpr);
+            typeNameRWKeys[typeExpr] = typeNameRokey;
+
+            if(section_rdata.ContainsKey(typeNameRokey) == false)
+            {
+                section_rdata[typeNameRokey] = new() { (GType.Parse("string"), typeExpr) };
+            }
+
+            if(section_data.ContainsKey(typeObjRokey) == false)
+            {
+                var fieldInitValues = new Dictionary<string, (GType typeExpr, string valExpr)>
+                {
+                    ["name"] = (GType.Parse("(FuncPtr)"), typeNameRokey),
+                };
+                SerializeObjectToSection(section_data, typeObjRokey, typeClassRec, fieldInitValues);
+            }
+        }
+
+        //序列化类对象到代码data段  
+        private void SerializeObjectToSection(
+            Dictionary<string, List<(GType typeExpr, string valExpr)>> targetSection,
+            string objRokey,
+            SymbolTable.Record classRec,
+            Dictionary<string, (GType typeExpr, string valExpr)> fieldInitValues = null)
+        {
+            if(classRec == null || classRec.category != SymbolTable.RecordCatagory.Class)
+                throw new GizboxException(ExceptioName.CodeGen, $"serialize object failed: invalid class rec ({classRec?.name ?? "null"}).");
+
+            var values = new List<(GType typeExpr, string valExpr)>();
+
+            if(vtableRoKeys.TryGetValue(classRec.name, out var vtableKey) == false)
+                throw new GizboxException(ExceptioName.CodeGen, $"serialize object failed: vtable not found for {classRec.name}");
+
+            values.Add((GType.Parse("(FuncPtr)"), vtableKey));
+
+            long cursor = 8;
+            var fieldRecs = classRec.envPtr.records.Values
+                .Where(r => r.category == SymbolTable.RecordCatagory.Variable)
+                .OrderBy(r => r.addr)
+                .ToList();
+
+            foreach(var fieldRec in fieldRecs)
+            {
+                if(fieldRec.addr < cursor)
+                    throw new GizboxException(ExceptioName.CodeGen, $"serialize object failed: invalid field offset {fieldRec.name}@{fieldRec.addr}");
+
+                while(cursor < fieldRec.addr)
+                {
+                    values.Add((GType.Parse("byte"), "0"));
+                    cursor++;
+                }
+
+                if(fieldInitValues != null
+                    && (fieldInitValues.TryGetValue(fieldRec.name, out var initVal)
+                        || fieldInitValues.TryGetValue(fieldRec.rawname, out initVal)))
+                {
+                    values.Add(initVal);
+                }
+                else
+                {
+                    values.Add(GetDefaultSerializedFieldValue(fieldRec));
+                }
+
+                cursor += fieldRec.size;
+            }
+
+            while(cursor < classRec.size)
+            {
+                values.Add((GType.Parse("byte"), "0"));
+                cursor++;
+            }
+
+            targetSection[objRokey] = values;
+        }
+
+        private (GType typeExpr, string valExpr) GetDefaultSerializedFieldValue(SymbolTable.Record fieldRec)
+        {
+            var fieldType = GType.Parse(fieldRec.typeExpression);
+            if(fieldType.IsReferenceType)
+            {
+                return (GType.Parse("ulong"), "0");
+            }
+
+            return (fieldType, TypeUtils.GenDefaultValue(fieldType.ToString()));
+        }
+
+
         private void GenClassInfo(SymbolTable.Record classRec)
         {
             var classTable = classRec.envPtr;
@@ -2394,6 +2594,12 @@ namespace Gizbox.Src.Backend
                                     }
                                 }
                                 break;
+                            case "%CONSTTYPE":
+                                {
+                                    var key = GetTypeObjectKey(iroperand.segments[1]);
+                                    iroperand.roDataKey = key;
+                                }
+                                break;
                         }
                     }
                     break;
@@ -2475,6 +2681,15 @@ namespace Gizbox.Src.Backend
                                 break;
                             case "%CONSTSTRING":
                                 {
+                                    return X64.rel(iroperandExpr.roDataKey);
+                                }
+                                break;
+                            case "%CONSTTYPE":
+                                {
+                                    if(string.IsNullOrEmpty(iroperandExpr.roDataKey))
+                                    {
+                                        iroperandExpr.roDataKey = GetTypeObjectKey(iroperandExpr.segments[1]);
+                                    }
                                     return X64.rel(iroperandExpr.roDataKey);
                                 }
                                 break;
@@ -2584,7 +2799,20 @@ namespace Gizbox.Src.Backend
                 //字面量或者常量  
                 else if(rawoperand.StartsWith("%CONST") || rawoperand.StartsWith("%LIT"))
                 {
-                    var parts = rawoperand.Split(':');
+                    var sep = rawoperand.IndexOf(':');
+                    string[] parts;
+                    if(sep >= 0)
+                    {
+                        parts = new[]
+                        {
+                            rawoperand.Substring(0, sep),
+                            rawoperand.Substring(sep + 1)
+                        };
+                    }
+                    else
+                    {
+                        parts = new[] { rawoperand };
+                    }
                     irOperand.type = IROperandExpr.Type.LitOrConst;
                     irOperand.segments = parts;
                 }
@@ -4435,7 +4663,14 @@ namespace Gizbox.Src.Backend
             }
             else if(expr.type == IROperandExpr.Type.LitOrConst)
             {
-                typeExpr = GType.Parse(UtilsW64.GetLitConstType(segments[0]));
+                if(segments.Length > 1 && segments[0] == "%CONSTTYPE")
+                {
+                    typeExpr = GType.Parse(segments[1]);
+                }
+                else
+                {
+                    typeExpr = GType.Parse(UtilsW64.GetLitConstType(segments[0]));
+                }
             }
             else if(expr.type == IROperandExpr.Type.Label)
             {
@@ -4449,12 +4684,12 @@ namespace Gizbox.Src.Backend
             return typeExpr.IsSSE;
         }
 
-        /// <summary> 是引用类型常量（目前只有字符串常量） </summary>
+        /// <summary> 是引用类型常量（地址即值） </summary>
         public bool IsConstAddrSemantic()
         {
             return this?.expr?.type == IROperandExpr.Type.LitOrConst
                 && this.expr.segments?.Length > 0
-                && this.expr.segments[0] == "%CONSTSTRING";
+                && (this.expr.segments[0] == "%CONSTSTRING" || this.expr.segments[0] == "%CONSTTYPE");
         }
     }
 
@@ -4593,6 +4828,8 @@ namespace Gizbox.Src.Backend
                     return "char";
                 case "%CONSTSTRING":
                     return "string";
+                case "%CONSTTYPE":
+                    return "Core::Type";
                 default:
                     return litconstMark;
             }
@@ -4938,7 +5175,8 @@ namespace Gizbox.Src.Backend
             return false;
         }
 
-        public static bool IsConstAddrSemantic(SymbolRecord rec)// 地址即值的全局静态常量（即常量引用类型）（使用lea指令加载地址） 
+        // 地址即值的全局静态常量（即常量引用类型）（使用lea指令加载地址）
+        public static bool IsConstAddrSemantic(SymbolRecord rec) 
         {
             //（字符串常量）  
             if(rec.GetAdditionInf().isGlobal && GType.Parse(rec.typeExpression).Category == GType.Kind.String)
