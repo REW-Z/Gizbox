@@ -404,10 +404,6 @@ namespace Gizbox
                         else
                         {
                             tokenName = identifierPattern.tokenName;
-                            if(identifierName == "HashMap")
-                            {
-                                Console.WriteLine(typeNameSet.Count);
-                            }
                         }
 
                         

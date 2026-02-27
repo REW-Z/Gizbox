@@ -103,9 +103,17 @@ void test_rtti()
 	var t1 = typeof(Core::Object);
 	var t2 = typeof(Core::Int);
 	var t3 = typeof(int);
+	int v1 = 111;
+	Core::Int v2 = null;
+
+	var t4 = gettype(v1);
+	var t5 = gettype(v2);
+
 	Console::PrintLn("Type of Core::Object: " + t1.name);
 	Console::PrintLn("Type of Core::Int: " + t2.name);
 	Console::PrintLn("Type of int: " + t3.name);
+	Console::PrintLn("GetType v1: " + t4.name);
+	Console::PrintLn("GetType v2: " + t5.name);
 }
 
 

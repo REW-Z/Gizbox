@@ -3807,6 +3807,59 @@ namespace Gizbox.SemanticRule
             return litnode;
         }
 
+        private SyntaxTree.TypeNode BuildTypeNodeFromTypeExpression(string typeExpr, Token refToken)
+        {
+            refToken ??= new Token("ID", PatternType.Id, typeExpr, 0, 0, 0);
+
+            if(typeExpr.EndsWith("[]"))
+            {
+                var elemTypeExpr = typeExpr.Substring(0, typeExpr.Length - 2);
+                var elemTypeNode = BuildTypeNodeFromTypeExpression(elemTypeExpr, refToken);
+                var arrTypeNode = new SyntaxTree.ArrayTypeNode()
+                {
+                    elemtentType = elemTypeNode,
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+                elemTypeNode.Parent = arrTypeNode;
+                return arrTypeNode;
+            }
+
+            bool isPrimitive = typeExpr == "void"
+                || typeExpr == "bool"
+                || typeExpr == "char"
+                || typeExpr == "byte"
+                || typeExpr == "int"
+                || typeExpr == "uint"
+                || typeExpr == "long"
+                || typeExpr == "ulong"
+                || typeExpr == "float"
+                || typeExpr == "double"
+                || typeExpr == "string";
+
+            if(isPrimitive)
+            {
+                return new SyntaxTree.PrimitiveTypeNode()
+                {
+                    token = new Token(typeExpr, PatternType.Keyword, typeExpr, refToken.line, refToken.start, refToken.length),
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+            }
+
+            var idNode = new SyntaxTree.IdentityNode()
+            {
+                token = new Token("ID", PatternType.Id, typeExpr, refToken.line, refToken.start, refToken.length),
+                identiferType = SyntaxTree.IdentityNode.IdType.Class,
+                attributes = new Dictionary<AstAttr, object>(),
+            };
+            var classTypeNode = new SyntaxTree.ClassTypeNode()
+            {
+                classname = idNode,
+                attributes = new Dictionary<AstAttr, object>(),
+            };
+            idNode.Parent = classTypeNode;
+            return classTypeNode;
+        }
+
 
         private bool CheckIntrinsicCall(SyntaxTree.CallNode callNode, out SyntaxTree.Node replace)
         {
@@ -3878,6 +3931,37 @@ namespace Gizbox.SemanticRule
                         replace = replaceNode;
                         return true;
                     }
+                }
+                else if(funcId.token?.attribute == "gettype")
+                {
+                    if(callNode.argumantsNode.arguments.Count != 1)
+                        throw new SemanticException(ExceptioName.SemanticAnalysysError, callNode, "gettype expects 1 argument.");
+
+                    if(callNode.argumantsNode.arguments[0] is not SyntaxTree.IdentityNode varId)
+                        throw new SemanticException(ExceptioName.SemanticAnalysysError, callNode, "gettype expects a variable identifier.");
+
+                    var varRec = Query(varId.FullName);
+                    if(varRec == null)
+                        throw new SemanticException(ExceptioName.IdentifierNotFound, varId, varId.FullName);
+
+                    if(varRec.category != SymbolTable.RecordCatagory.Variable
+                        && varRec.category != SymbolTable.RecordCatagory.Param)
+                    {
+                        throw new SemanticException(ExceptioName.SemanticAnalysysError, callNode, "gettype argument must be variable or parameter.");
+                    }
+
+                    var typeNode = BuildTypeNodeFromTypeExpression(varRec.typeExpression, funcId.token);
+                    var replaceNode = new SyntaxTree.TypeOfNode()
+                    {
+                        typeNode = typeNode,
+                        attributes = callNode.attributes,
+                    };
+                    typeNode.Parent = replaceNode;
+                    replaceNode.Parent = callNode.Parent;
+                    callNode.overrideNode = replaceNode;
+
+                    replace = replaceNode;
+                    return true;
                 }
             }
 

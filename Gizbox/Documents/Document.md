@@ -98,6 +98,13 @@ public:
 
 
 
+## RTTI    
+
+获取类型的Type对象：  
+`typeof(T)`  
+获取变量的Type对象：  
+`gettype(obj)`
+
 
 
 ## 所有权（Ownership）
