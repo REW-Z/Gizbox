@@ -66,6 +66,7 @@ namespace Gizbox
         var_rec,
         const_rec,
         func_rec,
+        func_ptr_ownsig,
         class_rec,
         obj_class_rec,
         not_a_property,
@@ -116,6 +117,21 @@ namespace Gizbox.SemanticRule
         private static readonly SymbolTable.RecordFlag OwnershipModelMask =
             SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.BorrowVar | SymbolTable.RecordFlag.ManualVar;
 
+        private class FunctionOwnershipSignature
+        {
+            public SymbolTable.RecordFlag ReturnModel;
+            public List<SymbolTable.RecordFlag> ParamModels = new List<SymbolTable.RecordFlag>();
+
+            public FunctionOwnershipSignature Clone()
+            {
+                return new FunctionOwnershipSignature()
+                {
+                    ReturnModel = this.ReturnModel,
+                    ParamModels = new List<SymbolTable.RecordFlag>(this.ParamModels),
+                };
+            }
+        }
+
 
         //temp  
         private int blockCounter = 0;//Block自增  
@@ -129,6 +145,9 @@ namespace Gizbox.SemanticRule
 
         //temp  
         private LifetimeInfo lifeTimeInfo = new();
+
+        //函数指针 -> 所有权签名（仅前端语义分析阶段使用）
+        private readonly Dictionary<SymbolTable.Record, FunctionOwnershipSignature> funcPtrOwnershipSignatures = new();
 
 
         //可用命名空间前缀列表(示例："XXX::YYY::")    
@@ -1113,6 +1132,10 @@ namespace Gizbox.SemanticRule
                         if (varDeclNode.typeNode is InferTypeNode typeNode)
                         {
                             var typeExpr = InferType(typeNode, varDeclNode.initializerNode);
+                            if(GType.Parse(typeExpr).Category == GType.Kind.Function)
+                            {
+                                throw new SemanticException(ExceptioName.VariableTypeDeclarationError, varDeclNode, "function pointer type does not support var inference, use TR(...) explicitly.");
+                            }
                             var record = envStack.Peek().GetRecord(varDeclNode.identifierNode.FullName);
                             record.typeExpression = typeExpr;
                         }
@@ -2037,8 +2060,16 @@ namespace Gizbox.SemanticRule
                             throw new GizboxException(ExceptioName.Undefine, "var record not found.");
 
                         // 值类型不用处理所有权
-                        if(GType.Parse(rec.typeExpression).IsReferenceType == false)
+                        var recType = GType.Parse(rec.typeExpression);
+                        if(recType.IsReferenceType == false)
                             break;
+
+                        // 函数指针不用处理所有权  
+                        if(recType.IsFunction)
+                        {
+                            TryBindFunctionPointerOwnership(rec, varDecl.initializerNode);
+                            break;
+                        }
 
 
                         // 检查：变量左值和初始值的所有权模型对比  
@@ -2157,8 +2188,16 @@ namespace Gizbox.SemanticRule
                                 throw new GizboxException(ExceptioName.Undefine, "var record not found.");
 
                             // 值类型不用处理所有权
-                            if(GType.Parse(lrec.typeExpression).IsReferenceType == false)
+                            var lrecType = GType.Parse(lrec.typeExpression);
+                            if(lrecType.IsReferenceType == false)
                                 break;
+                            // 函数指针不用处理所有权
+                            if(lrecType.IsFunction)
+                            {
+                                TryBindFunctionPointerOwnership(lrec, assignNode.rvalueNode);
+                                break;
+                            }
+
 
                             // 检查：变量左值和初始值的所有权模型对比  
                             CheckOwnershipCompare_Assign(assignNode, lrec, out var lmodel, out var rmodel);
@@ -2245,7 +2284,11 @@ namespace Gizbox.SemanticRule
                                 throw new GizboxException(ExceptioName.Undefine, $"field record {laccess.memberNode.FullName} not found.");
 
                             // 值类型不用处理所有权
-                            if(GType.Parse(lrec.typeExpression).IsReferenceType == false)
+                            var lrecType = GType.Parse(lrec.typeExpression);
+                            if(lrecType.IsReferenceType == false)
+                                break;
+                            // 函数指针不用处理所有权
+                            if(lrecType.IsFunction)
                                 break;
                             
                             // 检查：变量左值和初始值的所有权模型对比  
@@ -2410,9 +2453,9 @@ namespace Gizbox.SemanticRule
                         }
                         else if(sstmt.exprNode is SyntaxTree.CallNode cnode)
                         {
-                            SymbolTable.Record f = cnode.attributes[AstAttr.func_rec] as SymbolTable.Record;
+                            var callRetModel = GetCallReturnOwnershipModel(cnode);
 
-                            if(f.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                            if(callRetModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                             {
                                 // 视为临时所有权，需删除
                                 delExprs.Add(sstmt.exprNode);
@@ -2500,14 +2543,34 @@ namespace Gizbox.SemanticRule
                         }
                      
 
-                        // *** 获取函数的符号表记录 ***  
+                        // *** 获取函数的符号表记录（普通调用）或函数指针签名（指针调用） ***
                         SymbolTable.Record funcRec = null;
+                        FunctionOwnershipSignature funcPtrSig = null;
+
                         if(callNode.isMemberAccessFunction == false)
                         {
                             if(callNode.attributes.ContainsKey(AstAttr.mangled_name))
+                            {
                                 funcRec = Query((string)callNode.attributes[AstAttr.mangled_name]);
+                            }
                             else if(callNode.attributes.ContainsKey(AstAttr.extern_name))
+                            {
                                 funcRec = Query((string)callNode.attributes[AstAttr.extern_name]);
+                            }
+                            else
+                            {
+                                funcPtrSig = ResolveFunctionOwnershipSignatureFromExpr(callNode.funcNode);
+                                if(funcPtrSig == null)
+                                {
+                                    var funcTypeExpr = AnalyzeTypeExpression(callNode.funcNode);
+                                    funcPtrSig = BuildConservativeFunctionOwnershipSignatureFromType(funcTypeExpr);
+                                }
+
+                                if(funcPtrSig == null)
+                                    throw new GizboxException(ExceptioName.Undefine, "function pointer ownership signature not found.");
+
+                                callNode.attributes[AstAttr.func_ptr_ownsig] = funcPtrSig;
+                            }
                         }
                         else
                         {
@@ -2519,69 +2582,102 @@ namespace Gizbox.SemanticRule
                                 funcRec = memfuncRec;
                             }
                         }
-                        
-                        if(funcRec == null)
-                            throw new GizboxException(ExceptioName.Undefine, $"funcrec not found.");
 
-                        callNode.attributes[AstAttr.func_rec] = funcRec;
-
-
-                        if(funcRec == null || funcRec.envPtr == null)
+                        if(funcRec != null)
                         {
-                            throw new GizboxException(ExceptioName.Undefine, $"func rec not exist.");
-                        }
+                            callNode.attributes[AstAttr.func_rec] = funcRec;
 
+                            if(funcRec.envPtr == null)
+                                throw new GizboxException(ExceptioName.Undefine, "func rec not exist.");
 
-                        // *** 根据被调函数签名对实参做move/校验 ***
+                            // *** 根据被调函数签名对实参做move/校验 ***
+                            var allParams = funcRec.envPtr.GetByCategory(SymbolTable.RecordCatagory.Param) ?? new List<SymbolTable.Record>();
+                            // 成员函数形参表含this，非成员不含
+                            int offset = 0;
+                            if(callNode.isMemberAccessFunction && allParams.Count > 0 && allParams[0].name == "this")
+                                offset = 1;
 
-                        var allParams = funcRec.envPtr.GetByCategory(SymbolTable.RecordCatagory.Param) ?? new List<SymbolTable.Record>();
-                        // 成员函数形参表含this，非成员不含
-                        int offset = 0;
-                        if(callNode.isMemberAccessFunction && allParams.Count > 0 && allParams[0].name == "this")
-                            offset = 1;
-
-                        // 实参分析  
-                        for(int i = 0; i < callNode.argumantsNode.arguments.Count; ++i)
-                        {
-                            if(i + offset >= allParams.Count)
-                                break;
-                            var pr = allParams[i + offset];
-                            var pflag = pr.flags & (SymbolTable.RecordFlag.OwnerVar | SymbolTable.RecordFlag.BorrowVar | SymbolTable.RecordFlag.ManualVar);
-                            var arg = callNode.argumantsNode.arguments[i];
-                            var type = GType.Parse(pr.typeExpression);
-
-                            // 值类型参数不用处理所有权语义  
-                            if(type.IsReferenceType == false)
-                                continue;
-
-                            // 所有权比较  
-                            CheckOwnershipCompare_Param(pr, arg, out var paramModel, out var argModel);
-
-                            // 检查own模型实参能否MoveOut
-                            if(paramModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                            // 实参分析
+                            for(int i = 0; i < callNode.argumantsNode.arguments.Count; ++i)
                             {
-                                CheckOwnershipCanMoveOut(arg);
-                            }
+                                if(i + offset >= allParams.Count)
+                                    break;
+                                var pr = allParams[i + offset];
+                                var pflag = pr.flags & OwnershipModelMask;
+                                var arg = callNode.argumantsNode.arguments[i];
+                                var type = GType.Parse(pr.typeExpression);
 
+                                // 值类型参数不用处理所有权语义
+                                if(type.IsReferenceType == false)
+                                    continue;
 
-                            // 所有权转移  
-                            if(pflag.HasFlag(SymbolTable.RecordFlag.OwnerVar))
-                            {
-                                if(arg is SyntaxTree.IdentityNode argIdNode && argModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                                // 所有权比较
+                                CheckOwnershipCompare_Param(pr, arg, out var paramModel, out var argModel);
+
+                                // 检查own模型实参能否MoveOut
+                                if(paramModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                                 {
-                                    var argRec = Query(argIdNode.FullName);
-                                    lifeTimeInfo.currBranch.SetVarStatus(argRec.name, LifetimeInfo.VarStatus.Dead);
+                                    CheckOwnershipCanMoveOut(arg);
+                                }
 
-
-                                    // 语句结束实参赋值NULL，作为drop-flag  
-                                    if(callNode.attributes.TryGetValue(AstAttr.set_null_after_call, out var v) == false || v is not List<string>)
+                                // 所有权转移
+                                if(pflag.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                                {
+                                    if(arg is SyntaxTree.IdentityNode argIdNode && argModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                                     {
-                                        callNode.attributes[AstAttr.set_null_after_call] = new List<string>();
+                                        var argRec = Query(argIdNode.FullName);
+                                        lifeTimeInfo.currBranch.SetVarStatus(argRec.name, LifetimeInfo.VarStatus.Dead);
+
+                                        // 语句结束实参赋值NULL，作为drop-flag
+                                        if(callNode.attributes.TryGetValue(AstAttr.set_null_after_call, out var v) == false || v is not List<string>)
+                                        {
+                                            callNode.attributes[AstAttr.set_null_after_call] = new List<string>();
+                                        }
+                                        var listSetNull = (List<string>)callNode.attributes[AstAttr.set_null_after_call];
+                                        if(listSetNull.Contains(argRec.name) == false)
+                                        {
+                                            listSetNull.Add(argRec.name);
+                                        }
                                     }
-                                    var listSetNull = (List<string>)callNode.attributes[AstAttr.set_null_after_call];
-                                    if(listSetNull.Contains(argRec.name) == false)
+                                }
+                            }
+                        }
+                        else
+                        {
+                            if(funcPtrSig == null)
+                                throw new GizboxException(ExceptioName.Undefine, "funcrec not found.");
+
+                            for(int i = 0; i < callNode.argumantsNode.arguments.Count; ++i)
+                            {
+                                if(i >= funcPtrSig.ParamModels.Count)
+                                    break;
+
+                                var arg = callNode.argumantsNode.arguments[i];
+                                var argTypeExpr = AnalyzeTypeExpression(arg);
+                                if(GType.Parse(argTypeExpr).IsReferenceType == false)
+                                    continue;
+
+                                var paramModel = funcPtrSig.ParamModels[i] & OwnershipModelMask;
+                                CheckOwnershipCompare_Core(arg, paramModel, $"arg{i}", arg, out var argModel);
+
+                                if(paramModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
+                                {
+                                    CheckOwnershipCanMoveOut(arg);
+
+                                    if(arg is SyntaxTree.IdentityNode argIdNode && argModel.HasFlag(SymbolTable.RecordFlag.OwnerVar))
                                     {
-                                        listSetNull.Add(argRec.name);
+                                        var argRec = Query(argIdNode.FullName);
+                                        lifeTimeInfo.currBranch.SetVarStatus(argRec.name, LifetimeInfo.VarStatus.Dead);
+
+                                        if(callNode.attributes.TryGetValue(AstAttr.set_null_after_call, out var v) == false || v is not List<string>)
+                                        {
+                                            callNode.attributes[AstAttr.set_null_after_call] = new List<string>();
+                                        }
+                                        var listSetNull = (List<string>)callNode.attributes[AstAttr.set_null_after_call];
+                                        if(listSetNull.Contains(argRec.name) == false)
+                                        {
+                                            listSetNull.Add(argRec.name);
+                                        }
                                     }
                                 }
                             }
@@ -2653,6 +2749,123 @@ namespace Gizbox.SemanticRule
             foreach(var usingnamespace in this.ast.rootNode.usingNamespaceNodes)
             {
                 availableNamespacePrefixList.Add($"{usingnamespace.namespaceNameNode.FullName}::");
+            }
+        }
+
+        private SymbolTable.RecordFlag GetCallReturnOwnershipModel(SyntaxTree.CallNode callNode)
+        {
+            if(callNode.attributes.TryGetValue(AstAttr.func_rec, out var funcRecObj) && funcRecObj is SymbolTable.Record funcRec)
+            {
+                return funcRec.flags & OwnershipModelMask;
+            }
+
+            if(callNode.attributes.TryGetValue(AstAttr.func_ptr_ownsig, out var sigObj) && sigObj is FunctionOwnershipSignature sig)
+            {
+                return sig.ReturnModel & OwnershipModelMask;
+            }
+
+            return SymbolTable.RecordFlag.None;
+        }
+
+        private FunctionOwnershipSignature BuildFunctionOwnershipSignatureFromFunctionRecord(SymbolTable.Record funcRec)
+        {
+            if(funcRec == null || funcRec.envPtr == null)
+                return null;
+
+            var sig = new FunctionOwnershipSignature();
+            sig.ReturnModel = funcRec.flags & OwnershipModelMask;
+
+            var allParams = funcRec.envPtr.GetByCategory(SymbolTable.RecordCatagory.Param) ?? new List<SymbolTable.Record>();
+            foreach(var p in allParams)
+            {
+                if(p.name == "this")
+                    continue;
+
+                var model = p.flags & OwnershipModelMask;
+                if(model == SymbolTable.RecordFlag.None)
+                {
+                    var pType = GType.Parse(p.typeExpression);
+                    if(pType.IsClassType)
+                    {
+                        model = SymbolTable.RecordFlag.ManualVar;
+                    }
+                }
+
+                sig.ParamModels.Add(model);
+            }
+
+            return sig;
+        }
+
+        private FunctionOwnershipSignature BuildConservativeFunctionOwnershipSignatureFromType(string funcTypeExpr)
+        {
+            var ftype = GType.Parse(funcTypeExpr);
+            if(ftype.Category != GType.Kind.Function)
+                return null;
+
+            var sig = new FunctionOwnershipSignature();
+            sig.ReturnModel = ftype.FunctionReturnType.IsClassType ? SymbolTable.RecordFlag.ManualVar : SymbolTable.RecordFlag.None;
+
+            var paramTypes = ftype.FunctionParamTypes ?? new List<GType>();
+            foreach(var p in paramTypes)
+            {
+                sig.ParamModels.Add(p.IsClassType ? SymbolTable.RecordFlag.ManualVar : SymbolTable.RecordFlag.None);
+            }
+
+            return sig;
+        }
+
+        private FunctionOwnershipSignature ResolveFunctionOwnershipSignatureFromExpr(SyntaxTree.ExprNode expr)
+        {
+            if(expr == null)
+                return null;
+
+            if(expr is SyntaxTree.CastNode cast)
+            {
+                return ResolveFunctionOwnershipSignatureFromExpr(cast.factorNode);
+            }
+
+            if(expr is SyntaxTree.IdentityNode id)
+            {
+                var rec = Query(id.FullName) ?? Query_IgnoreMangle(id.FullName);
+                if(rec == null)
+                    return null;
+
+                if(rec.category == SymbolTable.RecordCatagory.Function)
+                {
+                    return BuildFunctionOwnershipSignatureFromFunctionRecord(rec);
+                }
+
+                if(GType.Parse(rec.typeExpression).Category == GType.Kind.Function)
+                {
+                    if(funcPtrOwnershipSignatures.TryGetValue(rec, out var saved))
+                        return saved.Clone();
+
+                    return BuildConservativeFunctionOwnershipSignatureFromType(rec.typeExpression);
+                }
+            }
+
+            return null;
+        }
+
+        private void TryBindFunctionPointerOwnership(SymbolTable.Record targetFuncPtr, SyntaxTree.ExprNode source)
+        {
+            if(targetFuncPtr == null)
+                return;
+
+            if(GType.Parse(targetFuncPtr.typeExpression).Category != GType.Kind.Function)
+                return;
+
+            var sig = ResolveFunctionOwnershipSignatureFromExpr(source)
+                ?? BuildConservativeFunctionOwnershipSignatureFromType(targetFuncPtr.typeExpression);
+
+            if(sig == null)
+            {
+                funcPtrOwnershipSignatures.Remove(targetFuncPtr);
+            }
+            else
+            {
+                funcPtrOwnershipSignatures[targetFuncPtr] = sig.Clone();
             }
         }
 
@@ -2914,8 +3127,7 @@ namespace Gizbox.SemanticRule
             // 临时右值 - 调用返回
             else if(rNode is CallNode callNode)
             {
-                var funcRec = callNode.attributes[AstAttr.func_rec] as SymbolTable.Record;
-                rModel = funcRec.flags & OwnershipModelMask;
+                rModel = GetCallReturnOwnershipModel(callNode);
 
                 if(rModel.HasFlag(SymbolTable.RecordFlag.OwnerVar) && lModel.HasFlag(SymbolTable.RecordFlag.OwnerVar) == false)
                 {
@@ -3024,6 +3236,13 @@ namespace Gizbox.SemanticRule
             if(type.IsReferenceType)
             {
                 SymbolTable.RecordFlag ownerModel = SymbolTable.RecordFlag.None;
+
+                // own/bor 仅允许用于 class 引用类型；string/array/function 等不支持所有权语义
+                if((explicitModifier.HasFlag(VarModifiers.Own) || explicitModifier.HasFlag(VarModifiers.Bor))
+                    && type.IsClassType == false)
+                {
+                    throw new SemanticException(ExceptioName.OwnershipError, typeNode, "own/bor only supports class reference types.");
+                }
 
                 if(explicitModifier.HasFlag(VarModifiers.Own))
                 {
@@ -3145,6 +3364,51 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.CallNode callNode:
                     {
+                        // 函数指针调用（callee 不是函数符号本身，而是一个函数类型值）
+                        if(callNode.isMemberAccessFunction == false)
+                        {
+                            SymbolTable.Record calleeRec = null;
+                            GType calleeType = null;
+
+                            if(callNode.funcNode is SyntaxTree.IdentityNode fid)
+                            {
+                                calleeRec = Query(fid.FullName);
+                                if(calleeRec == null)
+                                    calleeRec = Query_IgnoreMangle(fid.FullName);
+
+                                // 仅当标识符不是函数符号时，才按“函数指针值”处理
+                                if(calleeRec != null && calleeRec.category != SymbolTable.RecordCatagory.Function)
+                                {
+                                    calleeType = GType.Parse(calleeRec.typeExpression);
+                                }
+                            }
+                            else
+                            {
+                                calleeType = GType.Parse(AnalyzeTypeExpression(callNode.funcNode));
+                            }
+
+                            if(calleeType != null && calleeType.Category == GType.Kind.Function)
+                            {
+                                var paramTypes = calleeType.FunctionParamTypes ?? new List<GType>();
+                                if(paramTypes.Count != callNode.argumantsNode.arguments.Count)
+                                {
+                                    throw new SemanticException(ExceptioName.FunctionNotFound, callNode, "function pointer argument count mismatch");
+                                }
+
+                                for(int i = 0; i < paramTypes.Count; ++i)
+                                {
+                                    var argType = AnalyzeTypeExpression(callNode.argumantsNode.arguments[i]);
+                                    if(CheckType_Is(argType, paramTypes[i].ToString()) == false)
+                                    {
+                                        throw new SemanticException(ExceptioName.FunctionNotFound, callNode, "function pointer argument type mismatch");
+                                    }
+                                }
+
+                                nodeTypeExprssion = calleeType.FunctionReturnType.ToString();
+                                break;
+                            }
+                        }
+
                         string funcMangledName;
 
                         if (callNode.isMemberAccessFunction)

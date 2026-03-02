@@ -593,6 +593,13 @@ public partial class SemanticAnalyzer
                 arrayTypeNode.elemtentType = ReplaceTypeNode(arrayTypeNode.elemtentType, typeMap, arrayTypeNode);
                 arrayTypeNode.Parent = parent;
                 return arrayTypeNode;
+            case SyntaxTree.FuncPtrTypeNode funcPtrTypeNode:
+                for(int i = 0; i < funcPtrTypeNode.typeArguments.Count; ++i)
+                {
+                    funcPtrTypeNode.typeArguments[i] = ReplaceTypeNode(funcPtrTypeNode.typeArguments[i], typeMap, funcPtrTypeNode);
+                }
+                funcPtrTypeNode.Parent = parent;
+                return funcPtrTypeNode;
             default:
                 typeNode.Parent = parent;
                 return typeNode;

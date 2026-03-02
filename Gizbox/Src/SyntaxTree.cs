@@ -1317,6 +1317,7 @@ namespace Gizbox
         [KnownType(typeof(ClassTypeNode))]
         [KnownType(typeof(PrimitiveTypeNode))]
         [KnownType(typeof(InferTypeNode))]
+        [KnownType(typeof(FuncPtrTypeNode))]
         public abstract class TypeNode : Node { public abstract string TypeExpression(); }
 
         [DataContract(IsReference = true)]
@@ -1375,6 +1376,26 @@ namespace Gizbox
             public override string TypeExpression()
             {
                 return "var";
+            }
+        }
+
+        [DataContract(IsReference = true)]
+        public class FuncPtrTypeNode : TypeNode
+        {
+            [DataMember]
+            public readonly List<TypeNode> typeArguments = new();
+
+            public override string TypeExpression()
+            {
+                if(typeArguments.Count < 1)
+                    throw new GizboxException(ExceptioName.SemanticAnalysysError, "TR type arguments must contain return type at least.");
+
+                string returnType = typeArguments[0].TypeExpression();
+                if(typeArguments.Count == 1)
+                    return $"=> {returnType}";
+
+                string paramPart = string.Join(",", typeArguments.Skip(1).Select(t => t.TypeExpression()));
+                return $"{paramPart} => {returnType}";
             }
         }
 

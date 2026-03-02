@@ -191,8 +191,8 @@ namespace Gizbox
 
             literals.Add(new TokenPattern("LITBOOL", "(true|false)[^a-zA-Z]", 1));
             literals.Add(new TokenPattern("LITULONG", "[0-9]+([Uu][Ll]|[Ll][Uu])\\D", 1));
-            literals.Add(new TokenPattern("LITUINT", "[0-9]+[Uu]\\D", 1));
-            literals.Add(new TokenPattern("LITINT", "[0-9]+[^\\d\\.Ll]", 1));
+            literals.Add(new TokenPattern("LITUINT", "[0-9]+[Uu](?![Ll])\\D", 1));
+            literals.Add(new TokenPattern("LITINT", "[0-9]+[^\\d\\.Ll\\.Uu]", 1));
             literals.Add(new TokenPattern("LITLONG", "[0-9]+[Ll]\\D", 1));
             literals.Add(new TokenPattern("LITFLOAT", "[0-9]+\\.[0-9]+[Ff]\\D", 1));
             literals.Add(new TokenPattern("LITDOUBLE", "[0-9]+\\.[0-9]+[Dd]\\D", 1));

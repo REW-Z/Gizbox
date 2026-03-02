@@ -937,12 +937,34 @@ namespace Gizbox.SemanticRule
             AddActionAtTail("type -> stype", (psr, production) => {
                 psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
+            AddActionAtTail("type -> fptrtype", (psr, production) => {
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
+            });
             AddActionAtTail("type -> var", (psr, production) =>
             {
                 psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.InferTypeNode()
                 {
                     attributes = new Dictionary<AstAttr, object>(),
                 };
+            });
+
+            AddActionAtTail("fptrtype -> type ( typearglist )", (psr, production) =>
+            {
+                var node = new SyntaxTree.FuncPtrTypeNode()
+                {
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+
+                var returnType = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 3].attributes[ParseAttr.ast_node];
+                node.typeArguments.Add(returnType);
+
+                if(psr.stack[psr.stack.Top - 1].attributes.TryGetValue(ParseAttr.generic_args, out var argsObj)
+                    && argsObj is List<SyntaxTree.TypeNode> typeArgs)
+                {
+                    node.typeArguments.AddRange(typeArgs);
+                }
+
+                psr.newElement.attributes[ParseAttr.ast_node] = node;
             });
 
             AddActionAtTail("arrtype -> stypesb", (psr, production) => {

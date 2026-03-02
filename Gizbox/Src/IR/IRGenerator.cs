@@ -742,19 +742,32 @@ namespace Gizbox.IR
                     break;
                 case CallNode callNode:
                     {
-                        //函数全名  
-                        string fullName;
+                        //函数全名（直接调用）或函数指针（间接调用）
+                        string fullName = null;
+                        bool isPointerCall = false;
                         if(callNode.attributes.TryGetValue(AstAttr.mangled_name, out object oMangleName))
                         {
                             fullName = (string)oMangleName;
                         }
                         else if(callNode.attributes.TryGetValue(AstAttr.extern_name, out object oExternName))
                         {
-                            fullName= (string)oExternName;
+                            fullName = (string)oExternName;
                         }
                         else
                         {
-                            throw new SemanticException(ExceptioName.FunctionObfuscationNameNotSet, callNode, "Mangled function name and extern function name not found.");
+                            if(callNode.isMemberAccessFunction == false)
+                            {
+                                string calleeTypeExpr = (string)callNode.funcNode.attributes[AstAttr.type];
+                                if(GType.Parse(calleeTypeExpr).Category == GType.Kind.Function)
+                                {
+                                    isPointerCall = true;
+                                }
+                            }
+
+                            if(isPointerCall == false)
+                            {
+                                throw new SemanticException(ExceptioName.FunctionObfuscationNameNotSet, callNode, "Mangled function name and extern function name not found.");
+                            }
                         }
 
 
@@ -808,6 +821,10 @@ namespace Gizbox.IR
                                 GenNode(objNode);
                             }
                         }
+                        else if(isPointerCall)
+                        {
+                            GenNode(callNode.funcNode);
+                        }
 
                         //实参倒序压栈  
                         for (int i = callNode.argumantsNode.arguments.Count - 1; i >= 0; --i)
@@ -832,6 +849,10 @@ namespace Gizbox.IR
                         if (callNode.isMemberAccessFunction == true)
                         {
                             EmitCode("MCALL", fullName, "%LITINT:" + argCount);
+                        }
+                        else if(isPointerCall)
+                        {
+                            EmitCode("PCALL", GetRet(callNode.funcNode), "%LITINT:" + argCount);
                         }
                         else
                         {

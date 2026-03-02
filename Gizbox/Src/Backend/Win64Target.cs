@@ -404,13 +404,13 @@ namespace Gizbox.Src.Backend
                     currParamIdx += 1;
                     inf.PARAM_paramidx = currParamIdx;
                 }
-                else if(tac.op == "CALL" || tac.op == "MCALL")
+                else if(tac.op == "CALL" || tac.op == "MCALL" || tac.op == "PCALL")
                 {
                     currParamIdx = -1;
                 }
 
                 //CALL参数个数  
-                if(tac.op == "CALL" || tac.op == "MCALL")
+                if(tac.op == "CALL" || tac.op == "MCALL" || tac.op == "PCALL")
                 {
                     int.TryParse(tac.arg1, out inf.CALL_paramCount);
                 }
@@ -907,6 +907,22 @@ namespace Gizbox.Src.Backend
                             AfterCall(rspSub, homedRegs);
                         }
                         break;
+                    case "PCALL":
+                        {
+                            var callee = ParseOperand(tacInf.oprand0);
+
+                            //调用前准备
+                            int rspSub = 0;
+                            List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs = new();
+                            BeforeCall(tacInf, tempParamList, out rspSub, ref homedRegs);
+
+                            // 间接调用（函数指针）
+                            Emit(X64.call(callee));
+
+                            //调用后处理
+                            AfterCall(rspSub, homedRegs);
+                        }
+                        break;
                     case "MCALL":
                         {
                             // 第一参数是 方法名（未混淆），第二个参数是参数个数
@@ -1086,7 +1102,7 @@ namespace Gizbox.Src.Backend
 
                             if(tacInf.oprand1.IsConstAddrSemantic())
                             {
-                                var key = tacInf.oprand1.expr.roDataKey;
+                                var key = tacInf.oprand1.GetConstAddressSymbol();
 
                                 using(new RegUsageRange(this, RegisterEnum.R11))
                                 {
@@ -1305,6 +1321,33 @@ namespace Gizbox.Src.Backend
                             {
                                 Emit(X64.mov(castDst, castSrc, X64Size.qword));
                             }
+
+                            // 整数 -> 指针（仅允许64位整数）
+                            else if(srcType.IsInteger && targetType.IsReferenceType)
+                            {
+                                if(srcType.Size != 8)
+                                {
+                                    throw new GizboxException(
+                                        ExceptioName.CodeGen,
+                                        $"cast not support: integer({srcType}) to pointer({targetType}) requires 64-bit integer.");
+                                }
+
+                                Emit(X64.mov(castDst, castSrc, X64Size.qword));
+                            }
+                            // 指针 -> 整数（仅允许64位整数）
+                            else if(srcType.IsReferenceType && targetType.IsInteger)
+                            {
+                                if(targetType.Size != 8)
+                                {
+                                    throw new GizboxException(
+                                        ExceptioName.CodeGen,
+                                        $"cast not support: pointer({srcType}) to integer({targetType}) requires 64-bit integer.");
+                                }
+
+                                Emit(X64.mov(castDst, castSrc, X64Size.qword));
+                            }
+
+
                             // 浮点数 -> 浮点数
                             else if(srcType.IsSSE && targetType.IsSSE)
                             {
@@ -2389,9 +2432,9 @@ namespace Gizbox.Src.Backend
                 case "!":
                 case "CAST":
                     {
-                        // arg1 = op arg2
+                        // CAST dst, type, src  -> src 在 arg2
                         ASN(tac.arg0, lineNum, block, envStack);
-                        USE(tac.arg1, lineNum, block, envStack);
+                        USE(tac.arg2, lineNum, block, envStack);
                     }
                     break;
                 case "++":
@@ -2943,6 +2986,10 @@ namespace Gizbox.Src.Backend
                     return xoperand;
                 }
             }
+            else if(rec.category == SymbolTable.RecordCatagory.Function)
+            {
+                return X64.rel(rec.name);
+            }
             else
             {
                 throw new GizboxException(ExceptioName.CodeGen, "unknown error.");
@@ -2964,7 +3011,7 @@ namespace Gizbox.Src.Backend
                 int tIdx = p.PARAM_paramidx;
                 GType tType = p.oprand0.typeExpr;
                 bool tIsConstAddrSemantic = p.oprand0.IsConstAddrSemantic();
-                string tRokey = p.oprand0.expr.roDataKey;
+                string tRokey = p.oprand0.GetConstAddressSymbol();
 
                 paraminfos.Add((tSrcOperand, tIdx, tType, tIsConstAddrSemantic, tRokey));
             }
@@ -4584,6 +4631,8 @@ namespace Gizbox.Src.Backend
                     {
                         rec = context.Query(segments[0], tacinf.line);
                         if(rec == null)
+                            rec = context.ir.QueryRaw(segments[0], tacinf.line);
+                        if(rec == null)
                             throw new GizboxException(ExceptioName.CodeGen, $"cannot find variable {segments[0]} at line {tacinf.line}");
                         segmentRecs[0] = rec;
                         typeExpr = GType.Parse(rec.typeExpression);
@@ -4629,37 +4678,41 @@ namespace Gizbox.Src.Backend
             else if(expr.type == IROperandExpr.Type.RET)
             {
                 var call = context.Lookback(this.owner.line, "CALL");
+                var pcall = context.Lookback(this.owner.line, "PCALL");
                 var mcall = context.Lookback(this.owner.line, "MCALL");
 
                 TACInfo lastCall = null;
-                if(call != null && mcall != null)
-                {
-                    if(call.line > mcall.line)
-                        lastCall = call;
-                    else
-                        lastCall = mcall;
-                }
-                else if(call != null)
-                {
+                if(call != null)
                     lastCall = call;
-                }
-                else if(mcall != null)
-                {
+                if(pcall != null && (lastCall == null || pcall.line > lastCall.line))
+                    lastCall = pcall;
+                if(mcall != null && (lastCall == null || mcall.line > lastCall.line))
                     lastCall = mcall;
+
+                if(lastCall == null)
+                {
+                    throw new GizboxException(ExceptioName.CodeGen, $"no CALL/PCALL/MCALL before RET at line {this.owner.line}");
+                }
+
+                if(lastCall.tac.op == "PCALL")
+                {
+                    var calleeType = lastCall.oprand0?.typeExpr;
+                    if(calleeType == null || calleeType.Category != GType.Kind.Function)
+                        throw new GizboxException(ExceptioName.CodeGen, $"invalid function-pointer type for RET at line {this.owner.line}");
+
+                    typeExpr = calleeType.FunctionReturnType;
                 }
                 else
                 {
-                    throw new GizboxException(ExceptioName.CodeGen, $"no CALL or MCALL before RET at line {this.owner.line}");
+                    this.RET_functionRec = lastCall.oprand0.segmentRecs[0];
+
+                    if(this.RET_functionRec == null)
+                    {
+                        throw new GizboxException(ExceptioName.CodeGen, $"no function record for RET at line {this.owner.line}");
+                    }
+
+                    typeExpr = GType.Parse(RET_functionRec.typeExpression).FunctionReturnType;
                 }
-
-                this.RET_functionRec = lastCall.oprand0.segmentRecs[0];
-
-                if(this.RET_functionRec == null)
-                {
-                    throw new GizboxException(ExceptioName.CodeGen, $"no function record for RET at line {this.owner.line}");
-                }
-
-                typeExpr = GType.Parse(RET_functionRec.typeExpression).FunctionReturnType;
             }
             else if(expr.type == IROperandExpr.Type.LitOrConst)
             {
@@ -4687,9 +4740,35 @@ namespace Gizbox.Src.Backend
         /// <summary> 是引用类型常量（地址即值） </summary>
         public bool IsConstAddrSemantic()
         {
-            return this?.expr?.type == IROperandExpr.Type.LitOrConst
+            if(this?.expr?.type == IROperandExpr.Type.LitOrConst
                 && this.expr.segments?.Length > 0
-                && (this.expr.segments[0] == "%CONSTSTRING" || this.expr.segments[0] == "%CONSTTYPE");
+                && (this.expr.segments[0] == "%CONSTSTRING" || this.expr.segments[0] == "%CONSTTYPE"))
+            {
+                return true;
+            }
+
+            return this?.expr?.type == IROperandExpr.Type.Identifier
+                && this.segmentRecs != null
+                && this.segmentRecs.Length > 0
+                && this.segmentRecs[0]?.category == SymbolTable.RecordCatagory.Function;
+        }
+
+        public string GetConstAddressSymbol()
+        {
+            if(this?.expr?.type == IROperandExpr.Type.LitOrConst)
+            {
+                return this.expr.roDataKey;
+            }
+
+            if(this?.expr?.type == IROperandExpr.Type.Identifier
+                && this.segmentRecs != null
+                && this.segmentRecs.Length > 0
+                && this.segmentRecs[0]?.category == SymbolTable.RecordCatagory.Function)
+            {
+                return this.segmentRecs[0].name;
+            }
+
+            return null;
         }
     }
 

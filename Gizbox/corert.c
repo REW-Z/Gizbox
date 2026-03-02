@@ -70,6 +70,24 @@ const wchar_t* Core__Extern__LongToString(int64_t value)
     return buf;
 }
 
+// UInt32 -> 字符串
+const wchar_t* Core__Extern__UIntToString(uint32_t value)
+{
+    static wchar_t buf[32];
+    swprintf_s(buf, COUNT_OF(buf), L"%u", (unsigned int)value);
+    buf[COUNT_OF(buf) - 1] = L'\0';
+    return buf;
+}
+
+// UInt64 -> 字符串
+const wchar_t* Core__Extern__ULongToString(uint64_t value)
+{
+    static wchar_t buf[32];
+    swprintf_s(buf, COUNT_OF(buf), L"%llu", (unsigned long long)value);
+    buf[COUNT_OF(buf) - 1] = L'\0';
+    return buf;
+}
+
 // float -> 字符串（9 位有效数字）
 const wchar_t* Core__Extern__FloatToString(float value)
 {

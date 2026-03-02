@@ -57,6 +57,24 @@ namespace Core
 			return Core::Extern::LongToString(this.value);
 		}
 	}
+	class UInt
+	{
+		uint value = 0u;
+		
+		string ToString()
+		{
+			return Core::Extern::UIntToString(this.value);
+		}
+	}
+	class ULong
+	{
+		ulong value = 0ul;
+		
+		string ToString()
+		{
+			return Core::Extern::ULongToString(this.value);
+		}
+	}
 	class Float
 	{
 		float value = 0.0f;
@@ -85,7 +103,9 @@ namespace Core::Extern
 	extern string BoolToString(bool v);
 	extern string CharToString(char v);
 	extern string IntToString(int v);
+	extern string UIntToString(uint v);
 	extern string LongToString(long v);
+	extern string ULongToString(ulong v);
 	extern string FloatToString(float v);
 	extern string DoubleToString(double v);
 
@@ -178,3 +198,4 @@ namespace Core::Hash
 		return hash;
 	}
 }
+

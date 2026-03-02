@@ -700,6 +700,8 @@ namespace Gizbox
 
         public Kind Category => _Kind;
 
+        public bool IsFunction => _Kind == Kind.Function;
+
         public int Size
         {
             get
@@ -863,6 +865,10 @@ namespace Gizbox
                         return Parse("Core::Int");
                     case Kind.Long:
                         return Parse("Core::Long");
+                    case Kind.UInt:
+                        return Parse("Core::UInt");
+                    case Kind.ULong:
+                        return Parse("Core::ULong");
                     case Kind.Float:
                         return Parse("Core::Float");
                     case Kind.Double:
@@ -887,6 +893,10 @@ namespace Gizbox
                         return $"Core::Extern::IntToString";
                     case Kind.Long:
                         return $"Core::Extern::LongToString";
+                    case Kind.UInt:
+                        return $"Core::Extern::UIntToString";
+                    case Kind.ULong:
+                        return $"Core::Extern::ULongToString";
                     case Kind.Float:
                         return $"Core::Extern::FloatToString";
                     case Kind.Double:
