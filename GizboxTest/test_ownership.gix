@@ -39,7 +39,7 @@ class OIntList
     {
         Console::PrintLn("--GetBor");
 
-        return this.items[idx].itemValue;//从字段中返回bor类型，不转移所有权
+        return this.items[idx].itemValue;//从字段中返回bor类型，不转移所有权;
     }
 }
 
@@ -218,4 +218,6 @@ void main()
     test6();
 
     Console::PrintLn("Test Finish.");
+
+    Console::ReadLn();
 }

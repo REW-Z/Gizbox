@@ -147,16 +147,13 @@ namespace Gizbox
             "stmt -> if ( expr ) stmt elifclauselist elseclause",
 
             "declstmt -> decltype ID = expr ;",
-            "declstmt -> tmodf decltype ID = expr ;",
             "declstmt -> const decltype ID = lit ;",
 
-            "declstmt -> tmodf decltype ID = capture ( ID ) ;",
+            "declstmt -> decltype ID = capture ( ID ) ;",
             "declstmt -> decltype ID = leak ( ID ) ;",
 
             "declstmt -> decltype ID genparams ( params ) { statements }",
-            "declstmt -> tmodf decltype ID genparams ( params ) { statements }",
             "declstmt -> decltype operator ID genparams ( params ) { statements }",
-            "declstmt -> tmodf decltype operator ID genparams ( params ) { statements }",
             "declstmt -> extern decltype ID genparams ( params ) ;",
 
             "declstmt -> class TYPE_NAME genparams inherit { declstatements }",
@@ -191,6 +188,7 @@ namespace Gizbox
 
 
             "decltype -> type",
+            "decltype -> tmodf type",
             "type -> arrtype",
             "type -> stype",
             "type -> fptrtype",
@@ -305,8 +303,7 @@ namespace Gizbox
             "lit -> null",
 
 
-            "param -> tmodf type ID",
-            "param -> type ID",
+            "param -> decltype ID",
             "params -> params , param",
             "params -> param",
             "params -> ε",
@@ -329,8 +326,8 @@ namespace Gizbox
             "genparamlist -> TYPE_NAME",
             "genparamlist -> genparamlist , TYPE_NAME",
             "genargs -> GEN_LT typearglist GEN_GT",
-            "typearglist -> type",
-            "typearglist -> typearglist , type",
+            "typearglist -> decltype",
+            "typearglist -> typearglist , decltype",
 
             "inherit -> : namedtype",
             "inherit -> ε",

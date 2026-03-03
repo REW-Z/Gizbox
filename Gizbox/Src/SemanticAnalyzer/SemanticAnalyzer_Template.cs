@@ -629,6 +629,10 @@ public partial class SemanticAnalyzer
     //检查补全模板实例处的命名空间前缀  
     private void TemplateTryMatchNamespace(SyntaxTree.IdentityNode templateNameNode)
     {
+        if(templateNameNode.token.attribute.Contains("::"))
+            return;
+
+
         //不存在模板  
         if(templateFullNameDict.TryGetValue(templateNameNode.token.attribute, out var fullnameList) == false)
         {

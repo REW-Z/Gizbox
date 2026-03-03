@@ -1673,6 +1673,7 @@ namespace Gizbox.LALRGenerator
                 else
                 {
                     Nonterminal nt = symbol as Nonterminal;
+                    var exceptEpsilon = new HashSet<Terminal> { null };
                     foreach (var production in nt.productions)
                     {
                         //ε产生式  
@@ -1702,17 +1703,22 @@ namespace Gizbox.LALRGenerator
                             else if (currentSymbol != symbol)
                             {
                                 var currentFirst = FIRST(currentSymbol);
-                                newSet.UnionWith(currentFirst);
+                                newSet.UnionWith(currentFirst, exceptEpsilon);
 
                                 //如果当前符号的FIRST没有ε -> 到此结束  
                                 if (currentFirst.Contains(null) == false)
                                 {
                                     break;
                                 }
-                                //4.19修改添加    
+                                //当前符号可推出ε，继续看下一个符号
                                 else
                                 {
-                                    i++; break;
+                                    i++;
+                                    if(i >= production.body.Length)
+                                    {
+                                        newSet.AddDistinct(null);
+                                    }
+                                    continue;
                                 }
                             }
                             else // currentSymbol == symbol
@@ -1751,30 +1757,35 @@ namespace Gizbox.LALRGenerator
             //无缓存  
             TerminalSet newSet = new TerminalSet();
             cachedFIRSTOfSymbolStr[key] = newSet;
+            var exceptEpsilon = new HashSet<Terminal> { null };
+            bool allNullable = true;
             foreach (var s in sstr)
             {
                 if (s is Nonterminal)
                 {
-                    //该产生式中的该非终结符 可以 推导ε
-                    if ((s as Nonterminal).HasεProduction() == true)
-                    {
-                        newSet.UnionWith(FIRST(s));
+                    var firstS = FIRST(s);
+                    newSet.UnionWith(firstS, exceptEpsilon);
 
-                        continue;//跳到产生式下一个符号  
-                    }
-                    //该产生式中的该非终结符 不可以 推导ε
-                    else
+                    //该符号不能推出ε，停止
+                    if(firstS.Contains(null) == false)
                     {
-                        newSet.UnionWith(FIRST(s));
-
-                        break;//跳出该产生式  
+                        allNullable = false;
+                        break;
                     }
+
+                    continue;
                 }
                 else if (s is Terminal)
                 {
                     newSet.AddDistinct(s as Terminal);
+                    allNullable = false;
                     break;//跳出该产生式  
                 }
+            }
+
+            if(allNullable)
+            {
+                newSet.AddDistinct(null);
             }
 
             return newSet;

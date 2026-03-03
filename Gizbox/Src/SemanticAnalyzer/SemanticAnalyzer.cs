@@ -362,7 +362,7 @@ namespace Gizbox.SemanticRule
                         if(funcDeclNode.isTemplateFunction)
                         {
                             //附加命名空间名  
-                            if(isTopLevelAtNamespace == false)
+                            if(isGlobalOrTopNamespace == false)
                             {
                                 throw new SemanticException(ExceptioName.SemanticAnalysysError, funcDeclNode, "template function can only declare at global env.");
                             }
@@ -1318,6 +1318,8 @@ namespace Gizbox.SemanticRule
                     {
                         foreach (var clause in ifNode.conditionClauseList)
                         {
+                            //检查条件节点  
+                            Pass3_AnalysisNode(clause.conditionNode);
                             //检查条件是否为布尔类型  
                             CheckType_Equal("bool", clause.conditionNode);
                             //检查语句节点  
@@ -1446,40 +1448,39 @@ namespace Gizbox.SemanticRule
                         var typeR = GType.Parse(typeExprR);
 
                         // !! 操作符重载
-                        if(typeL.IsNumberType == false || typeR.IsNumberType == false)
+                        if(typeL.CanOverrideOperator || typeR.CanOverrideOperator)
                         {
                             var operatorRec = Query_OperatorOverload(binaryNode.GetOpName(), typeExprL, typeExprR);
-                            if(operatorRec == null)
-                                throw new SemanticException(ExceptioName.SemanticAnalysysError, binaryNode, $"operator overload not exist:{Utils.Mangle(binaryNode.GetOpName(), typeExprL, typeExprR)}");
-
-                            var overrideNode = new SyntaxTree.CallNode()
+                            if(operatorRec != null)
                             {
-                                isMemberAccessFunction = false,
-                                funcNode = new SyntaxTree.IdentityNode()
+                                var overrideNode = new SyntaxTree.CallNode()
                                 {
-                                    attributes = new Dictionary<AstAttr, object>(),
-                                    token = new Token("ID", PatternType.Id, operatorRec.rawname, default, default, default),
-                                    identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
-                                },
-                                argumantsNode = new SyntaxTree.ArgumentListNode()
-                                {
-                                },
-                                attributes = new(),
-                            };
-                            overrideNode.argumantsNode.arguments.AddRange(new List<SyntaxTree.ExprNode>() { binaryNode.leftNode, binaryNode.rightNode, });
-                            binaryNode.overrideNode = overrideNode;
-                            binaryNode.overrideNode.Parent = binaryNode.Parent;
+                                    isMemberAccessFunction = false,
+                                    funcNode = new SyntaxTree.IdentityNode()
+                                    {
+                                        attributes = new Dictionary<AstAttr, object>(),
+                                        token = new Token("ID", PatternType.Id, operatorRec.rawname, default, default, default),
+                                        identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
+                                    },
+                                    argumantsNode = new SyntaxTree.ArgumentListNode()
+                                    {
+                                    },
+                                    attributes = new(),
+                                };
+                                overrideNode.argumantsNode.arguments.AddRange(new List<SyntaxTree.ExprNode>() { binaryNode.leftNode, binaryNode.rightNode, });
+                                binaryNode.overrideNode = overrideNode;
+                                binaryNode.overrideNode.Parent = binaryNode.Parent;
 
-                            Pass3_AnalysisNode(binaryNode.overrideNode);
-                            Console.WriteLine(binaryNode.overrideNode.attributes.Count);
-                        }
-                        else
-                        {
-                            Pass3_AnalysisNode(binaryNode.leftNode);
-                            Pass3_AnalysisNode(binaryNode.rightNode);
+                                Pass3_AnalysisNode(binaryNode.overrideNode);
 
-                            AnalyzeTypeExpression(binaryNode);
+                                break;
+                            }
                         }
+
+                        Pass3_AnalysisNode(binaryNode.leftNode);
+                        Pass3_AnalysisNode(binaryNode.rightNode);
+
+                        AnalyzeTypeExpression(binaryNode);
                     }
                     break;
                 case SyntaxTree.IncDecNode incDecNode:
@@ -1490,13 +1491,15 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.CastNode castNode:
                     {
                         // !!特殊的转换需要重写为函数调用
+                        TryCompleteType(castNode.typeNode);
                         Pass3_AnalysisNode(castNode.factorNode);
                         AnalyzeTypeExpression(castNode.factorNode);
+                        AnalyzeTypeExpression(castNode);
 
                         var srcType = GType.Parse((string)castNode.factorNode.attributes[AstAttr.type]);
                         var targetType = GType.Parse(castNode.typeNode.TypeExpression());
 
-                        if(targetType.Category == GType.Kind.String)
+                        if(targetType.Category == GType.Kind.String && srcType.Category != GType.Kind.String)
                         {
                             var overrideNode = new SyntaxTree.CallNode()
                             {
@@ -1523,10 +1526,6 @@ namespace Gizbox.SemanticRule
                         {
                             throw new SemanticException(ExceptioName.SemanticAnalysysError, castNode, "cast to array not support.");
                         }
-
-                        TryCompleteType(castNode.typeNode);
-                        Pass3_AnalysisNode(castNode.factorNode);
-                        AnalyzeTypeExpression(castNode);
                     }
                     break;
                 case SyntaxTree.ElementAccessNode eleAccessNode:
@@ -2804,12 +2803,36 @@ namespace Gizbox.SemanticRule
                 return null;
 
             var sig = new FunctionOwnershipSignature();
-            sig.ReturnModel = ftype.FunctionReturnType.IsClassType ? SymbolTable.RecordFlag.ManualVar : SymbolTable.RecordFlag.None;
+            if(ftype.FunctionReturnType.IsClassType)
+            {
+                sig.ReturnModel = ftype.FunctionReturnType.OwnershipHint switch
+                {
+                    GType.OwnershipHintKind.Own => SymbolTable.RecordFlag.OwnerVar,
+                    GType.OwnershipHintKind.Borrow => SymbolTable.RecordFlag.BorrowVar,
+                    _ => SymbolTable.RecordFlag.ManualVar,
+                };
+            }
+            else
+            {
+                sig.ReturnModel = SymbolTable.RecordFlag.None;
+            }
 
             var paramTypes = ftype.FunctionParamTypes ?? new List<GType>();
             foreach(var p in paramTypes)
             {
-                sig.ParamModels.Add(p.IsClassType ? SymbolTable.RecordFlag.ManualVar : SymbolTable.RecordFlag.None);
+                if(p.IsClassType)
+                {
+                    sig.ParamModels.Add(p.OwnershipHint switch
+                    {
+                        GType.OwnershipHintKind.Own => SymbolTable.RecordFlag.OwnerVar,
+                        GType.OwnershipHintKind.Borrow => SymbolTable.RecordFlag.BorrowVar,
+                        _ => SymbolTable.RecordFlag.ManualVar,
+                    });
+                }
+                else
+                {
+                    sig.ParamModels.Add(SymbolTable.RecordFlag.None);
+                }
             }
 
             return sig;
@@ -3237,18 +3260,32 @@ namespace Gizbox.SemanticRule
             {
                 SymbolTable.RecordFlag ownerModel = SymbolTable.RecordFlag.None;
 
+                var effectiveModifier = explicitModifier != VarModifiers.None
+                    ? explicitModifier
+                    : typeNode.ownershipModifier;
+
+                if(effectiveModifier == VarModifiers.None && type.IsClassType)
+                {
+                    effectiveModifier = type.OwnershipHint switch
+                    {
+                        GType.OwnershipHintKind.Own => VarModifiers.Own,
+                        GType.OwnershipHintKind.Borrow => VarModifiers.Bor,
+                        _ => VarModifiers.None,
+                    };
+                }
+
                 // own/bor 仅允许用于 class 引用类型；string/array/function 等不支持所有权语义
-                if((explicitModifier.HasFlag(VarModifiers.Own) || explicitModifier.HasFlag(VarModifiers.Bor))
+                if((effectiveModifier.HasFlag(VarModifiers.Own) || effectiveModifier.HasFlag(VarModifiers.Bor))
                     && type.IsClassType == false)
                 {
                     throw new SemanticException(ExceptioName.OwnershipError, typeNode, "own/bor only supports class reference types.");
                 }
 
-                if(explicitModifier.HasFlag(VarModifiers.Own))
+                if(effectiveModifier.HasFlag(VarModifiers.Own))
                 {
                     ownerModel = SymbolTable.RecordFlag.OwnerVar;//显式own
                 }
-                else if(explicitModifier.HasFlag(VarModifiers.Bor))
+                else if(effectiveModifier.HasFlag(VarModifiers.Bor))
                 {
                     ownerModel = SymbolTable.RecordFlag.BorrowVar;//显式借用
                 }
@@ -3607,6 +3644,9 @@ namespace Gizbox.SemanticRule
         }
         private bool CheckType_Equal(string typeExpr1, string typeExpr2)
         {
+            typeExpr1 = NormalizeTypeExprForTypeCheck(typeExpr1);
+            typeExpr2 = NormalizeTypeExprForTypeCheck(typeExpr2);
+
             if (typeExpr1 == "null" && GType.Parse(typeExpr2).IsReferenceType)
             {
                 return true;
@@ -3620,6 +3660,9 @@ namespace Gizbox.SemanticRule
         }
         private bool CheckType_Is(string typeExpr1, string typeExpr2)
         {
+            typeExpr1 = NormalizeTypeExprForTypeCheck(typeExpr1);
+            typeExpr2 = NormalizeTypeExprForTypeCheck(typeExpr2);
+
             if(typeExpr1 == typeExpr2) return true;
 
             //有至少一个是基元类型  
@@ -3653,6 +3696,28 @@ namespace Gizbox.SemanticRule
 
 
             return false;
+        }
+
+        private string NormalizeTypeExprForTypeCheck(string typeExpr)
+        {
+            if(string.IsNullOrWhiteSpace(typeExpr))
+                return typeExpr;
+
+            var t = GType.Parse(typeExpr);
+            if(t.IsClassType)
+                return t.ObjectTypeName;
+
+            if(t.IsArray)
+                return NormalizeTypeExprForTypeCheck(t.ArrayElementType.ToString()) + "[]";
+
+            if(t.IsFunction)
+            {
+                var paramPart = string.Join(",", t.FunctionParamTypes.Select(p => NormalizeTypeExprForTypeCheck(p.ToString())));
+                var retPart = NormalizeTypeExprForTypeCheck(t.FunctionReturnType.ToString());
+                return paramPart + " => " + retPart;
+            }
+
+            return typeExpr;
         }
 
         private bool CheckReturnStmt(SyntaxTree.Node node, string returnType)
@@ -3732,6 +3797,8 @@ namespace Gizbox.SemanticRule
 
         private SymbolTable.Record Query(string name)
         {
+            name = GType.NormalizeTypeNameForSymbolLookup(name);
+
             //符号表链查找  
             var toList = envStack.AsList();
             for (int i = toList.Count - 1; i > -1; --i)
@@ -3756,6 +3823,8 @@ namespace Gizbox.SemanticRule
 
         private SymbolTable.Record Query_IgnoreMangle(string rawname)
         {
+            rawname = GType.NormalizeTypeNameForSymbolLookup(rawname);
+
             //符号表链查找  
             var toList = envStack.AsList();
             for (int i = toList.Count - 1; i > -1; --i)

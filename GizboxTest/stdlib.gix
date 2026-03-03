@@ -472,7 +472,20 @@ namespace Collections
 		int[] states = new int[16];
 		int opacity = 16;
 		int count = 0;
+
+		bool isInit = false;
 	
+		void Init()
+		{
+			for(int i = 0; i < this.opacity; ++i)
+			{
+				this.states[i] = 0;
+			}
+			this.count = 0;
+
+			this.isInit = true;
+		}
+
 		int HashKey(TKey key)
 		{
 			int h = hashof(key);
@@ -483,12 +496,20 @@ namespace Collections
 
 		int FindSlot(TKey key)
 		{
+			if(this.isInit == false)
+				this.Init();
+
 			int hash = this.HashKey(key);
+			Console::PrintLn("Hash:" + (string)hash);
 			int idx = hash % this.opacity;
 			int firstRemoved = -1;
 			for(int i = 0 ; i < 10; ++i)
 			{
 				int state = this.states[idx];
+				
+			Console::PrintLn("state:" + (string)state);
+			Console::PrintLn("idx:" + (string)idx);
+
 				if(state == 0)
 				{
 					if(firstRemoved >= 0)
@@ -496,10 +517,16 @@ namespace Collections
 					return idx;
 				}
 				if(state == 2 && firstRemoved < 0)
+				{
 					firstRemoved = idx;
+				}
 				if(state == 1 && this.keys[idx] == key)
+				{
 					return idx;
+				}
+				
 				idx += 1;
+
 				if(idx >= this.opacity)
 					idx = 0;
 			}
@@ -520,6 +547,10 @@ namespace Collections
 			this.values = new TValue[this.opacity];
 			this.states = new int[this.opacity];
 			this.count = 0;
+			for(int i = 0; i < this.opacity; ++i)
+			{
+				this.states[i] = 0;
+			}
 			for(int i = 0; i < oldOpacity; ++i)
 			{
 				if(oldStates[i] == 1)
@@ -532,8 +563,9 @@ namespace Collections
 		{
 			if(this.count * 10 >= this.opacity * 7)
 				this.Resize();
-				
+			
 			int idx = this.FindSlot(key);
+
 			if(this.states[idx] != 1)
 			{
 				this.keys[idx] = key;

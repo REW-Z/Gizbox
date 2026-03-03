@@ -57,22 +57,22 @@ void main()
     int x = 10;
     int y = 20;
     int z = Add<int>(x, y);
-    Console::PrintLn("z:" + (string)z);
+    Console::PrintLn("z: (30)" + (string)z);
 
     int p = 5;
     int q = Pow<int>(p);
-    Console::PrintLn("q:" + (string)q);
+    Console::PrintLn("q  (25):" + (string)q);
 
     //其他编译单元的模板函数测试  
     int m = -12;
     int n = Math::Abs<int>(m);
-    Console::PrintLn("n:" + (string)n);
+    Console::PrintLn("n: (12)" + (string)n);
     int m2 = 12;
     int n2 = Math::Abs<int>(m2);
-    Console::PrintLn("n2:" + (string)n2);
+    Console::PrintLn("n2: (12)" + (string)n2);
     int m3 = 0;
     int n3 = Math::Abs<int>(m3);
-    Console::PrintLn("n3:" + (string)n3);
+    Console::PrintLn("n3: (0)" + (string)n3);
 
     Console::PrintLn("Test Finish.");
 

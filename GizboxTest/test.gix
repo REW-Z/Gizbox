@@ -71,9 +71,15 @@ void test_dic()
 	int result = dict.Get(1);
 	Console::PrintLn("Dic1 result:" + (string)result);
 
+	int h = hashof("key");
+	Console::PrintLn("Hash of key:" + (string)h);
+
 	var dict2 = new HashMap<string, string>();
+	Console::PrintLn("111");
 	dict2.Add("key", "value");
+	Console::PrintLn("222");
 	string result2 = dict2.Get("key");
+	Console::PrintLn("333");
 	Console::PrintLn("Dic2 result:" + result2);
 
 	var dict3 = new HashMap<OOO, int>();

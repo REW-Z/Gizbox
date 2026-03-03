@@ -1040,7 +1040,7 @@ namespace Gizbox.IR
 
             //class对象 ->  先调用dtor再释放内存  
             EmitCode("PARAM", varname);
-            EmitCode("CALL", gtype.ToString() + "::dtor", "%LITINT:1");
+            EmitCode("CALL", gtype.ObjectTypeName + "::dtor", "%LITINT:1");
             EmitCode("DEALLOC", varname);
         }
 
@@ -1115,7 +1115,7 @@ namespace Gizbox.IR
 
                 //class对象 ->  先调用dtor再释放内存  
                 EmitCode("PARAM", accessExpr);
-                EmitCode("CALL", gtype.ToString() + "::dtor", "%LITINT:1");
+                EmitCode("CALL", gtype.ObjectTypeName + "::dtor", "%LITINT:1");
                 EmitCode("DEALLOC", accessExpr);
             }
 

@@ -553,6 +553,12 @@ namespace Gizbox
     public class GType
     {
         public static Dictionary<string, GType> typeExpressionCache = new();
+        public enum OwnershipHintKind
+        {
+            None,
+            Own,
+            Borrow,
+        }
         public enum Kind
         {
             Other,
@@ -595,19 +601,22 @@ namespace Gizbox
 
             GType type = new GType();
 
-            if(typeExpression.Contains("=>"))
+            string normalizedExpr = StripOwnershipQualifier(typeExpression, out var ownershipHint);
+            type._OwnershipHint = ownershipHint;
+
+            if(normalizedExpr.Contains("=>"))
             {
                 type._Kind = Kind.Function;
 
                 string paramPart = null;
                 string returnPart = null;
-                for(int i = 0; i < typeExpression.Length - 1; ++i)
+                for(int i = 0; i < normalizedExpr.Length - 1; ++i)
                 {
-                    if(typeExpression[i] == '=' && typeExpression[i + 1] == '>')
+                    if(normalizedExpr[i] == '=' && normalizedExpr[i + 1] == '>')
                     {
                         type._Function_ParamTypes = new List<GType>();
-                        paramPart = typeExpression.Substring(0, i).Trim();
-                        returnPart = typeExpression.Substring(i + 2).Trim();
+                        paramPart = normalizedExpr.Substring(0, i).Trim();
+                        returnPart = normalizedExpr.Substring(i + 2).Trim();
                         break;
                     }
                 }
@@ -620,19 +629,19 @@ namespace Gizbox
                     .ToList();
                 type._Function_ReturnType = Parse(returnPart.Trim());
             }
-            else if(typeExpression.EndsWith("[]"))
+            else if(normalizedExpr.EndsWith("[]"))
             {
                 type._Kind = Kind.Array;
-                var typeEle = typeExpression.Substring(0, typeExpression.Length - 2).Trim();
+                var typeEle = normalizedExpr.Substring(0, normalizedExpr.Length - 2).Trim();
                 type._Array_ElementType = Parse(typeEle);
             }
-            else if(typeExpression.StartsWith("(") && typeExpression.EndsWith(")"))
+            else if(normalizedExpr.StartsWith("(") && normalizedExpr.EndsWith(")"))
             {
                 type._Kind = Kind.Other;
             }
             else
             {
-                switch(typeExpression)
+                switch(normalizedExpr)
                 {
                     case "bool":
                         type._Kind = Kind.Bool;
@@ -666,6 +675,7 @@ namespace Gizbox
                         break;
                     default:
                         type._Kind = Kind.Object;
+                        type._ObjectTypeName = normalizedExpr;
                         break;
                 }
             }
@@ -673,6 +683,37 @@ namespace Gizbox
             type._RawTypeExpression = typeExpression;
             typeExpressionCache[typeExpression] = type;
             return type;
+        }
+
+        private static string StripOwnershipQualifier(string typeExpression, out OwnershipHintKind ownershipHint)
+        {
+            ownershipHint = OwnershipHintKind.None;
+
+            if(typeExpression.StartsWith("(own)"))
+            {
+                ownershipHint = OwnershipHintKind.Own;
+                return typeExpression.Substring("(own)".Length).Trim();
+            }
+
+            if(typeExpression.StartsWith("(bor)"))
+            {
+                ownershipHint = OwnershipHintKind.Borrow;
+                return typeExpression.Substring("(bor)".Length).Trim();
+            }
+
+            return typeExpression;
+        }
+
+        public static string NormalizeTypeNameForSymbolLookup(string typeExpression)
+        {
+            if(string.IsNullOrWhiteSpace(typeExpression))
+                return typeExpression;
+
+            var type = Parse(typeExpression);
+            if(type.Category == Kind.Object)
+                return type.ObjectTypeName;
+
+            return typeExpression;
         }
 
         public static GType GenFuncType(GType returnType, params GType[] paramTypes)
@@ -685,6 +726,8 @@ namespace Gizbox
         private GType _Array_ElementType;
         private GType _Function_ReturnType;
         private List<GType> _Function_ParamTypes;
+        private OwnershipHintKind _OwnershipHint;
+        private string _ObjectTypeName;
 
         private GType() { }
 
@@ -834,6 +877,29 @@ namespace Gizbox
                 return _Kind == Kind.Object;
             }
         }
+
+        public bool CanOverrideOperator        
+        {
+            get
+            {
+                if(_Kind == Kind.String)
+                    return true;
+
+                if(IsPrimitive)
+                {
+                    return false;
+                }
+                else
+                {
+                    return true;
+                }
+            }
+        }
+
+
+        public OwnershipHintKind OwnershipHint => _OwnershipHint;
+
+        public string ObjectTypeName => _ObjectTypeName ?? _RawTypeExpression;
 
         public bool IsInteger
         {

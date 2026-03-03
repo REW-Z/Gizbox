@@ -1417,7 +1417,7 @@ namespace Gizbox.Src.Backend
                                 bool toF32 = targetType.Size == 4;
 
                                 // 目标若不是XMM寄存器，先算到xmm0再回写
-                                bool needStoreBack = !(castDst is X64Reg dstReg && dstReg.IsXXM());
+                                bool needStoreBack = !(castDst is X64Reg dstReg && (dstReg.isVirtual == false && dstReg.IsXXM()));
                                 X64Operand workDst = needStoreBack ? (X64Operand)X64.xmm0 : castDst;
 
                                 // 有符号整数：可直接转换
@@ -4651,7 +4651,7 @@ namespace Gizbox.Src.Backend
                     }
                     else
                     {
-                        className = objRec.typeExpression;
+                        className = GType.NormalizeTypeNameForSymbolLookup(objRec.typeExpression);
                     }
                     var classRec = context.classDict[className];
                     var memberRec = context.QueryMember(className, segments[1]);
@@ -4879,10 +4879,21 @@ namespace Gizbox.Src.Backend
         {
             if(input is null)
                 return null;
-            var result = input.Replace("::", "__");
-            result = result.Replace(":", "_");
-            result = result.Replace('^', '_');
-            return result;
+
+            var normalized = input.Replace("::", "__");
+            StringBuilder strb = new StringBuilder(normalized.Length);
+            foreach(var ch in normalized)
+            {
+                if(char.IsLetterOrDigit(ch) || ch == '_' || ch == '$')
+                {
+                    strb.Append(ch);
+                }
+                else
+                {
+                    strb.Append('_');
+                }
+            }
+            return strb.ToString();
         }
 
         public static string GetLitConstType(string litconstMark)

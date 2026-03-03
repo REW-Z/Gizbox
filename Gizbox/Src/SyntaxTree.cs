@@ -1318,7 +1318,13 @@ namespace Gizbox
         [KnownType(typeof(PrimitiveTypeNode))]
         [KnownType(typeof(InferTypeNode))]
         [KnownType(typeof(FuncPtrTypeNode))]
-        public abstract class TypeNode : Node { public abstract string TypeExpression(); }
+        public abstract class TypeNode : Node
+        {
+            [DataMember]
+            public VarModifiers ownershipModifier = VarModifiers.None;
+
+            public abstract string TypeExpression();
+        }
 
         [DataContract(IsReference = true)]
         public class ArrayTypeNode : TypeNode
@@ -1352,10 +1358,18 @@ namespace Gizbox
 
             public override string TypeExpression()
             {
+                string rawTypeName;
                 if(genericArguments.Count == 0)
-                    return classname.FullName;
+                    rawTypeName = classname.FullName;
+                else
+                    rawTypeName = Utils.MangleTemplateInstanceName(classname.FullName, genericArguments.Select(t => t.TypeExpression()));
 
-                return Utils.MangleTemplateInstanceName(classname.FullName, genericArguments.Select(t => t.TypeExpression()));
+                if(ownershipModifier.HasFlag(VarModifiers.Own))
+                    return "(own)" + rawTypeName;
+                if(ownershipModifier.HasFlag(VarModifiers.Bor))
+                    return "(bor)" + rawTypeName;
+
+                return rawTypeName;
             }
         }
         [DataContract(IsReference = true)]
