@@ -213,6 +213,7 @@ namespace Gizbox.SemanticRule
             envStack.Clear();
             envStack.Push(ilUnit.globalScope.env);
             Pass2_CollectOtherSymbols(ast.rootNode);
+            RewriteAllKnownStructTypeExpressions();
 
             if (Compiler.enableLogSemanticAnalyzer)
             {
@@ -3782,12 +3783,12 @@ namespace Gizbox.SemanticRule
                             var classEnv = classRec.envPtr;
                             if (classEnv == null) throw new SemanticException(ExceptioName.ClassScopeNotFound, callNode, "");
 
-                            bool anyFunc = TryQueryAndMatchFunction(funcFullName, explicitArgTypeArr, explicitParamTypeArr, true, classEnv);
+                            bool anyFunc = TryQueryAndMatchFunction(funcFullName, explicitArgTypeArr, explicitParamTypeArr, out var matchedMemberRec, true, classEnv);
                             if(anyFunc == false) throw new SemanticException(ExceptioName.FunctionMemberNotFound, callNode, funcAccess.memberNode.FullName);
 
-                            funcMangledName = Utils.Mangle(funcFullName, explicitParamTypeArr);
+                            funcMangledName = matchedMemberRec?.name ?? Utils.Mangle(funcFullName, explicitParamTypeArr);
 
-                            var memberRec = classEnv.Class_GetMemberRecordInChain(funcMangledName);
+                            var memberRec = matchedMemberRec ?? classEnv.Class_GetMemberRecordInChain(funcMangledName);
                             if (memberRec == null) throw new SemanticException(ExceptioName.FunctionMemberNotFound, callNode, funcAccess.memberNode.FullName);
 
                             var typeExpr = memberRec.typeExpression;
@@ -3806,19 +3807,15 @@ namespace Gizbox.SemanticRule
 
                             var funcId = (callNode.funcNode as SyntaxTree.IdentityNode);
 
-                            bool anyFunc = TryQueryAndMatchFunction(funcId.FullName, argTypeArr, paramTypeArr);
+                            bool anyFunc = TryQueryAndMatchFunction(funcId.FullName, argTypeArr, paramTypeArr, out var matchedFuncRec);
                             if(anyFunc == false) throw new SemanticException(ExceptioName.FunctionNotFound, callNode, funcId.FullName);
 
 
-                            bool isExternFunc = false;
-                            funcMangledName = Utils.Mangle(funcId.FullName, paramTypeArr);
-                            var idRec = Query(funcMangledName);
+                            bool isExternFunc = matchedFuncRec != null && matchedFuncRec.flags.HasFlag(SymbolTable.RecordFlag.ExternFunc);
+                            funcMangledName = matchedFuncRec?.name ?? Utils.Mangle(funcId.FullName, paramTypeArr);
+                            var idRec = matchedFuncRec ?? Query(funcMangledName);
                             if(idRec == null)
-                            {
                                 idRec = Query(Utils.ToExternFuncName(funcId.FullName));
-                                if(idRec != null)
-                                    isExternFunc = true;
-                            }
 
                             if (idRec == null) 
                                 throw new SemanticException(ExceptioName.FunctionNotFound, callNode, funcId.FullName);
@@ -3829,7 +3826,7 @@ namespace Gizbox.SemanticRule
 
                             if(isExternFunc)
                             {
-                                callNode.attributes[AstAttr.extern_name] = Utils.ToExternFuncName(funcId.FullName);
+                                callNode.attributes[AstAttr.extern_name] = idRec.name;
                             }
                             else
                             {
@@ -4399,6 +4396,19 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.ClassTypeNode classTypeNode:
                     {
                         TryCompleteIdenfier(classTypeNode.classname);
+
+                        var typeName = classTypeNode.classname.FullName;
+                        var rec = Query(typeName);
+                        if(rec != null && rec.category == SymbolTable.RecordCatagory.Struct)
+                        {
+                            classTypeNode.isStructType = true;
+                            classTypeNode.structSize = (int)rec.size;
+                        }
+                        else
+                        {
+                            classTypeNode.isStructType = false;
+                            classTypeNode.structSize = 0;
+                        }
                     }
                     break;
                 case SyntaxTree.ArrayTypeNode arrayTypeNpde:
@@ -4411,7 +4421,11 @@ namespace Gizbox.SemanticRule
         }
 
         private bool TryQueryAndMatchFunction(string funcRawName, string[] argTypes, string[] outParamTypes, bool isMethod = false, SymbolTable classEnvOfMethod = null)
+            => TryQueryAndMatchFunction(funcRawName, argTypes, outParamTypes, out _, isMethod, classEnvOfMethod);
+
+        private bool TryQueryAndMatchFunction(string funcRawName, string[] argTypes, string[] outParamTypes, out SymbolTable.Record matchedFuncRec, bool isMethod = false, SymbolTable classEnvOfMethod = null)
         {
+            matchedFuncRec = null;
             List<SymbolTable.Record> allFunctions = new List<SymbolTable.Record>();
             if(classEnvOfMethod != null)
                 classEnvOfMethod.Class_GetAllMemberRecordInChainByRawname(funcRawName, allFunctions);
@@ -4487,6 +4501,7 @@ namespace Gizbox.SemanticRule
             //Result  
             if(targetFunc != null)
             {
+                matchedFuncRec = targetFunc;
                 if(targetFuncParams != null)
                 {
                     for(int i = 0; i < argTypes.Length; ++i)
@@ -4752,6 +4767,69 @@ namespace Gizbox.SemanticRule
 
             structRec.size = structSize;
             structRec.typeExpression = $"(struct:{structSize}){structRec.name}";
+
+            RewriteAllTypeExpressionsForStruct(structRec.name, structRec.typeExpression);
+        }
+
+        private void RewriteAllTypeExpressionsForStruct(string structName, string structTypeExpr)
+        {
+            foreach(var (_, rec) in ilUnit.globalScope.env.GetRecordsRecursive())
+            {
+                if(string.IsNullOrWhiteSpace(rec.typeExpression))
+                    continue;
+
+                rec.typeExpression = RewriteTypeExpressionForStruct(rec.typeExpression, structName, structTypeExpr);
+            }
+        }
+
+        private void RewriteAllKnownStructTypeExpressions()
+        {
+            foreach(var (_, rec) in ilUnit.globalScope.env.records)
+            {
+                if(rec.category != SymbolTable.RecordCatagory.Struct)
+                    continue;
+                if(string.IsNullOrWhiteSpace(rec.typeExpression))
+                    continue;
+
+                RewriteAllTypeExpressionsForStruct(rec.name, rec.typeExpression);
+            }
+        }
+
+        private string RewriteTypeExpressionForStruct(string typeExpr, string structName, string structTypeExpr)
+        {
+            if(string.IsNullOrWhiteSpace(typeExpr))
+                return typeExpr;
+
+            GType t;
+            try
+            {
+                t = GType.Parse(typeExpr);
+            }
+            catch
+            {
+                return typeExpr;
+            }
+
+            if(t.IsArray)
+            {
+                return RewriteTypeExpressionForStruct(t.ArrayElementType.ToString(), structName, structTypeExpr) + "[]";
+            }
+
+            if(t.Category == GType.Kind.Function)
+            {
+                var p = t.FunctionParamTypes?.Select(x => RewriteTypeExpressionForStruct(x.ToString(), structName, structTypeExpr))
+                    ?? Enumerable.Empty<string>();
+                var r = RewriteTypeExpressionForStruct(t.FunctionReturnType.ToString(), structName, structTypeExpr);
+                return $"{string.Join(",", p)} => {r}";
+            }
+
+            if(t.IsClassType && t.ObjectTypeName == structName)
+                return structTypeExpr;
+
+            if(t.IsStructType && t.ObjectTypeName == structName)
+                return structTypeExpr;
+
+            return typeExpr;
         }
 
         public static void Log(object content)

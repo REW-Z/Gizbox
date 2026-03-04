@@ -1370,6 +1370,10 @@ namespace Gizbox
             public IdentityNode classname { get => (IdentityNode)children_group_0[0]; set => children_group_0[0] = value; }
             [DataMember]
             public readonly List<TypeNode> genericArguments = new();
+            [DataMember]
+            public bool isStructType = false;
+            [DataMember]
+            public int structSize = 0;
 
             public ClassTypeNode()
             {
@@ -1389,6 +1393,15 @@ namespace Gizbox
                     return "(own class)" + rawTypeName;
                 if(ownershipModifier.HasFlag(VarModifiers.Bor))
                     return "(bor class)" + rawTypeName;
+
+                if(isStructType)
+                {
+                    if(structSize > 0)
+                        return $"(struct:{structSize})" + rawTypeName;
+
+                    // 结构体尺寸未决时，不输出错误尺寸，交由语义阶段后续统一重写
+                    return "(class)" + rawTypeName;
+                }
 
                 return "(class)" + rawTypeName;
             }

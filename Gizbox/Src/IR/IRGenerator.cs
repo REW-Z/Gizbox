@@ -1627,6 +1627,8 @@ namespace Gizbox.IR
                     return "%LITINT:0";
                 case GType.Kind.String:
                     return "%LITNULL:";
+                case GType.Kind.Struct:
+                    return "%LITDEFAULT:" + typeExpr;
             }
 
             return "%LITNULL:";

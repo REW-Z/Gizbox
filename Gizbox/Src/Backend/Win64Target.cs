@@ -493,7 +493,7 @@ namespace Gizbox.Src.Backend
                         {
                             var fRec = tacInf.oprand0?.segmentRecs?[0];
                             if(fRec != null)
-                                retType = GType.Parse(fRec.typeExpression).FunctionReturnType;
+                                retType = ResolveCallableReturnType(fRec);
                         }
 
                         if(retType != null && retType.IsStructType && retType.Size > 8)
@@ -866,11 +866,6 @@ namespace Gizbox.Src.Backend
                             Emit(X64.push(X64.rbp));
                             Emit(X64.mov(X64.rbp, X64.rsp, X64Size.qword));
 
-                            //保存寄存器（非易失性需要由Callee保存）  
-                            var placeholder = X64.placehold("callee_save");
-                            var placeholderNode = Emit(placeholder);
-                            calleeSavePlaceHolders.Add(currFuncEnv, placeholderNode);
-
                             //rsp分配局部变量空间  
                             int localVarsSize = localVarsSpaceSize[currFuncEnv];
                             if(localVarsSize % 16 != 0)
@@ -878,10 +873,21 @@ namespace Gizbox.Src.Backend
                             var subrsp = X64.sub(X64.rsp, X64.imm(localVarsSize), X64Size.qword);
                             subrsp.comment += $"    (local variables space alloc)";
                             Emit(subrsp);
+
+                            //保存寄存器（非易失性需要由Callee保存）  
+                            var placeholder = X64.placehold("callee_save");
+                            var placeholderNode = Emit(placeholder);
+                            calleeSavePlaceHolders.Add(currFuncEnv, placeholderNode);
                         }
                         break;
                     case "FUNC_END":
                         {
+                            //恢复寄存器（非易失性需要由Callee保存） 
+                            Debug.Assert(currFuncEnv != null);
+                            var placeholder = X64.placehold("callee_restore");
+                            var placeholderNode = Emit(placeholder);
+                            calleeRestorePlaceHolders.Add(currFuncEnv, placeholderNode);
+
                             //回收局部变量空间  
                             int localVarsSize = localVarsSpaceSize[currFuncEnv];
                             if(localVarsSize % 16 != 0)
@@ -889,13 +895,6 @@ namespace Gizbox.Src.Backend
                             var addrsp = X64.add(X64.rsp, X64.imm(localVarsSize), X64Size.qword);
                             addrsp.comment += $"    (local variables space release)";
                             Emit(addrsp);
-
-
-                            //恢复寄存器（非易失性需要由Callee保存） 
-                            Debug.Assert(currFuncEnv != null);
-                            var placeholder = X64.placehold("callee_restore");
-                            var placeholderNode = Emit(placeholder);
-                            calleeRestorePlaceHolders.Add(currFuncEnv, placeholderNode);
 
                             //函数尾声
                             Emit(X64.mov(X64.rsp, X64.rbp, X64Size.qword));
@@ -977,7 +976,7 @@ namespace Gizbox.Src.Backend
                             var targetFuncRec = tacInf.oprand0.segmentRecs[0];
                             Debug.Assert(targetFuncRec != null);
 
-                            var callRetType = GType.Parse(targetFuncRec.typeExpression).FunctionReturnType;
+                            var callRetType = ResolveCallableReturnType(targetFuncRec);
                             bool useHiddenRet = callRetType.IsStructType && callRetType.Size > 8;
 
                             //调用前准备  
@@ -1060,7 +1059,7 @@ namespace Gizbox.Src.Backend
 
                             var targetFuncRec = tacInf.oprand0.segmentRecs[0];
                             Debug.Assert(targetFuncRec != null);
-                            var callRetType = GType.Parse(targetFuncRec.typeExpression).FunctionReturnType;
+                            var callRetType = ResolveCallableReturnType(targetFuncRec);
                             bool useHiddenRet = callRetType.IsStructType && callRetType.Size > 8;
 
 
@@ -1250,11 +1249,49 @@ namespace Gizbox.Src.Backend
 
                             if(tacInf.oprand0.typeExpr.IsStructType)
                             {
-                                if(tacInf.oprand1.IsConstAddrSemantic())
-                                    throw new GizboxException(ExceptioName.CodeGen, "struct assignment does not support const-address semantic source.");
+                                int structSize = tacInf.oprand0.typeExpr.Size;
 
-                                var src = ParseOperand(tacInf.oprand1);
-                                EmitStructCopy(dst, src, tacInf.oprand0.typeExpr.Size);
+                                // struct 零初始化 (= structVar %LITNULL:)
+                                if(tacInf.oprand1.expr.type == IROperandExpr.Type.LitOrConst
+                                    && (tacInf.oprand1.expr.segments[0] == "%LITNULL"
+                                        || tacInf.oprand1.expr.segments[0] == "%LITDEFAULT"))
+                                {
+                                    EmitStructZero(dst, structSize);
+                                }
+                                // struct 接收函数返回值 (= structVar %RET)
+                                else if(tacInf.oprand1.expr.type == IROperandExpr.Type.RET)
+                                {
+                                    if(structSize <= 8)
+                                    {
+                                        // 小 struct：返回值直接在 RAX 中（值语义）
+                                        using(new RegUsageRange(this, RegisterEnum.RAX))
+                                        {
+                                            EmitMov(dst, X64.rax, (X64Size)structSize, false);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        // 大 struct：返回值已通过隐藏指针拷贝到 spill 槽
+                                        if(hiddenRetSpillOffsets.TryGetValue(currFuncEnv, out var spillOff))
+                                        {
+                                            EmitStructCopy(dst, X64.mem(X64.rbp, disp: spillOff), structSize);
+                                        }
+                                        else
+                                        {
+                                            throw new GizboxException(ExceptioName.CodeGen, "missing hidden return spill offset for large struct return.");
+                                        }
+                                    }
+                                }
+                                else if(tacInf.oprand1.IsConstAddrSemantic())
+                                {
+                                    throw new GizboxException(ExceptioName.CodeGen, "struct assignment does not support const-address semantic source.");
+                                }
+                                else
+                                {
+                                    // struct 拷贝（值语义）
+                                    var src = ParseOperand(tacInf.oprand1);
+                                    EmitStructCopy(dst, src, structSize);
+                                }
                             }
                             else if(tacInf.oprand1.IsConstAddrSemantic())
                             {
@@ -2024,7 +2061,7 @@ namespace Gizbox.Src.Backend
                 }
 
                 //callee-save占位展开  
-                int localvarsMoveBytes = 0;//局部变量向低地址移动让出空间给callee-save区域    
+                int localvarsMoveBytes = 0;//callee-save在局部变量区之下，不需要再平移局部变量
                 if(calleeSavePlaceHolders.TryGetValue(func.funcRec.envPtr, out var saveplaceholder))
                 {
 
@@ -2042,7 +2079,6 @@ namespace Gizbox.Src.Backend
                     {
                         bytes += 8;
                     }
-                    localvarsMoveBytes = bytes;
 
                     //rsp移动  
                     ind = InsertAfter(ind, X64.sub(X64.rsp, X64.imm(bytes), X64Size.qword));
@@ -2066,15 +2102,6 @@ namespace Gizbox.Src.Backend
 
                     ind.value.comment += $"    (callee-save of {func.funcRec.name} finish)";
 
-                }
-                //局部变量位移  
-                foreach(var (recName, rec) in func.funcRec.envPtr.records)
-                {
-                    if(rec.category != SymbolTable.RecordCatagory.Variable)
-                        continue;
-
-                    rec.addr -= localvarsMoveBytes;
-                    GixConsole.WriteLine($"单元 {ir.name} 的函数{func.funcRec.name} 变量位移：{recName}向下位移{localvarsMoveBytes}字节到{rec.addr}");
                 }
 
 
@@ -2913,6 +2940,11 @@ namespace Gizbox.Src.Backend
                                     return X64.imm(0);
                                 }
                                 break;
+                            case "%LITDEFAULT":
+                                {
+                                    return X64.imm(0);
+                                }
+                                break;
                             case "%LITFLOAT":
                             case "%LITDOUBLE":
                                 {
@@ -3123,7 +3155,6 @@ namespace Gizbox.Src.Backend
                 }
                 else if(rawoperand.Contains(".")
                     && !rawoperand.Contains("::")
-                    && !rawoperand.Contains("@")
                     && !rawoperand.StartsWith("%"))
                 {
                     var parts = rawoperand.Split('.');
@@ -3181,6 +3212,18 @@ namespace Gizbox.Src.Backend
                 return inf;
             }
             return null;
+        }
+
+        public GType ResolveCallableReturnType(SymbolTable.Record rec)
+        {
+            if(rec == null)
+                return null;
+
+            var t = GType.Parse(rec.typeExpression);
+            if(t.Category == GType.Kind.Function)
+                return t.FunctionReturnType;
+
+            return t;
         }
 
 
@@ -3735,20 +3778,36 @@ namespace Gizbox.Src.Backend
             throw new GizboxException(ExceptioName.CodeGen, "struct copy requires memory-like operands.");
         }
 
+        private RegisterEnum PickScratchGpReg(RegisterEnum preferred = RegisterEnum.R11)
+        {
+            if(currBorrowRegisters.ContainsKey(preferred) == false)
+                return preferred;
+
+            foreach(var reg in tempRegistersGP)
+            {
+                if(currBorrowRegisters.ContainsKey(reg) == false)
+                    return reg;
+            }
+
+            throw new GizboxException(ExceptioName.CodeGen, "no idle scratch GP register available.");
+        }
+
         private void EmitStructCopy(X64Operand dst, X64Operand src, int totalSize)
         {
             if(totalSize <= 0)
                 return;
 
             int offset = 0;
-            using(new RegUsageRange(this, RegisterEnum.R11))
+            var scratch = PickScratchGpReg(RegisterEnum.R11);
+            var scratchReg = new X64Reg(scratch);
+            using(new RegUsageRange(this, scratch))
             {
                 while(totalSize >= 8)
                 {
                     var d = AddDisp(dst, offset);
                     var s = AddDisp(src, offset);
-                    Emit(X64.mov(X64.r11, s, X64Size.qword));
-                    Emit(X64.mov(d, X64.r11, X64Size.qword));
+                    Emit(X64.mov(scratchReg, s, X64Size.qword));
+                    Emit(X64.mov(d, scratchReg, X64Size.qword));
                     offset += 8;
                     totalSize -= 8;
                 }
@@ -3756,8 +3815,8 @@ namespace Gizbox.Src.Backend
                 {
                     var d = AddDisp(dst, offset);
                     var s = AddDisp(src, offset);
-                    Emit(X64.mov(X64.r11, s, X64Size.dword));
-                    Emit(X64.mov(d, X64.r11, X64Size.dword));
+                    Emit(X64.mov(scratchReg, s, X64Size.dword));
+                    Emit(X64.mov(d, scratchReg, X64Size.dword));
                     offset += 4;
                     totalSize -= 4;
                 }
@@ -3765,8 +3824,8 @@ namespace Gizbox.Src.Backend
                 {
                     var d = AddDisp(dst, offset);
                     var s = AddDisp(src, offset);
-                    Emit(X64.mov(X64.r11, s, X64Size.word));
-                    Emit(X64.mov(d, X64.r11, X64Size.word));
+                    Emit(X64.mov(scratchReg, s, X64Size.word));
+                    Emit(X64.mov(d, scratchReg, X64Size.word));
                     offset += 2;
                     totalSize -= 2;
                 }
@@ -3774,8 +3833,44 @@ namespace Gizbox.Src.Backend
                 {
                     var d = AddDisp(dst, offset);
                     var s = AddDisp(src, offset);
-                    Emit(X64.mov(X64.r11, s, X64Size.@byte));
-                    Emit(X64.mov(d, X64.r11, X64Size.@byte));
+                    Emit(X64.mov(scratchReg, s, X64Size.@byte));
+                    Emit(X64.mov(d, scratchReg, X64Size.@byte));
+                }
+            }
+        }
+
+        private void EmitStructZero(X64Operand dst, int totalSize)
+        {
+            if(totalSize <= 0)
+                return;
+
+            int offset = 0;
+            var scratch = PickScratchGpReg(RegisterEnum.R11);
+            var scratchReg = new X64Reg(scratch);
+            using(new RegUsageRange(this, scratch))
+            {
+                Emit(X64.xor(scratchReg, scratchReg, X64Size.qword));
+                while(totalSize >= 8)
+                {
+                    Emit(X64.mov(AddDisp(dst, offset), scratchReg, X64Size.qword));
+                    offset += 8;
+                    totalSize -= 8;
+                }
+                if(totalSize >= 4)
+                {
+                    Emit(X64.mov(AddDisp(dst, offset), scratchReg, X64Size.dword));
+                    offset += 4;
+                    totalSize -= 4;
+                }
+                if(totalSize >= 2)
+                {
+                    Emit(X64.mov(AddDisp(dst, offset), scratchReg, X64Size.word));
+                    offset += 2;
+                    totalSize -= 2;
+                }
+                if(totalSize == 1)
+                {
+                    Emit(X64.mov(AddDisp(dst, offset), scratchReg, X64Size.@byte));
                 }
             }
         }
@@ -5137,12 +5232,19 @@ namespace Gizbox.Src.Backend
                         throw new GizboxException(ExceptioName.CodeGen, $"no function record for RET at line {this.owner.line}");
                     }
 
-                    typeExpr = GType.Parse(RET_functionRec.typeExpression).FunctionReturnType;
+                    typeExpr = context.ResolveCallableReturnType(RET_functionRec);
                 }
             }
             else if(expr.type == IROperandExpr.Type.LitOrConst)
             {
-                if(segments.Length > 1 && segments[0] == "%CONSTTYPE")
+                if(segments[0] == "%LITDEFAULT")
+                {
+                    if(segments.Length > 1)
+                        typeExpr = GType.Parse(segments[1]);
+                    else
+                        typeExpr = GType.Parse("(other)");
+                }
+                else if(segments.Length > 1 && segments[0] == "%CONSTTYPE")
                 {
                     typeExpr = GType.Parse(segments[1]);
                 }
