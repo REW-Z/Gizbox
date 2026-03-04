@@ -95,6 +95,7 @@ namespace Gizbox
             Param,
             Function,
             Class,
+            Struct,
             Other
         }
         public enum TableCatagory
@@ -574,6 +575,7 @@ namespace Gizbox
             Char,
             String,
             Object, //引用类型
+            Struct, //值类型结构体
             Array, //数组类型
             Function, //函数类型
         }
@@ -601,8 +603,11 @@ namespace Gizbox
 
             GType type = new GType();
 
-            string normalizedExpr = StripOwnershipQualifier(typeExpression, out var ownershipHint);
+            string normalizedExpr = StripTypePrefix(typeExpression, out var ownershipHint, out var explicitKind, out var explicitSize);
             type._OwnershipHint = ownershipHint;
+
+            if(explicitSize > 0)
+                type._ExplicitSize = explicitSize;
 
             if(normalizedExpr.Contains("=>"))
             {
@@ -643,6 +648,9 @@ namespace Gizbox
             {
                 switch(normalizedExpr)
                 {
+                    case "void":
+                        type._Kind = Kind.Void;
+                        break;
                     case "bool":
                         type._Kind = Kind.Bool;
                         break;
@@ -680,14 +688,90 @@ namespace Gizbox
                 }
             }
 
+            if(explicitKind.HasValue)
+            {
+                switch(explicitKind.Value)
+                {
+                    case Kind.Struct:
+                        type._Kind = Kind.Struct;
+                        type._ObjectTypeName = normalizedExpr;
+                        break;
+                    case Kind.Object:
+                        if(type._Kind == Kind.Object || type._Kind == Kind.Struct)
+                        {
+                            type._Kind = Kind.Object;
+                            type._ObjectTypeName = normalizedExpr;
+                        }
+                        break;
+                    case Kind.Byte:
+                    case Kind.Int:
+                    case Kind.UInt:
+                    case Kind.Long:
+                    case Kind.ULong:
+                    case Kind.Float:
+                    case Kind.Double:
+                    case Kind.Bool:
+                    case Kind.Char:
+                    case Kind.String:
+                    case Kind.Void:
+                        // primitive 前缀仅作为标注，不改变解析出的基元结果
+                        break;
+                }
+            }
+
             type._RawTypeExpression = typeExpression;
             typeExpressionCache[typeExpression] = type;
             return type;
         }
 
-        private static string StripOwnershipQualifier(string typeExpression, out OwnershipHintKind ownershipHint)
+        private static string StripTypePrefix(string typeExpression, out OwnershipHintKind ownershipHint, out Kind? explicitKind, out int explicitSize)
         {
             ownershipHint = OwnershipHintKind.None;
+            explicitKind = null;
+            explicitSize = 0;
+
+            if(string.IsNullOrWhiteSpace(typeExpression))
+                return typeExpression;
+
+            if(typeExpression.StartsWith("(struct:"))
+            {
+                int right = typeExpression.IndexOf(')');
+                if(right > 8)
+                {
+                    var sizeRaw = typeExpression.Substring(8, right - 8);
+                    if(int.TryParse(sizeRaw, out var parsedSize) && parsedSize > 0)
+                    {
+                        explicitSize = parsedSize;
+                    }
+                    explicitKind = Kind.Struct;
+                    return typeExpression.Substring(right + 1).Trim();
+                }
+            }
+
+            if(typeExpression.StartsWith("(primitive)"))
+            {
+                return typeExpression.Substring("(primitive)".Length).Trim();
+            }
+
+            if(typeExpression.StartsWith("(class)"))
+            {
+                explicitKind = Kind.Object;
+                return typeExpression.Substring("(class)".Length).Trim();
+            }
+
+            if(typeExpression.StartsWith("(own class)"))
+            {
+                ownershipHint = OwnershipHintKind.Own;
+                explicitKind = Kind.Object;
+                return typeExpression.Substring("(own class)".Length).Trim();
+            }
+
+            if(typeExpression.StartsWith("(bor class)"))
+            {
+                ownershipHint = OwnershipHintKind.Borrow;
+                explicitKind = Kind.Object;
+                return typeExpression.Substring("(bor class)".Length).Trim();
+            }
 
             if(typeExpression.StartsWith("(own)"))
             {
@@ -710,7 +794,7 @@ namespace Gizbox
                 return typeExpression;
 
             var type = Parse(typeExpression);
-            if(type.Category == Kind.Object)
+            if(type.Category == Kind.Object || type.Category == Kind.Struct)
                 return type.ObjectTypeName;
 
             return typeExpression;
@@ -728,6 +812,7 @@ namespace Gizbox
         private List<GType> _Function_ParamTypes;
         private OwnershipHintKind _OwnershipHint;
         private string _ObjectTypeName;
+        private int _ExplicitSize;
 
         private GType() { }
 
@@ -763,6 +848,7 @@ namespace Gizbox
                     Kind.Char => 2,
                     Kind.String => 8,
                     Kind.Object => 8,
+                    Kind.Struct => _ExplicitSize > 0 ? _ExplicitSize : 8,
                     Kind.Array => 8,
                     Kind.Function => 8,
                     _ => throw new GizboxException(ExceptioName.Undefine, $"unknown type expression category: {_Kind}"),
@@ -788,6 +874,7 @@ namespace Gizbox
                     Kind.Char => 2,
                     Kind.String => 8,
                     Kind.Object => 8,
+                    Kind.Struct => _ExplicitSize > 0 ? Math.Min(_ExplicitSize, 8) : 8,
                     Kind.Array => 8,
                     Kind.Function => 8,
                     _ => throw new GizboxException(ExceptioName.Undefine, $"unknown type expression category: {_Kind}"),
@@ -864,6 +951,8 @@ namespace Gizbox
                     _Kind == Kind.Function;
             }
         }
+
+        public bool IsStructType => _Kind == Kind.Struct;
 
         public bool IsArray
         {
@@ -1015,58 +1104,60 @@ namespace Gizbox
                 case "null":
                     return "null";
                 case "LITBOOL":
-                    return "bool";
+                    return "(primitive)bool";
                 case "LITUINT":
-                    return "uint";
+                    return "(primitive)uint";
                 case "LITULONG":
-                    return "ulong";
+                    return "(primitive)ulong";
                 case "LITINT":
-                    return "int";
+                    return "(primitive)int";
                 case "LITLONG":
-                    return "long";
+                    return "(primitive)long";
                 case "LITFLOAT":
-                    return "float";
+                    return "(primitive)float";
                 case "LITDOUBLE":
-                    return "double";
+                    return "(primitive)double";
                 case "LITCHAR":
-                    return "char";
+                    return "(primitive)char";
                 case "LITSTRING":
-                    return "string";
+                    return "(primitive)string";
             }
             return default;
         }
 
         public static string GenDefaultValue(string type)
         {
-            return type switch
+            var gtype = GType.Parse(type);
+            return gtype.Category switch
             {
-                "byte" => "0",
-                "int" => "0",
-                "uint" => "0u",
-                "long" => "0L",
-                "ulong" => "0ul",
-                "float" => "0f",
-                "double" => "0d",
-                "bool" => "false",
-                "char" => "\'\\0\'",
+                GType.Kind.Byte => "0",
+                GType.Kind.Int => "0",
+                GType.Kind.UInt => "0u",
+                GType.Kind.Long => "0L",
+                GType.Kind.ULong => "0ul",
+                GType.Kind.Float => "0f",
+                GType.Kind.Double => "0d",
+                GType.Kind.Bool => "false",
+                GType.Kind.Char => "'\\0'",
                 _ => "null"
             };
         }
 
         public static string GetLitTokenName(string type)
         {
-            return type switch
+            var gtype = GType.Parse(type);
+            return gtype.Category switch
             {
-                "byte" => "LITINT",
-                "uint" => "LITUINT",
-                "ulong" => "LITULONG",
-                "int" => "LITINT",
-                "long" => "LITLONG",
-                "float" => "LITFLOAT",
-                "double" => "LITDOUBLE",
-                "char" => "LITCHAR",
-                "bool" => "LITBOOL",
-                "string" => "LITSTRING",
+                GType.Kind.Byte => "LITINT",
+                GType.Kind.UInt => "LITUINT",
+                GType.Kind.ULong => "LITULONG",
+                GType.Kind.Int => "LITINT",
+                GType.Kind.Long => "LITLONG",
+                GType.Kind.Float => "LITFLOAT",
+                GType.Kind.Double => "LITDOUBLE",
+                GType.Kind.Char => "LITCHAR",
+                GType.Kind.Bool => "LITBOOL",
+                GType.Kind.String => "LITSTRING",
                 _ => "null"
             };
         }

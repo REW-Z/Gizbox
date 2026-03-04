@@ -61,6 +61,24 @@ void foo()
 
 # TODO  
 
+## Struct 落地进度（Todo/Done）
+
+### Done
+- 词法：新增 `struct` 关键字。  
+- 语法：新增 `declstmt -> struct TYPE_NAME { declstatements }`。  
+- AST：新增 `StructDeclareNode`。  
+- 语义：Pass1/Pass2/Pass3/Pass4 接入 struct；限制 struct 成员仅字段声明；禁止 `own/bor` 字段与 ownership class 字段。  
+- 布局：新增 `GenStructLayoutInfo`，计算字段偏移与整体大小，并回写 struct 类型表达式 `("struct:size")Name`。  
+- 类型系统：`GType` 新增 `Struct` Kind，支持解析 `(struct:size)`、`(primitive)`、`(class)`、`(own class)`、`(bor class)` 前缀。  
+- IR：结构体成员访问改为 `obj.field` 形式生成。  
+- 后端：接入结构体成员访问表达式解析与寻址（局部/参数基于 `rbp+offset`，全局基于 `rel+disp`）。  
+- 调用点 lowering：`Size > 8` 的 struct 实参在调用前复制到调用方栈临时区，并按地址传递。  
+- 返回值 lowering：`Size > 8` 的 struct 采用隐藏返回缓冲区（sret）路径，CALL/PCALL/MCALL 与 RETURN 已接入。  
+- 构建：当前工作区编译通过。  
+
+### TODO
+- 单元测试：补充 struct 字段访问、嵌套 struct、作为函数参数/返回值、大 struct 按值调用等用例。  
+
 
 ### 函数指针  
 

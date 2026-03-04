@@ -467,7 +467,8 @@ namespace Gizbox
 
             foreach (var record in lib.globalScope.env.records.Values)
             {
-                if (record.category != SymbolTable.RecordCatagory.Class)
+                if (record.category != SymbolTable.RecordCatagory.Class
+                    && record.category != SymbolTable.RecordCatagory.Struct)
                     continue;
 
                 var name = string.IsNullOrWhiteSpace(record.rawname) ? record.name : record.rawname;

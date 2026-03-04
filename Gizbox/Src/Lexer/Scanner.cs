@@ -107,6 +107,7 @@ namespace Gizbox
             keywords.Add(new TokenPattern("bor", "bor\\W", 1));
             keywords.Add(new TokenPattern("var", "var\\W", 1));
             keywords.Add(new TokenPattern("class", "class\\W", 1));
+            keywords.Add(new TokenPattern("struct", "struct\\W", 1));
             keywords.Add(new TokenPattern("void", "void\\W", 1));
             keywords.Add(new TokenPattern("bool", "bool\\W", 1));
             keywords.Add(new TokenPattern("byte", "byte\\W", 1));
@@ -386,9 +387,20 @@ namespace Gizbox
                     if (Compiler.enableLogScanner) Log("\n>>>>> identifier:" + identifierName + "\n\n");
 
                     string tokenName;
-                    if(tokens.Last().name == "namespace")
+                    var prevToken = tokens.Count > 0 ? tokens.Last() : null;
+
+                    if(prevToken != null && prevToken.name == "namespace")
                     {
                         tokenName = identifierPattern.tokenName;
+                    }
+                    else if(prevToken != null && (prevToken.name == "class" || prevToken.name == "struct"))
+                    {
+                        tokenName = "TYPE_NAME";
+
+                        string typename = identifierName;
+                        if(identifierName.Contains("::"))
+                            typename = identifierName.Substring(identifierName.LastIndexOf(':') + 1);
+                        typeNameSet.Add(typename);
                     }
                     else
                     {

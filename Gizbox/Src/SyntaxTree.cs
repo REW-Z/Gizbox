@@ -125,6 +125,7 @@ namespace Gizbox
         [KnownType(typeof(ExternFuncDeclareNode))]
         [KnownType(typeof(FuncDeclareNode))]
         [KnownType(typeof(ClassDeclareNode))]
+        [KnownType(typeof(StructDeclareNode))]
         [KnownType(typeof(AccessLabelNode))]
         [KnownType(typeof(OwnershipLeakStmtNode))]
         [KnownType(typeof(OwnershipCaptureStmtNode))]
@@ -194,6 +195,7 @@ namespace Gizbox
                 {
                     return this.parent;
                 }
+
                 set 
                 {
                     this.parent = value;
@@ -798,6 +800,8 @@ namespace Gizbox
         public enum FunctionKind
         {
             Normal,
+            Ctor,
+            Dtor,
             OperatorOverload,
         }
         [DataContract(IsReference = true)]
@@ -849,6 +853,21 @@ namespace Gizbox
                 memberDelareNodes = new ChildList<DeclareNode>(children_group_1);
             }
 
+        }
+
+        [DataContract(IsReference = true)]
+        public class StructDeclareNode : DeclareNode
+        {
+            public IdentityNode structNameNode { get => (IdentityNode)children_group_0[0]; set => children_group_0[0] = value; }
+            public readonly ChildList<DeclareNode> memberDelareNodes;
+
+            public StructDeclareNode()
+            {
+                children_group_0 = new();
+                children_group_0.Add(null);
+                children_group_1 = new();
+                memberDelareNodes = new ChildList<DeclareNode>(children_group_1);
+            }
         }
 
 
@@ -1209,12 +1228,14 @@ namespace Gizbox
         public class NewObjectNode : SpecialExprNode
         {
             public IdentityNode className { get => (IdentityNode)children_group_0[0]; set => children_group_0[0] = value; }
+            public ArgumentListNode argumantsNode { get => (ArgumentListNode)children_group_0[1]; set => children_group_0[1] = value; }
             [DataMember]
             public TypeNode typeNode;
 
             public NewObjectNode()
             {
                 children_group_0 = new();
+                children_group_0.Add(null);
                 children_group_0.Add(null);
             }
         }
@@ -1365,11 +1386,11 @@ namespace Gizbox
                     rawTypeName = Utils.MangleTemplateInstanceName(classname.FullName, genericArguments.Select(t => t.TypeExpression()));
 
                 if(ownershipModifier.HasFlag(VarModifiers.Own))
-                    return "(own)" + rawTypeName;
+                    return "(own class)" + rawTypeName;
                 if(ownershipModifier.HasFlag(VarModifiers.Bor))
-                    return "(bor)" + rawTypeName;
+                    return "(bor class)" + rawTypeName;
 
-                return rawTypeName;
+                return "(class)" + rawTypeName;
             }
         }
         [DataContract(IsReference = true)]
@@ -1380,7 +1401,7 @@ namespace Gizbox
 
             public override string TypeExpression()
             {
-                return token.name;
+                return "(primitive)" + token.name;
             }
         }
 

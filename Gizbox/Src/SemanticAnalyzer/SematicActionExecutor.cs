@@ -540,6 +540,36 @@ namespace Gizbox.SemanticRule
 
                 psr.newElement.attributes[ParseAttr.ast_node] = funcNode;
             });
+
+            AddActionAtTail("declstmt -> TYPE_NAME ( params ) { statements }", (psr, production) => {
+                var classToken = psr.stack[psr.stack.Top - 6].attributes[ParseAttr.token] as Token;
+
+                var ctorNode = new SyntaxTree.FuncDeclareNode()
+                {
+                    funcType = FunctionKind.Ctor,
+                    returnFlags = VarModifiers.None,
+
+                    returnTypeNode = new SyntaxTree.PrimitiveTypeNode()
+                    {
+                        token = new Token("void", PatternType.Keyword, "void", classToken.line, classToken.start, classToken.length),
+                        attributes = new Dictionary<AstAttr, object>(),
+                    },
+                    identifierNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = new Token("ID", PatternType.Id, "ctor", classToken.line, classToken.start, classToken.length),
+                        identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
+                    },
+                    parametersNode = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes[ParseAttr.ast_node],
+                    statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
+
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+
+                ctorNode.attributes[AstAttr.member_name] = classToken.attribute;
+
+                psr.newElement.attributes[ParseAttr.ast_node] = ctorNode;
+            });
             AddActionAtTail("declstmt -> decltype operator ID genparams ( params ) { statements }", (psr, production) => {
                 var funcNode = new SyntaxTree.FuncDeclareNode()
                 {
@@ -631,6 +661,25 @@ namespace Gizbox.SemanticRule
                 ((SyntaxTree.ClassDeclareNode)psr.newElement.attributes[ParseAttr.ast_node]).memberDelareNodes.AddRange(
                     (List<SyntaxTree.DeclareNode>)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.decl_stmts]
                 );
+            });
+
+            AddActionAtTail("declstmt -> struct TYPE_NAME { declstatements }", (psr, production) => {
+                var node = new SyntaxTree.StructDeclareNode()
+                {
+                    structNameNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 3].attributes[ParseAttr.token] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.Class,
+                    },
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+
+                node.memberDelareNodes.AddRange(
+                    (List<SyntaxTree.DeclareNode>)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.decl_stmts]
+                );
+
+                psr.newElement.attributes[ParseAttr.ast_node] = node;
             });
 
             AddActionAtTail("declstmt -> class own TYPE_NAME genparams inherit { declstatements }", (psr, production) => {
@@ -1408,9 +1457,9 @@ namespace Gizbox.SemanticRule
             });
 
 
-            AddActionAtTail("newobj -> new namedtype ( )", (psr, production) => {
+            AddActionAtTail("newobj -> new namedtype ( args )", (psr, production) => {
 
-                var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.id];
+                var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top - 3].attributes[ParseAttr.id];
                 idNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
 
                 var classTypeNode = new SyntaxTree.ClassTypeNode()
@@ -1419,7 +1468,7 @@ namespace Gizbox.SemanticRule
                     attributes = new Dictionary<AstAttr, object>(),
                 };
 
-                if(psr.stack[psr.stack.Top - 2].attributes.TryGetValue(ParseAttr.generic_args, out var genericArgsObj)
+                if(psr.stack[psr.stack.Top - 3].attributes.TryGetValue(ParseAttr.generic_args, out var genericArgsObj)
                     && genericArgsObj is List<SyntaxTree.TypeNode> genericArgs
                     && genericArgs.Count > 0)
                 {
@@ -1429,6 +1478,7 @@ namespace Gizbox.SemanticRule
                 psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.NewObjectNode()
                 {
                     className = idNode,
+                    argumantsNode = (SyntaxTree.ArgumentListNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
                     typeNode = classTypeNode,
 
                     attributes = new Dictionary<AstAttr, object>(),

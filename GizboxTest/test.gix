@@ -63,31 +63,48 @@ void test_sizeof()
 }
 
 // ----------------- Dic ------------------
-class OOO{}
+class OOO
+{
+	int value = 666;
+	OOO(int v)
+	{
+		this.value = v;
+	}
+}
 void test_dic()
 {
+	OOO o1 = new OOO(123);
+	OOO o2 = new OOO(123);
+	OOO o3 = o2;
+	Console::PrintLn("OOO o1 addr :" + (string)(hashof(o1)));
+	Console::PrintLn("OOO o2 addr :" + (string)(hashof(o2)));
+	Console::PrintLn("o1 o2 equal :" + (string)(o1 == o2));
+	Console::PrintLn("o2 o3 equal :" + (string)(o2 == o3));
+	Console::PrintLn("o1 ToString1::" + (string)(o1));
+	Console::PrintLn("o1 ToString2::" + o1.ToString());
+
+	
 	HashMap<int, int> dict = new HashMap<int, int>();
 	dict.Add(1, 10);
 	int result = dict.Get(1);
 	Console::PrintLn("Dic1 result:" + (string)result);
-
-	int h = hashof("key");
-	Console::PrintLn("Hash of key:" + (string)h);
-
+	
 	var dict2 = new HashMap<string, string>();
-	Console::PrintLn("111");
-	dict2.Add("key", "value");
-	Console::PrintLn("222");
-	string result2 = dict2.Get("key");
-	Console::PrintLn("333");
+	dict2.Add("name", "rew");
+	string result2 = dict2.Get("name");
 	Console::PrintLn("Dic2 result:" + result2);
 
 	var dict3 = new HashMap<OOO, int>();
-	OOO o = new OOO();
+	OOO o = new OOO(123);
 	dict3.Add(o, 123);
 	int result3 = dict3.Get(o);
-	Console::PrintLn("OOO addr :" + (string)(hashof(o)));
 	Console::PrintLn("Dic3 result:" + (string)result3);
+
+
+	ChainedHashMap<string, int> dict4 = new ChainedHashMap<string, int>();
+	dict4.Add("num", 123456);
+	int result4 = dict4.Get("num");
+	Console::PrintLn("Dic4 result:" + (string)result4);
 }
 
 // ----------------- 位运算 -----------------
@@ -157,6 +174,40 @@ class TestClass
 {
 	int Foo(int a){ return a + 1; }
 }
+// ----------------- Test-CTOR ------------------
+void test_ctor()
+{
+	AAA otest = new AAA();
+	Console::PrintLn("otest:" + (string)otest.value);
+
+	BBB otest2 = new BBB(999);
+	Console::PrintLn("otest2:" + (string)otest2.value);
+	BBB otest3 = new BBB("sss");
+	Console::PrintLn("otest3:" + (string)otest3.value);
+}
+class AAA
+{
+	int value = 0;
+	AAA()
+	{
+		Console::PrintLn("AAA default ctor called");
+		this.value = 111;
+	}
+	AAA(int v)
+	{
+		this.value = v;
+	}
+}
+class BBB : AAA
+{
+	BBB(int v)
+	{
+		Console::PrintLn("BBB ctor called with value:" + (string)v);
+	}
+	BBB(string aaa)
+	{
+	}
+}
 // ----------------- Main ------------------
 void main()
 {
@@ -169,6 +220,7 @@ void main()
 	test_rtti();
 	test_fileio();
 	test_funcptr();
+	test_ctor();
 
 	Console::PrintLn("Test finished!");
 	Console::ReadLn();

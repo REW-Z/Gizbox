@@ -5,7 +5,8 @@ namespace Core
 	{
 		string ToString()
 		{
-			return "Object";
+			var t = gettype(this);
+			return t.name ;
 		}
 
 		int GetHashCode()

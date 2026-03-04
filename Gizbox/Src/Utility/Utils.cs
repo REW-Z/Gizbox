@@ -211,50 +211,14 @@ namespace Gizbox
 
         public static int GetGizboxTypeAlignment(string typeExpression)
         {
-            // 这里可以根据Gizbox的类型系统定义来计算对齐
-            // 假设所有基本类型的对齐都是1字节
-            switch (typeExpression)
-            {
-                case "bool":
-                case "byte":
-                    return 1;
-                case "short":
-                case "char":
-                    return 2;
-                case "int":
-                case "float":
-                    return 4;
-                case "long":
-                case "double":
-                    return 8;
-                case "string":
-                    return 8;//指针
-                default:
-                    return 8;//引用类型指针
-            }
+            var gtype = GType.Parse(typeExpression);
+            return gtype.Align;
         }
 
         public static int GetGizboxTypeSize(string typeExpression)
         {
-            switch(typeExpression)
-            {
-                case "bool":
-                case "byte":
-                    return 1;
-                case "short":
-                case "char":
-                    return 2;
-                case "int":
-                case "float":
-                    return 4;
-                case "long":
-                case "double":
-                    return 8;
-                case "string":
-                    return 8;//指针
-                default:
-                    return 8;//引用类型指针
-            }
+            var gtype = GType.Parse(typeExpression);
+            return gtype.Size;
         }
 
 

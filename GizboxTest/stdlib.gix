@@ -481,6 +481,10 @@ namespace Collections
 			{
 				this.states[i] = 0;
 			}
+			for(int i = 0; i < this.opacity; ++i)
+			{
+				this.keys[i] = default(TKey);
+			}
 			this.count = 0;
 
 			this.isInit = true;
@@ -500,29 +504,33 @@ namespace Collections
 				this.Init();
 
 			int hash = this.HashKey(key);
-			Console::PrintLn("Hash:" + (string)hash);
+			
 			int idx = hash % this.opacity;
 			int firstRemoved = -1;
+
 			for(int i = 0 ; i < 10; ++i)
 			{
 				int state = this.states[idx];
 				
-			Console::PrintLn("state:" + (string)state);
-			Console::PrintLn("idx:" + (string)idx);
-
 				if(state == 0)
 				{
 					if(firstRemoved >= 0)
 						return firstRemoved;
 					return idx;
 				}
-				if(state == 2 && firstRemoved < 0)
+				if(state == 2)
 				{
-					firstRemoved = idx;
+					if(firstRemoved < 0)
+					{
+						firstRemoved = idx;
+					}
 				}
-				if(state == 1 && this.keys[idx] == key)
+				if(state == 1)
 				{
-					return idx;
+					if(this.keys[idx] == key)
+					{
+						return idx;
+					}
 				}
 				
 				idx += 1;
@@ -550,6 +558,10 @@ namespace Collections
 			for(int i = 0; i < this.opacity; ++i)
 			{
 				this.states[i] = 0;
+			}
+			for(int i = 0; i < this.opacity; ++i)
+			{
+				this.keys[i] = default(TKey);
 			}
 			for(int i = 0; i < oldOpacity; ++i)
 			{
@@ -606,6 +618,205 @@ namespace Collections
 		int Count()
 		{
 			return this.count;
+		}
+	}
+
+	class ChainedHashMap<TKey, TValue>
+	{
+	private:
+		int[] buckets = new int[16];
+		int[] hashes = new int[16];
+		int[] next = new int[16];
+		TKey[] keys = new TKey[16];
+		TValue[] values = new TValue[16];
+		int opacity = 16;
+		int count = 0;
+		int freeList = -1;
+		int freeCount = 0;
+
+		bool isInit = false;
+
+		void Init()
+		{
+			for(int i = 0; i < this.opacity; ++i)
+			{
+				this.buckets[i] = -1;
+				this.hashes[i] = -1;
+				this.next[i] = -1;
+				this.keys[i] = default(TKey);
+			}
+
+			this.count = 0;
+			this.freeList = -1;
+			this.freeCount = 0;
+			this.isInit = true;
+		}
+
+		int HashKey(TKey key)
+		{
+			int h = hashof(key);
+			if(h < 0)
+				h = -h;
+			return h;
+		}
+
+		void Resize()
+		{
+			int newOpacity = this.opacity * 2;
+			int[] newBuckets = new int[newOpacity];
+			int[] newHashes = new int[newOpacity];
+			int[] newNext = new int[newOpacity];
+			TKey[] newKeys = new TKey[newOpacity];
+			TValue[] newValues = new TValue[newOpacity];
+
+			for(int i = 0; i < newOpacity; ++i)
+			{
+				newBuckets[i] = -1;
+				newHashes[i] = -1;
+				newNext[i] = -1;
+				newKeys[i] = default(TKey);
+			}
+
+			for(int i = 0; i < this.count; ++i)
+			{
+				if(this.hashes[i] >= 0)
+				{
+					newHashes[i] = this.hashes[i];
+					newKeys[i] = this.keys[i];
+					newValues[i] = this.values[i];
+
+					int bucket = this.hashes[i] % newOpacity;
+					newNext[i] = newBuckets[bucket];
+					newBuckets[bucket] = i;
+				}
+				else
+				{
+					newNext[i] = this.next[i];
+				}
+			}
+
+			this.opacity = newOpacity;
+			this.buckets = newBuckets;
+			this.hashes = newHashes;
+			this.next = newNext;
+			this.keys = newKeys;
+			this.values = newValues;
+		}
+
+		int FindEntry(TKey key)
+		{
+			if(this.isInit == false)
+				this.Init();
+
+			int hash = this.HashKey(key);
+			int bucket = hash % this.opacity;
+
+			int i = this.buckets[bucket];
+			while(i != -1)
+			{
+				if(this.hashes[i] == hash && this.keys[i] == key)
+					return i;
+				i = this.next[i];
+			}
+
+			return -1;
+		}
+
+	public:
+		void Add(TKey key, TValue value)
+		{
+			if(this.isInit == false)
+				this.Init();
+		
+			// 只有没有可复用槽位且entries已满 -> 扩容
+			if(this.freeCount == 0 && this.count >= this.opacity)
+				this.Resize();
+		
+			int hash = this.HashKey(key);
+			int bucket = hash % this.opacity;
+		
+			int i = this.buckets[bucket];
+			while(i != -1)
+			{
+				if(this.hashes[i] == hash && this.keys[i] == key)
+				{
+					this.values[i] = value;
+					return;
+				}
+				i = this.next[i];
+			}
+		
+			int idx = -1;
+			if(this.freeCount > 0)
+			{
+				idx = this.freeList;
+				this.freeList = this.next[idx];
+				this.freeCount -= 1;
+			}
+			else
+			{
+				idx = this.count;
+				this.count += 1;
+			}
+		
+			this.hashes[idx] = hash;
+			this.keys[idx] = key;
+			this.values[idx] = value;
+			this.next[idx] = this.buckets[bucket];
+			this.buckets[bucket] = idx;
+		}
+
+		TValue Get(TKey key)
+		{
+			int idx = this.FindEntry(key);
+			if(idx >= 0)
+				return this.values[idx];
+			return default(TValue);
+		}
+
+		bool ContainsKey(TKey key)
+		{
+			return this.FindEntry(key) >= 0;
+		}
+
+		bool Remove(TKey key)
+		{
+			if(this.isInit == false)
+				this.Init();
+
+			int hash = this.HashKey(key);
+			int bucket = hash % this.opacity;
+
+			int last = -1;
+			int i = this.buckets[bucket];
+			while(i != -1)
+			{
+				if(this.hashes[i] == hash && this.keys[i] == key)
+				{
+					if(last == -1)
+						this.buckets[bucket] = this.next[i];
+					else
+						this.next[last] = this.next[i];
+
+					this.hashes[i] = -1;
+					this.keys[i] = default(TKey);
+					this.values[i] = default(TValue);
+					this.next[i] = this.freeList;
+					this.freeList = i;
+					this.freeCount += 1;
+					return true;
+				}
+
+				last = i;
+				i = this.next[i];
+			}
+
+			return false;
+		}
+
+		int Count()
+		{
+			return this.count - this.freeCount;
 		}
 	}
 }

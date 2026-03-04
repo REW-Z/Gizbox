@@ -153,11 +153,13 @@ namespace Gizbox
             "declstmt -> decltype ID = leak ( ID ) ;",
 
             "declstmt -> decltype ID genparams ( params ) { statements }",
+            "declstmt -> TYPE_NAME ( params ) { statements }",
             "declstmt -> decltype operator ID genparams ( params ) { statements }",
             "declstmt -> extern decltype ID genparams ( params ) ;",
 
             "declstmt -> class TYPE_NAME genparams inherit { declstatements }",
             "declstmt -> class own TYPE_NAME genparams inherit { declstatements }",
+            "declstmt -> struct TYPE_NAME { declstatements }",
 
             "declstmt -> acmodif :",
 
@@ -279,7 +281,7 @@ namespace Gizbox
             "indexaccess -> idsb",
             "indexaccess -> memberaccess [ aexpr ]",
 
-            "newobj -> new namedtype ( )",
+            "newobj -> new namedtype ( args )",
             "newarr -> new namedtype [ aexpr ]",
             "newarr -> new primitive [ aexpr ]",
 

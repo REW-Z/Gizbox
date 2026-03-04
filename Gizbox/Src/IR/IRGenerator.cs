@@ -87,6 +87,18 @@ namespace Gizbox.IR
                         GenNode(programNode.statementsNode);
                     }
                     break;
+                case StructDeclareNode structDeclNode:
+                    {
+                        envStackTemp.Push(structDeclNode.attributes[AstAttr.env] as SymbolTable);
+                        EnvBegin(structDeclNode.attributes[AstAttr.env] as SymbolTable);
+
+                        EmitCode("").label = "struct_begin:" + structDeclNode.structNameNode.FullName;
+                        EmitCode("").label = "struct_end:" + structDeclNode.structNameNode.FullName;
+
+                        EnvEnd(structDeclNode.attributes[AstAttr.env] as SymbolTable);
+                        envStackTemp.Pop();
+                    }
+                    break;
                 case NamespaceNode namespaceNode:
                     {
                         GenNode(namespaceNode.stmtsNode);
@@ -153,11 +165,28 @@ namespace Gizbox.IR
 
                         EmitCode("").label = "class_begin:" + className;
 
-                        //生成隐式构造函数  
-                        EmitCtor(classDeclNode);
+                        bool hasExplicitCtor = false;
+                        bool hasExplicitDtor = false;
+                        foreach(var memberDecl in classDeclNode.memberDelareNodes)
+                        {
+                            if(memberDecl is not FuncDeclareNode fn)
+                                continue;
 
-                        //生成隐式析构函数  
-                        EmitDtor(classDeclNode);
+                            if(IsCtorFuncDecl(fn))
+                                hasExplicitCtor = true;
+                            if(IsDtorFuncDecl(fn))
+                                hasExplicitDtor = true;
+                        }
+
+                        if(hasExplicitCtor == false)
+                        {
+                            EmitCtor(classDeclNode);
+                        }
+
+                        if(hasExplicitDtor == false)
+                        {
+                            EmitDtor(classDeclNode);
+                        }
 
                         //成员函数
                         foreach(var memberDecl in classDeclNode.memberDelareNodes)
@@ -183,10 +212,14 @@ namespace Gizbox.IR
                             break;
                         //是否是实例成员函数  
                         bool isMethod = envStackTemp.Peek().tableCatagory == SymbolTable.TableCatagory.ClassScope;
+                        bool isCtor = IsCtorFuncDecl(funcDeclNode);
+                        bool isDtor = IsDtorFuncDecl(funcDeclNode);
 
                         //函数全名(修饰)    
                         string funcFinalName;
-                        if (isMethod)
+                        if (isMethod && (isCtor || isDtor))
+                            funcFinalName = (string)funcDeclNode.attributes[AstAttr.mangled_name];
+                        else if (isMethod)
                             funcFinalName = envStackTemp.Peek().name + "." + (string)funcDeclNode.attributes[AstAttr.mangled_name];
                         else
                             funcFinalName = (string)funcDeclNode.attributes[AstAttr.mangled_name];
@@ -208,10 +241,28 @@ namespace Gizbox.IR
 
                         EmitCode("FUNC_BEGIN", funcFinalName).label = "func_begin:" + funcFinalName;
 
+                        if(isMethod && isCtor)
+                        {
+                            var ownerClass = TryGetOwnerClassDecl(funcDeclNode);
+                            if(ownerClass != null)
+                            {
+                                EmitCtorPrologue(ownerClass, funcDeclNode);
+                            }
+                        }
+
                         //语句  
                         foreach (var stmt in funcDeclNode.statementsNode.statements)
                         {
                             GenNode(stmt);
+                        }
+
+                        if(isMethod && isDtor)
+                        {
+                            var ownerClass = TryGetOwnerClassDecl(funcDeclNode);
+                            if(ownerClass != null)
+                            {
+                                EmitDtorEpilogue(ownerClass);
+                            }
                         }
 
                         // 函数正常退出需要回收的 Owner
@@ -582,18 +633,26 @@ namespace Gizbox.IR
                             return false;
                         }
 
+                        string memberSep = "->";
+                        if(objMemberAccess.objectNode.attributes.TryGetValue(AstAttr.type, out var objTypeObj) && objTypeObj is string objTypeExpr)
+                        {
+                            var objType = GType.Parse(objTypeExpr);
+                            if(objType.IsStructType)
+                                memberSep = ".";
+                        }
+
                         // 作为左值使用
                         bool isLeftValue = (objMemberAccess.Parent is AssignNode assign) && (assign.lvalueNode == objMemberAccess);
                         if(isLeftValue)
                         {
-                            SetRet(objMemberAccess, objExpr + "->" + objMemberAccess.memberNode.FullName);
+                            SetRet(objMemberAccess, objExpr + memberSep + objMemberAccess.memberNode.FullName);
                         }
                         else
                         {
                             // 右值：读一次到临时变量，返回该临时
                             string valueType = (string)objMemberAccess.attributes[AstAttr.type];
                             string tmp = NewTemp(valueType);
-                            EmitCode("=", tmp, objExpr + "->" + objMemberAccess.memberNode.FullName);
+                            EmitCode("=", tmp, objExpr + memberSep + objMemberAccess.memberNode.FullName);
                             SetRet(objMemberAccess, tmp);
                         }
 
@@ -917,6 +976,9 @@ namespace Gizbox.IR
                 case NewObjectNode newObjNode:
                     {
                         string className = newObjNode.className.FullName;
+                        string ctorName = newObjNode.attributes.TryGetValue(AstAttr.mangled_name, out object ctorNameObj)
+                            ? (string)ctorNameObj
+                            : BuildCtorFunctionFullName(className, Array.Empty<string>());
 
                         //表达式的返回变量 (始终存到临时变量)    
                         SetRet(newObjNode, NewTemp(className));
@@ -926,8 +988,15 @@ namespace Gizbox.IR
                         }
 
                         EmitCode("ALLOC", GetRet(newObjNode), className);
+
+                        for(int i = newObjNode.argumantsNode.arguments.Count - 1; i >= 0; --i)
+                        {
+                            GenNode(newObjNode.argumantsNode.arguments[i]);
+                            EmitCode("PARAM", GetRet(newObjNode.argumantsNode.arguments[i]));
+                        }
+
                         EmitCode("PARAM", GetRet(newObjNode));
-                        EmitCode("CALL", className + "::ctor", "%LITINT:" + 1);
+                        EmitCode("CALL", ctorName, "%LITINT:" + (newObjNode.argumantsNode.arguments.Count + 1));
                     }
                     break;
                 case NewArrayNode newArrNode:
@@ -1126,14 +1195,120 @@ namespace Gizbox.IR
             EmitCode("").label = label;
         }
 
+        private bool IsCtorFuncDecl(FuncDeclareNode funcDeclNode)
+        {
+            return funcDeclNode?.identifierNode?.token?.attribute == "ctor";
+        }
+
+        private static string BuildCtorFunctionFullName(string classFullName, params string[] paramTypes)
+        {
+            return Utils.Mangle(classFullName + "::ctor", paramTypes ?? Array.Empty<string>());
+        }
+
+        private bool IsDtorFuncDecl(FuncDeclareNode funcDeclNode)
+        {
+            return funcDeclNode?.identifierNode?.token?.attribute == "dtor";
+        }
+
+        private ClassDeclareNode TryGetOwnerClassDecl(SyntaxTree.Node node)
+        {
+            var p = node?.Parent;
+            while(p != null)
+            {
+                if(p is ClassDeclareNode classDeclNode)
+                    return classDeclNode;
+                p = p.Parent;
+            }
+
+            return null;
+        }
+
+        private void EmitCtorPrologue(ClassDeclareNode classDeclNode, FuncDeclareNode currentCtorNode = null)
+        {
+            if(classDeclNode.baseClassNameNode != null)
+            {
+                var baseClassName = classDeclNode.baseClassNameNode.FullName;
+                var baseClassRec = Query(baseClassName);
+                if(baseClassRec == null || baseClassRec.envPtr == null)
+                    throw new GizboxException(ExceptioName.BaseClassNotFound, baseClassName);
+
+                var ctorParamTypes = currentCtorNode?.parametersNode?.parameterNodes?.Select(p => p.typeNode.TypeExpression()).ToArray() ?? Array.Empty<string>();
+                string baseCtorName = BuildCtorFunctionFullName(baseClassName, ctorParamTypes);
+                bool useDefaultCtorFallback = false;
+                if(baseClassRec.envPtr.ContainRecordName(baseCtorName) == false)
+                {
+                    string baseDefaultCtor = BuildCtorFunctionFullName(baseClassName, Array.Empty<string>());
+                    if(baseClassRec.envPtr.ContainRecordName(baseDefaultCtor))
+                    {
+                        baseCtorName = baseDefaultCtor;
+                        useDefaultCtorFallback = true;
+                    }
+                    else
+                    {
+                        throw new GizboxException(ExceptioName.SemanticAnalysysError, $"base ctor signature not found: {baseCtorName}.");
+                    }
+                }
+
+                if(useDefaultCtorFallback == false)
+                {
+                    for(int i = (currentCtorNode?.parametersNode?.parameterNodes.Count ?? 0) - 1; i >= 0; --i)
+                    {
+                        var p = currentCtorNode.parametersNode.parameterNodes[i];
+                        EmitCode("PARAM", p.identifierNode.FullName);
+                    }
+                }
+                EmitCode("PARAM", "this");
+                int baseArgCount = useDefaultCtorFallback ? 1 : ((currentCtorNode?.parametersNode?.parameterNodes.Count ?? 0) + 1);
+                EmitCode("CALL", baseCtorName, "%LITINT:" + baseArgCount);
+            }
+
+            foreach(var memberDecl in classDeclNode.memberDelareNodes)
+            {
+                if(memberDecl is not VarDeclareNode fieldDecl)
+                    continue;
+
+                GenNode(fieldDecl.initializerNode);
+                EmitCode("=", "this->" + fieldDecl.identifierNode.FullName, GetRet(fieldDecl.initializerNode));
+            }
+        }
+
+        private void EmitDtorEpilogue(ClassDeclareNode classDeclNode)
+        {
+            for(int i = classDeclNode.memberDelareNodes.Count - 1; i >= 0; --i)
+            {
+                if(classDeclNode.memberDelareNodes[i] is not VarDeclareNode fieldDecl)
+                    continue;
+
+                var classEnv = envStackTemp[envStackTemp.Count - 2];
+                if(classEnv == null)
+                    continue;
+
+                if(classEnv.ContainRecordName(fieldDecl.identifierNode.FullName) == false)
+                    continue;
+
+                var fieldRec = classEnv.GetRecord(fieldDecl.identifierNode.FullName);
+                if(fieldRec.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar) == false)
+                    continue;
+
+                EmitOwnDropField("this", fieldDecl.identifierNode.FullName);
+            }
+
+            if(classDeclNode.baseClassNameNode != null)
+            {
+                var baseClassName = classDeclNode.baseClassNameNode.FullName;
+                EmitCode("PARAM", "this");
+                EmitCode("CALL", baseClassName + "::dtor", "%LITINT:1");
+            }
+        }
+
         public void EmitCtor(ClassDeclareNode classDeclNode)
         {
             //隐式构造函数 
             //全名    
-            string funcFullName = classDeclNode.classNameNode.FullName + "::ctor";
+            string funcFullName = BuildCtorFunctionFullName(classDeclNode.classNameNode.FullName, Array.Empty<string>());
 
             //函数开始    
-            var ctorEnv = envStackTemp.Peek().GetTableInChildren(classDeclNode.classNameNode.FullName + "::ctor");
+            var ctorEnv = envStackTemp.Peek().GetTableInChildren(funcFullName);
             envStackTemp.Push(ctorEnv);
             EnvBegin(ctorEnv);
 
@@ -1141,29 +1316,7 @@ namespace Gizbox.IR
 
             EmitCode("FUNC_BEGIN", funcFullName).label = "func_begin:" + funcFullName;
 
-
-            //基类构造函数调用  
-            if(classDeclNode.baseClassNameNode != null)
-            {
-                var baseClassName = classDeclNode.baseClassNameNode.FullName;
-                var baseRec = Query(baseClassName);
-                var baseEnv = baseRec.envPtr;
-
-                EmitCode("PARAM", "this");
-                EmitCode("CALL", baseClassName + "::ctor", "%LITINT:1");
-            }
-
-            //成员变量初始化
-            foreach(var memberDecl in classDeclNode.memberDelareNodes)
-            {
-                if(memberDecl is VarDeclareNode)
-                {
-                    var fieldDecl = memberDecl as VarDeclareNode;
-
-                    GenNode(fieldDecl.initializerNode);
-                    EmitCode("=", "this->" + fieldDecl.identifierNode.FullName, GetRet(fieldDecl.initializerNode));
-                }
-            }
+            EmitCtorPrologue(classDeclNode, null);
 
             //其他语句(Not Implement)  
             //...  
@@ -1191,35 +1344,7 @@ namespace Gizbox.IR
             EmitCode("").label = "entry:" + funcFullName;
             EmitCode("FUNC_BEGIN", funcFullName).label = "func_begin:" + funcFullName;
 
-            //先析构派生类的Owner字段（逆序）
-            //仅处理：变量声明节点 + 该字段是 OwnerVar（由语义分析标记）
-            for(int i = classDeclNode.memberDelareNodes.Count - 1; i >= 0; --i)
-            {
-                if(classDeclNode.memberDelareNodes[i] is not VarDeclareNode fieldDecl)
-                    continue;
-
-                var classEnv = envStackTemp[envStackTemp.Count - 2]; // 当前类的 env（dtor env 之下一级）
-                if(classEnv == null)
-                    continue;
-
-                if(classEnv.ContainRecordName(fieldDecl.identifierNode.FullName) == false)
-                    continue;
-
-                var fieldRec = classEnv.GetRecord(fieldDecl.identifierNode.FullName);
-                if(fieldRec.flags.HasFlag(SymbolTable.RecordFlag.OwnerVar) == false)
-                    continue;
-
-                EmitOwnDropField("this", fieldDecl.identifierNode.FullName);
-            }
-
-            //再调用基类析构  
-            if(classDeclNode.baseClassNameNode != null)
-            {
-                var baseClassName = classDeclNode.baseClassNameNode.FullName;
-
-                EmitCode("PARAM", "this");
-                EmitCode("CALL", baseClassName + "::dtor", "%LITINT:1");
-            }
+            EmitDtorEpilogue(classDeclNode);
 
             EmitCode("RETURN");
 
@@ -1434,9 +1559,10 @@ namespace Gizbox.IR
             {
                 string typeName = (string)literalNode.attributes[AstAttr.type];
 
-                if (typeName != "null")
+                if(typeName != "(class)null")
                 {
-                    if (typeName == "string")
+                    var gtype = GType.Parse(typeName);
+                    if(gtype.Category == GType.Kind.String)
                     {
                         string lex = literalNode.token.attribute;
                         string conststr = lex.Substring(1, lex.Length - 2);
@@ -1450,7 +1576,11 @@ namespace Gizbox.IR
                     }
                     else
                     {
-                        operandStr = "%LIT" + typeName.ToUpper() + ":" + literalNode.token.attribute;
+                        string litName = TypeUtils.GetLitTokenName(typeName);
+                        if(litName == "null")
+                            throw new SemanticException(ExceptioName.LiteralTypeUnknown, literalNode, literalNode.token.ToString());
+
+                        operandStr = "%" + litName + ":" + literalNode.token.attribute;
                     }
                 }
                 else
@@ -1475,27 +1605,27 @@ namespace Gizbox.IR
                 return "%LITNULL:";
             }
 
-            switch (typeExpr)
+            switch (gtype.Category)
             {
-                case "bool":
+                case GType.Kind.Bool:
                     return "%LITBOOL:false";
-                case "char":
+                case GType.Kind.Char:
                     return "%LITCHAR:'\\0'";
-                case "byte":
+                case GType.Kind.Byte:
                     return "%LITINT:0";
-                case "uint":
+                case GType.Kind.UInt:
                     return "%LITUINT:0u";
-                case "float":
+                case GType.Kind.Float:
                     return "%LITFLOAT:0.0f";
-                case "double":
+                case GType.Kind.Double:
                     return "%LITDOUBLE:0.0d";
-                case "ulong":
+                case GType.Kind.ULong:
                     return "%LITULONG:0ul";
-                case "long":
+                case GType.Kind.Long:
                     return "%LITLONG:0L";
-                case "int":
+                case GType.Kind.Int:
                     return "%LITINT:0";
-                case "string":
+                case GType.Kind.String:
                     return "%LITNULL:";
             }
 

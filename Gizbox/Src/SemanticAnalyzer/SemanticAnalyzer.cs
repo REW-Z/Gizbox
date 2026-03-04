@@ -552,6 +552,30 @@ namespace Gizbox.SemanticRule
                         }
                     }
                     break;
+                case SyntaxTree.StructDeclareNode structDeclNode:
+                    {
+                        if(isGlobalOrTopNamespace)
+                        {
+                            if(isTopLevelAtNamespace)
+                                structDeclNode.structNameNode.SetPrefix(currentNamespace);
+
+                            var newEnv = new SymbolTable(structDeclNode.structNameNode.FullName, SymbolTable.TableCatagory.ClassScope, envStack.Peek());
+                            structDeclNode.attributes[AstAttr.env] = newEnv;
+
+                            var newRec = envStack.Peek().NewRecord(
+                                structDeclNode.structNameNode.FullName,
+                                SymbolTable.RecordCatagory.Struct,
+                                "",
+                                newEnv
+                            );
+                            structDeclNode.attributes[AstAttr.class_rec] = newRec;
+                        }
+                        else
+                        {
+                            throw new SemanticException(ExceptioName.ClassDefinitionGlobalOrNamespaceOnly, structDeclNode, "");
+                        }
+                    }
+                    break;
                 case SyntaxTree.AccessLabelNode accessLabelNode:
                     {
                         throw new SemanticException(ExceptioName.SemanticAnalysysError, accessLabelNode, "access label node can only declare in class scope.");
@@ -739,6 +763,9 @@ namespace Gizbox.SemanticRule
                         if (isMethod) className = envStack.Peek().name;
                         if (isMethod && isGlobalOrTopAtNamespace) throw new SemanticException(ExceptioName.NamespaceTopLevelNonMemberFunctionOnly, funcDeclNode, "");
 
+                        if(isMethod == false && (IsCtorIdentifier(funcDeclNode.identifierNode) || IsDtorIdentifier(funcDeclNode.identifierNode)))
+                            throw new SemanticException(ExceptioName.SemanticAnalysysError, funcDeclNode, "constructor/destructor can only be declared in class scope.");
+
 
                         //如果是成员函数 - 加入符号表  
                         if (isGlobalOrTopAtNamespace == false && isMethod == true)
@@ -768,13 +795,42 @@ namespace Gizbox.SemanticRule
                             }
                             typeExpr += (" => " + funcDeclNode.returnTypeNode.TypeExpression());
 
-                            //函数修饰名称（成员函数）(要加上this基类型)  
-                            var funcMangledName = Utils.Mangle(funcDeclNode.identifierNode.FullName, paramTypeArr);
+                            //函数修饰名称（成员函数）
+                            bool isCtor = IsCtorIdentifier(funcDeclNode.identifierNode);
+                            bool isDtor = IsDtorIdentifier(funcDeclNode.identifierNode);
+
+                            if(isCtor && funcDeclNode.attributes.TryGetValue(AstAttr.member_name, out var ctorDeclNameObj) && ctorDeclNameObj is string ctorDeclName)
+                            {
+                                var classShortName = GetClassShortName(className);
+                                if(ctorDeclName != classShortName)
+                                    throw new SemanticException(ExceptioName.SemanticAnalysysError, funcDeclNode, "constructor name must match class name.");
+                            }
+
+                            string funcMangledName;
+
+                            if(isCtor)
+                            {
+                                funcMangledName = BuildCtorFunctionFullName(className, paramTypeArr);
+                            }
+                            else if(isDtor)
+                            {
+                                if(paramTypeArr.Length != 0)
+                                    throw new SemanticException(ExceptioName.SemanticAnalysysError, funcDeclNode, "destructor can not have parameters.");
+
+                                funcMangledName = BuildDtorFunctionFullName(className);
+                            }
+                            else
+                            {
+                                funcMangledName = Utils.Mangle(funcDeclNode.identifierNode.FullName, paramTypeArr);
+                            }
+
                             funcDeclNode.attributes[AstAttr.mangled_name] = funcMangledName;
 
 
                             //新的作用域（成员函数）  
-                            string envName = isMethod ? envStack.Peek().name + "." + funcMangledName : funcMangledName;
+                            string envName = (isMethod && isCtor == false && isDtor == false) 
+                                ? envStack.Peek().name + "." + funcMangledName 
+                                : funcMangledName;
 
                             var newEnv = new SymbolTable(envName, SymbolTable.TableCatagory.FuncScope, envStack.Peek());
                             funcDeclNode.attributes[AstAttr.env] = newEnv;
@@ -785,8 +841,11 @@ namespace Gizbox.SemanticRule
                                 envStack.Peek().records.Remove(funcMangledName);
                             }
 
-                            //添加到虚函数表（成员函数）    
-                            this.ilUnit.vtables[className].NewRecord(funcMangledName, className);
+                            //添加到虚函数表（成员函数）
+                            if(isCtor == false && isDtor == false)
+                            {
+                                this.ilUnit.vtables[className].NewRecord(funcMangledName, className);
+                            }
 
                             //成员访问控制修饰符  
                             bool isPrivate = (funcDeclNode.attributes.TryGetValue(AstAttr.member_access_modifiers, out object accessmodif) && (AccessMofifier)accessmodif == AccessMofifier.Private);
@@ -800,6 +859,11 @@ namespace Gizbox.SemanticRule
                                 );
                             newRec.rawname = funcDeclNode.identifierNode.FullName;
                             newRec.accessFlags = isPrivate ? SymbolTable.AccessFlag.Private : SymbolTable.AccessFlag.Public;
+
+                            if(isCtor)
+                                newRec.flags |= SymbolTable.RecordFlag.Ctor;
+                            if(isDtor)
+                                newRec.flags |= SymbolTable.RecordFlag.Dtor;
 
                             funcDeclNode.attributes[AstAttr.func_rec] = newRec;
                         }
@@ -965,35 +1029,48 @@ namespace Gizbox.SemanticRule
                             Pass2_CollectOtherSymbols(declNode);
                         }
 
-                        //构造函数  
+                        bool hasExplicitCtor = false;
+                        bool hasExplicitDtor = false;
+                        foreach(var decl in classDeclNode.memberDelareNodes)
                         {
-                            //默认隐式构造函数的符号表  
-                            var ctorEnv = new SymbolTable(classDeclNode.classNameNode.FullName + "::ctor", SymbolTable.TableCatagory.FuncScope, newEnv);
+                            if(decl is not SyntaxTree.FuncDeclareNode fn)
+                                continue;
+
+                            if(IsCtorIdentifier(fn.identifierNode))
+                                hasExplicitCtor = true;
+                            if(IsDtorIdentifier(fn.identifierNode))
+                                hasExplicitDtor = true;
+                        }
+
+                        //构造函数
+                        if(hasExplicitCtor == false)
+                        {
+                            var ctorName = BuildCtorFunctionFullName(classDeclNode.classNameNode.FullName, Array.Empty<string>());
+                            var ctorEnv = new SymbolTable(ctorName, SymbolTable.TableCatagory.FuncScope, newEnv);
                             ctorEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, classDeclNode.classNameNode.FullName);
-                            //添加条目-构造函数    
                             var ctorRec = newEnv.NewRecord(
-                                classDeclNode.classNameNode.FullName + "::ctor",
+                                ctorName,
                                 SymbolTable.RecordCatagory.Function,
                                 GType.GenFuncType(GType.Parse("void"), GType.Parse(classDeclNode.classNameNode.FullName)).ToString(),
                                 ctorEnv
                             );
-                            ctorRec.rawname = classDeclNode.classNameNode.FullName + "::ctor";
+                            ctorRec.rawname = "ctor";
                             ctorRec.flags |= SymbolTable.RecordFlag.Ctor;
                         }
 
-                        //析构函数  
+                        //析构函数
+                        if(hasExplicitDtor == false)
                         {
-                            //默认隐式析构函数的符号表  
-                            var dtorEnv = new SymbolTable(classDeclNode.classNameNode.FullName + "::dtor", SymbolTable.TableCatagory.FuncScope, newEnv);
+                            var dtorName = BuildDtorFunctionFullName(classDeclNode.classNameNode.FullName);
+                            var dtorEnv = new SymbolTable(dtorName, SymbolTable.TableCatagory.FuncScope, newEnv);
                             dtorEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, classDeclNode.classNameNode.FullName);
-                            //添加条目-析构函数
                             var dtorRec = newEnv.NewRecord(
-                                classDeclNode.classNameNode.FullName + "::dtor",
+                                dtorName,
                                 SymbolTable.RecordCatagory.Function,
                                 GType.GenFuncType(GType.Parse("void"), GType.Parse(classDeclNode.classNameNode.FullName)).ToString(),
                                 dtorEnv
                             );
-                            dtorRec.rawname = classDeclNode.classNameNode.FullName + "::dtor";
+                            dtorRec.rawname = "dtor";
                             dtorRec.flags |= SymbolTable.RecordFlag.Dtor;
                         }
 
@@ -1002,6 +1079,27 @@ namespace Gizbox.SemanticRule
 
 
                         //离开类作用域  
+                        envStack.Pop();
+                    }
+                    break;
+                case SyntaxTree.StructDeclareNode structDeclNode:
+                    {
+                        structDeclNode.structNameNode.attributes[AstAttr.def_at_env] = envStack.Peek();
+
+                        var newEnv = (SymbolTable)structDeclNode.attributes[AstAttr.env];
+                        envStack.Push(newEnv);
+
+                        foreach(var declNode in structDeclNode.memberDelareNodes)
+                        {
+                            if(declNode is not SyntaxTree.VarDeclareNode)
+                                throw new SemanticException(ExceptioName.SemanticAnalysysError, declNode, "struct only allows field variable declarations.");
+
+                            Pass2_CollectOtherSymbols(declNode);
+                        }
+
+                        // 生成结构体内存布局
+                        GenStructLayoutInfo(structDeclNode.attributes[AstAttr.class_rec] as SymbolTable.Record);
+
                         envStack.Pop();
                     }
                     break;
@@ -1304,7 +1402,57 @@ namespace Gizbox.SemanticRule
                             Pass3_AnalysisNode(declNode);
                         }
 
+                        // 当前语法不支持在构造函数中显式指定 base(...)
+                        // 简化规则：若基类没有默认构造（通常表示基类显式构造集合），
+                        // 则派生类必须显式定义并且其构造签名集合与基类一致。
+                        if(classdeclNode.baseClassNameNode != null)
+                        {
+                            string baseClassName = classdeclNode.baseClassNameNode.FullName;
+                            var baseClassRec = Query(baseClassName);
+                            if(baseClassRec == null || baseClassRec.envPtr == null)
+                                throw new SemanticException(ExceptioName.BaseClassNotFound, classdeclNode.baseClassNameNode, baseClassName);
+
+                            var baseCtorSigs = GetCtorSignatureSet(baseClassRec.envPtr);
+                            bool baseHasDefaultCtor = baseCtorSigs.Contains(string.Empty);
+                            if(baseHasDefaultCtor == false)
+                            {
+                                var derivedCtorSigs = new HashSet<string>();
+                                foreach(var decl in classdeclNode.memberDelareNodes)
+                                {
+                                    if(decl is not FuncDeclareNode fn)
+                                        continue;
+                                    if(IsCtorIdentifier(fn.identifierNode) == false)
+                                        continue;
+
+                                    derivedCtorSigs.Add(
+                                        BuildCtorSignatureKeyByParamTypes(fn.parametersNode.parameterNodes.Select(p => p.typeNode.TypeExpression()))
+                                    );
+                                }
+
+                                if(derivedCtorSigs.Count == 0)
+                                    throw new SemanticException(ExceptioName.SemanticAnalysysError, classdeclNode, "base class has no default constructor; derived class must define matching constructors.");
+
+                                if(baseCtorSigs.SetEquals(derivedCtorSigs) == false)
+                                    throw new SemanticException(ExceptioName.SemanticAnalysysError, classdeclNode, "derived constructor signatures must match base constructor signatures.");
+                            }
+                        }
+
                         //离开作用域  
+                        envStack.Pop();
+                    }
+                    break;
+                case SyntaxTree.StructDeclareNode structDeclNode:
+                    {
+                        envStack.Push(structDeclNode.attributes[AstAttr.env] as SymbolTable);
+
+                        foreach(var declNode in structDeclNode.memberDelareNodes)
+                        {
+                            if(declNode is not SyntaxTree.VarDeclareNode)
+                                throw new SemanticException(ExceptioName.SemanticAnalysysError, declNode, "struct only allows field variable declarations.");
+
+                            Pass3_AnalysisNode(declNode);
+                        }
+
                         envStack.Pop();
                     }
                     break;
@@ -1361,7 +1509,8 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.ReturnStmtNode retNode:
                     {
                         //检查返回值  
-                        Pass3_AnalysisNode(retNode.returnExprNode);
+                        if(retNode.returnExprNode != null)
+                        { Pass3_AnalysisNode(retNode.returnExprNode); }
                     }
                     break;
                 case SyntaxTree.DeleteStmtNode delNode:
@@ -1501,26 +1650,64 @@ namespace Gizbox.SemanticRule
 
                         if(targetType.Category == GType.Kind.String && srcType.Category != GType.Kind.String)
                         {
-                            var overrideNode = new SyntaxTree.CallNode()
+                            //基元类型转string   
+                            if(srcType.IsPrimitive)
                             {
-                                isMemberAccessFunction = false,
-                                funcNode = new SyntaxTree.IdentityNode() 
+                                var overrideNode = new SyntaxTree.CallNode()
                                 {
-                                    attributes = new Dictionary<AstAttr, object>(),
-                                    token = new Token("ID", PatternType.Id, srcType.ExternConvertStringFunction, default, default, default),
-                                    identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
-                                },
-                                argumantsNode = new SyntaxTree.ArgumentListNode()
-                                { },
-                                attributes = new(),
-                            };
-                            overrideNode.argumantsNode.arguments.Add(castNode.factorNode);
-                            castNode.overrideNode = overrideNode;
+                                    isMemberAccessFunction = false,
+                                    funcNode = new SyntaxTree.IdentityNode()
+                                    {
+                                        attributes = new Dictionary<AstAttr, object>(),
+                                        token = new Token("ID", PatternType.Id, srcType.ExternConvertStringFunction, default, default, default),
+                                        identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
+                                    },
+                                    argumantsNode = new SyntaxTree.ArgumentListNode()
+                                    { },
+                                    attributes = new(),
+                                };
+                                overrideNode.argumantsNode.arguments.Add(castNode.factorNode);
+                                castNode.overrideNode = overrideNode;
+                                castNode.overrideNode.Parent = castNode.Parent;
+
+                                Pass3_AnalysisNode(castNode.overrideNode);
+
+                                break;
+                            }
+                            //类对象转string -> 调用ToString成员函数  
+                            else
+                            {
+                                var overrideNode = new SyntaxTree.CallNode()
+                                {
+                                    isMemberAccessFunction = true,
+                                    funcNode = new SyntaxTree.ObjectMemberAccessNode()
+                                    {
+                                        attributes = new Dictionary<AstAttr, object>(),
+                                        memberNode = new IdentityNode()
+                                        {
+                                            token = new Token("ID", PatternType.Id, "ToString", default, default, default),
+                                            attributes = new Dictionary<AstAttr, object>(),
+                                            identiferType = IdentityNode.IdType.VariableOrField,                                            
+                                        }, 
+                                        objectNode = castNode.factorNode,
+                                    },
+                                    argumantsNode = new SyntaxTree.ArgumentListNode()
+                                    { },
+                                    attributes = new(),
+                                };
+                                castNode.overrideNode = overrideNode;
+                                castNode.overrideNode.Parent = castNode.Parent;
+                                castNode.Parent.ReplaceChild(castNode, castNode.overrideNode);
+                                Pass3_AnalysisNode(castNode.overrideNode);
+                                break;
+                            }
+                        }
+                        else if(targetType.Category == GType.Kind.String && srcType.Category == GType.Kind.String)
+                        {
+                            castNode.overrideNode = castNode.factorNode;
                             castNode.overrideNode.Parent = castNode.Parent;
-
+                            castNode.Parent.ReplaceChild(castNode, castNode.overrideNode);
                             Pass3_AnalysisNode(castNode.overrideNode);
-
-                            break;
                         }
                         else if(targetType.Category == GType.Kind.Array)
                         {
@@ -1719,6 +1906,24 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.NewObjectNode newobjNode:
                     {
                         TryCompleteIdenfier(newobjNode.className);
+
+                        foreach(var arg in newobjNode.argumantsNode.arguments)
+                        {
+                            Pass3_AnalysisNode(arg);
+                        }
+
+                        string className = newobjNode.className.FullName;
+                        var classRec = Query(className);
+                        if(classRec == null || classRec.envPtr == null)
+                            throw new SemanticException(ExceptioName.ClassDefinitionNotFound, newobjNode.className, className);
+
+                        var argTypes = newobjNode.argumantsNode.arguments.Select(a => AnalyzeTypeExpression(a)).ToArray();
+                        var matchedParamTypes = new string[argTypes.Length];
+                        bool ctorMatched = TryQueryAndMatchFunction("ctor", argTypes, matchedParamTypes, true, classRec.envPtr);
+                        if(ctorMatched == false)
+                            throw new SemanticException(ExceptioName.FunctionMemberNotFound, newobjNode, "ctor");
+
+                        newobjNode.attributes[AstAttr.mangled_name] = BuildCtorFunctionFullName(className, matchedParamTypes);
                     }
                     break;
                 case SyntaxTree.NewArrayNode newArrNode:
@@ -1963,6 +2168,30 @@ namespace Gizbox.SemanticRule
                         //离开作用域
                         envStack.Pop();
 
+                        break;
+                    }
+                case SyntaxTree.StructDeclareNode structDecl:
+                    {
+                        envStack.Push(structDecl.attributes[AstAttr.env] as SymbolTable);
+
+                        foreach(var decl in structDecl.memberDelareNodes)
+                        {
+                            if(decl is not VarDeclareNode fvar)
+                                throw new SemanticException(ExceptioName.SemanticAnalysysError, decl, "struct only allows field variable declarations.");
+
+                            if(fvar.flags.HasFlag(VarModifiers.Own) || fvar.flags.HasFlag(VarModifiers.Bor))
+                                throw new SemanticException(ExceptioName.OwnershipError, fvar, "struct field cannot use own/bor.");
+
+                            var ftype = GType.Parse(fvar.typeNode.TypeExpression());
+                            if(ftype.IsClassType)
+                            {
+                                var classRec = Query(ftype.ObjectTypeName);
+                                if(classRec != null && classRec.flags.HasFlag(SymbolTable.RecordFlag.OwnershipClass))
+                                    throw new SemanticException(ExceptioName.OwnershipError, fvar, "struct field cannot be ownership class type.");
+                            }
+                        }
+
+                        envStack.Pop();
                         break;
                     }
                 case SyntaxTree.FuncDeclareNode funcDecl:
@@ -2751,6 +2980,78 @@ namespace Gizbox.SemanticRule
             }
         }
 
+        private static bool IsCtorIdentifier(SyntaxTree.IdentityNode id)
+        {
+            return id?.token?.attribute == "ctor";
+        }
+
+        private static bool IsDtorIdentifier(SyntaxTree.IdentityNode id)
+        {
+            return id?.token?.attribute == "dtor";
+        }
+
+        private static string GetClassShortName(string classFullName)
+        {
+            if(string.IsNullOrEmpty(classFullName))
+                return classFullName;
+
+            int p = classFullName.LastIndexOf("::", StringComparison.Ordinal);
+            string shortName = p >= 0 ? classFullName.Substring(p + 2) : classFullName;
+            int g = shortName.IndexOf('^');
+            if(g >= 0)
+                shortName = shortName.Substring(0, g);
+            return shortName;
+        }
+
+        private static string BuildCtorFunctionFullName(string classFullName, params string[] paramTypes)
+        {
+            return Utils.Mangle(classFullName + "::ctor", paramTypes ?? Array.Empty<string>());
+        }
+
+        private static string BuildDtorFunctionFullName(string classFullName)
+        {
+            return classFullName + "::dtor";
+        }
+
+        private static string BuildCtorSignatureKeyByParamTypes(IEnumerable<string> paramTypes)
+        {
+            return string.Join(",", paramTypes ?? Array.Empty<string>());
+        }
+
+        private static string BuildCtorSignatureKeyFromRecord(SymbolTable.Record ctorRec)
+        {
+            if(ctorRec?.envPtr == null)
+                return string.Empty;
+
+            var ps = ctorRec.envPtr.GetByCategory(SymbolTable.RecordCatagory.Param)
+                ?.Where(p => p.name != "this")
+                .Select(p => p.typeExpression)
+                .ToArray()
+                ?? Array.Empty<string>();
+
+            return BuildCtorSignatureKeyByParamTypes(ps);
+        }
+
+        private static HashSet<string> GetCtorSignatureSet(SymbolTable classEnv)
+        {
+            var set = new HashSet<string>();
+            if(classEnv == null)
+                return set;
+
+            foreach(var kv in classEnv.records)
+            {
+                var rec = kv.Value;
+                if(rec.category != SymbolTable.RecordCatagory.Function)
+                    continue;
+                if(rec.flags.HasFlag(SymbolTable.RecordFlag.Ctor) == false)
+                    continue;
+
+                set.Add(BuildCtorSignatureKeyFromRecord(rec));
+            }
+
+            return set;
+        }
+
         private SymbolTable.RecordFlag GetCallReturnOwnershipModel(SyntaxTree.CallNode callNode)
         {
             if(callNode.attributes.TryGetValue(AstAttr.func_rec, out var funcRecObj) && funcRecObj is SymbolTable.Record funcRec)
@@ -3170,6 +3471,14 @@ namespace Gizbox.SemanticRule
                 return;
             }
 
+            //临时右值 - Binary/Unary表达式
+            else if(rNode is BinaryOpNode || rNode is UnaryOpNode)
+            {
+                //Pass阶段所有二元一元运算目前都只针对基元值类型。其他类型的运算都被重载为函数调用。    
+                rModel = SymbolTable.RecordFlag.None;
+                return;
+            }
+
             //临时右值 - SizeOf/TypeOf
             else if(rNode is SizeOfNode || rNode is TypeOfNode)
             {
@@ -3550,7 +3859,7 @@ namespace Gizbox.SemanticRule
                         }
                         
 
-                        nodeTypeExprssion = newObjNode.typeNode?.TypeExpression() ?? className;
+                        nodeTypeExprssion = newObjNode.typeNode?.TypeExpression() ?? $"(class){className}";
                     }
                     break;
                 case SyntaxTree.NewArrayNode newArrNode:
@@ -3569,12 +3878,12 @@ namespace Gizbox.SemanticRule
                         {
                             if (CheckType_Equal(typeL, typeR) == false) throw new SemanticException(ExceptioName.InconsistentExpressionTypesCannotCompare, binaryOp, "");
 
-                            nodeTypeExprssion = "bool";
+                            nodeTypeExprssion = "(primitive)bool";
                         }
                         //普通运算符  
                         else
                         {
-                            if (typeL != typeR) throw new SemanticException(ExceptioName.BinaryOperationTypeMismatch, binaryOp, "");
+                            if (CheckType_Equal(typeL, typeR) == false) throw new SemanticException(ExceptioName.BinaryOperationTypeMismatch, binaryOp, "");
 
                             nodeTypeExprssion = typeL;
                         }
@@ -3597,7 +3906,7 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.SizeOfNode sizeofNode:
                     {
-                        nodeTypeExprssion = "int";
+                        nodeTypeExprssion = "(primitive)int";
                     }
                     break;
                 case SyntaxTree.TypeOfNode typeofNode:
@@ -3605,13 +3914,14 @@ namespace Gizbox.SemanticRule
                         if(Query("Core::Type") == null)
                             throw new SemanticException(ExceptioName.ClassDefinitionNotFound, typeofNode, "Core::Type");
 
-                        nodeTypeExprssion = "Core::Type";
+                        nodeTypeExprssion = "(class)Core::Type";
                     }
                     break;
                 default:
                     throw new SemanticException(ExceptioName.CannotAnalyzeExpressionNodeType, exprNode, exprNode.GetType().Name);
             }
 
+            nodeTypeExprssion = CanonicalizeTypeExpression(nodeTypeExprssion);
             exprNode.attributes[AstAttr.type] = nodeTypeExprssion;
 
             return nodeTypeExprssion;
@@ -3704,7 +4014,7 @@ namespace Gizbox.SemanticRule
                 return typeExpr;
 
             var t = GType.Parse(typeExpr);
-            if(t.IsClassType)
+            if(t.IsClassType || t.IsStructType)
                 return t.ObjectTypeName;
 
             if(t.IsArray)
@@ -3717,7 +4027,72 @@ namespace Gizbox.SemanticRule
                 return paramPart + " => " + retPart;
             }
 
-            return typeExpr;
+            return t.Category switch
+            {
+                GType.Kind.Void => "void",
+                GType.Kind.Bool => "bool",
+                GType.Kind.Byte => "byte",
+                GType.Kind.Char => "char",
+                GType.Kind.Int => "int",
+                GType.Kind.UInt => "uint",
+                GType.Kind.Long => "long",
+                GType.Kind.ULong => "ulong",
+                GType.Kind.Float => "float",
+                GType.Kind.Double => "double",
+                GType.Kind.String => "string",
+                _ => typeExpr,
+            };
+        }
+
+        private string CanonicalizeTypeExpression(string typeExpr)
+        {
+            if(string.IsNullOrWhiteSpace(typeExpr))
+                return typeExpr;
+
+            var t = GType.Parse(typeExpr);
+
+            if(t.IsArray)
+                return CanonicalizeTypeExpression(t.ArrayElementType.ToString()) + "[]";
+
+            if(t.Category == GType.Kind.Function)
+            {
+                var p = t.FunctionParamTypes?.Select(x => CanonicalizeTypeExpression(x.ToString())) ?? Enumerable.Empty<string>();
+                var r = CanonicalizeTypeExpression(t.FunctionReturnType.ToString());
+                return $"{string.Join(",", p)} => {r}";
+            }
+
+            if(t.IsStructType)
+            {
+                var n = t.ObjectTypeName;
+                var size = t.Size;
+                return $"(struct:{size}){n}";
+            }
+
+            if(t.IsClassType)
+            {
+                var n = t.ObjectTypeName;
+                if(t.OwnershipHint == GType.OwnershipHintKind.Own)
+                    return $"(own class){n}";
+                if(t.OwnershipHint == GType.OwnershipHintKind.Borrow)
+                    return $"(bor class){n}";
+                return $"(class){n}";
+            }
+
+            return t.Category switch
+            {
+                GType.Kind.Void => "(primitive)void",
+                GType.Kind.Bool => "(primitive)bool",
+                GType.Kind.Byte => "(primitive)byte",
+                GType.Kind.Char => "(primitive)char",
+                GType.Kind.Int => "(primitive)int",
+                GType.Kind.UInt => "(primitive)uint",
+                GType.Kind.Long => "(primitive)long",
+                GType.Kind.ULong => "(primitive)ulong",
+                GType.Kind.Float => "(primitive)float",
+                GType.Kind.Double => "(primitive)double",
+                GType.Kind.String => "(primitive)string",
+                _ => typeExpr,
+            };
         }
 
         private bool CheckReturnStmt(SyntaxTree.Node node, string returnType)
@@ -4270,12 +4645,23 @@ namespace Gizbox.SemanticRule
                     if(callNode.argumantsNode.arguments.Count != 1)
                         throw new SemanticException(ExceptioName.SemanticAnalysysError, callNode, "gettype expects 1 argument.");
 
-                    if(callNode.argumantsNode.arguments[0] is not SyntaxTree.IdentityNode varId)
+                    SymbolTable.Record varRec = null;
+                    if(callNode.argumantsNode.arguments[0] is SyntaxTree.IdentityNode varId)
+                    {
+                        varRec = Query(varId.FullName);
+                        if(varRec == null)
+                            throw new SemanticException(ExceptioName.IdentifierNotFound, varId, varId.FullName);
+                    }
+                    else if(callNode.argumantsNode.arguments[0] is SyntaxTree.ThisNode thisNode)
+                    {
+                        varRec = Query("this");
+                        if(varRec == null)
+                            throw new SemanticException(ExceptioName.IdentifierNotFound, thisNode, "this");
+                    }
+
+                    if(varRec == null)
                         throw new SemanticException(ExceptioName.SemanticAnalysysError, callNode, "gettype expects a variable identifier.");
 
-                    var varRec = Query(varId.FullName);
-                    if(varRec == null)
-                        throw new SemanticException(ExceptioName.IdentifierNotFound, varId, varId.FullName);
 
                     if(varRec.category != SymbolTable.RecordCatagory.Variable
                         && varRec.category != SymbolTable.RecordCatagory.Param)
@@ -4331,6 +4717,41 @@ namespace Gizbox.SemanticRule
             }
 
             classRec.size = classSize;
+        }
+
+        private void GenStructLayoutInfo(SymbolTable.Record structRec)
+        {
+            if(structRec == null || structRec.envPtr == null)
+                throw new GizboxException(ExceptioName.SemanticAnalysysError, "invalid struct record.");
+
+            var structEnv = structRec.envPtr;
+            List<SymbolTable.Record> fieldRecs = new();
+            foreach(var (_, memberRec) in structEnv.records)
+            {
+                if(memberRec.category != SymbolTable.RecordCatagory.Variable)
+                    continue;
+                fieldRecs.Add(memberRec);
+            }
+
+            (int size, int align)[] fieldSizeAndAlignArr = new (int size, int align)[fieldRecs.Count];
+            for(int i = 0; i < fieldRecs.Count; i++)
+            {
+                var ftype = GType.Parse(fieldRecs[i].typeExpression);
+                var size = ftype.Size;
+                var align = ftype.Align;
+
+                fieldRecs[i].size = size;
+                fieldSizeAndAlignArr[i] = (size, align);
+            }
+
+            long structSize = MemUtility.ClassLayout(0, fieldSizeAndAlignArr, out var allocAddrs);
+            for(int i = 0; i < fieldRecs.Count; i++)
+            {
+                fieldRecs[i].addr = allocAddrs[i];
+            }
+
+            structRec.size = structSize;
+            structRec.typeExpression = $"(struct:{structSize}){structRec.name}";
         }
 
         public static void Log(object content)

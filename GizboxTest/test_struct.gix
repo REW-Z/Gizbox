@@ -1,0 +1,120 @@
+﻿import <"core">  
+import <"stdlib">  
+
+using Core;  
+using Console;
+using Collections;
+
+struct Pair
+{
+	int a = 0;
+	int b = 0;
+}
+
+struct BigData
+{
+	long x = 0L;
+	long y = 0L;
+	long z = 0L;
+	int tag = 0;
+}
+
+struct Wrapper
+{
+	Pair p = default(Pair);
+	int n = 0;
+}
+
+Pair MakePair(int a, int b)
+{
+	Pair p = default(Pair);
+	p.a = a;
+	p.b = b;
+	return p;
+}
+
+int SumPair(Pair p)
+{
+	return p.a + p.b;
+}
+
+BigData MakeBig(long seed)
+{
+	BigData d = default(BigData);
+	d.x = seed;
+	d.y = seed + 1L;
+	d.z = seed + 2L;
+	d.tag = 7;
+	return d;
+}
+
+long SumBig(BigData d)
+{
+	return d.x + d.y + d.z + (long)d.tag;
+}
+
+BigData ForwardBig(BigData d)
+{
+	return d;
+}
+
+void test_struct_small()
+{
+	Pair p1 = default(Pair);
+	p1.a = 10;
+	p1.b = 20;
+
+	Pair p2 = p1;
+	p2.a = p2.a + 1;
+
+	int s1 = SumPair(p1);
+	int s2 = SumPair(p2);
+
+	Console::PrintLn("Pair s1=" + (string)s1 + " s2=" + (string)s2);
+
+	Pair p3 = MakePair(3, 4);
+	Console::PrintLn("Pair make=" + (string)SumPair(p3));
+}
+
+void test_struct_nested()
+{
+	Wrapper w = default(Wrapper);
+	w.p.a = 5;
+	w.p.b = 6;
+	w.n = 100;
+
+	int sum = w.p.a + w.p.b + w.n;
+	Console::PrintLn("Wrapper sum=" + (string)sum);
+}
+
+void test_struct_big()
+{
+	BigData d1 = default(BigData);
+	d1.x = 100L;
+	d1.y = 200L;
+	d1.z = 300L;
+	d1.tag = 1;
+
+	BigData d2 = d1;
+	d2.tag = 2;
+
+	long s1 = SumBig(d1);
+	long s2 = SumBig(d2);
+	Console::PrintLn("Big s1=" + (string)s1 + " s2=" + (string)s2);
+
+	BigData d3 = MakeBig(1000L);
+	Console::PrintLn("Big make=" + (string)SumBig(d3));
+
+	BigData d4 = ForwardBig(d3);
+	Console::PrintLn("Big forward=" + (string)SumBig(d4));
+}
+
+void main()
+{
+	test_struct_small();
+	test_struct_nested();
+	test_struct_big();
+
+	Console::PrintLn("Test finished!");
+	Console::ReadLn();
+}
