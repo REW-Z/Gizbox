@@ -12,6 +12,8 @@
 
 #define COUNT_OF(a) (sizeof(a) / sizeof((a)[0]))
 
+const wchar_t* Core__Extern__StringClone(const wchar_t* v);
+
 // 输出未格式化的 Unicode 宽字符串，不附加换行
 void Console__Print(const wchar_t* text)
 {
@@ -58,7 +60,7 @@ const wchar_t* Core__Extern__IntToString(int32_t value)
     static wchar_t buf[32];
     swprintf_s(buf, COUNT_OF(buf), L"%d", value);
     buf[COUNT_OF(buf) - 1] = L'\0';
-    return buf;
+    return Core__Extern__StringClone(buf);
 }
 
 // Int64 -> 字符串
@@ -67,7 +69,7 @@ const wchar_t* Core__Extern__LongToString(int64_t value)
     static wchar_t buf[32];
     swprintf_s(buf, COUNT_OF(buf), WPRId64, value);
     buf[COUNT_OF(buf) - 1] = L'\0';
-    return buf;
+    return Core__Extern__StringClone(buf);
 }
 
 // UInt32 -> 字符串
@@ -76,7 +78,7 @@ const wchar_t* Core__Extern__UIntToString(uint32_t value)
     static wchar_t buf[32];
     swprintf_s(buf, COUNT_OF(buf), L"%u", (unsigned int)value);
     buf[COUNT_OF(buf) - 1] = L'\0';
-    return buf;
+    return Core__Extern__StringClone(buf);
 }
 
 // UInt64 -> 字符串
@@ -85,7 +87,7 @@ const wchar_t* Core__Extern__ULongToString(uint64_t value)
     static wchar_t buf[32];
     swprintf_s(buf, COUNT_OF(buf), L"%llu", (unsigned long long)value);
     buf[COUNT_OF(buf) - 1] = L'\0';
-    return buf;
+    return Core__Extern__StringClone(buf);
 }
 
 // float -> 字符串（9 位有效数字）
@@ -94,7 +96,7 @@ const wchar_t* Core__Extern__FloatToString(float value)
     static wchar_t buf[64];
     swprintf_s(buf, COUNT_OF(buf), L"%.9g", (double)value);
     buf[COUNT_OF(buf) - 1] = L'\0';
-    return buf;
+    return Core__Extern__StringClone(buf);
 }
 
 // double -> 字符串（17 位有效数字）
@@ -103,7 +105,7 @@ const wchar_t* Core__Extern__DoubleToString(double value)
     static wchar_t buf[64];
     swprintf_s(buf, COUNT_OF(buf), L"%.17g", value);
     buf[COUNT_OF(buf) - 1] = L'\0';
-    return buf;
+    return Core__Extern__StringClone(buf);
 }
 
 // Bool -> 字符串
@@ -119,37 +121,25 @@ const wchar_t* Core__Extern__CharToString(int32_t value)
     static wchar_t buf[2];
     buf[0] = (wchar_t)value;
     buf[1] = L'\0';
-    return buf;
+    return Core__Extern__StringClone(buf);
 }
 
 // Concat string a + b -> 字符串
 const wchar_t* Core__Extern__Concat(const wchar_t* a, const wchar_t* b)
 {
-    static wchar_t* s_buf = NULL;
-    static size_t s_cap = 0;
-
     size_t la = (a != NULL) ? wcslen(a) : 0;
     size_t lb = (b != NULL) ? wcslen(b) : 0;
     size_t need = la + lb + 1; // 包含结尾的 L'\0'
 
-    if (need > s_cap)
-    {
-        wchar_t* newBuf = (wchar_t*)realloc(s_buf, need * sizeof(wchar_t));
-        if (!newBuf)
-        {
-            // 分配失败时返回空串
-            static const wchar_t empty[] = L"";
-            return empty;
-        }
-        s_buf = newBuf;
-        s_cap = need;
-    }
+    wchar_t* buf = (wchar_t*)malloc(need * sizeof(wchar_t));
+    if (!buf)
+        return NULL;
 
-    if (la > 0) wmemcpy(s_buf, a, la);
-    if (lb > 0) wmemcpy(s_buf + la, b, lb);
-    s_buf[la + lb] = L'\0';
+    if (la > 0) wmemcpy(buf, a, la);
+    if (lb > 0) wmemcpy(buf + la, b, lb);
+    buf[la + lb] = L'\0';
 
-    return s_buf;
+    return buf;
 }
 
 int32_t Core__Extern__StringLength(const wchar_t* v)

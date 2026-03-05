@@ -16,7 +16,6 @@ struct BigData
 	long x = 0L;
 	long y = 0L;
 	long z = 0L;
-	int tag = 0;
 }
 
 struct Wrapper
@@ -44,13 +43,12 @@ BigData MakeBig(long seed)
 	d.x = seed;
 	d.y = seed + 1L;
 	d.z = seed + 2L;
-	d.tag = 7;
 	return d;
 }
 
 long SumBig(BigData d)
 {
-	return d.x + d.y + d.z + (long)d.tag;
+	return d.x + d.y + d.z;
 }
 
 BigData ForwardBig(BigData d)
@@ -66,14 +64,11 @@ void test_struct_small()
 	p1.a = 10;
 	p1.b = 20;
 	
-
 	Pair p2 = p1;
 	p2.a = p2.a + 1;
 	
-
 	int s1 = SumPair(p1);
 	int s2 = SumPair(p2);
-	
 	
 	Console::PrintLn("Pair s1=" + (string)s1 + "  Pair s2=" + (string)s2);
 	Console::PrintLn("Pair s1=" + (string)s1);
@@ -108,20 +103,18 @@ void test_struct_big()
 	d1.x = 100L;
 	d1.y = 200L;
 	d1.z = 300L;
-	d1.tag = 1;
 
 	BigData d2 = d1;
-	d2.tag = 2;
 
 	long s1 = SumBig(d1);
 	long s2 = SumBig(d2);
 	Console::PrintLn("Big s1=" + (string)s1 + " s2=" + (string)s2);
 
 	BigData d3 = MakeBig(1000L);
-	Console::PrintLn("Big make=" + (string)SumBig(d3));
+	Console::PrintLn("make Big sum=" + (string)SumBig(d3));
 
 	BigData d4 = ForwardBig(d3);
-	Console::PrintLn("Big forward=" + (string)SumBig(d4));
+	Console::PrintLn("forward Big sum=" + (string)SumBig(d4));
 }
 
 void main()

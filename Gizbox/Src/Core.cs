@@ -733,6 +733,11 @@ namespace Gizbox
             if(string.IsNullOrWhiteSpace(typeExpression))
                 return typeExpression;
 
+            // 函数类型前缀应由参数/返回值各自解析，
+            // 不能在整体层面剥离首个参数的前缀（例如: "(struct:24)BigData => long"）。
+            if(typeExpression.Contains("=>"))
+                return typeExpression;
+
             if(typeExpression.StartsWith("(struct:"))
             {
                 int right = typeExpression.IndexOf(')');

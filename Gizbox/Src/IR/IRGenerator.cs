@@ -643,7 +643,14 @@ namespace Gizbox.IR
 
                         // 作为左值使用
                         bool isLeftValue = (objMemberAccess.Parent is AssignNode assign) && (assign.lvalueNode == objMemberAccess);
-                        if(isLeftValue)
+
+                        // 结构体链式访问中间节点（如 w.p.a 里的 w.p）不能先读到临时变量，
+                        // 否则后续写入会写到副本而非原对象。
+                        bool isStructChainBase = memberSep == "."
+                            && objMemberAccess.Parent is ObjectMemberAccessNode parentAccess
+                            && parentAccess.objectNode == objMemberAccess;
+
+                        if(isLeftValue || isStructChainBase)
                         {
                             SetRet(objMemberAccess, objExpr + memberSep + objMemberAccess.memberNode.FullName);
                         }

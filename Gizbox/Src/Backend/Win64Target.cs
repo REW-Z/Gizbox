@@ -146,6 +146,7 @@ namespace Gizbox.Src.Backend
         // 附加数据  
         private Dictionary<SymbolTable, int> localVarsSpaceSize = new();
         private Dictionary<SymbolTable, int> hiddenRetSpillOffsets = new();
+        private Dictionary<SymbolTable, int> hiddenRetReserveSizes = new();
         private Dictionary<X64Instruction, InstructionAdditionalInfo> instuctonAdditionalInfos = new();
 
         // *** 状态数据 ***
@@ -416,7 +417,7 @@ namespace Gizbox.Src.Backend
                 //CALL参数个数  
                 if(tac.op == "CALL" || tac.op == "MCALL" || tac.op == "PCALL")
                 {
-                    int.TryParse(tac.arg1, out inf.CALL_paramCount);
+                    inf.CALL_paramCount = ParseCallParamCount(tac.arg1);
                 }
 
                 //构造函数调用对象类型
@@ -453,11 +454,7 @@ namespace Gizbox.Src.Backend
                         return;
 
                     int reserve = AlignUp8(currMaxHiddenRetSize);
-                    int oldSize = localVarsSpaceSize.TryGetValue(currFnEnv, out var s) ? s : 0;
-                    int spillOffset = -(oldSize + reserve);
-
-                    hiddenRetSpillOffsets[currFnEnv] = spillOffset;
-                    localVarsSpaceSize[currFnEnv] = oldSize + reserve;
+                    hiddenRetReserveSizes[currFnEnv] = reserve;
                 }
 
                 for(int line = 0; line < ir.codes.Count; ++line)
@@ -789,8 +786,20 @@ namespace Gizbox.Src.Backend
                     {
                         localVars[i].addr = result[i];
                     }
-                    funcRec.size = frameSize;
-                    localVarsSpaceSize[funcRec.envPtr] = (int)frameSize;
+
+                    int reserveHiddenRet = 0;
+                    if(hiddenRetReserveSizes.TryGetValue(funcRec.envPtr, out var reserve) && reserve > 0)
+                    {
+                        reserveHiddenRet = reserve;
+                        hiddenRetSpillOffsets[funcRec.envPtr] = -((int)frameSize + reserveHiddenRet);
+                    }
+                    else
+                    {
+                        hiddenRetSpillOffsets.Remove(funcRec.envPtr);
+                    }
+
+                    funcRec.size = frameSize + reserveHiddenRet;
+                    localVarsSpaceSize[funcRec.envPtr] = (int)frameSize + reserveHiddenRet;
                 }
             }
             else
@@ -997,6 +1006,8 @@ namespace Gizbox.Src.Backend
                                 BeforeCall(tacInf, tempParamList, out rspSub, ref homedRegs);
                             }
 
+                            tempParamList.Clear();
+
                             // 实际的函数调用
                             // （CALL 指令会自动把返回地址（下一条指令的 RIP）压入栈顶）  
                             Emit(X64.call(funcName));
@@ -1036,6 +1047,8 @@ namespace Gizbox.Src.Backend
                             {
                                 BeforeCall(tacInf, tempParamList, out rspSub, ref homedRegs);
                             }
+
+                            tempParamList.Clear();
 
                             // 间接调用（函数指针）
                             Emit(X64.call(callee));
@@ -1088,6 +1101,8 @@ namespace Gizbox.Src.Backend
                             {
                                 BeforeCall(tacInf, tempParamList, out rspSub, ref homedRegs);
                             }
+
+                            tempParamList.Clear();
 
                             // 此时 RCX 已由 BeforeCall 正确设置为 this，再取 vtable 函数地址
                             Emit(X64.mov(X64.rax, X64.mem(X64.rcx, disp: 0), X64Size.qword));
@@ -2540,14 +2555,44 @@ namespace Gizbox.Src.Backend
 
             //参数偏移  
             {
+                bool useHiddenRet = false;
+                var retType = ResolveCallableReturnType(funcRec);
+                if(retType != null && retType.IsStructType && retType.Size > 8)
+                    useHiddenRet = true;
+
                 foreach(var (key, rec) in funcTable.records)
                 {
                     if(rec.category != SymbolTable.RecordCatagory.Param)
                         continue;
-                    rec.addr = 16 + (rec.index * 8);//16包含rbp槽和返回值地址槽  
+
+                    // [rbp+16] 对应 ABI 参数槽0（home slot of RCX/XMM0）。
+                    // 大结构体返回时存在隐藏返回指针，占用参数槽0，用户参数整体右移一位。
+                    int abiParamIndex = rec.index + (useHiddenRet ? 1 : 0);
+                    rec.addr = 16 + (abiParamIndex * 8);//16包含rbp槽和返回值地址槽  
                 }
             }
             //（局部变量内存偏移，需要等活跃变量分析之后）
+        }
+
+        private bool FunctionUsesHiddenRet(SymbolTable funcEnv)
+        {
+            if(funcEnv == null)
+                return false;
+
+            if(funcDict.TryGetValue(funcEnv.name, out var funcRec) == false)
+                return false;
+
+            var retType = ResolveCallableReturnType(funcRec);
+            return retType != null && retType.IsStructType && retType.Size > 8;
+        }
+
+        private int GetAbiParamIndex(SymbolRecord paramRec)
+        {
+            if(paramRec == null || paramRec.category != SymbolTable.RecordCatagory.Param)
+                return -1;
+
+            var funcEnv = paramRec.GetAdditionInf().GetFunctionEnv();
+            return paramRec.index + (FunctionUsesHiddenRet(funcEnv) ? 1 : 0);
         }
 
         private (GType type, string valExpr) GetStaticInitValue(SymbolTable.Record rec)
@@ -3029,23 +3074,27 @@ namespace Gizbox.Src.Backend
                 case IROperandExpr.Type.StructMemberAccess:
                     {
                         var objName = iroperandExpr.segments[0];
-                        var fieldName = iroperandExpr.segments[1];
                         var objRec = irOperand.segmentRecs[0];
-                        var fieldRec = irOperand.segmentRecs[1];
-
                         if(objRec == null)
-                            throw new GizboxException(ExceptioName.CodeGen, $"object not found for struct member access \"{objName}.{fieldName}\" at line {irOperand.owner.line}");
-                        if(fieldRec == null)
-                            throw new GizboxException(ExceptioName.CodeGen, $"field not found for struct member access \"{objName}.{fieldName}\" at line {irOperand.owner.line}");
+                            throw new GizboxException(ExceptioName.CodeGen, $"object not found for struct member access \"{string.Join(".", iroperandExpr.segments)}\" at line {irOperand.owner.line}");
+
+                        long totalFieldOffset = 0;
+                        for(int i = 1; i < irOperand.segmentRecs.Length; ++i)
+                        {
+                            var fieldRec = irOperand.segmentRecs[i];
+                            if(fieldRec == null)
+                                throw new GizboxException(ExceptioName.CodeGen, $"field not found for struct member access \"{string.Join(".", iroperandExpr.segments)}\" at line {irOperand.owner.line}");
+                            totalFieldOffset += fieldRec.addr;
+                        }
 
                         if(objRec.GetAdditionInf().isGlobal)
                         {
-                            return X64.rel(objRec.name, fieldRec.addr);
+                            return X64.rel(objRec.name, totalFieldOffset);
                         }
 
                         if(objRec.category == SymbolTable.RecordCatagory.Variable)
                         {
-                            return X64.mem(X64.rbp, disp: objRec.addr + fieldRec.addr);
+                            return X64.mem(X64.rbp, disp: objRec.addr + totalFieldOffset);
                         }
 
                         if(objRec.category == SymbolTable.RecordCatagory.Param)
@@ -3053,9 +3102,9 @@ namespace Gizbox.Src.Backend
                             var objType = GType.Parse(objRec.typeExpression);
                             if(objType.IsStructType && objType.Size > 8)
                             {
-                                return X64.mem(GetRecVReg(objRec), disp: fieldRec.addr);
+                                return X64.mem(GetRecVReg(objRec), disp: totalFieldOffset);
                             }
-                            return X64.mem(X64.rbp, disp: objRec.addr + fieldRec.addr);
+                            return X64.mem(X64.rbp, disp: objRec.addr + totalFieldOffset);
                         }
 
                         throw new GizboxException(ExceptioName.CodeGen, $"unsupported struct member base category: {objRec.category}");
@@ -3158,7 +3207,7 @@ namespace Gizbox.Src.Backend
                     && !rawoperand.StartsWith("%"))
                 {
                     var parts = rawoperand.Split('.');
-                    if(parts.Length == 2)
+                    if(parts.Length >= 2)
                     {
                         irOperand.type = IROperandExpr.Type.StructMemberAccess;
                         irOperand.segments = parts;
@@ -3226,6 +3275,26 @@ namespace Gizbox.Src.Backend
             return t;
         }
 
+        private static int ParseCallParamCount(string raw)
+        {
+            if(string.IsNullOrWhiteSpace(raw))
+                return 0;
+
+            // IR里通常是 "%LITINT:n"
+            const string litIntPrefix = "%LITINT:";
+            if(raw.StartsWith(litIntPrefix, StringComparison.Ordinal))
+            {
+                var n = raw.Substring(litIntPrefix.Length);
+                if(int.TryParse(n, out var v))
+                    return v;
+            }
+
+            if(int.TryParse(raw, out var direct))
+                return direct;
+
+            return 0;
+        }
+
 
         /// <summary> 变量或参数分配操作数（如果不是寄存器就包装为虚拟寄存器） </summary>
         public X64Reg GetRecVReg(SymbolRecord rec)
@@ -3248,9 +3317,10 @@ namespace Gizbox.Src.Backend
             if(rec.category == SymbolTable.RecordCatagory.Param)
             {
                 var type = GType.Parse(rec.typeExpression);
+                int abiParamIndex = GetAbiParamIndex(rec);
                 if(type.IsSSE == false)
                 {
-                    switch(rec.index)
+                    switch(abiParamIndex)
                     {
                         case 0:
                             return X64.rcx;
@@ -3261,12 +3331,12 @@ namespace Gizbox.Src.Backend
                         case 3:
                             return X64.r9;
                         default:
-                            return X64.mem(X64.rbp, disp: rec.addr); // 超过4个参数走栈 (addr已考虑rbp和返回地址槽位)
+                            return X64.mem(X64.rbp, disp: rec.addr); // 超过4个参数走栈 (addr已考虑隐藏返回参数)
                     }
                 }
                 else
                 {
-                    switch(rec.index)
+                    switch(abiParamIndex)
                     {
                         case 0:
                             return X64.xmm0;
@@ -3400,8 +3470,8 @@ namespace Gizbox.Src.Backend
                 {
                     foreach(var callerParam in callerParams)
                     {
-                        //正序的参数idx  
-                        int trueParamIndex = callerParam.index;
+                        //正序的 ABI 参数 idx（考虑隐藏返回指针占位）
+                        int trueParamIndex = GetAbiParamIndex(callerParam);
                         var type = GType.Parse(callerParam.typeExpression);
                         if(trueParamIndex < 4)
                         {
@@ -3411,12 +3481,12 @@ namespace Gizbox.Src.Backend
                             var intreg = UtilsW64.GetParamReg(trueParamIndex, false);
                             if(isSse)
                             {
-                                EmitMov(X64.mem(X64.rbp, disp: 16 + (8 * trueParamIndex)), ssereg, X64Size.qword, true);
+                                EmitMov(X64.mem(X64.rbp, disp: callerParam.addr), ssereg, X64Size.qword, true);
                                 homedRegs.Add((paramIdx: trueParamIndex, reg: ssereg, isSse: true));
                             }
                             else
                             {
-                                EmitMov(X64.mem(X64.rbp, disp: 16 + (8 * trueParamIndex)), intreg, X64Size.qword, false);
+                                EmitMov(X64.mem(X64.rbp, disp: callerParam.addr), intreg, X64Size.qword, false);
                                 homedRegs.Add((paramIdx: trueParamIndex, reg: intreg, isSse: false));
                             }
                         }
@@ -5173,6 +5243,11 @@ namespace Gizbox.Src.Backend
             else if(expr.type == IROperandExpr.Type.StructMemberAccess)
             {
                 var objRec = context.Query(segments[0], tacinf.line);
+                segmentRecs[0] = objRec;
+
+                if(objRec == null)
+                    throw new GizboxException(ExceptioName.CodeGen, $"cannot find struct base {segments[0]} at line {tacinf.line}");
+
                 string structName;
                 if(objRec.category == SymbolTable.RecordCatagory.Struct)
                 {
@@ -5183,9 +5258,25 @@ namespace Gizbox.Src.Backend
                     structName = GType.NormalizeTypeNameForSymbolLookup(objRec.typeExpression);
                 }
 
-                var memberRec = context.QueryMember(structName, segments[1]);
-                segmentRecs[0] = objRec;
-                segmentRecs[1] = memberRec;
+                SymbolTable.Record memberRec = null;
+                for(int i = 1; i < segments.Length; ++i)
+                {
+                    memberRec = context.QueryMember(structName, segments[i]);
+                    if(memberRec == null)
+                        throw new GizboxException(ExceptioName.CodeGen, $"cannot find struct member {segments[i]} in {structName} at line {tacinf.line}");
+
+                    segmentRecs[i] = memberRec;
+
+                    if(i < segments.Length - 1)
+                    {
+                        var memberType = GType.Parse(memberRec.typeExpression);
+                        if(memberType.IsStructType == false)
+                            throw new GizboxException(ExceptioName.CodeGen, $"member {memberRec.name} in {structName} is not struct for nested access at line {tacinf.line}");
+
+                        structName = GType.NormalizeTypeNameForSymbolLookup(memberRec.typeExpression);
+                    }
+                }
+
                 typeExpr = GType.Parse(memberRec.typeExpression);
             }
             else if(expr.type == IROperandExpr.Type.ArrayElementAccess)
