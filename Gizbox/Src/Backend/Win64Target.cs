@@ -3428,17 +3428,10 @@ namespace Gizbox.Src.Backend
                 callerSavePlaceHolders[currFuncEnv].Add(placeholderSaveNode);
 
 
-                // 栈帧16字节对齐 (如果是奇数个参数 -> 需要8字节对齐栈指针)
-                // (寄存器保存区自己确保16字节对齐)
-                if(paramCount % 2 != 0)
+                // 栈上传参空间（考虑隐藏返回指针参数）
+                if(effectiveParamCount > 4)
                 {
-                    // 如果是奇数个参数，先将rsp对齐到16字节
-                    rspSub += 8;
-                }
-                // 其他栈参数空间
-                if(paramCount > 4)
-                {
-                    int onStackParamLen = (paramCount - 4) * 8;
+                    int onStackParamLen = (effectiveParamCount - 4) * 8;
                     rspSub += onStackParamLen;
                 }
 
@@ -3458,6 +3451,12 @@ namespace Gizbox.Src.Backend
 
                 // 影子空间(32字节)
                 rspSub += 32;
+
+                // Win64: call 前 RSP 必须 16 字节对齐
+                if((rspSub & 15) != 0)
+                {
+                    rspSub += 8;
+                }
 
                 //移动rsp  
                 Emit(X64.sub(X64.rsp, X64.imm(rspSub), X64Size.qword));

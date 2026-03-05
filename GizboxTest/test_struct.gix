@@ -59,20 +59,29 @@ BigData ForwardBig(BigData d)
 void test_struct_small()
 {
 	Console::PrintLn("---- test_struct_small---");
-
+	
+	Console::PrintLn("1");
 	Pair p1 = default(Pair);
 	p1.a = 10;
 	p1.b = 20;
 	
+	Console::PrintLn("2");
+
 	Pair p2 = p1;
 	p2.a = p2.a + 1;
 	
+	Console::PrintLn("3");
+
 	int s1 = SumPair(p1);
 	int s2 = SumPair(p2);
 	
+	Console::PrintLn("4");
+
 	Console::PrintLn("Pair s1=" + (string)s1 + "  Pair s2=" + (string)s2);
 	Console::PrintLn("Pair s1=" + (string)s1);
 	Console::PrintLn("Pair s2=" + (string)s2);
+	
+	Console::PrintLn("5");
 
 	Pair p3 = MakePair(3, 4);
 	Console::PrintLn("Pair make=" + (string)SumPair(p3));
