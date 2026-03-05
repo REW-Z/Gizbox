@@ -1387,7 +1387,7 @@ namespace Gizbox
                 if(genericArguments.Count == 0)
                     rawTypeName = classname.FullName;
                 else
-                    rawTypeName = Utils.MangleTemplateInstanceName(classname.FullName, genericArguments.Select(t => t.TypeExpression()));
+                    rawTypeName = Utils.MangleTemplateInstanceName(classname.FullName, genericArguments.Select(t => GType.Parse(t.TypeExpression())));
 
                 if(ownershipModifier.HasFlag(VarModifiers.Own))
                     return "(own class)" + rawTypeName;

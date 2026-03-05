@@ -5223,7 +5223,7 @@ namespace Gizbox.Src.Backend
                     }
                     else
                     {
-                        className = GType.NormalizeTypeNameForSymbolLookup(objRec.typeExpression);
+                        className = GType.Normalize(objRec.typeExpression);
                     }
                     var classRec = context.classDict[className];
                     var memberRec = context.QueryMember(className, segments[1]);
@@ -5254,7 +5254,7 @@ namespace Gizbox.Src.Backend
                 }
                 else
                 {
-                    structName = GType.NormalizeTypeNameForSymbolLookup(objRec.typeExpression);
+                    structName = GType.Normalize(objRec.typeExpression);
                 }
 
                 SymbolTable.Record memberRec = null;
@@ -5272,7 +5272,7 @@ namespace Gizbox.Src.Backend
                         if(memberType.IsStructType == false)
                             throw new GizboxException(ExceptioName.CodeGen, $"member {memberRec.name} in {structName} is not struct for nested access at line {tacinf.line}");
 
-                        structName = GType.NormalizeTypeNameForSymbolLookup(memberRec.typeExpression);
+                        structName = GType.Normalize(memberRec.typeExpression);
                     }
                 }
 

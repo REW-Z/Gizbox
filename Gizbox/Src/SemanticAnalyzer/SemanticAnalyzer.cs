@@ -532,6 +532,11 @@ namespace Gizbox.SemanticRule
                             var newEnv = new SymbolTable(classDeclNode.classNameNode.FullName, SymbolTable.TableCatagory.ClassScope, envStack.Peek());
                             classDeclNode.attributes[AstAttr.env] = newEnv;
 
+                            if(classDeclNode.classNameNode.FullName.Contains("("))
+                            {
+                                throw new Exception();
+                            }
+
                             //添加条目-类名    
                             var newRec = envStack.Peek().NewRecord(
                                 classDeclNode.classNameNode.FullName,
@@ -784,7 +789,7 @@ namespace Gizbox.SemanticRule
                             TryCompleteType(funcDeclNode.returnTypeNode);
 
                             //形参列表 （成员函数）(不包含this类型)  
-                            var paramTypeArr = funcDeclNode.parametersNode.parameterNodes.Select(n => n.typeNode.TypeExpression()).ToArray();
+                            var paramTypeArr = funcDeclNode.parametersNode.parameterNodes.Select(n => GType.Normalize(n.typeNode.TypeExpression())).ToArray();
 
 
                             //符号的类型表达式（成员函数）  
@@ -3682,10 +3687,11 @@ namespace Gizbox.SemanticRule
 
                 case SyntaxTree.ObjectMemberAccessNode accessNode:
                     {
-                        var className = AnalyzeTypeExpression(accessNode.objectNode);
+                        var classTypeExpression = AnalyzeTypeExpression(accessNode.objectNode);
+                        GType classType = GType.Parse(classTypeExpression);
 
-                        var classRec = Query(className);
-                        if (classRec == null) throw new SemanticException(ExceptioName.ClassNameNotFound, accessNode.objectNode, className);
+                        var classRec = Query(classType.ObjectTypeName);
+                        if (classRec == null) throw new SemanticException(ExceptioName.ClassNameNotFound, accessNode.objectNode, classType.ObjectTypeName);
 
                         var classEnv = classRec.envPtr;
                         if (classEnv == null) throw new SemanticException(ExceptioName.ClassScopeNotFound, accessNode.objectNode, "");
@@ -3693,7 +3699,7 @@ namespace Gizbox.SemanticRule
                         var memberRec = classEnv.Class_GetMemberRecordInChainByRawname(accessNode.memberNode.FullName);//使用RawName以防找不到成员为函数时找不到    
                         if (memberRec == null) throw new SemanticException(ExceptioName.MemberFieldNotFound, accessNode.objectNode, accessNode.memberNode.FullName);
 
-                        accessNode.attributes[AstAttr.klass] = className;//记录memberAccess节点的点左边类型
+                        accessNode.attributes[AstAttr.klass] = classTypeExpression;//记录memberAccess节点的点左边类型
                         accessNode.attributes[AstAttr.member_name] = accessNode.memberNode.FullName;//记录memberAccess节点的点右边名称
 
                         nodeTypeExprssion = memberRec.typeExpression;
@@ -4169,7 +4175,7 @@ namespace Gizbox.SemanticRule
 
         private SymbolTable.Record Query(string name)
         {
-            name = GType.NormalizeTypeNameForSymbolLookup(name);
+            name = GType.Normalize(name);
 
             //符号表链查找  
             var toList = envStack.AsList();
@@ -4190,12 +4196,13 @@ namespace Gizbox.SemanticRule
                 }
             }
 
+            Console.WriteLine();
             return null;
         }
 
         private SymbolTable.Record Query_IgnoreMangle(string rawname)
         {
-            rawname = GType.NormalizeTypeNameForSymbolLookup(rawname);
+            rawname = GType.Normalize(rawname);
 
             //符号表链查找  
             var toList = envStack.AsList();

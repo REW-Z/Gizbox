@@ -318,7 +318,7 @@ public partial class SemanticAnalyzer
     //注册函数模板实例
     private void RegisterFunctionTemplateInstance(SyntaxTree.IdentityNode funcId, SyntaxTree.CallNode callNode, Dictionary<string, FunctionTemplateInstance> instances)
     {
-        var argTypes = callNode.genericArguments.Select(t => t.TypeExpression()).ToArray();
+        var argTypes = callNode.genericArguments.Select(t => GType.Parse(t.TypeExpression())).ToArray();
         var mangledBaseName = Utils.MangleTemplateInstanceName(funcId.FullName, argTypes);
         if(instances.ContainsKey(mangledBaseName))
         {

@@ -604,6 +604,7 @@ namespace Gizbox
             GType type = new GType();
 
             string normalizedExpr = StripTypePrefix(typeExpression, out var ownershipHint, out var explicitKind, out var explicitSize);
+            type._NormTypeName = normalizedExpr;
             type._OwnershipHint = ownershipHint;
 
             if(explicitSize > 0)
@@ -793,7 +794,7 @@ namespace Gizbox
             return typeExpression;
         }
 
-        public static string NormalizeTypeNameForSymbolLookup(string typeExpression)
+        public static string Normalize(string typeExpression)
         {
             if(string.IsNullOrWhiteSpace(typeExpression))
                 return typeExpression;
@@ -811,6 +812,7 @@ namespace Gizbox
         }
 
         private string _RawTypeExpression;
+        private string _NormTypeName;
         private Kind _Kind;
         private GType _Array_ElementType;
         private GType _Function_ReturnType;
@@ -994,6 +996,8 @@ namespace Gizbox
         public OwnershipHintKind OwnershipHint => _OwnershipHint;
 
         public string ObjectTypeName => _ObjectTypeName ?? _RawTypeExpression;
+
+        public string NormTypeName => _NormTypeName;
 
         public bool IsInteger
         {
