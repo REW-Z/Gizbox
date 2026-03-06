@@ -1200,13 +1200,13 @@ namespace Gizbox.LALRGenerator
         /// </summary>
         private void InitLALRCollection()
         {
-            if (genratorInput?.noMergeNonterminals != null &&
-                genratorInput.noMergeNonterminals.Any(n => outputData.grammerSet.nonterminalDict.ContainsKey(n)))
+            //禁止合并
+            if(genratorInput.disableLALRMerge)
             {
                 this.groups = new List<List<int>>();
                 outputData.lalrStates = new List<State>();
 
-                for (int i = 0; i < this.canonicalItemCollection.Count; ++i)
+                for(int i = 0; i < this.canonicalItemCollection.Count; ++i)
                 {
                     groups.Add(new List<int> { i });
                     State state = new State(i, "I_" + i, this.canonicalItemCollection[i]);
@@ -1215,6 +1215,20 @@ namespace Gizbox.LALRGenerator
 
                 Compiler.Pause("使用规范LR(1)项集族(禁用合并)" + outputData.lalrStates.Count);
                 return;
+            }
+
+            //排除合并
+            HashSet<Production> noMergeProductions = null;
+            if (genratorInput?.noMergeProductions != null)
+            {
+                noMergeProductions = new HashSet<Production>();
+                foreach (var expression in genratorInput.noMergeProductions)
+                {
+                    if (outputData.grammerSet.productionDict.TryGetValue(expression, out var production))
+                    {
+                        noMergeProductions.Add(production);
+                    }
+                }
             }
 
             //计算重新分的组  
@@ -1232,6 +1246,12 @@ namespace Gizbox.LALRGenerator
 
                     if (Utils_IsSameCore(this.canonicalItemCollection[i], this.canonicalItemCollection[j]))
                     {
+                        if (Utils_CanNotMerge(this.canonicalItemCollection[i], this.canonicalItemCollection[j], noMergeProductions))
+                        {
+                            GixConsole.WriteLine("第" + i + "个项集和第" + j + "个项集有相同核心，但命中noMergeProductions，禁止合并。");
+                            continue;
+                        }
+
                         GixConsole.WriteLine("第" + i + "个项集和第" + j + "个项集有相同核心，可以合并。");
 
                         if (anySame == false)
@@ -1624,6 +1644,25 @@ namespace Gizbox.LALRGenerator
 
             // O(n) 
             return core1.SetEquals(core2);
+        }
+
+        private bool Utils_CanNotMerge(LR1ItemSet set1, LR1ItemSet set2, HashSet<Production> noMergeProductions)
+        {
+            if (noMergeProductions == null || noMergeProductions.Count == 0)
+                return false;
+
+            foreach(var item in set1)
+            {
+                if(noMergeProductions.Contains(item.production))
+                    return true;
+            }
+            foreach(var item in set2)
+            {
+                if(noMergeProductions.Contains(item.production))
+                    return true;
+            }
+
+            return false;
         }
 
         private LR1ItemSet Utils_UnionSet(IEnumerable<LR1ItemSet> setArr)

@@ -12,6 +12,8 @@ float globalVar2 = 444.0f;
 
 void test_global_var()
 {
+	Console::PrintLn("------- test globalvar -------");
+
 	int result = globalVar1 + (int)globalVar2;
 	Console::PrintLn("result:" + (string)result);
 }
@@ -20,6 +22,8 @@ void test_global_var()
 
 void test_reg_alloc()
 {
+	Console::PrintLn("------- test_reg_alloc -------");
+
 	int v1 = 2;
 	int v2 = 2;
 	int v3 = 2;
@@ -44,20 +48,32 @@ int sum(int x, int y, int z)
 	return x + y - z;
 }
 
+class TestClass
+{
+	int Foo(int a){ return a + 1; }
+}
 void test_call()
 {
+	Console::PrintLn("------- test_call -------");
+
 	int num1 = 1000;
 	int num2 = 200;
 	int num3 = 100;
 	int num4 = sum(num1, num2, num3);
 	Console::PrintLn("Calc:");
 	Console::PrintLn((string)num4);
+
+
+	TestClass obj = new TestClass();
+	int rs = obj.Foo(123456);
+	Console::PrintLn("TestClass.Foo result:" + (string)rs);
 }
 
 // ----------------- SizeOf ------------------
 
 void test_sizeof()
-{
+{	Console::PrintLn("------- test sizeof -------");
+
 	int sizeofint = sizeof(int);
 	Console::PrintLn("sizeof(int):" + (string)sizeofint);
 }
@@ -73,6 +89,8 @@ class OOO
 }
 void test_dic()
 {
+	Console::PrintLn("------- test dic -------");
+
 	OOO o1 = new OOO(123);
 	OOO o2 = new OOO(123);
 	OOO o3 = o2;
@@ -90,8 +108,9 @@ void test_dic()
 	Console::PrintLn("Dic1 result:" + (string)result);
 	
 	var dict2 = new HashMap<string, string>();
-	dict2.Add("name", "rew");
-	string result2 = dict2.Get("name");
+	string strKey = "name";
+	dict2.Add(strKey, "rew");
+	string result2 = dict2.Get(strKey);
 	Console::PrintLn("Dic2 result:" + result2);
 
 	var dict3 = new HashMap<OOO, int>();
@@ -110,6 +129,8 @@ void test_dic()
 // ----------------- 位运算 -----------------
 void test_bitwise()
 {
+	Console::PrintLn("------- test bitwise -------");
+
 	int a = 5; // 0101
 	int b = 3; // 0011
 	int andResult = a & b; // 0001 -> 1
@@ -123,6 +144,8 @@ void test_bitwise()
 // ----------------- RTTI ------------------
 void test_rtti()
 {
+	Console::PrintLn("------- test rtti -------");
+
 	var t1 = typeof(Core::Object);
 	var t2 = typeof(Core::Int);
 	var t3 = typeof(int);
@@ -142,6 +165,8 @@ void test_rtti()
 // ----------------- IO --------------------
 void test_fileio()
 {
+	Console::PrintLn("------- test io -------");
+	
 	var path = "C:\\Users\\saus\\Desktop\\test_file.txt";
 	IO::FileWriteAllText(path, "Hello World!");
 	Console::PrintLn("File written:" + path);
@@ -150,6 +175,8 @@ void test_fileio()
 // ----------------- FuncPtr ---------------
 void test_funcptr()
 {
+	Console::PrintLn("------- test_funcptr -------");
+
 	//测试函数指针和函数指针转换整数
 	int(int,int) funcPtr = Add;
 	int rs = funcPtr(111,444);
@@ -170,13 +197,12 @@ int Add(int a, int b)
 {
 	return a + b;
 }
-class TestClass
-{
-	int Foo(int a){ return a + 1; }
-}
 // ----------------- Test-CTOR ------------------
 void test_ctor()
 {
+	Console::PrintLn("------- test ctor-------");
+
+	Console::PrintLn("Testing constructors:");
 	AAA otest = new AAA();
 	Console::PrintLn("otest:" + (string)otest.value);
 
@@ -208,6 +234,30 @@ class BBB : AAA
 	{
 	}
 }
+// ----------------- Test-DTOR -------------
+void test_dtor()
+{
+	Console::PrintLn("------- dtor -------");
+
+	own CCC otest = new CCC();
+}
+
+class DDD
+{
+	~DDD()
+	{
+		Console::PrintLn("DDD destructor called!");
+	}
+}
+class CCC
+{
+	own DDD fieldd = new DDD();
+	~CCC()
+	{
+		Console::PrintLn("CCC destructor called!");
+	}
+}
+
 // ----------------- Main ------------------
 void main()
 {
@@ -221,6 +271,7 @@ void main()
 	test_fileio();
 	test_funcptr();
 	test_ctor();
+	test_dtor();
 
 	Console::PrintLn("Test finished!");
 	Console::ReadLn();

@@ -22,6 +22,9 @@
     <None Update="stdlib.gix">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="test_boolexpr.gix">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="test_struct.gix">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

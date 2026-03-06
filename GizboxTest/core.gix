@@ -114,6 +114,7 @@ namespace Core::Extern
 
 	extern int StringLength(string v);
 	extern int StringCompare(string a, string b);
+	extern bool StringEqual(string a, string b);
 	extern string StringClone(string v);
 	extern void StringFree(string v);
 	extern string StringConcatNew(string a, string b);
@@ -157,6 +158,10 @@ namespace Core::IntrinsicOperatorOverloads
 	string operator add(string a, string b)
 	{
 		return Core::Extern::Concat(a, b);
+	}
+	bool operator equal(string a, string b)
+	{
+		return Core::Extern::StringEqual(a, b);
 	}
 }
 

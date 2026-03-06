@@ -139,6 +139,20 @@ public:
 `gettype(obj)`
 
 
+## 运算符重载  
+
+支持以下运算符重载：  
+`+`、`-`、`*`、`/`、`%`、`==`、`!=`、`<`、`>`、`<=`、`>=`、`<<`、`>>`
+必须使用标识符格式重载：  
+`add`、`sub`、`mul`、`div`、`mod`、`equal`、`notequal`、`lt`、`gt`、`le`、`ge`、`lshift`、`rshift`。
+示例：  
+```
+string operator add(string a, string b)
+{
+    //...
+}
+```
+
 
 ## 所有权（Ownership）
 

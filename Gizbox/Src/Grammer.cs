@@ -11,9 +11,10 @@ namespace Gizbox
     {
         public List<string> terminalNames;
 
-        public HashSet<string> noMergeNonterminals = new HashSet<string>() {
-            "genargs",
+        public HashSet<string> noMergeProductions = new HashSet<string>() {
         };
+
+        public bool disableLALRMerge = true;
 
         public List<string> nonterminalNames = new List<string>() {
 
@@ -154,6 +155,7 @@ namespace Gizbox
 
             "declstmt -> decltype ID genparams ( params ) { statements }",
             "declstmt -> TYPE_NAME ( params ) { statements }",
+            "declstmt -> ~ TYPE_NAME ( ) { statements }",
             "declstmt -> decltype operator ID genparams ( params ) { statements }",
             "declstmt -> extern decltype ID genparams ( params ) ;",
 

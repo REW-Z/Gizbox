@@ -156,6 +156,18 @@ int32_t Core__Extern__StringCompare(const wchar_t* a, const wchar_t* b)
     return wcscmp(a, b);
 }
 
+int32_t Core__Extern__StringEqual(const wchar_t* a, const wchar_t* b)
+{
+    // 同指针（包括同时为 NULL）直接判等
+    if (a == b) return 1;
+
+    // 仅一方为 NULL，不相等
+    if (a == NULL || b == NULL) return 0;
+
+    // 按内容比较
+    return wcscmp(a, b) == 0 ? 1 : 0;
+}
+
 const wchar_t* Core__Extern__StringClone(const wchar_t* v)
 {
     if (!v)

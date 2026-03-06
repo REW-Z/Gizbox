@@ -52,6 +52,12 @@ void main()
     Console::PrintLn((string)(list.Get(1)));
     Console::PrintLn((string)(list.Get(2)));
 
+    List<string> strlist = new List<string>();
+    strlist.Add("111");
+    Console::PrintLn("strlist:");
+    Console::PrintLn(strlist.Get(0));
+
+
 
     //模板函数（泛型函数测试）  
     int x = 10;

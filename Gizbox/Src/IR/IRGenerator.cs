@@ -220,7 +220,7 @@ namespace Gizbox.IR
                         if (isMethod && (isCtor || isDtor))
                             funcFinalName = (string)funcDeclNode.attributes[AstAttr.mangled_name];
                         else if (isMethod)
-                            funcFinalName = envStackTemp.Peek().name + "." + (string)funcDeclNode.attributes[AstAttr.mangled_name];
+                            funcFinalName = envStackTemp.Peek().name + "::" + (string)funcDeclNode.attributes[AstAttr.mangled_name];
                         else
                             funcFinalName = (string)funcDeclNode.attributes[AstAttr.mangled_name];
 
@@ -679,26 +679,63 @@ namespace Gizbox.IR
                 case BinaryOpNode binaryOp:
                     {
                         GenNode(binaryOp.leftNode);
-                        GenNode(binaryOp.rightNode);
 
                         if (binaryOp.leftNode.attributes.ContainsKey(AstAttr.type) == false)
                             throw new SemanticException(ExceptioName.TypeNotSet, binaryOp.leftNode, "");
 
-                        //if (binaryOp.rightNode.attributes.ContainsKey("type") == false)
-                        //    throw new SemanticException(binaryOp.rightNode, "type未设置!");
-
-                        //表达式的返回变量  
-                        if(binaryOp.IsCompare)
+                        // && 与 || 使用短路代码生成
+                        if(binaryOp.op == "&&")
                         {
+                            // ret = false; if(left==false) goto end; if(right==false) goto end; ret = true; end:
                             SetRet(binaryOp, NewTemp("bool"));
+                            EmitCode("=", GetRet(binaryOp), "%LITBOOL:false");
+
+                            string endLabel = $"sc_and_end_{markCounter++}";
+
+                            EmitCode("IF_FALSE_JUMP", GetRet(binaryOp.leftNode), "%LABEL:" + endLabel);
+
+                            GenNode(binaryOp.rightNode);
+                            EmitCode("IF_FALSE_JUMP", GetRet(binaryOp.rightNode), "%LABEL:" + endLabel);
+
+                            EmitCode("=", GetRet(binaryOp), "%LITBOOL:true");
+                            EmitCode("").label = endLabel;
+                        }
+                        else if(binaryOp.op == "||")
+                        {
+                            // ret = false; if(left!=false) { ret=true; goto end; } if(right!=false) ret=true; end:
+                            SetRet(binaryOp, NewTemp("bool"));
+                            EmitCode("=", GetRet(binaryOp), "%LITBOOL:false");
+
+                            string evalRightLabel = $"sc_or_eval_right_{markCounter++}";
+                            string endLabel = $"sc_or_end_{markCounter++}";
+
+                            EmitCode("IF_FALSE_JUMP", GetRet(binaryOp.leftNode), "%LABEL:" + evalRightLabel);
+                            EmitCode("=", GetRet(binaryOp), "%LITBOOL:true");
+                            EmitCode("JUMP", "%LABEL:" + endLabel);
+
+                            EmitCode("").label = evalRightLabel;
+                            GenNode(binaryOp.rightNode);
+                            EmitCode("IF_FALSE_JUMP", GetRet(binaryOp.rightNode), "%LABEL:" + endLabel);
+                            EmitCode("=", GetRet(binaryOp), "%LITBOOL:true");
+
+                            EmitCode("").label = endLabel;
                         }
                         else
                         {
-                            SetRet(binaryOp, NewTemp((string)binaryOp.leftNode.attributes[AstAttr.type]));
-                        }
-                        
+                            GenNode(binaryOp.rightNode);
 
-                        EmitCode(binaryOp.op, GetRet(binaryOp), GetRet(binaryOp.leftNode), GetRet(binaryOp.rightNode));
+                            //表达式的返回变量  
+                            if(binaryOp.IsCompare)
+                            {
+                                SetRet(binaryOp, NewTemp("bool"));
+                            }
+                            else
+                            {
+                                SetRet(binaryOp, NewTemp((string)binaryOp.leftNode.attributes[AstAttr.type]));
+                            }
+
+                            EmitCode(binaryOp.op, GetRet(binaryOp), GetRet(binaryOp.leftNode), GetRet(binaryOp.rightNode));
+                        }
                     }
                     break;
                 case UnaryOpNode unaryOp:
@@ -1161,8 +1198,8 @@ namespace Gizbox.IR
             if(false)
             {
                 var objRec = Query(varname);
-                var objType = objRec.typeExpression;
-                var classRec = Query(objType);
+                var objType = GType.Parse(objRec.typeExpression);
+                var classRec = Query(objType.NormTypeName);
                 var fieldRec = classRec.envPtr.GetRecord(fieldName);
                 string tmp2 = RentTemp(fieldRec.typeExpression, "objfield_ptr");
                 EmitCode("=", tmp2, accessExpr);
@@ -1172,8 +1209,8 @@ namespace Gizbox.IR
             else
             {
                 var objRec = Query(varname);
-                var objType = objRec.typeExpression;
-                var classRec = Query(objType);
+                var objType = GType.Parse(objRec.typeExpression);
+                var classRec = Query(objType.NormTypeName);
                 var fieldRec = classRec.envPtr.GetRecord(fieldName);
 
                 GType gtype = GType.Parse(fieldRec.typeExpression);
@@ -1572,6 +1609,11 @@ namespace Gizbox.IR
                     if(gtype.Category == GType.Kind.String)
                     {
                         string lex = literalNode.token.attribute;
+                        if(string.Equals(lex, "null", StringComparison.Ordinal))
+                        {
+                            operandStr = "%LITNULL:";
+                            return operandStr;
+                        }
                         string conststr = lex.Substring(1, lex.Length - 2);
                         ilUnit.constData.Add(("string", conststr));
                         int ptr = ilUnit.constData.Count - 1;

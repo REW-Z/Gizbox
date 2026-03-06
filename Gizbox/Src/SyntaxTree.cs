@@ -1130,6 +1130,14 @@ namespace Gizbox
                     case "*": return "mul";
                     case "/": return "div";
                     case "%": return "mod";
+                    case "==": return "equal";
+                    case "!=": return "notequal";
+                    case "<": return "lt";
+                    case ">": return "gt";
+                    case "<=": return "le";
+                    case ">=": return "ge";
+                    case "<<" : return "lshift";
+                    case ">>" : return "rshift";
                 }
                 return null;
             }
@@ -1390,9 +1398,9 @@ namespace Gizbox
                     rawTypeName = Utils.MangleTemplateInstanceName(classname.FullName, genericArguments.Select(t => GType.Parse(t.TypeExpression())));
 
                 if(ownershipModifier.HasFlag(VarModifiers.Own))
-                    return "(own class)" + rawTypeName;
+                    return "(own-class)" + rawTypeName;
                 if(ownershipModifier.HasFlag(VarModifiers.Bor))
-                    return "(bor class)" + rawTypeName;
+                    return "(bor-class)" + rawTypeName;
 
                 if(isStructType)
                 {

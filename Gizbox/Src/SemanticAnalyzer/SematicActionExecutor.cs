@@ -570,6 +570,39 @@ namespace Gizbox.SemanticRule
 
                 psr.newElement.attributes[ParseAttr.ast_node] = ctorNode;
             });
+
+            AddActionAtTail("declstmt -> ~ TYPE_NAME ( ) { statements }", (psr, production) => {
+                var classToken = psr.stack[psr.stack.Top - 5].attributes[ParseAttr.token] as Token;
+
+                var dtorNode = new SyntaxTree.FuncDeclareNode()
+                {
+                    funcType = FunctionKind.Dtor,
+                    returnFlags = VarModifiers.None,
+
+                    returnTypeNode = new SyntaxTree.PrimitiveTypeNode()
+                    {
+                        token = new Token("void", PatternType.Keyword, "void", classToken.line, classToken.start, classToken.length),
+                        attributes = new Dictionary<AstAttr, object>(),
+                    },
+                    identifierNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = new Token("ID", PatternType.Id, "dtor", classToken.line, classToken.start, classToken.length),
+                        identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
+                    },
+                    parametersNode = new SyntaxTree.ParameterListNode()
+                    {
+                        attributes = new Dictionary<AstAttr, object>(),
+                    },
+                    statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
+
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+
+                dtorNode.attributes[AstAttr.member_name] = classToken.attribute;
+
+                psr.newElement.attributes[ParseAttr.ast_node] = dtorNode;
+            });
             AddActionAtTail("declstmt -> decltype operator ID genparams ( params ) { statements }", (psr, production) => {
                 var funcNode = new SyntaxTree.FuncDeclareNode()
                 {

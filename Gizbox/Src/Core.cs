@@ -765,31 +765,38 @@ namespace Gizbox
                 return typeExpression.Substring("(class)".Length).Trim();
             }
 
-            if(typeExpression.StartsWith("(own class)"))
+            if(typeExpression.StartsWith("(own-class)"))
             {
                 ownershipHint = OwnershipHintKind.Own;
                 explicitKind = Kind.Object;
-                return typeExpression.Substring("(own class)".Length).Trim();
+                return typeExpression.Substring("(own-class)".Length).Trim();
             }
 
-            if(typeExpression.StartsWith("(bor class)"))
+            if(typeExpression.StartsWith("(bor-class)"))
             {
                 ownershipHint = OwnershipHintKind.Borrow;
                 explicitKind = Kind.Object;
-                return typeExpression.Substring("(bor class)".Length).Trim();
+                return typeExpression.Substring("(bor-class)".Length).Trim();
             }
 
-            if(typeExpression.StartsWith("(own)"))
+            if(typeExpression.StartsWith("(ptr)"))
             {
-                ownershipHint = OwnershipHintKind.Own;
-                return typeExpression.Substring("(own)".Length).Trim();
+                ownershipHint = OwnershipHintKind.None;
+                explicitKind = Kind.Object;
+                return typeExpression.Substring("(ptr)".Length).Trim();
             }
 
-            if(typeExpression.StartsWith("(bor)"))
-            {
-                ownershipHint = OwnershipHintKind.Borrow;
-                return typeExpression.Substring("(bor)".Length).Trim();
-            }
+            //if(typeExpression.StartsWith("(own)"))
+            //{
+            //    ownershipHint = OwnershipHintKind.Own;
+            //    return typeExpression.Substring("(own)".Length).Trim();
+            //}
+
+            //if(typeExpression.StartsWith("(bor)"))
+            //{
+            //    ownershipHint = OwnershipHintKind.Borrow;
+            //    return typeExpression.Substring("(bor)".Length).Trim();
+            //}
 
             return typeExpression;
         }
@@ -1219,11 +1226,11 @@ namespace Gizbox
             if(dataIndexDict.TryGetValue(fname, out var index))
             {
                 data[index].className = cname;
-                data[index].funcfullname = $"{cname}.{fname}";
+                data[index].funcfullname = $"{cname}::{fname}";
             }
             else
             {
-                var newfuncRec = new Record() { funcName = fname, className = cname, funcfullname = $"{cname}.{fname}" };
+                var newfuncRec = new Record() { funcName = fname, className = cname, funcfullname = $"{cname}::{fname}" };
 
                 data.Add(newfuncRec);
                 int newindex = data.Count - 1;
@@ -1235,7 +1242,7 @@ namespace Gizbox
         {
             foreach(var rec in this.data)
             {
-                var newrec = new Record() { funcName = rec.funcName, className = rec.className, funcfullname = rec.className + "." + rec.funcName };
+                var newrec = new Record() { funcName = rec.funcName, className = rec.className, funcfullname = rec.className + "::" + rec.funcName };
                 targetTable.data.Add(newrec);
                 int index = targetTable.data.Count - 1;
                 targetTable.dataIndexDict[rec.funcName] = index;

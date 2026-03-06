@@ -513,9 +513,9 @@ namespace Gizbox.Src.Backend
             {
                 var tac = ir.codes[line];
                 // 读取字符串字面量和浮点数字面量到静态常量数据区  
-                CollectReadOnlyData(tac.arg0, line);
-                CollectReadOnlyData(tac.arg1, line);
-                CollectReadOnlyData(tac.arg2, line);
+                CollectReadOnlyData(tac.op, tac.arg0, line);
+                CollectReadOnlyData(tac.op, tac.arg1, line);
+                CollectReadOnlyData(tac.op, tac.arg2, line);
             }
             
 
@@ -1144,8 +1144,10 @@ namespace Gizbox.Src.Backend
                             if(codeParamObj == null)
                                 throw new GizboxException(ExceptioName.CodeGen, "MCALL missing this parameter.");
 
-                            string className = codeParamObj.oprand0.typeExpr.ToString();
+                            string className = codeParamObj.oprand0.typeExpr.NormTypeName;
                             var (index, vrec) = QueryVTable(className, methodName);
+                            if(vrec == null)
+                                throw new GizboxException(ExceptioName.CodeGen, $"vtable method not found: class={className}, method={methodName}");
 
                             //调用前准备(和CALL指令一致)  
                             int rspSub = 0;
@@ -2582,9 +2584,16 @@ namespace Gizbox.Src.Backend
 
 
             //构造函数加入globalFuncs  
-            globalFuncsInfos.Add(classTable.name + "::ctor");
             //析构函数加入globalFuncs
-            globalFuncsInfos.Add(classTable.name + "::dtor");
+            foreach(var funcRec in classRec.envPtr.GetByCategory(SymbolTable.RecordCatagory.Function))
+            {
+                if(funcRec.name.StartsWith(classTable.name + "::ctor") || funcRec.name.StartsWith(classTable.name + "::dtor"))
+                {
+                    globalFuncsInfos.Add(funcRec.name);
+                }
+            }
+            //globalFuncsInfos.Add(classTable.name + "::ctor");
+            //globalFuncsInfos.Add(classTable.name + "::dtor");
 
             //方法信息(包含构造函数)  
             foreach(var (memName, memRec) in classTable.records)
@@ -2722,8 +2731,8 @@ namespace Gizbox.Src.Backend
                 case "=":
                     {
                         // arg1 = arg2
-                        ASN(tac.arg0, lineNum, block, envStack);
-                        USE(tac.arg1, lineNum, block, envStack);
+                        ASN(tac.op, tac.arg0, lineNum, block, envStack);
+                        USE(tac.op, tac.arg1, lineNum, block, envStack);
                     }
                     break;
                 case "+=":
@@ -2733,9 +2742,9 @@ namespace Gizbox.Src.Backend
                 case "%=":
                     {
                         // arg1 += arg2
-                        USE(tac.arg0, lineNum, block, envStack);
-                        ASN(tac.arg0, lineNum, block, envStack);
-                        USE(tac.arg1, lineNum, block, envStack);
+                        USE(tac.op, tac.arg0, lineNum, block, envStack);
+                        ASN(tac.op, tac.arg0, lineNum, block, envStack);
+                        USE(tac.op, tac.arg1, lineNum, block, envStack);
                     }
                     break;
                 case "+":
@@ -2755,9 +2764,9 @@ namespace Gizbox.Src.Backend
                 case "!=":
                     {
                         // arg1 = arg2 op arg3
-                        ASN(tac.arg0, lineNum, block, envStack);
-                        USE(tac.arg1, lineNum, block, envStack);
-                        USE(tac.arg2, lineNum, block, envStack);
+                        ASN(tac.op, tac.arg0, lineNum, block, envStack);
+                        USE(tac.op, tac.arg1, lineNum, block, envStack);
+                        USE(tac.op, tac.arg2, lineNum, block, envStack);
                     }
                     break;
                 case "NEG":
@@ -2765,57 +2774,57 @@ namespace Gizbox.Src.Backend
                 case "CAST":
                     {
                         // CAST dst, type, src  -> src 在 arg2
-                        ASN(tac.arg0, lineNum, block, envStack);
-                        USE(tac.arg2, lineNum, block, envStack);
+                        ASN(tac.op, tac.arg0, lineNum, block, envStack);
+                        USE(tac.op, tac.arg2, lineNum, block, envStack);
                     }
                     break;
                 case "++":
                 case "--":
                     {
                         // ++arg1 或 --arg1
-                        USE(tac.arg0, lineNum, block, envStack);
-                        ASN(tac.arg0, lineNum, block, envStack);
+                        USE(tac.op, tac.arg0, lineNum, block, envStack);
+                        ASN(tac.op, tac.arg0, lineNum, block, envStack);
                     }
                     break;
                 case "IF_FALSE_JUMP":
                     {
-                        USE(tac.arg0, lineNum, block, envStack);
+                        USE(tac.op, tac.arg0, lineNum, block, envStack);
                     }
                     break;
                 case "RETURN":
                     {
                         if(!string.IsNullOrEmpty(tac.arg0))
                         {
-                            USE(tac.arg0, lineNum, block, envStack);
+                            USE(tac.op, tac.arg0, lineNum, block, envStack);
                         }
                     }
                     break;
                 case "PARAM":
                     {
-                        USE(tac.arg0, lineNum, block, envStack);
+                        USE(tac.op, tac.arg0, lineNum, block, envStack);
                     }
                     break;
                 case "ALLOC":
                     {
                         // arg1 = alloc
-                        ASN(tac.arg0, lineNum, block, envStack);
+                        ASN(tac.op, tac.arg0, lineNum, block, envStack);
                     }
                     break;
                 case "ALLOC_ARRAY":
                     {
                         // arg1 = alloc_array arg2
-                        ASN(tac.arg0, lineNum, block, envStack);
-                        USE(tac.arg1, lineNum, block, envStack);
+                        ASN(tac.op, tac.arg0, lineNum, block, envStack);
+                        USE(tac.op, tac.arg1, lineNum, block, envStack);
                     }
                     break;
                 case "DEALLOC":
                     {
-                        USE(tac.arg0, lineNum, block, envStack);
+                        USE(tac.op, tac.arg0, lineNum, block, envStack);
                     }
                     break;
                 case "DEALLOC_ARRAY":
                     {
-                        USE(tac.arg0, lineNum, block, envStack);
+                        USE(tac.op, tac.arg0, lineNum, block, envStack);
                     }
                     break;
                 case "CALL":
@@ -2824,62 +2833,62 @@ namespace Gizbox.Src.Backend
             }
         }
 
-        /// <summary>
-        /// 分析操作数（返回USE或者DEF的变量对象）
-        /// </summary>
-        /// <param name="operand"></param>
-        /// <returns></returns>
-        private bool IsAccess(string operand, out string memberOrElementOwner)
-        {
-            var irOperand = ParseIRExpr(operand);
+        ///// <summary>
+        ///// 分析操作数（返回USE或者DEF的变量对象）
+        ///// </summary>
+        ///// <param name="operand"></param>
+        ///// <returns></returns>
+        //private bool IsAccess(string op, string operand, out string memberOrElementOwner)
+        //{
+        //    var irOperand = ParseIRExpr(op, operand);
 
-            memberOrElementOwner = null;
+        //    memberOrElementOwner = null;
 
-            switch(irOperand.type)
-            {
-                case IROperandExpr.Type.Identifier:
-                    {
-                        return false;
-                    }
-                    break;
-                case IROperandExpr.Type.ClassMemberAccess:
-                    {
-                        memberOrElementOwner = irOperand.segments[0];
-                        return true;
-                    }
-                case IROperandExpr.Type.StructMemberAccess:
-                    {
-                        memberOrElementOwner = irOperand.segments[0];
-                        return true;
-                    }
-                case IROperandExpr.Type.ArrayElementAccess:
-                    {
-                        memberOrElementOwner = irOperand.segments[0];
-                        return true;
-                    }
-            }
-            return false;
-        }
+        //    switch(irOperand.type)
+        //    {
+        //        case IROperandExpr.Type.Identifier:
+        //            {
+        //                return false;
+        //            }
+        //            break;
+        //        case IROperandExpr.Type.ClassMemberAccess:
+        //            {
+        //                memberOrElementOwner = irOperand.segments[0];
+        //                return true;
+        //            }
+        //        case IROperandExpr.Type.StructMemberAccess:
+        //            {
+        //                memberOrElementOwner = irOperand.segments[0];
+        //                return true;
+        //            }
+        //        case IROperandExpr.Type.ArrayElementAccess:
+        //            {
+        //                memberOrElementOwner = irOperand.segments[0];
+        //                return true;
+        //            }
+        //    }
+        //    return false;
+        //}
 
         // USE  
-        private void USE(string operand, int lineNum, BasicBlock block, Gizbox.GStack<SymbolTable> envStack)
+        private void USE(string op, string operand, int lineNum, BasicBlock block, Gizbox.GStack<SymbolTable> envStack)
         {
             if(string.IsNullOrEmpty(operand))
                 return;
 
-            var irOperand = ParseIRExpr(operand);
+            var irOperand = ParseIRExpr(op, operand);
             if(irOperand.type == IROperandExpr.Type.ClassMemberAccess)
             {
-                USE(irOperand.segments[0], lineNum, block, envStack);
+                USE(op, irOperand.segments[0], lineNum, block, envStack);
             }
             else if(irOperand.type == IROperandExpr.Type.StructMemberAccess)
             {
-                USE(irOperand.segments[0], lineNum, block, envStack);
+                USE(op, irOperand.segments[0], lineNum, block, envStack);
             }
             else if(irOperand.type == IROperandExpr.Type.ArrayElementAccess)
             {
-                USE(irOperand.segments[0], lineNum, block, envStack);
-                USE(irOperand.segments[1], lineNum, block, envStack);
+                USE(op, irOperand.segments[0], lineNum, block, envStack);
+                USE(op, irOperand.segments[1], lineNum, block, envStack);
             }
             else if(irOperand.type == IROperandExpr.Type.Identifier)
             {
@@ -2896,25 +2905,25 @@ namespace Gizbox.Src.Backend
         }
 
         // 赋值 -> 可能是DEF也可能是USE  
-        private void ASN(string operand, int lineNum, BasicBlock block, Gizbox.GStack<SymbolTable> envStack)
+        private void ASN(string op, string operand, int lineNum, BasicBlock block, Gizbox.GStack<SymbolTable> envStack)
         {
             if(string.IsNullOrEmpty(operand))
                 return;
 
 
-            var irOperand = ParseIRExpr(operand);
+            var irOperand = ParseIRExpr(op, operand);
             if(irOperand.type == IROperandExpr.Type.ClassMemberAccess)
             {
-                USE(irOperand.segments[0], lineNum, block, envStack);
+                USE(op, irOperand.segments[0], lineNum, block, envStack);
             }
             else if(irOperand.type == IROperandExpr.Type.StructMemberAccess)
             {
-                USE(irOperand.segments[0], lineNum, block, envStack);
+                USE(op, irOperand.segments[0], lineNum, block, envStack);
             }
             else if(irOperand.type == IROperandExpr.Type.ArrayElementAccess)
             {
-                USE(irOperand.segments[0], lineNum, block, envStack);
-                USE(irOperand.segments[1], lineNum, block, envStack);
+                USE(op, irOperand.segments[0], lineNum, block, envStack);
+                USE(op, irOperand.segments[1], lineNum, block, envStack);
             }
             else
             {
@@ -2939,12 +2948,12 @@ namespace Gizbox.Src.Backend
         /// <summary>
         /// 读取只读数据（复杂字面量）
         /// </summary>
-        private void CollectReadOnlyData(string operand, int line)
+        private void CollectReadOnlyData(string op, string operand, int line)
         {
             if(string.IsNullOrEmpty(operand))
                 return;
 
-            var iroperand = ParseIRExpr(operand);
+            var iroperand = ParseIRExpr(op, operand);
             switch(iroperand.type)
             {
                 case IROperandExpr.Type.LitOrConst:
@@ -3227,7 +3236,7 @@ namespace Gizbox.Src.Backend
             return null;
         }
 
-        public IROperandExpr ParseIRExpr(string rawoperand)
+        public IROperandExpr ParseIRExpr(string op, string rawoperand)
         {
             if(operandCache.TryGetValue(rawoperand, out var result))
             {
@@ -3236,6 +3245,7 @@ namespace Gizbox.Src.Backend
             else
             {
                 IROperandExpr irOperand = new();
+
 
                 //返回值虚拟寄存器
                 if(rawoperand == "%RET")
@@ -3280,7 +3290,8 @@ namespace Gizbox.Src.Backend
                 }
                 else if(rawoperand.Contains(".")
                     && !rawoperand.Contains("::")
-                    && !rawoperand.StartsWith("%"))
+                    && !rawoperand.StartsWith("%")
+                    )
                 {
                     var parts = rawoperand.Split('.');
                     if(parts.Length >= 2)
@@ -5225,7 +5236,7 @@ namespace Gizbox.Src.Backend
         public IROperand(Win64CodeGenContext context, TACInfo tacinf, int operandIdx, string rawoperand)
         {
             this.owner = tacinf;
-            this.expr = context.ParseIRExpr(rawoperand);
+            this.expr = context.ParseIRExpr(tacinf.tac.op, rawoperand);
             this.operandIdx = operandIdx;
             this.segmentRecs = new SymbolTable.Record[segments.Length];
             if(expr.type == IROperandExpr.Type.Identifier)//Function Or Variable
@@ -5257,15 +5268,58 @@ namespace Gizbox.Src.Backend
                     segmentRecs[0] = classRec.envPtr.GetRecord(segments[0]);
                     typeExpr = Utils.DtorType(classRec);
                 }
-                else if(segments[0].Contains("."))
+                else if(segments[0].Contains("::"))
                 {
-                    string[] parts = segments[0].Split('.');
-                    string className = parts[0];
-                    string memberName = parts[1];
-                    var (classRec, memberRec) = context.QueryClassAndMember(className, memberName);
-                    segmentRecs[0] = memberRec;
-                    typeExpr = GType.Parse(memberRec.typeExpression);
-                    Win64Target.Log("------- " + typeExpr.ToString());
+                    int sep = segments[0].LastIndexOf("::", StringComparison.Ordinal);
+                    bool resolvedAsMethod = false;
+
+                    if(sep > 0 && sep + 2 < segments[0].Length)
+                    {
+                        string className = segments[0].Substring(0, sep);
+                        string memberName = segments[0].Substring(sep + 2);
+
+                        if(context.classDict.ContainsKey(className))
+                        {
+                            var memberRec = context.QueryMember(className, memberName);
+                            if(memberRec != null)
+                            {
+                                segmentRecs[0] = memberRec;
+                                typeExpr = GType.Parse(memberRec.typeExpression);
+                                Win64Target.Log("------- " + typeExpr.ToString());
+                                resolvedAsMethod = true;
+                            }
+                        }
+                    }
+
+                    if(resolvedAsMethod == false)
+                    {
+                        // 可能是普通命名空间函数（例如 Core::Hash::GetHashCode@_int）
+                        if(owner.tac.op == "CALL" && operandIdx == 0)
+                        {
+                            rec = context.Query(segments[0], owner.line);
+                            segmentRecs[0] = rec;
+                            typeExpr = GType.Parse(rec.typeExpression);
+                        }
+                        //CAST指令中标识符作为类型名
+                        else if(owner.tac.op == "CAST" && this.operandIdx == 1)
+                        {
+                            typeExpr = GType.Parse("(type)");
+                        }
+                        else if(owner.tac.op == "EXTERN_IMPL")
+                        {
+                            typeExpr = GType.Parse("(other)");
+                        }
+                        else
+                        {
+                            rec = context.Query(segments[0], tacinf.line);
+                            if(rec == null)
+                                rec = context.ir.QueryRaw(segments[0], tacinf.line);
+                            if(rec == null)
+                                throw new GizboxException(ExceptioName.CodeGen, $"cannot find variable {segments[0]} at line {tacinf.line}");
+                            segmentRecs[0] = rec;
+                            typeExpr = GType.Parse(rec.typeExpression);
+                        }
+                    }
                 }
                 else
                 {

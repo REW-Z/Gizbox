@@ -1,0 +1,71 @@
+﻿import <"core">  
+import <"stdlib">  
+
+using Core;  
+using Console;
+using Collections;
+
+int and_right_hits = 0;
+int or_right_hits = 0;
+
+bool LeftFalse()
+{
+	return false;
+}
+
+bool LeftTrue()
+{
+	return true;
+}
+
+bool RightOfAnd()
+{
+	and_right_hits++;
+	Console::PrintLn("Error:right-hits");
+	return true;
+}
+
+bool RightOfOr()
+{
+	or_right_hits++;
+	Console::PrintLn("Error:right-hits");
+	return false;
+}
+
+void main()
+{
+	if(LeftFalse() && RightOfAnd())
+	{
+		Console::PrintLn("FAIL: LeftFalse() && RightOfAnd() should be false");
+	}
+	else
+	{
+		if(and_right_hits == 0)
+		{
+			Console::PrintLn("SUCCESS: &&");
+		}
+		else
+		{
+			Console::PrintLn("FAIL: &&");
+		}
+	}
+
+	if(LeftTrue() || RightOfOr())
+	{
+		if(or_right_hits == 0)
+		{
+			Console::PrintLn("SUCCESS: ||");
+		}
+		else
+		{
+			Console::PrintLn("FAIL: ||");
+		}
+	}
+	else
+	{
+		Console::PrintLn("FAIL: LeftTrue() || RightOfOr() should be true");
+	}
+
+	Console::PrintLn("Test finished!");
+	Console::ReadLn();
+}

@@ -417,7 +417,7 @@ namespace Gizbox.SemanticRule
                             funcDeclNode.attributes[AstAttr.mangled_name] = funcMangledName;
 
                             //新的作用域  
-                            string envName = isMethod ? envStack.Peek().name + "." + funcMangledName : funcMangledName;
+                            string envName = isMethod ? envStack.Peek().name + "::" + funcMangledName : funcMangledName;
 
                             var newEnv = new SymbolTable(envName, SymbolTable.TableCatagory.FuncScope, envStack.Peek());
                             funcDeclNode.attributes[AstAttr.env] = newEnv;
@@ -832,7 +832,7 @@ namespace Gizbox.SemanticRule
 
                             //新的作用域（成员函数）  
                             string envName = (isMethod && isCtor == false && isDtor == false) 
-                                ? envStack.Peek().name + "." + funcMangledName 
+                                ? envStack.Peek().name + "::" + funcMangledName 
                                 : funcMangledName;
 
                             var newEnv = new SymbolTable(envName, SymbolTable.TableCatagory.FuncScope, envStack.Peek());
@@ -886,7 +886,9 @@ namespace Gizbox.SemanticRule
                             //隐藏的this参数加入符号表    
                             if(isMethod)
                             {
-                                funcEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, className);
+                                var classRec = funcDeclNode.Parent.attributes[AstAttr.class_rec] as SymbolTable.Record;
+                                bool isOwnershipClass = classRec.flags.HasFlag(SymbolTable.RecordFlag.OwnershipClass);
+                                funcEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, $"{ (isOwnershipClass ? "(own-class)" : "(class)")}{className}");
                             }
 
                             //形参加入符号表  
@@ -1050,7 +1052,7 @@ namespace Gizbox.SemanticRule
                         {
                             var ctorName = BuildCtorFunctionFullName(classDeclNode.classNameNode.FullName, Array.Empty<string>());
                             var ctorEnv = new SymbolTable(ctorName, SymbolTable.TableCatagory.FuncScope, newEnv);
-                            ctorEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, classDeclNode.classNameNode.FullName);
+                            ctorEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, $"{(classDeclNode.flags.HasFlag(TypeModifiers.Own) ? "(own-class)" : "(class)")}{classDeclNode.classNameNode.FullName}");
                             var ctorRec = newEnv.NewRecord(
                                 ctorName,
                                 SymbolTable.RecordCatagory.Function,
@@ -1066,7 +1068,7 @@ namespace Gizbox.SemanticRule
                         {
                             var dtorName = BuildDtorFunctionFullName(classDeclNode.classNameNode.FullName);
                             var dtorEnv = new SymbolTable(dtorName, SymbolTable.TableCatagory.FuncScope, newEnv);
-                            dtorEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, classDeclNode.classNameNode.FullName);
+                            dtorEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, $"{ (classDeclNode.flags.HasFlag(TypeModifiers.Own) ? "(own-class)" : "(class)") }{classDeclNode.classNameNode.FullName}");
                             var dtorRec = newEnv.NewRecord(
                                 dtorName,
                                 SymbolTable.RecordCatagory.Function,
@@ -3921,9 +3923,14 @@ namespace Gizbox.SemanticRule
                     throw new SemanticException(ExceptioName.CannotAnalyzeExpressionNodeType, exprNode, exprNode.GetType().Name);
             }
 
+            string sss = nodeTypeExprssion;
             nodeTypeExprssion = CanonicalizeTypeExpression(nodeTypeExprssion);
             exprNode.attributes[AstAttr.type] = nodeTypeExprssion;
 
+            if(nodeTypeExprssion.Contains("(class)class)"))
+            {
+                throw new Exception();
+            }
             return nodeTypeExprssion;
         }
 
@@ -3978,21 +3985,21 @@ namespace Gizbox.SemanticRule
             //有至少一个是基元类型  
             if(GType.Parse(typeExpr1).IsValuePrimitive || GType.Parse(typeExpr2).IsValuePrimitive)
             {
-                return typeExpr1 == typeExpr2;
+                return GType.Normalize(typeExpr1) == GType.Normalize(typeExpr2);
             }
             //全是非基元类型  
             else
             {
                 //null可以是任何非基元类型的子类  
-                if(typeExpr1 == "null")
+                if(GType.Normalize(typeExpr1) == "null")
                 {
                     return true;
                 }
                 //两个都是类类型
                 else if(GType.Parse(typeExpr1).IsClassType && GType.Parse(typeExpr2).IsClassType)
                 {
-                    var typeRec1 = Query(typeExpr1);
-                    if(typeRec1.envPtr.Class_IsSubClassOf(typeExpr2))
+                    var typeRec1 = Query(GType.Normalize(typeExpr1));
+                    if(typeRec1.envPtr.Class_IsSubClassOf(GType.Normalize(typeExpr2)))
                     {
                         return true;
                     }
@@ -4072,9 +4079,9 @@ namespace Gizbox.SemanticRule
             {
                 var n = t.ObjectTypeName;
                 if(t.OwnershipHint == GType.OwnershipHintKind.Own)
-                    return $"(own class){n}";
+                    return $"(own-class){n}";
                 if(t.OwnershipHint == GType.OwnershipHintKind.Borrow)
-                    return $"(bor class){n}";
+                    return $"(bor-class){n}";
                 return $"(class){n}";
             }
 
@@ -4567,14 +4574,14 @@ namespace Gizbox.SemanticRule
             {
                 return new SyntaxTree.PrimitiveTypeNode()
                 {
-                    token = new Token(typeExpr, PatternType.Keyword, typeExpr, refToken.line, refToken.start, refToken.length),
+                    token = new Token(GType.Normalize(typeExpr), PatternType.Keyword, typeExpr, refToken.line, refToken.start, refToken.length),
                     attributes = new Dictionary<AstAttr, object>(),
                 };
             }
 
             var idNode = new SyntaxTree.IdentityNode()
             {
-                token = new Token("ID", PatternType.Id, typeExpr, refToken.line, refToken.start, refToken.length),
+                token = new Token("ID", PatternType.Id, GType.Normalize(typeExpr), refToken.line, refToken.start, refToken.length),
                 identiferType = SyntaxTree.IdentityNode.IdType.Class,
                 attributes = new Dictionary<AstAttr, object>(),
             };
@@ -4583,8 +4590,6 @@ namespace Gizbox.SemanticRule
                 classname = idNode,
                 attributes = new Dictionary<AstAttr, object>(),
             };
-            if(idNode.token.attribute.Contains("("))
-                throw new Exception();
             idNode.Parent = classTypeNode;
             return classTypeNode;
         }

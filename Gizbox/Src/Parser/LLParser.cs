@@ -7,6 +7,15 @@ using System.Collections.Generic;
 
 namespace Gizbox
 {
+    public class LLScanner
+    {
+        public List<Token> Scan(string source)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+
 
     /// <summary>
     /// 语法分析器( LL(1) )  
@@ -173,7 +182,6 @@ namespace Gizbox
                 }
             }
 
-
             //验证文法    
             ValidLL1();
         }
@@ -251,7 +259,7 @@ namespace Gizbox
                             var newProduction = new Production(grammerSet, A_quot, αA_quat.ToArray());
                         }
                         //添加ε产生式  
-                        var newproduction = new Production(grammerSet, A_quot, new Symbol[] { null });
+                        var newproduction = new Production(grammerSet, A_quot, new Symbol[] { });
                     }
                 }
             }
