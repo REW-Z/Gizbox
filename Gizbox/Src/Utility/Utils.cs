@@ -7,13 +7,13 @@ namespace Gizbox
 {
     public static class Utils
     {
-        public static string Mangle(string funcname, params string[] paramTypes)
+        public static string Mangle(string funcname, params string[] paramTypeExpressions)
         {
             string result = funcname + "@";
-            foreach (var paramType in paramTypes)
+            foreach (var paramTypeExpression in paramTypeExpressions)
             {
                 result += '_';
-                result += paramType;
+                result += GType.Normalize(paramTypeExpression);
             }
             return result;
         }

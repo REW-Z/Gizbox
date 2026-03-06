@@ -800,10 +800,8 @@ namespace Gizbox
                 return typeExpression;
 
             var type = Parse(typeExpression);
-            if(type.Category == Kind.Object || type.Category == Kind.Struct)
-                return type.ObjectTypeName;
 
-            return typeExpression;
+            return type.NormTypeName;
         }
 
         public static GType GenFuncType(GType returnType, params GType[] paramTypes)

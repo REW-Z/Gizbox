@@ -416,7 +416,7 @@ public partial class SemanticAnalyzer
     //注册模板类实例
     private void RegisterTemplateInstance(SyntaxTree.ClassTypeNode classType, Dictionary<string, ClassTemplateInstance> instances)
     {
-        var mangledName = classType.TypeExpression();
+        var mangledName = GType.Normalize(classType.TypeExpression());
         if(instances.ContainsKey(mangledName))
             return;
 
@@ -431,7 +431,7 @@ public partial class SemanticAnalyzer
     //规范化模板类类型引用（清理泛型参数并替换类型名）
     private void NormalizeGenericUsage(SyntaxTree.ClassTypeNode classType)
     {
-        var mangledName = classType.TypeExpression();
+        var mangledName = GType.Normalize(classType.TypeExpression());
         classType.genericArguments.Clear();
         classType.classname.SetPrefix(null);
         classType.classname.token.attribute = mangledName;
@@ -440,7 +440,7 @@ public partial class SemanticAnalyzer
     //规范化new语句中的模板类型引用
     private void NormalizeGenericUsage(SyntaxTree.NewObjectNode newObjNode, SyntaxTree.ClassTypeNode classType)
     {
-        var mangledName = classType.TypeExpression();
+        var mangledName = GType.Normalize(classType.TypeExpression());
         classType.genericArguments.Clear();
         classType.classname.SetPrefix(null);
         classType.classname.token.attribute = mangledName;
@@ -546,6 +546,10 @@ public partial class SemanticAnalyzer
                 newArrayNode.typeNode = ReplaceTypeNode(newArrayNode.typeNode, typeMap, newArrayNode);
                 break;
             case SyntaxTree.NewObjectNode newObjNode:
+
+                if(newObjNode.className.FullName.Contains("BBB"))
+                    throw new Exception();
+
                 if(newObjNode.typeNode != null)
                     newObjNode.typeNode = ReplaceTypeNode(newObjNode.typeNode, typeMap, newObjNode);
                 if(newObjNode.className != null && typeMap.TryGetValue(newObjNode.className.FullName, out var replType) && replType is SyntaxTree.ClassTypeNode replClass)

@@ -148,6 +148,9 @@ namespace Gizbox.Src.Backend
         private Dictionary<SymbolTable, int> hiddenRetSpillOffsets = new();
         private Dictionary<SymbolTable, int> hiddenRetReserveSizes = new();
         private Dictionary<X64Instruction, InstructionAdditionalInfo> instuctonAdditionalInfos = new();
+        // 记录“已通过 hidden-ret 直接写入目标地址”的“= dst %RET”语句行号。
+        // 命中时在“=”分支跳过重复的 struct copy。
+        private HashSet<int> hiddenRetDirectAssignLines = new();
 
         // *** 状态数据 ***
         private SymbolTable globalEnv = null; // 全局作用域
@@ -987,6 +990,24 @@ namespace Gizbox.Src.Backend
 
                             var callRetType = ResolveCallableReturnType(targetFuncRec);
                             bool useHiddenRet = callRetType.IsStructType && callRetType.Size > 8;
+                            X64Operand hiddenRetDirectDst = null;
+                            TACInfo hiddenRetDirectAssign = null;
+
+                            if(useHiddenRet && i + 1 < ir.codes.Count)
+                            {
+                                var nextTac = ir.codes[i + 1];
+                                // 模式识别：CALL 后紧跟“= dst %RET”（大结构体）
+                                // 该场景可把 hidden-ret 指针直接指向 dst，避免 %RET spill 中转。
+                                if(nextTac.op == "=" && nextTac.arg1 == "%RET")
+                                {
+                                    var nextInf = GetTacInfo(nextTac);
+                                    if(nextInf?.oprand0?.typeExpr?.IsStructType == true && nextInf.oprand0.typeExpr.Size == callRetType.Size)
+                                    {
+                                        hiddenRetDirectDst = ParseOperand(nextInf.oprand0);
+                                        hiddenRetDirectAssign = nextInf;
+                                    }
+                                }
+                            }
 
                             //调用前准备  
                             int rspSub = 0;
@@ -999,7 +1020,7 @@ namespace Gizbox.Src.Backend
                                 {
                                     paraminfos.Add((ParseOperand(p.oprand0), p.PARAM_paramidx, p.oprand0.typeExpr, p.oprand0.IsConstAddrSemantic(), p.oprand0.GetConstAddressSymbol()));
                                 }
-                                BeforeCall(tacInf.CALL_paramCount, paraminfos, out rspSub, ref homedRegs, callRetType.Size, out hiddenRetOffset);
+                                BeforeCall(tacInf.CALL_paramCount, paraminfos, out rspSub, ref homedRegs, callRetType.Size, out hiddenRetOffset, hiddenRetDirectDst);
                             }
                             else
                             {
@@ -1019,6 +1040,10 @@ namespace Gizbox.Src.Backend
 
                                 EmitStructCopy(X64.mem(X64.rbp, disp: spillOffset), X64.mem(X64.rsp, disp: hiddenRetOffset), callRetType.Size);
                             }
+                            else if(useHiddenRet && hiddenRetDirectAssign != null)
+                            {
+                                hiddenRetDirectAssignLines.Add(hiddenRetDirectAssign.line);
+                            }
 
                             //调用后处理
                             AfterCall(rspSub, homedRegs);
@@ -1029,6 +1054,23 @@ namespace Gizbox.Src.Backend
                             var callee = ParseOperand(tacInf.oprand0);
                             var callRetType = tacInf.oprand0.typeExpr.FunctionReturnType;
                             bool useHiddenRet = callRetType.IsStructType && callRetType.Size > 8;
+                            X64Operand hiddenRetDirectDst = null;
+                            TACInfo hiddenRetDirectAssign = null;
+
+                            if(useHiddenRet && i + 1 < ir.codes.Count)
+                            {
+                                var nextTac = ir.codes[i + 1];
+                                // 模式识别：PCALL 后紧跟“= dst %RET”（大结构体）
+                                if(nextTac.op == "=" && nextTac.arg1 == "%RET")
+                                {
+                                    var nextInf = GetTacInfo(nextTac);
+                                    if(nextInf?.oprand0?.typeExpr?.IsStructType == true && nextInf.oprand0.typeExpr.Size == callRetType.Size)
+                                    {
+                                        hiddenRetDirectDst = ParseOperand(nextInf.oprand0);
+                                        hiddenRetDirectAssign = nextInf;
+                                    }
+                                }
+                            }
 
                             //调用前准备
                             int rspSub = 0;
@@ -1041,7 +1083,7 @@ namespace Gizbox.Src.Backend
                                 {
                                     paraminfos.Add((ParseOperand(p.oprand0), p.PARAM_paramidx, p.oprand0.typeExpr, p.oprand0.IsConstAddrSemantic(), p.oprand0.GetConstAddressSymbol()));
                                 }
-                                BeforeCall(tacInf.CALL_paramCount, paraminfos, out rspSub, ref homedRegs, callRetType.Size, out hiddenRetOffset);
+                                BeforeCall(tacInf.CALL_paramCount, paraminfos, out rspSub, ref homedRegs, callRetType.Size, out hiddenRetOffset, hiddenRetDirectDst);
                             }
                             else
                             {
@@ -1060,6 +1102,10 @@ namespace Gizbox.Src.Backend
 
                                 EmitStructCopy(X64.mem(X64.rbp, disp: spillOffset), X64.mem(X64.rsp, disp: hiddenRetOffset), callRetType.Size);
                             }
+                            else if(useHiddenRet && hiddenRetDirectAssign != null)
+                            {
+                                hiddenRetDirectAssignLines.Add(hiddenRetDirectAssign.line);
+                            }
 
                             //调用后处理
                             AfterCall(rspSub, homedRegs);
@@ -1074,6 +1120,23 @@ namespace Gizbox.Src.Backend
                             Debug.Assert(targetFuncRec != null);
                             var callRetType = ResolveCallableReturnType(targetFuncRec);
                             bool useHiddenRet = callRetType.IsStructType && callRetType.Size > 8;
+                            X64Operand hiddenRetDirectDst = null;
+                            TACInfo hiddenRetDirectAssign = null;
+
+                            if(useHiddenRet && i + 1 < ir.codes.Count)
+                            {
+                                var nextTac = ir.codes[i + 1];
+                                // 模式识别：MCALL 后紧跟“= dst %RET”（大结构体）
+                                if(nextTac.op == "=" && nextTac.arg1 == "%RET")
+                                {
+                                    var nextInf = GetTacInfo(nextTac);
+                                    if(nextInf?.oprand0?.typeExpr?.IsStructType == true && nextInf.oprand0.typeExpr.Size == callRetType.Size)
+                                    {
+                                        hiddenRetDirectDst = ParseOperand(nextInf.oprand0);
+                                        hiddenRetDirectAssign = nextInf;
+                                    }
+                                }
+                            }
 
 
                             // 提前解析 this 的静态类型（此时还未清空 tempParamList）
@@ -1095,7 +1158,7 @@ namespace Gizbox.Src.Backend
                                 {
                                     paraminfos.Add((ParseOperand(p.oprand0), p.PARAM_paramidx, p.oprand0.typeExpr, p.oprand0.IsConstAddrSemantic(), p.oprand0.GetConstAddressSymbol()));
                                 }
-                                BeforeCall(tacInf.CALL_paramCount, paraminfos, out rspSub, ref homedRegs, callRetType.Size, out hiddenRetOffset);
+                                BeforeCall(tacInf.CALL_paramCount, paraminfos, out rspSub, ref homedRegs, callRetType.Size, out hiddenRetOffset, hiddenRetDirectDst);
                             }
                             else
                             {
@@ -1117,6 +1180,10 @@ namespace Gizbox.Src.Backend
                                     throw new GizboxException(ExceptioName.CodeGen, "hidden return spill slot not reserved.");
 
                                 EmitStructCopy(X64.mem(X64.rbp, disp: spillOffset), X64.mem(X64.rsp, disp: hiddenRetOffset), callRetType.Size);
+                            }
+                            else if(useHiddenRet && hiddenRetDirectAssign != null)
+                            {
+                                hiddenRetDirectAssignLines.Add(hiddenRetDirectAssign.line);
                             }
 
 
@@ -1286,6 +1353,14 @@ namespace Gizbox.Src.Backend
                                     }
                                     else
                                     {
+                                        if(hiddenRetDirectAssignLines.Contains(tacInf.line))
+                                        {
+                                            // 该“= dst %RET”已在调用阶段通过 hidden-ret 直接写入 dst。
+                                            // 这里不再重复拷贝。
+                                            hiddenRetDirectAssignLines.Remove(tacInf.line);
+                                        }
+                                        else
+                                        {
                                         // 大 struct：返回值已通过隐藏指针拷贝到 spill 槽
                                         if(hiddenRetSpillOffsets.TryGetValue(currFuncEnv, out var spillOff))
                                         {
@@ -1294,6 +1369,7 @@ namespace Gizbox.Src.Backend
                                         else
                                         {
                                             throw new GizboxException(ExceptioName.CodeGen, "missing hidden return spill offset for large struct return.");
+                                        }
                                         }
                                     }
                                 }
@@ -3411,7 +3487,7 @@ namespace Gizbox.Src.Backend
             BeforeCall(paramCount, tempParamInfos, out rspSub, ref homedRegs, 0, out hiddenDummy);
         }
 
-        private void BeforeCall(int paramCount, List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey)> tempParamInfos, out int rspSub, ref List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs, int hiddenRetSize, out int hiddenRetOffset)
+        private void BeforeCall(int paramCount, List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey)> tempParamInfos, out int rspSub, ref List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs, int hiddenRetSize, out int hiddenRetOffset, X64Operand hiddenRetDst = null)
         {
             rspSub = 0;
             hiddenRetOffset = -1;
@@ -3443,7 +3519,7 @@ namespace Gizbox.Src.Backend
                         extraStructTempBytes += ((paraminfo.type.Size + 7) & ~7);
                     }
                 }
-                if(hiddenRetSize > 0)
+                if(hiddenRetSize > 0 && hiddenRetDst == null)
                 {
                     extraStructTempBytes += ((hiddenRetSize + 7) & ~7);
                 }
@@ -3498,12 +3574,29 @@ namespace Gizbox.Src.Backend
 
                 if(hiddenRetSize > 0)
                 {
-                    hiddenRetOffset = structTempCursor;
-                    structTempCursor += ((hiddenRetSize + 7) & ~7);
-
                     using(new RegUsageRange(this, RegisterEnum.R11))
                     {
-                        Emit(X64.lea(X64.r11, X64.mem(X64.rsp, disp: hiddenRetOffset)));
+                        if(hiddenRetDst != null)
+                        {
+                            // 直接返回到稳定目标地址（通常是“= dst %RET”的 dst）。
+                            // 这样可避免 caller 侧的 %RET spill 中转。
+                            if(hiddenRetDst is X64Reg reg)
+                            {
+                                Emit(X64.mov(X64.r11, reg, X64Size.qword));
+                            }
+                            else
+                            {
+                                Emit(X64.lea(X64.r11, hiddenRetDst));
+                            }
+                        }
+                        else
+                        {
+                            // 兼容路径：hidden-ret 临时区放在本次调用栈帧内，调用后再按旧逻辑拷贝到 spill。
+                            hiddenRetOffset = structTempCursor;
+                            structTempCursor += ((hiddenRetSize + 7) & ~7);
+                            Emit(X64.lea(X64.r11, X64.mem(X64.rsp, disp: hiddenRetOffset)));
+                        }
+
                         Emit(X64.mov(UtilsW64.GetParamReg(0, false), X64.r11, X64Size.qword));
                         Emit(X64.mov(X64.mem(X64.rsp, disp: 0), X64.r11, X64Size.qword));
                     }
@@ -5179,8 +5272,8 @@ namespace Gizbox.Src.Backend
                     //Call指令中标识符作为函数名  
                     if(owner.tac.op == "MCALL" && operandIdx == 0)
                     {
-                        var objClass = owner.MCALL_methodTargetObject.typeExpr;
-                        rec = context.QueryMember(objClass.ToString(), segments[0]);
+                        var objClassType = owner.MCALL_methodTargetObject.typeExpr;
+                        rec = context.QueryMember(objClassType.NormTypeName, segments[0]);
                         segmentRecs[0] = rec;
                         typeExpr = GType.Parse(rec.typeExpression);
                     }

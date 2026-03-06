@@ -532,11 +532,6 @@ namespace Gizbox.SemanticRule
                             var newEnv = new SymbolTable(classDeclNode.classNameNode.FullName, SymbolTable.TableCatagory.ClassScope, envStack.Peek());
                             classDeclNode.attributes[AstAttr.env] = newEnv;
 
-                            if(classDeclNode.classNameNode.FullName.Contains("("))
-                            {
-                                throw new Exception();
-                            }
-
                             //添加条目-类名    
                             var newRec = envStack.Peek().NewRecord(
                                 classDeclNode.classNameNode.FullName,
@@ -688,6 +683,8 @@ namespace Gizbox.SemanticRule
                                 SymbolTable.RecordCatagory.Variable,
                                 varDeclNode.typeNode.TypeExpression()
                                 );
+
+
                             newRec.accessFlags = isPrivate ? SymbolTable.AccessFlag.Private : SymbolTable.AccessFlag.Public;
                             
                             varDeclNode.attributes[AstAttr.var_rec] = newRec;
@@ -1785,7 +1782,7 @@ namespace Gizbox.SemanticRule
                         {
                             var memberAccess = assignNode.lvalueNode as SyntaxTree.ObjectMemberAccessNode;
 
-                            var className = AnalyzeTypeExpression(memberAccess.objectNode);
+                            var className = GType.Normalize(AnalyzeTypeExpression(memberAccess.objectNode));
 
                             var classRec = Query(className);
                             if (classRec == null) throw new SemanticException(ExceptioName.ClassSymbolTableNotFound, assignNode, className);
@@ -1839,7 +1836,7 @@ namespace Gizbox.SemanticRule
                     {
                         Pass3_AnalysisNode(objMemberAccessNode.objectNode);
 
-                        var className = AnalyzeTypeExpression(objMemberAccessNode.objectNode);
+                        var className = GType.Normalize(AnalyzeTypeExpression(objMemberAccessNode.objectNode));
                         var classRec = Query(className);
                         if(classRec == null) throw new SemanticException(ExceptioName.ClassSymbolTableNotFound, objMemberAccessNode, className);
                         var classEnv = classRec.envPtr;
@@ -2810,7 +2807,7 @@ namespace Gizbox.SemanticRule
                         {
                             if(callNode.funcNode is ObjectMemberAccessNode memberAccNode)
                             {
-                                var objtype = (string)memberAccNode.objectNode.attributes[AstAttr.type];
+                                var objtype = GType.Normalize((string)memberAccNode.objectNode.attributes[AstAttr.type]);
                                 var classRec = Query(objtype);
                                 var memfuncRec = classRec.envPtr.Class_GetMemberRecordInChain((string)callNode.attributes[AstAttr.mangled_name]);
                                 funcRec = memfuncRec;
@@ -3773,7 +3770,7 @@ namespace Gizbox.SemanticRule
                             var funcAccess = (callNode.funcNode as SyntaxTree.ObjectMemberAccessNode);
                             string funcFullName = funcAccess.memberNode.FullName;
 
-                            var className = AnalyzeTypeExpression(funcAccess.objectNode);
+                            var className = GType.Normalize(AnalyzeTypeExpression(funcAccess.objectNode));
 
 
                             List<string> allArgTypeList = new List<string>() { className };
@@ -4586,6 +4583,8 @@ namespace Gizbox.SemanticRule
                 classname = idNode,
                 attributes = new Dictionary<AstAttr, object>(),
             };
+            if(idNode.token.attribute.Contains("("))
+                throw new Exception();
             idNode.Parent = classTypeNode;
             return classTypeNode;
         }
