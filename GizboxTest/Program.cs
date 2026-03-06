@@ -70,14 +70,14 @@ switch(cmdIdx)
         {
             //生成库文件  
             Console.WriteLine("生成库文件");
-            string libsrcCore = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\core.gix");
-            string libsrcStd = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\stdlib.gix");
+            string libsrcCore = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\lib\\core.gix");
+            string libsrcStd = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\lib\\stdlib.gix");
             Compiler libCompiler = new Compiler();
             libCompiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
             libCompiler.ConfigParserDataSource(hardcode: true);
             //libCompiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
-            libCompiler.CompileToLib(libsrcCore, "core", AppDomain.CurrentDomain.BaseDirectory + "\\core.gixlib");
-            libCompiler.CompileToLib(libsrcStd, "stdlib", AppDomain.CurrentDomain.BaseDirectory + "\\stdlib.gixlib");
+            libCompiler.CompileToLib(libsrcCore, "core", AppDomain.CurrentDomain.BaseDirectory + "\\lib\\core.gixlib");
+            libCompiler.CompileToLib(libsrcStd, "stdlib", AppDomain.CurrentDomain.BaseDirectory + "\\lib\\stdlib.gixlib");
             return;
         }
         break;
@@ -106,7 +106,7 @@ switch(cmdIdx)
         {
             Console.WriteLine("测试x64目标代码生成");
 
-            var projpath = Path.Combine(Utility.RepoPath, "GizboxTest");
+            var projpath = Path.Combine(Utility.RepoPath, "GizboxTest", "test");
             DirectoryInfo projDir = new DirectoryInfo(projpath);
             var gixFiles = projDir.GetFiles("*.gix");
 

@@ -13,28 +13,31 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="example.gix">
+    <None Update="lib\graphics.gix">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="core.gix">
+    <None Update="test\example.gix">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="stdlib.gix">
+    <None Update="lib\core.gix">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="test_boolexpr.gix">
+    <None Update="lib\stdlib.gix">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="test_struct.gix">
+    <None Update="test\test_boolexpr.gix">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="test_template.gix">
+    <None Update="test\test_struct.gix">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="test_ownership.gix">
+    <None Update="test\test_template.gix">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="test.gix">
+    <None Update="test\test_ownership.gix">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="test\test.gix">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
