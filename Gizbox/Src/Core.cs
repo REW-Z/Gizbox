@@ -119,6 +119,7 @@ namespace Gizbox
             ManualVar = 1 << 12,
             OwnerVar = 1 << 13,
             BorrowVar = 1 << 14,
+            Addressable = 1 << 15,
         }
 
         public enum AccessFlag : uint
@@ -576,6 +577,7 @@ namespace Gizbox
             String,
             Object, //引用类型
             Struct, //值类型结构体
+            Ref, //按地址别名
             Array, //数组类型
             Function, //函数类型
         }
@@ -602,6 +604,16 @@ namespace Gizbox
                 return cached;
 
             GType type = new GType();
+
+            if(typeExpression.StartsWith("(ref)"))
+            {
+                type._Kind = Kind.Ref;
+                type._Ref_TargetType = Parse(typeExpression.Substring("(ref)".Length).Trim());
+                type._NormTypeName = type._Ref_TargetType.NormTypeName;
+                type._RawTypeExpression = typeExpression;
+                typeExpressionCache[typeExpression] = type;
+                return type;
+            }
 
             string normalizedExpr = StripTypePrefix(typeExpression, out var ownershipHint, out var explicitKind, out var explicitSize);
             type._NormTypeName = normalizedExpr;
@@ -754,6 +766,12 @@ namespace Gizbox
                 }
             }
 
+            if(typeExpression.StartsWith("(struct)"))
+            {
+                explicitKind = Kind.Struct;
+                return typeExpression.Substring("(struct)".Length).Trim();
+            }
+
             if(typeExpression.StartsWith("(primitive)"))
             {
                 return typeExpression.Substring("(primitive)".Length).Trim();
@@ -808,6 +826,9 @@ namespace Gizbox
 
             var type = Parse(typeExpression);
 
+            if(type.IsRefType)
+                return Normalize(type.RefTargetType.ToString());
+
             return type.NormTypeName;
         }
 
@@ -820,6 +841,7 @@ namespace Gizbox
         private string _NormTypeName;
         private Kind _Kind;
         private GType _Array_ElementType;
+        private GType _Ref_TargetType;
         private GType _Function_ReturnType;
         private List<GType> _Function_ParamTypes;
         private OwnershipHintKind _OwnershipHint;
@@ -861,6 +883,7 @@ namespace Gizbox
                     Kind.String => 8,
                     Kind.Object => 8,
                     Kind.Struct => _ExplicitSize > 0 ? _ExplicitSize : 8,
+                    Kind.Ref => 8,
                     Kind.Array => 8,
                     Kind.Function => 8,
                     _ => throw new GizboxException(ExceptioName.Undefine, $"unknown type expression category: {_Kind}"),
@@ -887,6 +910,7 @@ namespace Gizbox
                     Kind.String => 8,
                     Kind.Object => 8,
                     Kind.Struct => _ExplicitSize > 0 ? Math.Min(_ExplicitSize, 8) : 8,
+                    Kind.Ref => 8,
                     Kind.Array => 8,
                     Kind.Function => 8,
                     _ => throw new GizboxException(ExceptioName.Undefine, $"unknown type expression category: {_Kind}"),
@@ -953,7 +977,7 @@ namespace Gizbox
         }
 
 
-        public bool IsReferenceType
+        public bool IsRawReferenceType
         {
             get
             {
@@ -963,6 +987,8 @@ namespace Gizbox
                     _Kind == Kind.Function;
             }
         }
+
+        public bool IsRefType => _Kind == Kind.Ref;
 
         public bool IsStructType => _Kind == Kind.Struct;
 
@@ -1104,6 +1130,17 @@ namespace Gizbox
                     throw new GizboxException(ExceptioName.Undefine, $"cannot get element type of non-array type: {_Kind}");
 
                 return _Array_ElementType;
+            }
+        }
+
+        public GType RefTargetType
+        {
+            get
+            {
+                if(_Kind != Kind.Ref)
+                    throw new GizboxException(ExceptioName.Undefine, $"cannot get target type of non-ref type: {_Kind}");
+
+                return _Ref_TargetType;
             }
         }
     }

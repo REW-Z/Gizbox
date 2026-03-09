@@ -117,20 +117,21 @@ namespace Gizbox
             //路径查找  
             else
             {
-                foreach (var dir in this.libPathFindList)
+                foreach(var dir in this.libPathFindList)
                 {
-                    if (System.IO.Directory.Exists(dir) == false) continue;
+                    if(System.IO.Directory.Exists(dir) == false)
+                        continue;
 
                     System.IO.DirectoryInfo dirInfo = new System.IO.DirectoryInfo(dir);
-                    foreach (var f in dirInfo.GetFiles())
+                    foreach(var f in dirInfo.GetFiles())
                     {
-                        if (System.IO.Path.GetFileNameWithoutExtension(f.Name) == libname)
+                        if(System.IO.Path.GetFileNameWithoutExtension(f.Name) == libname)
                         {
-                            if (System.IO.Path.GetExtension(f.Name).EndsWith("gixlib"))
+                            if(System.IO.Path.GetExtension(f.Name).EndsWith("gixlib"))
                             {
                                 var unit = Gizbox.IR.ILSerializer.Deserialize(f.FullName);
 
-                                if (unit.name != libname)
+                                if(unit.name != libname)
                                 {
                                     throw new GizboxException(ExceptioName.LibraryFileNameMismatch, libname + " and " + unit.name);
                                 }

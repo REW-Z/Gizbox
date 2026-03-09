@@ -73,7 +73,8 @@ switch(cmdIdx)
             string libsrcCore = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\lib\\core.gix");
             string libsrcStd = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\lib\\stdlib.gix");
             Compiler libCompiler = new Compiler();
-            libCompiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
+            libCompiler.AddLibPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "lib"));
+            libCompiler.AddLibPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "test"));
             libCompiler.ConfigParserDataSource(hardcode: true);
             //libCompiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
             libCompiler.CompileToLib(libsrcCore, "core", AppDomain.CurrentDomain.BaseDirectory + "\\lib\\core.gixlib");
@@ -128,6 +129,8 @@ switch(cmdIdx)
                 string source = System.IO.File.ReadAllText(path);
                 Gizbox.Compiler compiler = new Compiler();
                 compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
+                compiler.AddLibPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "lib"));
+                compiler.AddLibPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "test"));
                 compiler.ConfigParserDataSource(hardcode: true);
                 //compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
                 var il = compiler.CompileToIR(source, isMainUnit: true, "test");

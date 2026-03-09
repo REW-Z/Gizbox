@@ -141,6 +141,7 @@ namespace Gizbox
         [KnownType(typeof(IdentityNode))]
         [KnownType(typeof(LiteralNode))]
         [KnownType(typeof(DefaultValueNode))]
+        [KnownType(typeof(BraceInitializerNode))]
         [KnownType(typeof(BinaryOpNode))]
         [KnownType(typeof(UnaryOpNode))]
         [KnownType(typeof(AssignNode))]
@@ -156,7 +157,8 @@ namespace Gizbox
         [KnownType(typeof(TypeOfNode))]
         [KnownType(typeof(SizeOfNode))]
         [KnownType(typeof(ArrayTypeNode))]
-        [KnownType(typeof(ClassTypeNode))]
+        [KnownType(typeof(RefTypeNode))]
+        [KnownType(typeof(NamedTypeNode))]
         [KnownType(typeof(PrimitiveTypeNode))]
         [KnownType(typeof(InferTypeNode))]
         [KnownType(typeof(ArgumentListNode))]
@@ -1105,6 +1107,18 @@ namespace Gizbox
         }
 
         [DataContract(IsReference = true)]
+        public class BraceInitializerNode : ExprNode
+        {
+            public readonly ChildList<ExprNode> fieldExprNodes;
+
+            public BraceInitializerNode()
+            {
+                children_group_0 = new();
+                fieldExprNodes = new ChildList<ExprNode>(children_group_0);
+            }
+        }
+
+        [DataContract(IsReference = true)]
         public class BinaryOpNode : ExprNode
         {
             [DataMember]
@@ -1343,7 +1357,8 @@ namespace Gizbox
 
         [DataContract(IsReference = true)]
         [KnownType(typeof(ArrayTypeNode))]
-        [KnownType(typeof(ClassTypeNode))]
+        [KnownType(typeof(RefTypeNode))]
+        [KnownType(typeof(NamedTypeNode))]
         [KnownType(typeof(PrimitiveTypeNode))]
         [KnownType(typeof(InferTypeNode))]
         [KnownType(typeof(FuncPtrTypeNode))]
@@ -1373,7 +1388,24 @@ namespace Gizbox
         }
 
         [DataContract(IsReference = true)]
-        public class ClassTypeNode : TypeNode
+        public class RefTypeNode : TypeNode
+        {
+            public TypeNode targetType { get => (TypeNode)children_group_0[0]; set => children_group_0[0] = value; }
+
+            public RefTypeNode()
+            {
+                children_group_0 = new();
+                children_group_0.Add(null);
+            }
+
+            public override string TypeExpression()
+            {
+                return "(ref)" + targetType.TypeExpression();
+            }
+        }
+
+        [DataContract(IsReference = true)]
+        public class NamedTypeNode : TypeNode
         {
             public IdentityNode classname { get => (IdentityNode)children_group_0[0]; set => children_group_0[0] = value; }
             [DataMember]
@@ -1383,7 +1415,7 @@ namespace Gizbox
             [DataMember]
             public int structSize = 0;
 
-            public ClassTypeNode()
+            public NamedTypeNode()
             {
                 children_group_0 = new();
                 children_group_0.Add(null);
@@ -1407,8 +1439,7 @@ namespace Gizbox
                     if(structSize > 0)
                         return $"(struct:{structSize})" + rawTypeName;
 
-                    // 结构体尺寸未决时，不输出错误尺寸，交由语义阶段后续统一重写
-                    return "(class)" + rawTypeName;
+                    return "(struct)" + rawTypeName;
                 }
 
                 return "(class)" + rawTypeName;

@@ -342,7 +342,7 @@ namespace Gizbox.Src.Backend
                     string initval = rec.initValue;
 
                     var type = GType.Parse(rec.typeExpression);
-                    if(type.IsReferenceType == false)
+                    if(type.IsRawReferenceType == false)
                     {
                         section_data.Add(key, new() { GetStaticInitValue(rec) });
                     }
@@ -981,6 +981,29 @@ namespace Gizbox.Src.Backend
                             tempParamList.Add(tacInf);
                         }
                         break;
+                    case "REF_BIND":
+                        {
+                            var dstRec = tacInf.oprand0.segmentRecs[0];
+                            if(dstRec == null)
+                                throw new GizboxException(ExceptioName.CodeGen, "ref bind target not found.");
+
+                            var dstStorage = GetRecOperand(dstRec);
+                            var srcAddress = ParseAddressOperand(tacInf.oprand1);
+
+                            if(srcAddress is X64Reg srcReg)
+                            {
+                                EmitMov(dstStorage, srcReg, X64Size.qword, false);
+                            }
+                            else
+                            {
+                                using(new RegUsageRange(this, RegisterEnum.R11))
+                                {
+                                    Emit(X64.lea(X64.r11, srcAddress));
+                                    EmitMov(dstStorage, X64.r11, X64Size.qword, false);
+                                }
+                            }
+                        }
+                        break;
                     case "CALL":
                         {
                             // 第一参数是 函数名，第二个参数是 参数个数
@@ -1015,10 +1038,19 @@ namespace Gizbox.Src.Backend
                             List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs = new();
                             if(useHiddenRet)
                             {
-                                List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey)> paraminfos = new();
+                                List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey, bool isByRef)> paraminfos = new();
                                 foreach(var p in tempParamList)
                                 {
-                                    paraminfos.Add((ParseOperand(p.oprand0), p.PARAM_paramidx, p.oprand0.typeExpr, p.oprand0.IsConstAddrSemantic(), p.oprand0.GetConstAddressSymbol()));
+                                    int sourceParamIndex = (tempParamList.Count - 1) - p.PARAM_paramidx;
+                                    var expectedType = ResolveCallParameterType(tacInf, sourceParamIndex);
+                                    bool isByRef = expectedType?.IsRefType == true;
+                                    paraminfos.Add((
+                                        isByRef ? ParseAddressOperand(p.oprand0) : ParseOperand(p.oprand0),
+                                        p.PARAM_paramidx,
+                                        isByRef ? expectedType : p.oprand0.typeExpr,
+                                        isByRef == false && p.oprand0.IsConstAddrSemantic(),
+                                        p.oprand0.GetConstAddressSymbol(),
+                                        isByRef));
                                 }
                                 BeforeCall(tacInf.CALL_paramCount, paraminfos, out rspSub, ref homedRegs, callRetType.Size, out hiddenRetOffset, hiddenRetDirectDst);
                             }
@@ -1078,10 +1110,19 @@ namespace Gizbox.Src.Backend
                             List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs = new();
                             if(useHiddenRet)
                             {
-                                List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey)> paraminfos = new();
+                                List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey, bool isByRef)> paraminfos = new();
                                 foreach(var p in tempParamList)
                                 {
-                                    paraminfos.Add((ParseOperand(p.oprand0), p.PARAM_paramidx, p.oprand0.typeExpr, p.oprand0.IsConstAddrSemantic(), p.oprand0.GetConstAddressSymbol()));
+                                    int sourceParamIndex = (tempParamList.Count - 1) - p.PARAM_paramidx;
+                                    var expectedType = ResolveCallParameterType(tacInf, sourceParamIndex);
+                                    bool isByRef = expectedType?.IsRefType == true;
+                                    paraminfos.Add((
+                                        isByRef ? ParseAddressOperand(p.oprand0) : ParseOperand(p.oprand0),
+                                        p.PARAM_paramidx,
+                                        isByRef ? expectedType : p.oprand0.typeExpr,
+                                        isByRef == false && p.oprand0.IsConstAddrSemantic(),
+                                        p.oprand0.GetConstAddressSymbol(),
+                                        isByRef));
                                 }
                                 BeforeCall(tacInf.CALL_paramCount, paraminfos, out rspSub, ref homedRegs, callRetType.Size, out hiddenRetOffset, hiddenRetDirectDst);
                             }
@@ -1155,10 +1196,19 @@ namespace Gizbox.Src.Backend
                             List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs = new();
                             if(useHiddenRet)
                             {
-                                List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey)> paraminfos = new();
+                                List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey, bool isByRef)> paraminfos = new();
                                 foreach(var p in tempParamList)
                                 {
-                                    paraminfos.Add((ParseOperand(p.oprand0), p.PARAM_paramidx, p.oprand0.typeExpr, p.oprand0.IsConstAddrSemantic(), p.oprand0.GetConstAddressSymbol()));
+                                    int sourceParamIndex = (tempParamList.Count - 1) - p.PARAM_paramidx;
+                                    var expectedType = ResolveCallParameterType(tacInf, sourceParamIndex);
+                                    bool isByRef = expectedType?.IsRefType == true;
+                                    paraminfos.Add((
+                                        isByRef ? ParseAddressOperand(p.oprand0) : ParseOperand(p.oprand0),
+                                        p.PARAM_paramidx,
+                                        isByRef ? expectedType : p.oprand0.typeExpr,
+                                        isByRef == false && p.oprand0.IsConstAddrSemantic(),
+                                        p.oprand0.GetConstAddressSymbol(),
+                                        isByRef));
                                 }
                                 BeforeCall(tacInf.CALL_paramCount, paraminfos, out rspSub, ref homedRegs, callRetType.Size, out hiddenRetOffset, hiddenRetDirectDst);
                             }
@@ -1208,8 +1258,8 @@ namespace Gizbox.Src.Backend
 
                             int rspSub;
                             List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs = new();
-                            List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey)> paramInfos 
-                                = new() { (X64.imm(objectSize), 0, GType.Parse("int"), false, null) } ;
+                            List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey, bool isByRef)> paramInfos 
+                                = new() { (X64.imm(objectSize), 0, GType.Parse("int"), false, null, false) } ;
                             BeforeCall(1, paramInfos, out rspSub, ref homedRegs);
                             // 调用malloc分配堆内存（参数是字节数）
                             Emit(X64.call("malloc"));
@@ -1264,8 +1314,8 @@ namespace Gizbox.Src.Backend
                             //动态分配  
                             int rspSub;
                             List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs = new();
-                            List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey)> paramInfos
-                                = new() { (X64.rax, 0, GType.Parse("int"), false, null) };
+                            List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey, bool isByRef)> paramInfos
+                                = new() { (X64.rax, 0, GType.Parse("int"), false, null, false) };
                             BeforeCall(1, paramInfos, out rspSub, ref homedRegs);
                             Emit(X64.call("malloc"));
                             AfterCall(rspSub, homedRegs);
@@ -1281,8 +1331,8 @@ namespace Gizbox.Src.Backend
 
                             int rspSub;
                             List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs = new();
-                            List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey)> paramInfos
-                                = new() { (objPtr, 0, tacInf.oprand0.typeExpr, false, null) };
+                            List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey, bool isByRef)> paramInfos
+                                = new() { (objPtr, 0, tacInf.oprand0.typeExpr, false, null, false) };
                             BeforeCall(1, paramInfos, out rspSub, ref homedRegs);
                             Emit(X64.call("free"));
                             AfterCall(rspSub, homedRegs);
@@ -1295,8 +1345,8 @@ namespace Gizbox.Src.Backend
 
                             int rspSub;
                             List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs = new();
-                            List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey)> paramInfos
-                                = new() { (arrPtr, 0, tacInf.oprand0.typeExpr, false, null) };
+                            List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey, bool isByRef)> paramInfos
+                                = new() { (arrPtr, 0, tacInf.oprand0.typeExpr, false, null, false) };
                             BeforeCall(1, paramInfos, out rspSub, ref homedRegs);
                             Emit(X64.call("free"));
                             AfterCall(rspSub, homedRegs);
@@ -1603,13 +1653,13 @@ namespace Gizbox.Src.Backend
                                 break;
                             }
                             // 指针类型转换 -> 指针直接赋值
-                            else if(srcType.IsReferenceType && targetType.IsReferenceType)
+                            else if(srcType.IsRawReferenceType && targetType.IsRawReferenceType)
                             {
                                 Emit(X64.mov(castDst, castSrc, X64Size.qword));
                             }
 
                             // 整数 -> 指针（仅允许64位整数）
-                            else if(srcType.IsInteger && targetType.IsReferenceType)
+                            else if(srcType.IsInteger && targetType.IsRawReferenceType)
                             {
                                 if(srcType.Size != 8)
                                 {
@@ -1621,7 +1671,7 @@ namespace Gizbox.Src.Backend
                                 Emit(X64.mov(castDst, castSrc, X64Size.qword));
                             }
                             // 指针 -> 整数（仅允许64位整数）
-                            else if(srcType.IsReferenceType && targetType.IsInteger)
+                            else if(srcType.IsRawReferenceType && targetType.IsInteger)
                             {
                                 if(targetType.Size != 8)
                                 {
@@ -2569,7 +2619,7 @@ namespace Gizbox.Src.Backend
         private (GType typeExpr, string valExpr) GetDefaultSerializedFieldValue(SymbolTable.Record fieldRec)
         {
             var fieldType = GType.Parse(fieldRec.typeExpression);
-            if(fieldType.IsReferenceType)
+            if(fieldType.IsRawReferenceType)
             {
                 return (GType.Parse("ulong"), "0");
             }
@@ -2701,6 +2751,8 @@ namespace Gizbox.Src.Backend
                             return (GType.Parse("int"), "0.0");
                         case GType.Kind.Double:
                             return (GType.Parse("int"), "0.0");
+                        case GType.Kind.Ref:
+                            return (GType.Parse("ulong"), "0");
                     }
                 }
                 else
@@ -2802,6 +2854,12 @@ namespace Gizbox.Src.Backend
                 case "PARAM":
                     {
                         USE(tac.op, tac.arg0, lineNum, block, envStack);
+                    }
+                    break;
+                case "REF_BIND":
+                    {
+                        ASN(tac.op, tac.arg0, lineNum, block, envStack);
+                        USE(tac.op, tac.arg1, lineNum, block, envStack);
                     }
                     break;
                 case "ALLOC":
@@ -3129,6 +3187,11 @@ namespace Gizbox.Src.Backend
                         }
 
                         var recType = GType.Parse(rec.typeExpression);
+                        if(recType.IsRefType)
+                        {
+                            return X64.mem(GetRecVReg(rec), disp: 0);
+                        }
+
                         if(rec.category == SymbolTable.RecordCatagory.Param && recType.IsStructType && recType.Size > 8)
                         {
                             // 大结构体参数在调用约定下按地址传入，这里解引用为结构体对象本体
@@ -3177,6 +3240,12 @@ namespace Gizbox.Src.Backend
                             return X64.rel(objRec.name, totalFieldOffset);
                         }
 
+                        var objType = GType.Parse(objRec.typeExpression);
+                        if(objType.IsRefType)
+                        {
+                            return X64.mem(GetRecVReg(objRec), disp: totalFieldOffset);
+                        }
+
                         if(objRec.category == SymbolTable.RecordCatagory.Variable)
                         {
                             return X64.mem(X64.rbp, disp: objRec.addr + totalFieldOffset);
@@ -3184,7 +3253,6 @@ namespace Gizbox.Src.Backend
 
                         if(objRec.category == SymbolTable.RecordCatagory.Param)
                         {
-                            var objType = GType.Parse(objRec.typeExpression);
                             if(objType.IsStructType && objType.Size > 8)
                             {
                                 return X64.mem(GetRecVReg(objRec), disp: totalFieldOffset);
@@ -3234,6 +3302,98 @@ namespace Gizbox.Src.Backend
             }
 
             return null;
+        }
+
+        private X64Operand ParseAddressOperand(IROperand irOperand)
+        {
+            if(irOperand == null)
+                return null;
+
+            var iroperandExpr = irOperand.expr;
+            switch(iroperandExpr.type)
+            {
+                case IROperandExpr.Type.Identifier:
+                    {
+                        var rec = irOperand.segmentRecs[0];
+                        if(rec == null)
+                            throw new GizboxException(ExceptioName.CodeGen, $"identifier address not found: {iroperandExpr.segments[0]}");
+
+                        var recType = GType.Parse(rec.typeExpression);
+                        if(recType.IsRefType)
+                            return GetRecVReg(rec);
+
+                        if(rec.category == SymbolTable.RecordCatagory.Param && recType.IsStructType && recType.Size > 8)
+                            return GetRecVReg(rec);
+
+                        if(rec.GetAdditionInf().isGlobal)
+                            return X64.rel(rec.name);
+
+                        return X64.mem(X64.rbp, disp: rec.addr);
+                    }
+                case IROperandExpr.Type.ClassMemberAccess:
+                    {
+                        var objRec = irOperand.segmentRecs[0];
+                        var fieldRec = irOperand.segmentRecs[1];
+                        if(objRec == null || fieldRec == null)
+                            throw new GizboxException(ExceptioName.CodeGen, $"class member address not found: {string.Join("->", iroperandExpr.segments)}");
+
+                        return X64.mem(GetRecVReg(objRec), disp: fieldRec.addr);
+                    }
+                case IROperandExpr.Type.StructMemberAccess:
+                    {
+                        var objRec = irOperand.segmentRecs[0];
+                        if(objRec == null)
+                            throw new GizboxException(ExceptioName.CodeGen, $"struct member address base not found: {string.Join(".", iroperandExpr.segments)}");
+
+                        long totalFieldOffset = 0;
+                        for(int i = 1; i < irOperand.segmentRecs.Length; ++i)
+                        {
+                            var fieldRec = irOperand.segmentRecs[i];
+                            if(fieldRec == null)
+                                throw new GizboxException(ExceptioName.CodeGen, $"struct member address field not found: {string.Join(".", iroperandExpr.segments)}");
+                            totalFieldOffset += fieldRec.addr;
+                        }
+
+                        if(objRec.GetAdditionInf().isGlobal)
+                            return X64.rel(objRec.name, totalFieldOffset);
+
+                        var objType = GType.Parse(objRec.typeExpression);
+                        if(objType.IsRefType)
+                            return X64.mem(GetRecVReg(objRec), disp: totalFieldOffset);
+
+                        if(objRec.category == SymbolTable.RecordCatagory.Param && objType.IsStructType && objType.Size > 8)
+                            return X64.mem(GetRecVReg(objRec), disp: totalFieldOffset);
+
+                        return X64.mem(X64.rbp, disp: objRec.addr + totalFieldOffset);
+                    }
+                case IROperandExpr.Type.ArrayElementAccess:
+                    {
+                        var arrayRec = irOperand.segmentRecs[0];
+                        if(arrayRec == null)
+                            throw new GizboxException(ExceptioName.CodeGen, $"array address not found: {string.Join("", iroperandExpr.segments)}");
+
+                        var elemType = GType.Parse(arrayRec.typeExpression).ArrayElementType;
+                        int elemSize = elemType.Size;
+                        var baseV = GetRecVReg(arrayRec);
+
+                        var idxRec = irOperand.segmentRecs.Length > 1 ? irOperand.segmentRecs[1] : null;
+                        if(idxRec != null)
+                        {
+                            return X64.mem(baseV, GetRecVReg(idxRec), elemSize, 0);
+                        }
+
+                        var indexExpr = iroperandExpr.segments[1];
+                        if(indexExpr != null && indexExpr.StartsWith("%LITINT:"))
+                        {
+                            long immIndex = long.Parse(indexExpr.Substring("%LITINT:".Length));
+                            return X64.mem(baseV, disp: checked(immIndex * elemSize));
+                        }
+
+                        throw new GizboxException(ExceptioName.CodeGen, $"unsupported array address expression \"{indexExpr}\" at line {irOperand.owner.line}");
+                    }
+            }
+
+            throw new GizboxException(ExceptioName.CodeGen, $"operand is not addressable: {iroperandExpr.type}");
         }
 
         public IROperandExpr ParseIRExpr(string op, string rawoperand)
@@ -3362,6 +3522,28 @@ namespace Gizbox.Src.Backend
             return t;
         }
 
+        private GType ResolveCallParameterType(TACInfo callTacInfo, int sourceParamIndex)
+        {
+            if(callTacInfo == null || sourceParamIndex < 0)
+                return null;
+
+            if(callTacInfo.tac.op == "PCALL")
+            {
+                var paramTypes = callTacInfo.oprand0?.typeExpr?.FunctionParamTypes;
+                if(paramTypes != null && sourceParamIndex < paramTypes.Count)
+                    return paramTypes[sourceParamIndex];
+
+                return null;
+            }
+
+            var funcRec = callTacInfo.oprand0?.segmentRecs?[0];
+            var paramRecs = funcRec?.envPtr?.GetByCategory(SymbolTable.RecordCatagory.Param);
+            if(paramRecs != null && sourceParamIndex < paramRecs.Count)
+                return GType.Parse(paramRecs[sourceParamIndex].typeExpression);
+
+            return null;
+        }
+
         private static int ParseCallParamCount(string raw)
         {
             if(string.IsNullOrWhiteSpace(raw))
@@ -3404,6 +3586,9 @@ namespace Gizbox.Src.Backend
             if(rec.category == SymbolTable.RecordCatagory.Param)
             {
                 var type = GType.Parse(rec.typeExpression);
+                if(rec.flags.HasFlag(SymbolTable.RecordFlag.Addressable))
+                    return X64.mem(X64.rbp, disp: rec.addr);
+
                 int abiParamIndex = GetAbiParamIndex(rec);
                 if(type.IsSSE == false)
                 {
@@ -3441,7 +3626,7 @@ namespace Gizbox.Src.Backend
             else if(rec.category == SymbolTable.RecordCatagory.Variable)
             {
                 var type = GType.Parse(rec.typeExpression);
-                if(type.IsStructType)
+                if(type.IsStructType || rec.flags.HasFlag(SymbolTable.RecordFlag.Addressable))
                 {
                     if(rec.GetAdditionInf().isGlobal)
                         return X64.rel(rec.name);
@@ -3476,29 +3661,32 @@ namespace Gizbox.Src.Backend
         private void BeforeCall(TACInfo tacInfo, List<TACInfo> tempParamList, out int rspSub, ref List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs)
         {
             int paramCount = tacInfo.CALL_paramCount;
-            List<(X64Operand srcOperand, int idx, GType type, bool isRefOfConst, string rokey)> paraminfos = new();
+            List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string rokey, bool isByRef)> paraminfos = new();
             foreach(var p in tempParamList )
             {
-                var tSrcOperand = ParseOperand(p.oprand0);
+                int sourceParamIndex = (tempParamList.Count - 1) - p.PARAM_paramidx;
+                var expectedType = ResolveCallParameterType(tacInfo, sourceParamIndex);
+                bool isByRef = expectedType?.IsRefType == true;
+                var tSrcOperand = isByRef ? ParseAddressOperand(p.oprand0) : ParseOperand(p.oprand0);
                 int tIdx = p.PARAM_paramidx;
-                GType tType = p.oprand0.typeExpr;
-                bool tIsConstAddrSemantic = p.oprand0.IsConstAddrSemantic();
+                GType tType = isByRef ? expectedType : p.oprand0.typeExpr;
+                bool tIsConstAddrSemantic = isByRef == false && p.oprand0.IsConstAddrSemantic();
                 string tRokey = p.oprand0.GetConstAddressSymbol();
 
-                paraminfos.Add((tSrcOperand, tIdx, tType, tIsConstAddrSemantic, tRokey));
+                paraminfos.Add((tSrcOperand, tIdx, tType, tIsConstAddrSemantic, tRokey, isByRef));
             }
 
             BeforeCall(paramCount, paraminfos, out rspSub, ref homedRegs);
 
             tempParamList.Clear();
         }
-        private void BeforeCall(int paramCount, List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey)> tempParamInfos, out int rspSub, ref List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs)
+        private void BeforeCall(int paramCount, List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey, bool isByRef)> tempParamInfos, out int rspSub, ref List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs)
         {
             int hiddenDummy;
             BeforeCall(paramCount, tempParamInfos, out rspSub, ref homedRegs, 0, out hiddenDummy);
         }
 
-        private void BeforeCall(int paramCount, List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey)> tempParamInfos, out int rspSub, ref List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs, int hiddenRetSize, out int hiddenRetOffset, X64Operand hiddenRetDst = null)
+        private void BeforeCall(int paramCount, List<(X64Operand srcOperand, int idx, GType type, bool isConstAddrSemantic, string? rokey, bool isByRef)> tempParamInfos, out int rspSub, ref List<(int paramIdx, X64Reg reg, bool isSse)> homedRegs, int hiddenRetSize, out int hiddenRetOffset, X64Operand hiddenRetDst = null)
         {
             rspSub = 0;
             hiddenRetOffset = -1;
@@ -3617,10 +3805,39 @@ namespace Gizbox.Src.Backend
                 {
                     var srcOperand = paraminfo.srcOperand;
                     bool isConstAddrSemantic = paraminfo.isConstAddrSemantic;
+                    bool isByRef = paraminfo.isByRef;
 
                     int trueParamIndex = (tempParamInfos.Count - 1) - paraminfo.idx;
                     if(hiddenRetSize > 0)
                         trueParamIndex += 1;
+
+                    if(isByRef)
+                    {
+                        if(trueParamIndex < 4)
+                        {
+                            var intreg = UtilsW64.GetParamReg(trueParamIndex, false);
+                            if(srcOperand is X64Reg srcReg)
+                                Emit(X64.mov(intreg, srcReg, X64Size.qword));
+                            else
+                                Emit(X64.lea(intreg, srcOperand));
+                        }
+
+                        int byRefSlotOffset = 8 * trueParamIndex;
+                        if(srcOperand is X64Reg byRefReg)
+                        {
+                            Emit(X64.mov(X64.mem(X64.rsp, disp: byRefSlotOffset), byRefReg, X64Size.qword));
+                        }
+                        else
+                        {
+                            using(new RegUsageRange(this, RegisterEnum.R11))
+                            {
+                                Emit(X64.lea(X64.r11, srcOperand));
+                                Emit(X64.mov(X64.mem(X64.rsp, disp: byRefSlotOffset), X64.r11, X64Size.qword));
+                            }
+                        }
+
+                        continue;
+                    }
 
                     if(paraminfo.type.IsStructType && paraminfo.type.Size > 8)
                     {
@@ -4539,6 +4756,13 @@ namespace Gizbox.Src.Backend
         // 检查 栈参数/全局变量 的虚拟寄存器使用  
         private void CheckGlobalVarAndStackParamVRegUse()
         {
+            static bool NeedMaterializeFromStackSlot(SymbolTable.Record rec)
+            {
+                return rec.category == SymbolTable.RecordCatagory.Variable
+                    && rec.GetAdditionInf().isGlobal == false
+                    && rec.flags.HasFlag(SymbolTable.RecordFlag.Addressable);
+            }
+
             var curr = instructions.First;
             X64Operand[] oprands = new X64Operand[2];
             while(curr != null)
@@ -4574,6 +4798,13 @@ namespace Gizbox.Src.Backend
                             {
                                 newinsn = InsertBefore(curr, X64.mov(new X64Reg(scratchReg), X64.rel(reg.vRegVar.name), (X64Size)vartype.Size));
                             }
+                            UseScratchRegister(newinsn, curr, scratchReg);
+                        }
+                        else if(NeedMaterializeFromStackSlot(reg.vRegVar))
+                        {
+                            var scratchReg = TryGetIdleScratchReg(curr.Prev, curr, vartype.IsSSE);
+                            reg.AllocPhysReg(scratchReg);
+                            var newinsn = InsertBefore(curr, X64.mov(new X64Reg(scratchReg), X64.mem(X64.rbp, disp: reg.vRegVar.addr), X64Size.qword));
                             UseScratchRegister(newinsn, curr, scratchReg);
                         }
                     }
@@ -4615,6 +4846,13 @@ namespace Gizbox.Src.Backend
                                     
                                 UseScratchRegister(newinsn, curr, scratchReg);
                             }
+                            else if(NeedMaterializeFromStackSlot(xMem.baseReg.vRegVar))
+                            {
+                                var scratchReg = TryGetIdleScratchReg(curr.Prev, curr, isSSE: false, regPrefer: RegisterEnum.R11);
+                                xMem.baseReg.AllocPhysReg(scratchReg);
+                                var newinsn = InsertBefore(curr, X64.mov(new X64Reg(scratchReg), X64.mem(X64.rbp, disp: xMem.baseReg.vRegVar.addr), X64Size.qword));
+                                UseScratchRegister(newinsn, curr, scratchReg);
+                            }
                         }
                         if(xMem.indexReg != null && xMem.indexReg.isVirtual)
                         {
@@ -4630,6 +4868,13 @@ namespace Gizbox.Src.Backend
                                 var scratchReg = TryGetIdleScratchReg(curr.Prev, curr, isSSE: false, regPrefer:RegisterEnum.R10);
                                 xMem.indexReg.AllocPhysReg(scratchReg);
                                 var newinsn = InsertBefore(curr, X64.lea(new X64Reg(scratchReg), X64.rel(xMem.indexReg.vRegVar.name)));
+                                UseScratchRegister(newinsn, curr, scratchReg);
+                            }
+                            else if(NeedMaterializeFromStackSlot(xMem.indexReg.vRegVar))
+                            {
+                                var scratchReg = TryGetIdleScratchReg(curr.Prev, curr, isSSE: false, regPrefer: RegisterEnum.R10);
+                                xMem.indexReg.AllocPhysReg(scratchReg);
+                                var newinsn = InsertBefore(curr, X64.mov(new X64Reg(scratchReg), X64.mem(X64.rbp, disp: xMem.indexReg.vRegVar.addr), X64Size.qword));
                                 UseScratchRegister(newinsn, curr, scratchReg);
                             }
                         }
@@ -5233,6 +5478,15 @@ namespace Gizbox.Src.Backend
         public SymbolTable.Record[] segmentRecs;//变量的符号表条目（如果子操作数是变量）  
         public SymbolTable.Record RET_functionRec;//返回值的函数符号表条目（如果是RET操作数）
 
+        private static GType GetRuntimeValueType(SymbolTable.Record rec)
+        {
+            if(rec == null)
+                return null;
+
+            var type = GType.Parse(rec.typeExpression);
+            return type.IsRefType ? type.RefTargetType : type;
+        }
+
         public IROperand(Win64CodeGenContext context, TACInfo tacinf, int operandIdx, string rawoperand)
         {
             this.owner = tacinf;
@@ -5284,7 +5538,7 @@ namespace Gizbox.Src.Backend
                             if(memberRec != null)
                             {
                                 segmentRecs[0] = memberRec;
-                                typeExpr = GType.Parse(memberRec.typeExpression);
+                                typeExpr = GetRuntimeValueType(memberRec);
                                 Win64Target.Log("------- " + typeExpr.ToString());
                                 resolvedAsMethod = true;
                             }
@@ -5317,7 +5571,7 @@ namespace Gizbox.Src.Backend
                             if(rec == null)
                                 throw new GizboxException(ExceptioName.CodeGen, $"cannot find variable {segments[0]} at line {tacinf.line}");
                             segmentRecs[0] = rec;
-                            typeExpr = GType.Parse(rec.typeExpression);
+                            typeExpr = GetRuntimeValueType(rec);
                         }
                     }
                 }
@@ -5354,7 +5608,7 @@ namespace Gizbox.Src.Backend
                         if(rec == null)
                             throw new GizboxException(ExceptioName.CodeGen, $"cannot find variable {segments[0]} at line {tacinf.line}");
                         segmentRecs[0] = rec;
-                        typeExpr = GType.Parse(rec.typeExpression);
+                        typeExpr = GetRuntimeValueType(rec);
                     }
                 }
             }
@@ -5905,6 +6159,7 @@ namespace Gizbox.Src.Backend
                 case GType.Kind.Long:
                 case GType.Kind.ULong:
                 case GType.Kind.Double:
+                case GType.Kind.Ref:
                     x64DefineType = (X64DefSize)8;
                     break;
                 case GType.Kind.Array:
@@ -5939,6 +6194,7 @@ namespace Gizbox.Src.Backend
                 case GType.Kind.Long:
                 case GType.Kind.ULong:
                 case GType.Kind.Double:
+                case GType.Kind.Ref:
                     resSize = (X64ResSize)8;
                     break;
                 case GType.Kind.Array://引用类型

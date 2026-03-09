@@ -400,7 +400,7 @@ namespace Gizbox.SemanticRule
                             {
                                 if (i != 0) typeExpr += ",";
                                 var paramNode = funcDeclNode.parametersNode.parameterNodes[i];
-                                typeExpr += (paramNode.typeNode.TypeExpression());
+                                typeExpr += paramNode.typeNode.TypeExpression();
                             }
                             typeExpr += (" => " + funcDeclNode.returnTypeNode.TypeExpression());
 
@@ -469,10 +469,10 @@ namespace Gizbox.SemanticRule
                                 var paramNode = externFuncDeclNode.parametersNode.parameterNodes[i];
                                 typeExpr += (paramNode.typeNode.TypeExpression());
                             }
-                            typeExpr += (" => " + externFuncDeclNode.returnTypeNode.TypeExpression());
+                            typeExpr += (" => " + (externFuncDeclNode.returnTypeNode.TypeExpression()));
 
                             //函数修饰名称  
-                            var paramTypeArr = externFuncDeclNode.parametersNode.parameterNodes.Select(n => n.typeNode.TypeExpression()).ToArray();
+                            var paramTypeArr = externFuncDeclNode.parametersNode.parameterNodes.Select(n => (n.typeNode.TypeExpression())).ToArray();
                             //var funcFullName = Utils.Mangle(externFuncDeclNode.identifierNode.FullName, paramTypeArr);
                             var funcFullName = Utils.ToExternFuncName(externFuncDeclNode.identifierNode.FullName);
                             externFuncDeclNode.attributes[AstAttr.extern_name] = funcFullName;
@@ -786,7 +786,7 @@ namespace Gizbox.SemanticRule
                             TryCompleteType(funcDeclNode.returnTypeNode);
 
                             //形参列表 （成员函数）(不包含this类型)  
-                            var paramTypeArr = funcDeclNode.parametersNode.parameterNodes.Select(n => GType.Normalize(n.typeNode.TypeExpression())).ToArray();
+                            var paramTypeArr = funcDeclNode.parametersNode.parameterNodes.Select(n => n.typeNode.TypeExpression()).ToArray();
 
 
                             //符号的类型表达式（成员函数）  
@@ -1228,12 +1228,20 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.VarDeclareNode varDeclNode:
                     {
+                        bool isBraceInitializer = varDeclNode.initializerNode is SyntaxTree.BraceInitializerNode;
+
                         //分析初始化表达式  
-                        Pass3_AnalysisNode(varDeclNode.initializerNode);
+                        if(isBraceInitializer == false)
+                        {
+                            Pass3_AnalysisNode(varDeclNode.initializerNode);
+                        }
 
                         //类型推断  
                         if (varDeclNode.typeNode is InferTypeNode typeNode)
                         {
+                            if(isBraceInitializer)
+                                throw new SemanticException(ExceptioName.VariableTypeDeclarationError, varDeclNode, "brace initializer does not support var inference.");
+
                             var typeExpr = InferType(typeNode, varDeclNode.initializerNode);
                             if(GType.Parse(typeExpr).Category == GType.Kind.Function)
                             {
@@ -1245,14 +1253,25 @@ namespace Gizbox.SemanticRule
                         //类型检查（初始值）  
                         else
                         {
-                            bool valid = CheckType_Equal(varDeclNode.typeNode.TypeExpression(), varDeclNode.initializerNode);
-                            if(!valid)
+                            ValidateByRefType(varDeclNode.typeNode, varDeclNode);
+
+                            var declaredTypeExpr = varDeclNode.typeNode.TypeExpression();
+                            if(GType.Parse(declaredTypeExpr).IsRefType)
                             {
-                                var a = varDeclNode.typeNode.TypeExpression();
-                                var b = AnalyzeTypeExpression(varDeclNode.initializerNode);
-                                throw new SemanticException(ExceptioName.VariableTypeDeclarationError, varDeclNode, "type:" + varDeclNode.typeNode.TypeExpression() + "  intializer type:" + AnalyzeTypeExpression(varDeclNode.initializerNode));
+                                ValidateRefBinding(varDeclNode, declaredTypeExpr, varDeclNode.initializerNode);
                             }
-                                
+                            else if(varDeclNode.initializerNode is SyntaxTree.BraceInitializerNode braceInitializerNode)
+                            {
+                                AnalyzeBraceInitializerAgainstType(braceInitializerNode, declaredTypeExpr, varDeclNode);
+                            }
+                            else
+                            {
+                                bool valid = CheckType_Equal(declaredTypeExpr, varDeclNode.initializerNode);
+                                if(!valid)
+                                {
+                                    throw new SemanticException(ExceptioName.VariableTypeDeclarationError, varDeclNode, "type:" + declaredTypeExpr + "  intializer type:" + AnalyzeTypeExpression(varDeclNode.initializerNode));
+                                }
+                            }
                         }
                     }
                     break;
@@ -1271,6 +1290,8 @@ namespace Gizbox.SemanticRule
                         //类型检查（初始值）  
                         else
                         {
+                            ValidateByRefType(captureNode.typeNode, captureNode);
+
                             bool valid = CheckType_Equal(captureNode.typeNode.TypeExpression(), captureNode.rIdentifier);
                             if(!valid)
                             {
@@ -1287,7 +1308,7 @@ namespace Gizbox.SemanticRule
 
                         //capture不能用于值类型  
                         GType gtype = GType.Parse(captureNode.typeNode.TypeExpression());
-                        if(gtype.IsReferenceType == false)
+                        if(gtype.IsRawReferenceType == false)
                         {
                             throw new SemanticException(ExceptioName.OwnershipError, captureNode, "capture can not be used on value type");
                         }
@@ -1307,6 +1328,8 @@ namespace Gizbox.SemanticRule
                         //类型检查（初始值）  
                         else
                         {
+                            ValidateByRefType(leakNode.typeNode, leakNode);
+
                             bool valid = CheckType_Equal(leakNode.typeNode.TypeExpression(), leakNode.rIdentifier);
                             if(!valid)
                             {
@@ -1318,7 +1341,7 @@ namespace Gizbox.SemanticRule
 
                         //leak不能用于值类型  
                         GType gtype = GType.Parse(leakNode.typeNode.TypeExpression());
-                        if(gtype.IsReferenceType == false)
+                        if(gtype.IsRawReferenceType == false)
                         {
                             throw new SemanticException(ExceptioName.OwnershipError, leakNode, "leak can not be used on value type");
                         }
@@ -1348,6 +1371,11 @@ namespace Gizbox.SemanticRule
                         //返回类型不支持推断  
                         if(funcDeclNode.returnTypeNode is SyntaxTree.InferTypeNode)
                             throw new SemanticException(ExceptioName.SemanticAnalysysError, funcDeclNode.returnTypeNode, "");
+
+                        ValidateByRefType(funcDeclNode.returnTypeNode, funcDeclNode.returnTypeNode);
+
+                        if(IsDeclaredByRef(funcDeclNode.returnTypeNode))
+                            throw new SemanticException(ExceptioName.SemanticAnalysysError, funcDeclNode.returnTypeNode, "ref return type is not supported.");
 
                         //返回值类型检查（仅限非void的函数）  
                         if (!(funcDeclNode.returnTypeNode is SyntaxTree.PrimitiveTypeNode && (funcDeclNode.returnTypeNode as SyntaxTree.PrimitiveTypeNode).token.name == "void"))
@@ -1388,9 +1416,19 @@ namespace Gizbox.SemanticRule
                         if(externFuncDeclNode.returnTypeNode is SyntaxTree.InferTypeNode)
                             throw new SemanticException(ExceptioName.SemanticAnalysysError, externFuncDeclNode.returnTypeNode, "");
 
+                        ValidateByRefType(externFuncDeclNode.returnTypeNode, externFuncDeclNode.returnTypeNode);
+
+                        if(IsDeclaredByRef(externFuncDeclNode.returnTypeNode))
+                            throw new SemanticException(ExceptioName.SemanticAnalysysError, externFuncDeclNode.returnTypeNode, "ref return type is not supported.");
+
 
                         //离开作用域  
                         envStack.Pop();
+                    }
+                    break;
+                case SyntaxTree.ParameterNode paramNode:
+                    {
+                        ValidateByRefType(paramNode.typeNode, paramNode);
                     }
                     break;
                 case SyntaxTree.ClassDeclareNode classdeclNode:
@@ -1588,6 +1626,11 @@ namespace Gizbox.SemanticRule
                         AnalyzeTypeExpression(litnode);
                     }
                     break;
+                case SyntaxTree.BraceInitializerNode braceInitializerNode:
+                    {
+                        throw new SemanticException(ExceptioName.SemanticAnalysysError, braceInitializerNode, "brace initializer requires a known target type.");
+                    }
+                    break;
                 case SyntaxTree.UnaryOpNode unaryNode:
                     {
                         Pass3_AnalysisNode(unaryNode.exprNode);
@@ -1756,6 +1799,50 @@ namespace Gizbox.SemanticRule
 
                         //Func分析  
                         AnalyzeTypeExpression(callNode);
+
+                        SymbolTable.Record resolvedFuncRec = null;
+                        if(callNode.attributes.TryGetValue(AstAttr.func_rec, out var funcRecObj) && funcRecObj is SymbolTable.Record funcRec && funcRec.envPtr != null)
+                        {
+                            resolvedFuncRec = funcRec;
+                        }
+                        else if(callNode.isMemberAccessFunction)
+                        {
+                            if(callNode.funcNode is ObjectMemberAccessNode memberAccess
+                                && callNode.attributes.TryGetValue(AstAttr.mangled_name, out var mangledObj)
+                                && mangledObj is string mangledName)
+                            {
+                                var objTypeExpr = GetValueTypeExpression((string)memberAccess.objectNode.attributes[AstAttr.type]);
+                                var classRec = Query(GType.Normalize(objTypeExpr));
+                                resolvedFuncRec = classRec?.envPtr?.Class_GetMemberRecordInChain(mangledName);
+                            }
+                        }
+                        else if(callNode.attributes.TryGetValue(AstAttr.mangled_name, out var directMangledObj) && directMangledObj is string directMangledName)
+                        {
+                            resolvedFuncRec = Query(directMangledName);
+                        }
+                        else if(callNode.attributes.TryGetValue(AstAttr.extern_name, out var externObj) && externObj is string externName)
+                        {
+                            resolvedFuncRec = Query(externName);
+                        }
+
+                        if(resolvedFuncRec != null && resolvedFuncRec.envPtr != null)
+                        {
+                            callNode.attributes[AstAttr.func_rec] = resolvedFuncRec;
+
+                            var paramTypeExprs = (resolvedFuncRec.envPtr.GetByCategory(SymbolTable.RecordCatagory.Param) ?? new List<SymbolTable.Record>())
+                                .Where(p => p.name != "this")
+                                .Select(p => p.typeExpression)
+                                .ToList();
+                            ValidateCallByRefArguments(callNode, paramTypeExprs);
+                        }
+                        else if(callNode.isMemberAccessFunction == false)
+                        {
+                            var calleeType = GType.Parse((string)callNode.funcNode.attributes[AstAttr.type]);
+                            if(calleeType.IsFunction)
+                            {
+                                ValidateCallByRefArguments(callNode, calleeType.FunctionParamTypes.Select(p => p.ToString()).ToList());
+                            }
+                        }
 
                         //参数个数检查暂无...
 
@@ -2294,7 +2381,7 @@ namespace Gizbox.SemanticRule
 
                         // 值类型不用处理所有权
                         var recType = GType.Parse(rec.typeExpression);
-                        if(recType.IsReferenceType == false)
+                        if(recType.IsRawReferenceType == false)
                             break;
 
                         // 函数指针不用处理所有权  
@@ -2422,7 +2509,7 @@ namespace Gizbox.SemanticRule
 
                             // 值类型不用处理所有权
                             var lrecType = GType.Parse(lrec.typeExpression);
-                            if(lrecType.IsReferenceType == false)
+                            if(lrecType.IsRawReferenceType == false)
                                 break;
                             // 函数指针不用处理所有权
                             if(lrecType.IsFunction)
@@ -2518,7 +2605,7 @@ namespace Gizbox.SemanticRule
 
                             // 值类型不用处理所有权
                             var lrecType = GType.Parse(lrec.typeExpression);
-                            if(lrecType.IsReferenceType == false)
+                            if(lrecType.IsRawReferenceType == false)
                                 break;
                             // 函数指针不用处理所有权
                             if(lrecType.IsFunction)
@@ -2734,7 +2821,7 @@ namespace Gizbox.SemanticRule
                         if(fieldRec == null)
                             throw new SemanticException(ExceptioName.MemberFieldNotFound, replaceNode, targetAccess.memberNode.FullName);
 
-                        if(GType.Parse(fieldRec.typeExpression).IsReferenceType)
+                        if(GType.Parse(fieldRec.typeExpression).IsRawReferenceType)
                         {
                             var lmodel = fieldRec.flags & OwnershipModelMask;
                             CheckOwnershipCompare_Core(replaceNode, lmodel, fieldRec.name, replaceNode.newValueNode, out var _);
@@ -2841,7 +2928,7 @@ namespace Gizbox.SemanticRule
                                 var type = GType.Parse(pr.typeExpression);
 
                                 // 值类型参数不用处理所有权语义
-                                if(type.IsReferenceType == false)
+                                if(type.IsRawReferenceType == false)
                                     continue;
 
                                 // 所有权比较
@@ -2887,7 +2974,7 @@ namespace Gizbox.SemanticRule
 
                                 var arg = callNode.argumantsNode.arguments[i];
                                 var argTypeExpr = AnalyzeTypeExpression(arg);
-                                if(GType.Parse(argTypeExpr).IsReferenceType == false)
+                                if(GType.Parse(argTypeExpr).IsRawReferenceType == false)
                                     continue;
 
                                 var paramModel = funcPtrSig.ParamModels[i] & OwnershipModelMask;
@@ -3561,6 +3648,157 @@ namespace Gizbox.SemanticRule
             }
         }
 
+        /// <summary> 判断表达式是否可作为引用绑定目标（必须是可寻址左值）</summary>
+        private bool IsRefBindable(SyntaxTree.ExprNode exprNode)
+        {
+            return exprNode is IdentityNode
+                || exprNode is ObjectMemberAccessNode
+                || exprNode is ElementAccessNode;
+        }
+
+        /// <summary> 将引用绑定目标对应的基对象标记为地址暴露  </summary>
+        private void MarkRefBindAddressable(SyntaxTree.ExprNode exprNode)
+        {
+            switch(exprNode)
+            {
+                case IdentityNode idNode:
+                    {
+                        var rec = Query(idNode.FullName);
+                        if(rec != null && (rec.category == SymbolTable.RecordCatagory.Variable || rec.category == SymbolTable.RecordCatagory.Param))
+                        {
+                            var recType = GType.Parse(rec.typeExpression);
+                            if(recType.IsRefType == false)
+                                rec.flags |= SymbolTable.RecordFlag.Addressable;
+                        }
+                    }
+                    break;
+                case ObjectMemberAccessNode accessNode:
+                    MarkRefBindAddressable(accessNode.objectNode);
+                    break;
+                case ElementAccessNode elementAccessNode:
+                    MarkRefBindAddressable(elementAccessNode.containerNode);
+                    break;
+            }
+        }
+
+
+        /// <summary> ByRef声明类型 </summary>
+        private bool IsDeclaredByRef(SyntaxTree.TypeNode typeNode)
+        {
+            var type = GType.Parse((typeNode).TypeExpression());
+            return type.IsRefType;
+        }
+
+        /// <summary> 检查ByRef类型的合法性 </summary>
+        private void ValidateByRefType(SyntaxTree.TypeNode typeNode, SyntaxTree.Node errorNode)
+        {
+            if(typeNode == null)
+                return;
+
+            var type = GType.Parse(typeNode.TypeExpression());
+            if(type.IsRefType && type.RefTargetType.IsClassType)
+                throw new SemanticException(ExceptioName.SemanticAnalysysError, errorNode, "class type does not support by-reference declaration.");
+        }
+
+
+        /// <summary> 校验引用绑定 </summary>
+        private void ValidateRefBinding(SyntaxTree.Node errorNode, string declaredTypeExpr, SyntaxTree.ExprNode exprNode)
+        {
+            var declaredType = GType.Parse(declaredTypeExpr);
+            if(declaredType.IsRefType == false)
+                return;
+
+            if(IsRefBindable(exprNode) == false)
+                throw new SemanticException(ExceptioName.SemanticAnalysysError, errorNode, "reference binding requires an lvalue argument.");
+
+            string valueTypeExpr = AnalyzeTypeExpression(exprNode);
+            if(CheckType_Equal(declaredType.RefTargetType.ToString(), valueTypeExpr) == false)
+                throw new SemanticException(ExceptioName.VariableTypeDeclarationError, errorNode, $"reference target type:{declaredType.RefTargetType}  value type:{valueTypeExpr}");
+
+            MarkRefBindAddressable(exprNode);
+        }
+
+        private List<SymbolTable.Record> GetStructFieldRecordsInOrder(string structTypeExpr)
+        {
+            var structRec = Query(structTypeExpr);
+            if(structRec == null || structRec.category != SymbolTable.RecordCatagory.Struct || structRec.envPtr == null)
+                throw new GizboxException(ExceptioName.SemanticAnalysysError, $"struct definition not found: {structTypeExpr}");
+
+            return structRec.envPtr.records.Values
+                .Where(r => r.category == SymbolTable.RecordCatagory.Variable)
+                .OrderBy(r => r.addr)
+                .ToList();
+        }
+
+        private void AnalyzeBraceInitializerAgainstType(SyntaxTree.BraceInitializerNode initNode, string expectedTypeExpr, SyntaxTree.Node errorNode)
+        {
+            var expectedType = GType.Parse(expectedTypeExpr);
+            if(expectedType.IsStructType == false)
+                throw new SemanticException(ExceptioName.VariableTypeDeclarationError, errorNode, "brace initializer can only be used with struct type.");
+
+            var fieldRecs = GetStructFieldRecordsInOrder(expectedType.ObjectTypeName);
+            if(initNode.fieldExprNodes.Count > fieldRecs.Count)
+                throw new SemanticException(ExceptioName.VariableTypeDeclarationError, errorNode, "too many struct initializer elements.");
+
+            for(int i = 0; i < initNode.fieldExprNodes.Count; ++i)
+            {
+                var fieldExpr = initNode.fieldExprNodes[i];
+                var fieldRec = fieldRecs[i];
+
+                if(fieldExpr is SyntaxTree.BraceInitializerNode nestedInit)
+                {
+                    AnalyzeBraceInitializerAgainstType(nestedInit, fieldRec.typeExpression, errorNode);
+                }
+                else
+                {
+                    Pass3_AnalysisNode(fieldExpr);
+
+                    if(CheckType_Equal(fieldRec.typeExpression, fieldExpr) == false)
+                    {
+                        throw new SemanticException(ExceptioName.VariableTypeDeclarationError, errorNode, $"struct field initializer type mismatch: field={fieldRec.name}, type={fieldRec.typeExpression}, value type={AnalyzeTypeExpression(fieldExpr)}");
+                    }
+                }
+            }
+
+            initNode.attributes[AstAttr.type] = expectedTypeExpr;
+        }
+
+        /// <summary>
+        /// 按被调函数形参列表批量校验所有byref实参绑定。
+        /// </summary>
+        private void ValidateCallByRefArguments(SyntaxTree.CallNode callNode, IList<string> parameterTypeExprs)
+        {
+            if(parameterTypeExprs == null)
+                return;
+
+            int count = Math.Min(callNode.argumantsNode.arguments.Count, parameterTypeExprs.Count);
+            for(int i = 0; i < count; ++i)
+            {
+                var paramType = GType.Parse(parameterTypeExprs[i]);
+                if(paramType.IsRefType == false)
+                    continue;
+
+                ValidateRefBinding(callNode, parameterTypeExprs[i], callNode.argumantsNode.arguments[i]);
+            }
+        }
+
+
+        /// <summary>
+        /// 获取表达式的值类型。
+        /// 若类型为byref，则递归剥离byref（返回其最终指向的值类型表达式）
+        /// </summary>
+        private string GetValueTypeExpression(string typeExpr)
+        {
+            if(string.IsNullOrWhiteSpace(typeExpr))
+                return typeExpr;
+
+            var type = GType.Parse(typeExpr);
+            if(type.IsRefType)
+                return GetValueTypeExpression(type.RefTargetType.ToString());
+
+            return typeExpr;
+        }
+
 
         /// <summary>
         /// 分析变量/参数/返回值的所有权模型  
@@ -3570,7 +3808,15 @@ namespace Gizbox.SemanticRule
             string typeExpr = typeNode.TypeExpression();
 
             GType type = GType.Parse(typeExpr);
-            if(type.IsReferenceType)
+            if(type.IsRefType)
+            {
+                if(explicitModifier != VarModifiers.None || typeNode.ownershipModifier != VarModifiers.None)
+                    throw new SemanticException(ExceptioName.OwnershipError, typeNode, "ref type can not use own/bor modifiers.");
+
+                return SymbolTable.RecordFlag.None;
+            }
+
+            if(type.IsRawReferenceType)
             {
                 SymbolTable.RecordFlag ownerModel = SymbolTable.RecordFlag.None;
 
@@ -3606,7 +3852,7 @@ namespace Gizbox.SemanticRule
                 else
                 {
                     bool isOwnershipClass = false;
-                    if(typeNode is ClassTypeNode classTypeNode)
+                    if(typeNode is NamedTypeNode classTypeNode)
                     {
                         var classRec = Query(classTypeNode.classname.FullName);
 
@@ -3661,7 +3907,7 @@ namespace Gizbox.SemanticRule
                         }
 
 
-                        nodeTypeExprssion = result.typeExpression;
+                        nodeTypeExprssion = GetValueTypeExpression(result.typeExpression);
                     }
                     break;
                 case SyntaxTree.LiteralNode litNode:
@@ -3686,7 +3932,7 @@ namespace Gizbox.SemanticRule
 
                 case SyntaxTree.ObjectMemberAccessNode accessNode:
                     {
-                        var classTypeExpression = AnalyzeTypeExpression(accessNode.objectNode);
+                        var classTypeExpression = GetValueTypeExpression(AnalyzeTypeExpression(accessNode.objectNode));
                         GType classType = GType.Parse(classTypeExpression);
 
                         var classRec = Query(classType.ObjectTypeName);
@@ -3706,7 +3952,7 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.ElementAccessNode eleAccessNode:
                     {
-                        string containerTypeExpr = AnalyzeTypeExpression(eleAccessNode.containerNode);
+                        string containerTypeExpr = GetValueTypeExpression(AnalyzeTypeExpression(eleAccessNode.containerNode));
 
                         if (containerTypeExpr.EndsWith("[]") == false)
                             throw new SemanticException(ExceptioName.Undefine, eleAccessNode, "only array can use [] operator");
@@ -3964,11 +4210,11 @@ namespace Gizbox.SemanticRule
             typeExpr1 = NormalizeTypeExprForTypeCheck(typeExpr1);
             typeExpr2 = NormalizeTypeExprForTypeCheck(typeExpr2);
 
-            if (typeExpr1 == "null" && GType.Parse(typeExpr2).IsReferenceType)
+            if (typeExpr1 == "null" && GType.Parse(typeExpr2).IsRawReferenceType)
             {
                 return true;
             }
-            else if (typeExpr2 == "null" && GType.Parse(typeExpr1).IsReferenceType)
+            else if (typeExpr2 == "null" && GType.Parse(typeExpr1).IsRawReferenceType)
             {
                 return true;
             }
@@ -4021,6 +4267,9 @@ namespace Gizbox.SemanticRule
                 return typeExpr;
 
             var t = GType.Parse(typeExpr);
+            if(t.IsRefType)
+                return NormalizeTypeExprForTypeCheck(t.RefTargetType.ToString());
+
             if(t.IsClassType || t.IsStructType)
                 return t.ObjectTypeName;
 
@@ -4057,6 +4306,9 @@ namespace Gizbox.SemanticRule
                 return typeExpr;
 
             var t = GType.Parse(typeExpr);
+
+            if(t.IsRefType)
+                return "(ref)" + CanonicalizeTypeExpression(t.RefTargetType.ToString());
 
             if(t.IsArray)
                 return CanonicalizeTypeExpression(t.ArrayElementType.ToString()) + "[]";
@@ -4404,7 +4656,7 @@ namespace Gizbox.SemanticRule
             {
                 case SyntaxTree.PrimitiveTypeNode primitiveTypeNode:
                     break;
-                case SyntaxTree.ClassTypeNode classTypeNode:
+                case SyntaxTree.NamedTypeNode classTypeNode:
                     {
                         TryCompleteIdenfier(classTypeNode.classname);
 
@@ -4425,6 +4677,11 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.ArrayTypeNode arrayTypeNpde:
                     {
                         TryCompleteType(arrayTypeNpde.elemtentType);
+                    }
+                    break;
+                case SyntaxTree.RefTypeNode refTypeNode:
+                    {
+                        TryCompleteType(refTypeNode.targetType);
                     }
                     break;
             }
@@ -4545,6 +4802,19 @@ namespace Gizbox.SemanticRule
         {
             refToken ??= new Token("ID", PatternType.Id, typeExpr, 0, 0, 0);
 
+            var parsedType = GType.Parse(typeExpr);
+            if(parsedType.IsRefType)
+            {
+                var targetTypeNode = BuildTypeNodeFromTypeExpression(parsedType.RefTargetType.ToString(), refToken);
+                var refTypeNode = new SyntaxTree.RefTypeNode()
+                {
+                    targetType = targetTypeNode,
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+                targetTypeNode.Parent = refTypeNode;
+                return refTypeNode;
+            }
+
             if(typeExpr.EndsWith("[]"))
             {
                 var elemTypeExpr = typeExpr.Substring(0, typeExpr.Length - 2);
@@ -4585,7 +4855,7 @@ namespace Gizbox.SemanticRule
                 identiferType = SyntaxTree.IdentityNode.IdType.Class,
                 attributes = new Dictionary<AstAttr, object>(),
             };
-            var classTypeNode = new SyntaxTree.ClassTypeNode()
+            var classTypeNode = new SyntaxTree.NamedTypeNode()
             {
                 classname = idNode,
                 attributes = new Dictionary<AstAttr, object>(),
@@ -4832,6 +5102,11 @@ namespace Gizbox.SemanticRule
                     ?? Enumerable.Empty<string>();
                 var r = RewriteTypeExpressionForStruct(t.FunctionReturnType.ToString(), structName, structTypeExpr);
                 return $"{string.Join(",", p)} => {r}";
+            }
+
+            if(t.IsRefType)
+            {
+                return "(ref)" + RewriteTypeExpressionForStruct(t.RefTargetType.ToString(), structName, structTypeExpr);
             }
 
             if(t.IsClassType && t.ObjectTypeName == structName)

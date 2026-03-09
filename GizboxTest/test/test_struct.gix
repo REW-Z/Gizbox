@@ -5,6 +5,7 @@ using Core;
 using Console;
 using Collections;
 
+
 struct Pair
 {
 	int a = 0;
@@ -16,6 +17,17 @@ struct BigData
 	long x = 0L;
 	long y = 0L;
 	long z = 0L;
+}
+namespace BigData
+{
+	BigData Create(long x, long y, long z)
+	{
+		BigData d = default(BigData);
+		d.x = x;
+		d.y = y;
+		d.z = z;
+		return d;
+	}
 }
 
 struct Wrapper
@@ -126,11 +138,72 @@ void test_struct_big()
 	Console::PrintLn("forward Big sum=" + (string)SumBig(d4));
 }
 
+void test_ref_param()
+{
+	int a = 234;
+	AddOneRef(a);
+	Console::PrintLn("a=" + (string)a);
+
+
+	Pair p = default(Pair);
+	PairAddTwoRef(p);
+	Console::PrintLn("p.a=" + (string)p.a + " p.b=" + (string)p.b);
+
+	Pair p2 = default(Pair);
+	PairAddTwo(p2);
+	Console::PrintLn("p2.a=" + (string)p2.a + " p2.b=" + (string)p2.b);
+
+	BigData d = default(BigData);
+	BigAddTwoRef(d);
+	long sumBig = SumBig(d);
+	Console::PrintLn("d sum =" + (string)sumBig);
+
+	BigData d2 = default(BigData);
+	BigAddTwo(d2);
+	sumBig = SumBig(d2);
+	Console::PrintLn("d2 sum =" + (string)sumBig);
+
+	BigData d3 = BigData::Create(10L, 20L, 30L);
+	Console::PrintLn("d3 sum =" + (string)SumBig(d3));
+
+	BigData d4 = { 11L, 22L, 33L };
+	Console::PrintLn("d4 sum =" + (string)SumBig(d4));
+}
+void AddOneRef(int& x)
+{
+	int newx = x + 1;
+	x = newx;
+}
+void BigAddTwo(BigData d)
+{
+	d.x = d.x + 2L;
+	d.y = d.y + 2L;
+	d.z = d.z + 2L;
+}
+void PairAddTwo(Pair p)
+{
+	p.a = p.a + 2;
+	p.b = p.b + 2;
+}
+void BigAddTwoRef(BigData& d)
+{
+	d.x = d.x + 2L;
+	d.y = d.y + 2L;
+	d.z = d.z + 2L;
+}
+void PairAddTwoRef(Pair& p)
+{
+	p.a = p.a + 2;
+	p.b = p.b + 2;
+}
+
+
 void main()
 {
 	test_struct_small();
 	test_struct_nested();
 	test_struct_big();
+	test_ref_param();
 
 	Console::PrintLn("Test finished!");
 	Console::ReadLn();

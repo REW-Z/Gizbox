@@ -154,7 +154,7 @@ public partial class SemanticAnalyzer
 
         if(!inTemplate)
         {
-            if(node is SyntaxTree.ClassTypeNode classType && classType.genericArguments.Count > 0)
+            if(node is SyntaxTree.NamedTypeNode classType && classType.genericArguments.Count > 0)
             {
                 //记录类型引用处的模板实例
                 TemplateTryMatchNamespace(classType.classname);
@@ -162,7 +162,7 @@ public partial class SemanticAnalyzer
                 NormalizeGenericUsage(classType);
             }
 
-            if(node is SyntaxTree.NewObjectNode newObjNode && newObjNode.typeNode is SyntaxTree.ClassTypeNode newObjTypeNode && newObjTypeNode.genericArguments.Count > 0)
+            if(node is SyntaxTree.NewObjectNode newObjNode && newObjNode.typeNode is SyntaxTree.NamedTypeNode newObjTypeNode && newObjTypeNode.genericArguments.Count > 0)
             {
                 //记录new处的模板实例并规范化名称
                 TemplateTryMatchNamespace(newObjTypeNode.classname);
@@ -184,7 +184,7 @@ public partial class SemanticAnalyzer
             }
         }
 
-        if(node is SyntaxTree.ClassTypeNode classTypeWithArgs)
+        if(node is SyntaxTree.NamedTypeNode classTypeWithArgs)
         {
             foreach(var arg in classTypeWithArgs.genericArguments)
             {
@@ -414,7 +414,7 @@ public partial class SemanticAnalyzer
     }
 
     //注册模板类实例
-    private void RegisterTemplateInstance(SyntaxTree.ClassTypeNode classType, Dictionary<string, ClassTemplateInstance> instances)
+    private void RegisterTemplateInstance(SyntaxTree.NamedTypeNode classType, Dictionary<string, ClassTemplateInstance> instances)
     {
         var mangledName = GType.Normalize(classType.TypeExpression());
         if(instances.ContainsKey(mangledName))
@@ -429,7 +429,7 @@ public partial class SemanticAnalyzer
     }
 
     //规范化模板类类型引用（清理泛型参数并替换类型名）
-    private void NormalizeGenericUsage(SyntaxTree.ClassTypeNode classType)
+    private void NormalizeGenericUsage(SyntaxTree.NamedTypeNode classType)
     {
         var mangledName = GType.Normalize(classType.TypeExpression());
         classType.genericArguments.Clear();
@@ -438,7 +438,7 @@ public partial class SemanticAnalyzer
     }
 
     //规范化new语句中的模板类型引用
-    private void NormalizeGenericUsage(SyntaxTree.NewObjectNode newObjNode, SyntaxTree.ClassTypeNode classType)
+    private void NormalizeGenericUsage(SyntaxTree.NewObjectNode newObjNode, SyntaxTree.NamedTypeNode classType)
     {
         var mangledName = GType.Normalize(classType.TypeExpression());
         classType.genericArguments.Clear();
@@ -552,13 +552,13 @@ public partial class SemanticAnalyzer
 
                 if(newObjNode.typeNode != null)
                     newObjNode.typeNode = ReplaceTypeNode(newObjNode.typeNode, typeMap, newObjNode);
-                if(newObjNode.className != null && typeMap.TryGetValue(newObjNode.className.FullName, out var replType) && replType is SyntaxTree.ClassTypeNode replClass)
+                if(newObjNode.className != null && typeMap.TryGetValue(newObjNode.className.FullName, out var replType) && replType is SyntaxTree.NamedTypeNode replClass)
                 {
                     newObjNode.className = (SyntaxTree.IdentityNode)replClass.classname.DeepClone();
                     newObjNode.className.Parent = newObjNode;
                 }
                 break;
-            case SyntaxTree.ClassTypeNode classTypeNode:
+            case SyntaxTree.NamedTypeNode classTypeNode:
                 for(int i = 0; i < classTypeNode.genericArguments.Count; ++i)
                 {
                     classTypeNode.genericArguments[i] = ReplaceTypeNode(classTypeNode.genericArguments[i], typeMap, classTypeNode);
@@ -580,7 +580,7 @@ public partial class SemanticAnalyzer
 
         switch(typeNode)
         {
-            case SyntaxTree.ClassTypeNode classTypeNode:
+            case SyntaxTree.NamedTypeNode classTypeNode:
                 if(typeMap.TryGetValue(classTypeNode.classname.FullName, out var replacement) && classTypeNode.genericArguments.Count == 0)
                 {
                     var cloned = (SyntaxTree.TypeNode)replacement.DeepClone();

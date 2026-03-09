@@ -65,6 +65,7 @@ namespace Gizbox
             "decltype",
             "type",
             "stype",
+            "reftype",
             "arrtype",
             "fptrtype",
             "namedtype",
@@ -86,6 +87,7 @@ namespace Gizbox
             "cast",
             "lvalue",
             "memberaccess",
+            "braceinit",
             "kwexpr",
 
             //函数过程
@@ -194,9 +196,12 @@ namespace Gizbox
             "decltype -> type",
             "decltype -> tmodf type",
             "type -> arrtype",
+            "type -> reftype",
             "type -> stype",
             "type -> fptrtype",
             "type -> var",
+            "reftype -> stype &",
+            "reftype -> arrtype &",
             "arrtype -> stypesb",
             "fptrtype -> type ( typearglist )",
             "stype -> primitive",
@@ -267,8 +272,11 @@ namespace Gizbox
             "primary -> call",
             "primary -> newobj",
             "primary -> newarr",
+            "primary -> braceinit",
             "primary -> kwexpr",
             "primary -> lit",
+
+            "braceinit -> { args }",
 
             "incdec -> ++ ID",
             "incdec -> -- ID",

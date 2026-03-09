@@ -313,9 +313,18 @@ namespace Gizbox.IR
                 case VarDeclareNode varDeclNode:
                     {
                         GenNode(varDeclNode.identifierNode);
-                        GenNode(varDeclNode.initializerNode);
 
-                        var tac = EmitCode("=", GetRet(varDeclNode.identifierNode), GetRet(varDeclNode.initializerNode));
+                        var declaredTypeExpr = GetDeclaredTypeExpression(varDeclNode.typeNode.TypeExpression());
+                        if(GType.Parse(declaredTypeExpr).IsRefType)
+                        {
+                            string bindTargetExpr = BuildAddressableExpression(varDeclNode.initializerNode);
+                            EmitCode("REF_BIND", GetRet(varDeclNode.identifierNode), bindTargetExpr);
+                        }
+                        else
+                        {
+                            GenNode(varDeclNode.initializerNode);
+                            EmitCode("=", GetRet(varDeclNode.identifierNode), GetRet(varDeclNode.initializerNode));
+                        }
 
 
                         // 被移动变量置NULL  
@@ -617,49 +626,48 @@ namespace Gizbox.IR
                         SetRet(defaultNode, temp);
                     }
                     break;
+                case BraceInitializerNode braceInitNode:
+                    {
+                        string structTypeExpr = (string)braceInitNode.attributes[AstAttr.type];
+                        string temp = NewTemp(structTypeExpr);
+                        EmitCode("=", temp, GenDefaultOperandStr(structTypeExpr));
+
+                        var fieldRecs = GetStructFieldRecordsInOrder(structTypeExpr);
+                        for(int i = 0; i < braceInitNode.fieldExprNodes.Count; ++i)
+                        {
+                            var fieldExpr = braceInitNode.fieldExprNodes[i];
+                            var fieldRec = fieldRecs[i];
+
+                            GenNode(fieldExpr);
+                            EmitCode("=", temp + "." + fieldRec.name, GetRet(fieldExpr));
+                        }
+
+                        SetRet(braceInitNode, temp);
+                    }
+                    break;
                 case ObjectMemberAccessNode objMemberAccess:
                     {
-                        GenNode(objMemberAccess.objectNode);
-
-                        // 取出objec的返回表达式
-                        string objExpr = TrimName(GetRet(objMemberAccess.objectNode));
-
-                        bool IsAccess(ExprNode node)
-                        {
-                            if(node is ElementAccessNode)
-                                return true;
-                            if(node is ObjectMemberAccessNode)
-                                return true;
-                            return false;
-                        }
-
-                        string memberSep = "->";
-                        if(objMemberAccess.objectNode.attributes.TryGetValue(AstAttr.type, out var objTypeObj) && objTypeObj is string objTypeExpr)
-                        {
-                            var objType = GType.Parse(objTypeExpr);
-                            if(objType.IsStructType)
-                                memberSep = ".";
-                        }
+                        string accessExpr = BuildAddressableExpression(objMemberAccess);
 
                         // 作为左值使用
                         bool isLeftValue = (objMemberAccess.Parent is AssignNode assign) && (assign.lvalueNode == objMemberAccess);
 
                         // 结构体链式访问中间节点（如 w.p.a 里的 w.p）不能先读到临时变量，
                         // 否则后续写入会写到副本而非原对象。
-                        bool isStructChainBase = memberSep == "."
+                        bool isStructChainBase = accessExpr.Contains(".")
                             && objMemberAccess.Parent is ObjectMemberAccessNode parentAccess
                             && parentAccess.objectNode == objMemberAccess;
 
                         if(isLeftValue || isStructChainBase)
                         {
-                            SetRet(objMemberAccess, objExpr + memberSep + objMemberAccess.memberNode.FullName);
+                            SetRet(objMemberAccess, accessExpr);
                         }
                         else
                         {
                             // 右值：读一次到临时变量，返回该临时
                             string valueType = (string)objMemberAccess.attributes[AstAttr.type];
                             string tmp = NewTemp(valueType);
-                            EmitCode("=", tmp, objExpr + memberSep + objMemberAccess.memberNode.FullName);
+                            EmitCode("=", tmp, accessExpr);
                             SetRet(objMemberAccess, tmp);
                         }
 
@@ -911,7 +919,10 @@ namespace Gizbox.IR
                         //实参计算
                         for (int i = callNode.argumantsNode.arguments.Count - 1; i >= 0; --i)
                         {
-                            //计算参数表达式的值  
+                            var argTypeExpr = GetCallParameterTypeExpression(callNode, i);
+                            if(argTypeExpr != null && GType.Parse(argTypeExpr).IsRefType)
+                                continue;
+
                             GenNode(callNode.argumantsNode.arguments[i]);
                         }
 
@@ -932,7 +943,11 @@ namespace Gizbox.IR
                         //实参倒序压栈  
                         for (int i = callNode.argumantsNode.arguments.Count - 1; i >= 0; --i)
                         {
-                            EmitCode("PARAM", GetRet(callNode.argumantsNode.arguments[i]));
+                            var argTypeExpr = GetCallParameterTypeExpression(callNode, i);
+                            if(argTypeExpr != null && GType.Parse(argTypeExpr).IsRefType)
+                                EmitCode("PARAM", BuildAddressableExpression(callNode.argumantsNode.arguments[i]));
+                            else
+                                EmitCode("PARAM", GetRet(callNode.argumantsNode.arguments[i]));
                         }
                         //this实参压栈（成员方法）    
                         if (callNode.isMemberAccessFunction == true)
@@ -1116,6 +1131,74 @@ namespace Gizbox.IR
             return newCode;
         }
 
+        private string GetDeclaredTypeExpression(string typeExpr)
+        {
+            if(string.IsNullOrWhiteSpace(typeExpr))
+                return typeExpr;
+
+            var type = GType.Parse(typeExpr);
+            if(type.IsRefType)
+                return "(ref)" + GetDeclaredTypeExpression(type.RefTargetType.ToString());
+
+            return typeExpr;
+        }
+
+        private string GetAddressMemberSeparator(string objectTypeExpr)
+        {
+            var objType = GType.Parse(objectTypeExpr);
+            if(objType.IsRefType)
+                objType = objType.RefTargetType;
+
+            return objType.IsStructType ? "." : "->";
+        }
+
+        private string BuildAddressableExpression(ExprNode exprNode)
+        {
+            switch(exprNode)
+            {
+                case IdentityNode idNode:
+                    GenNode(idNode);
+                    return GetRet(idNode);
+                case ObjectMemberAccessNode objMemberAccess:
+                    GenNode(objMemberAccess.objectNode);
+                    string objExpr = TrimName(GetRet(objMemberAccess.objectNode));
+                    string objTypeExpr = (string)objMemberAccess.objectNode.attributes[AstAttr.type];
+                    return objExpr + GetAddressMemberSeparator(objTypeExpr) + objMemberAccess.memberNode.FullName;
+                case ElementAccessNode eleAccessNode:
+                    GenNode(eleAccessNode.indexNode);
+                    GenNode(eleAccessNode.containerNode);
+                    string container = TrimName(GetRet(eleAccessNode.containerNode));
+                    string index = TrimName(GetRet(eleAccessNode.indexNode));
+                    return container + "[" + index + "]";
+                default:
+                    throw new GizboxException(ExceptioName.SemanticAnalysysError, $"expression is not addressable: {exprNode?.GetType().Name ?? "null"}");
+            }
+        }
+
+        private string GetCallParameterTypeExpression(CallNode callNode, int argumentIndex)
+        {
+            if(argumentIndex < 0)
+                return null;
+
+            if(callNode.attributes.TryGetValue(AstAttr.func_rec, out var funcRecObj) && funcRecObj is SymbolTable.Record funcRec && funcRec.envPtr != null)
+            {
+                var paramRecs = (funcRec.envPtr.GetByCategory(SymbolTable.RecordCatagory.Param) ?? new List<SymbolTable.Record>())
+                    .Where(p => p.name != "this")
+                    .ToList();
+                if(argumentIndex < paramRecs.Count)
+                    return paramRecs[argumentIndex].typeExpression;
+            }
+
+            if(callNode.isMemberAccessFunction == false && callNode.funcNode.attributes.TryGetValue(AstAttr.type, out var typeObj) && typeObj is string funcTypeExpr)
+            {
+                var funcType = GType.Parse(funcTypeExpr);
+                if(funcType.IsFunction && funcType.FunctionParamTypes != null && argumentIndex < funcType.FunctionParamTypes.Count)
+                    return funcType.FunctionParamTypes[argumentIndex].ToString();
+            }
+
+            return null;
+        }
+
         public void EmitDeleteArrayCode(string expr)
         {
             //目前语言只支持原子类型和引用类型的元素，删除数组不需要调用析构函数。  
@@ -1276,7 +1359,7 @@ namespace Gizbox.IR
                 if(baseClassRec == null || baseClassRec.envPtr == null)
                     throw new GizboxException(ExceptioName.BaseClassNotFound, baseClassName);
 
-                var ctorParamTypes = currentCtorNode?.parametersNode?.parameterNodes?.Select(p => p.typeNode.TypeExpression()).ToArray() ?? Array.Empty<string>();
+                var ctorParamTypes = currentCtorNode?.parametersNode?.parameterNodes?.Select(p => GetDeclaredTypeExpression(p.typeNode.TypeExpression())).ToArray() ?? Array.Empty<string>();
                 string baseCtorName = BuildCtorFunctionFullName(baseClassName, ctorParamTypes);
                 bool useDefaultCtorFallback = false;
                 if(baseClassRec.envPtr.ContainRecordName(baseCtorName) == false)
@@ -1649,7 +1732,7 @@ namespace Gizbox.IR
         private string GenDefaultOperandStr(string typeExpr)
         {
             var gtype = GType.Parse(typeExpr);
-            if (gtype.IsReferenceType)
+            if (gtype.IsRawReferenceType)
             {
                 return "%LITNULL:";
             }
@@ -1681,6 +1764,18 @@ namespace Gizbox.IR
             }
 
             return "%LITNULL:";
+        }
+
+        private List<SymbolTable.Record> GetStructFieldRecordsInOrder(string structTypeExpr)
+        {
+            var structRec = Query(GType.Normalize(structTypeExpr));
+            if(structRec == null || structRec.category != SymbolTable.RecordCatagory.Struct || structRec.envPtr == null)
+                throw new GizboxException(ExceptioName.SemanticAnalysysError, $"struct definition not found: {structTypeExpr}");
+
+            return structRec.envPtr.records.Values
+                .Where(r => r.category == SymbolTable.RecordCatagory.Variable)
+                .OrderBy(r => r.addr)
+                .ToList();
         }
 
 

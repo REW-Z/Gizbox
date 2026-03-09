@@ -946,6 +946,9 @@ namespace Gizbox.SemanticRule
             AddActionAtTail("type -> arrtype", (psr, production) => {
                 psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ArrayTypeNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
+            AddActionAtTail("type -> reftype", (psr, production) => {
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
+            });
             AddActionAtTail("type -> stype", (psr, production) => {
                 psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
@@ -991,11 +994,27 @@ namespace Gizbox.SemanticRule
                 };
             });
 
+            AddActionAtTail("reftype -> stype &", (psr, production) => {
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.RefTypeNode()
+                {
+                    targetType = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+            });
+
+            AddActionAtTail("reftype -> arrtype &", (psr, production) => {
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.RefTypeNode()
+                {
+                    targetType = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+            });
+
             AddActionAtTail("stype -> namedtype", (psr, production) => {
                 var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[ParseAttr.id];
                 idNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
 
-                var classTypeNode = new SyntaxTree.ClassTypeNode()
+                var classTypeNode = new SyntaxTree.NamedTypeNode()
                 {
                     classname = idNode,
 
@@ -1289,6 +1308,9 @@ namespace Gizbox.SemanticRule
             AddActionAtTail("primary -> newarr", (psr, production) => {
                 psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
+            AddActionAtTail("primary -> braceinit", (psr, production) => {
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
+            });
 
             AddActionAtTail("primary -> kwexpr", (psr, production) => {
                 psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
@@ -1305,6 +1327,19 @@ namespace Gizbox.SemanticRule
 
             AddActionAtTail("primary -> lit", (psr, production) => {
                 psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
+            });
+
+            AddActionAtTail("braceinit -> { args }", (psr, production) => {
+                var node = new SyntaxTree.BraceInitializerNode()
+                {
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+
+                node.fieldExprNodes.AddRange(
+                    ((SyntaxTree.ArgumentListNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node]).arguments.ToList()
+                );
+
+                psr.newElement.attributes[ParseAttr.ast_node] = node;
             });
 
 
@@ -1495,7 +1530,7 @@ namespace Gizbox.SemanticRule
                 var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top - 3].attributes[ParseAttr.id];
                 idNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
 
-                var classTypeNode = new SyntaxTree.ClassTypeNode()
+                var classTypeNode = new SyntaxTree.NamedTypeNode()
                 {
                     classname = idNode,
                     attributes = new Dictionary<AstAttr, object>(),
@@ -1523,7 +1558,7 @@ namespace Gizbox.SemanticRule
                 var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top - 3].attributes[ParseAttr.id];
                 idNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
 
-                var classTypeNode = new SyntaxTree.ClassTypeNode()
+                var classTypeNode = new SyntaxTree.NamedTypeNode()
                 {
                     classname = idNode,
                     attributes = new Dictionary<AstAttr, object>(),
@@ -1683,7 +1718,7 @@ namespace Gizbox.SemanticRule
 
                 ((SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[ParseAttr.id]).identiferType = SyntaxTree.IdentityNode.IdType.Class;
 
-                var classTypeNode = new SyntaxTree.ClassTypeNode()
+                var classTypeNode = new SyntaxTree.NamedTypeNode()
                 {
                     classname = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[ParseAttr.id],
 
