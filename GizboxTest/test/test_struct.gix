@@ -198,12 +198,22 @@ void PairAddTwoRef(Pair& p)
 }
 
 
+void test_size()
+{
+	int sizePair = sizeof(Pair);
+	int sizeBigData = sizeof(BigData);
+
+	Console::PrintLn("sizeof Pair=" + (string)sizePair);
+	Console::PrintLn("sizeof BigData=" + (string)sizeBigData);
+}
+
 void main()
 {
 	test_struct_small();
 	test_struct_nested();
 	test_struct_big();
 	test_ref_param();
+	test_size();
 
 	Console::PrintLn("Test finished!");
 	Console::ReadLn();

@@ -1985,6 +1985,7 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.SizeOfNode sizeofNode:
                     {
+                        TryCompleteType(sizeofNode.typeNode);
                         AnalyzeTypeExpression(sizeofNode);
                     }
                     break;

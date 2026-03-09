@@ -1114,6 +1114,7 @@ namespace Gizbox.LALRGenerator
 
 
             //DEBUG
+            if(false)
             {
                 GixConsole.WriteLine("\n\n\n***输出项集族***");
                 for (int i = 0; i < this.canonicalItemCollection.Count; ++i)
@@ -1155,6 +1156,7 @@ namespace Gizbox.LALRGenerator
 
 
             //DEBUG  
+            if(false)
             {
                 GixConsole.WriteLine("------------------------规范LR(1)项集族的GOTO表--------------------------");
                 GixConsole.WriteLine("-------------------------------------------------------------------------");
@@ -1217,19 +1219,6 @@ namespace Gizbox.LALRGenerator
                 return;
             }
 
-            //排除合并
-            HashSet<Production> noMergeProductions = null;
-            if (genratorInput?.noMergeProductions != null)
-            {
-                noMergeProductions = new HashSet<Production>();
-                foreach (var expression in genratorInput.noMergeProductions)
-                {
-                    if (outputData.grammerSet.productionDict.TryGetValue(expression, out var production))
-                    {
-                        noMergeProductions.Add(production);
-                    }
-                }
-            }
 
             //计算重新分的组  
             List<int> markedSet = new List<int>();
@@ -1246,12 +1235,6 @@ namespace Gizbox.LALRGenerator
 
                     if (Utils_IsSameCore(this.canonicalItemCollection[i], this.canonicalItemCollection[j]))
                     {
-                        if (Utils_CanNotMerge(this.canonicalItemCollection[i], this.canonicalItemCollection[j], noMergeProductions))
-                        {
-                            GixConsole.WriteLine("第" + i + "个项集和第" + j + "个项集有相同核心，但命中noMergeProductions，禁止合并。");
-                            continue;
-                        }
-
                         GixConsole.WriteLine("第" + i + "个项集和第" + j + "个项集有相同核心，可以合并。");
 
                         if (anySame == false)

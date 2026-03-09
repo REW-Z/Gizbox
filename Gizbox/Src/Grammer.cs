@@ -11,9 +11,6 @@ namespace Gizbox
     {
         public List<string> terminalNames;
 
-        public HashSet<string> noMergeProductions = new HashSet<string>() {
-        };
-
         public bool disableLALRMerge = true;
 
         public List<string> nonterminalNames = new List<string>() {
