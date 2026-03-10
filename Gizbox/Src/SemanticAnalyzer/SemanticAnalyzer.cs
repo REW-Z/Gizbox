@@ -1262,7 +1262,7 @@ namespace Gizbox.SemanticRule
                             }
                             else if(varDeclNode.initializerNode is SyntaxTree.BraceInitializerNode braceInitializerNode)
                             {
-                                AnalyzeBraceInitializerAgainstType(braceInitializerNode, declaredTypeExpr, varDeclNode);
+                                AnalyzeBraceInitializerType(braceInitializerNode, declaredTypeExpr, varDeclNode);
                             }
                             else
                             {
@@ -1621,13 +1621,40 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.DefaultValueNode defaultValNode:
                     {
-                        var litnode = GenDefaultLitNode(defaultValNode.typeNode);
-                        defaultValNode.overrideNode = litnode;
-                        AnalyzeTypeExpression(litnode);
+                        TryCompleteType(defaultValNode.typeNode);
+
+                        var typeExpr = defaultValNode.typeNode.TypeExpression();
+                        var gtype = GType.Parse(typeExpr);
+
+                        if(gtype.IsStructType)
+                        {
+                            var initNode = GenDefaultBraceInitializerNode(defaultValNode.typeNode);
+                            defaultValNode.overrideNode = initNode;
+                            defaultValNode.overrideNode.Parent = defaultValNode.Parent;
+
+                            AnalyzeBraceInitializerType(initNode, typeExpr, defaultValNode);
+                        }
+                        else
+                        {
+                            var litnode = GenDefaultLitNode(defaultValNode.typeNode);
+                            defaultValNode.overrideNode = litnode;
+                            defaultValNode.overrideNode.Parent = defaultValNode.Parent;
+
+                            AnalyzeTypeExpression(litnode);
+                        }
                     }
                     break;
                 case SyntaxTree.BraceInitializerNode braceInitializerNode:
                     {
+                        if(braceInitializerNode.attributes != null
+                            && braceInitializerNode.attributes.TryGetValue(AstAttr.type, out var targetTypeObj)
+                            && targetTypeObj is string targetTypeExpr
+                            && string.IsNullOrWhiteSpace(targetTypeExpr) == false)
+                        {
+                            AnalyzeBraceInitializerType(braceInitializerNode, targetTypeExpr, braceInitializerNode);
+                            break;
+                        }
+
                         throw new SemanticException(ExceptioName.SemanticAnalysysError, braceInitializerNode, "brace initializer requires a known target type.");
                     }
                     break;
@@ -3731,16 +3758,98 @@ namespace Gizbox.SemanticRule
                 .ToList();
         }
 
-        private void AnalyzeBraceInitializerAgainstType(SyntaxTree.BraceInitializerNode initNode, string expectedTypeExpr, SyntaxTree.Node errorNode)
+        private SyntaxTree.StructDeclareNode FindStructDeclareNode(string structTypeExpr)
+        {
+            var structName = GType.Normalize(structTypeExpr);
+
+            SyntaxTree.StructDeclareNode FindInNode(SyntaxTree.Node node)
+            {
+                if(node == null)
+                    return null;
+
+                if(node is SyntaxTree.StructDeclareNode structDeclNode
+                    && structDeclNode.structNameNode?.FullName == structName)
+                {
+                    return structDeclNode;
+                }
+
+                foreach(var child in node.Children())
+                {
+                    var found = FindInNode(child);
+                    if(found != null)
+                        return found;
+                }
+
+                return null;
+            }
+
+            var currentUnitStruct = FindInNode(ast?.rootNode);
+            if(currentUnitStruct != null)
+                return currentUnitStruct;
+
+            foreach(var lib in ilUnit.dependencyLibs)
+            {
+                var depStruct = FindInNode(lib?.astRoot);
+                if(depStruct != null)
+                    return depStruct;
+            }
+
+            return null;
+        }
+
+        /// <summary> 查找并返回指定结构体在AST中按声明顺序的字段声明节点列表 </summary>
+        private List<SyntaxTree.VarDeclareNode> GetStructFieldDeclsInOrder(string structTypeExpr)
+        {
+            var structDeclNode = FindStructDeclareNode(structTypeExpr);
+            if(structDeclNode == null)
+                throw new GizboxException(ExceptioName.SemanticAnalysysError, $"struct AST definition not found: {structTypeExpr}");
+
+            var result = new List<SyntaxTree.VarDeclareNode>();
+            foreach(var declNode in structDeclNode.memberDelareNodes)
+            {
+                if(declNode is SyntaxTree.VarDeclareNode fieldDecl)
+                    result.Add(fieldDecl);
+            }
+
+            return result;
+        }
+
+        /// <summary> 克隆结构体字段声明中指定的初始化表达式 </summary>
+        private SyntaxTree.ExprNode CloneStructFieldInitializer(SyntaxTree.VarDeclareNode fieldDecl, SyntaxTree.Node parentNode)
+        {
+            if(fieldDecl?.initializerNode == null)
+                throw new GizboxException(ExceptioName.SemanticAnalysysError, $"struct field initializer not found: {fieldDecl?.identifierNode?.FullName ?? "?"}");
+
+            if(fieldDecl.initializerNode.DeepClone() is not SyntaxTree.ExprNode clonedExpr)
+                throw new GizboxException(ExceptioName.SemanticAnalysysError, $"struct field initializer clone failed: {fieldDecl.identifierNode?.FullName ?? "?"}");
+
+            clonedExpr.Parent = parentNode;
+            return clonedExpr;
+        }
+
+        //分析并补全结构体的初始化表达式
+        private void AnalyzeBraceInitializerType(SyntaxTree.BraceInitializerNode initNode, string expectedTypeExpr, SyntaxTree.Node errorNode)
         {
             var expectedType = GType.Parse(expectedTypeExpr);
             if(expectedType.IsStructType == false)
                 throw new SemanticException(ExceptioName.VariableTypeDeclarationError, errorNode, "brace initializer can only be used with struct type.");
 
             var fieldRecs = GetStructFieldRecordsInOrder(expectedType.ObjectTypeName);
+            var fieldDecls = GetStructFieldDeclsInOrder(expectedType.ObjectTypeName);
+
             if(initNode.fieldExprNodes.Count > fieldRecs.Count)
                 throw new SemanticException(ExceptioName.VariableTypeDeclarationError, errorNode, "too many struct initializer elements.");
 
+            if(fieldDecls.Count != fieldRecs.Count)
+                throw new GizboxException(ExceptioName.SemanticAnalysysError, $"struct field declaration count mismatch: {expectedTypeExpr}");
+
+            for(int i = initNode.fieldExprNodes.Count; i < fieldDecls.Count; ++i)
+            {
+                var clonedInitExpr = CloneStructFieldInitializer(fieldDecls[i], initNode);
+                initNode.fieldExprNodes.Add(clonedInitExpr);
+            }
+
+            //对每个字段的初始化表达式进行分析与类型校验
             for(int i = 0; i < initNode.fieldExprNodes.Count; ++i)
             {
                 var fieldExpr = initNode.fieldExprNodes[i];
@@ -3748,7 +3857,7 @@ namespace Gizbox.SemanticRule
 
                 if(fieldExpr is SyntaxTree.BraceInitializerNode nestedInit)
                 {
-                    AnalyzeBraceInitializerAgainstType(nestedInit, fieldRec.typeExpression, errorNode);
+                    AnalyzeBraceInitializerType(nestedInit, fieldRec.typeExpression, errorNode);
                 }
                 else
                 {
@@ -4796,7 +4905,25 @@ namespace Gizbox.SemanticRule
             };
             return litnode;
         }
+        private BraceInitializerNode GenDefaultBraceInitializerNode(SyntaxTree.TypeNode typenode)
+        {
+            var initNode = new SyntaxTree.BraceInitializerNode()
+            {
+                attributes = new Dictionary<AstAttr, object>(),
+            };
 
+            var start = typenode?.StartToken();
+            var end = typenode?.EndToken();
+
+            if(start != null)
+                initNode.attributes[AstAttr.start] = start;
+            if(end != null)
+                initNode.attributes[AstAttr.end] = end;
+
+            initNode.attributes[AstAttr.type] = typenode.TypeExpression();
+
+            return initNode;
+        }
         private SyntaxTree.TypeNode BuildTypeNodeFromTypeExpression(string typeExpr, Token refToken)
         {
             refToken ??= new Token("ID", PatternType.Id, typeExpr, 0, 0, 0);

@@ -55,6 +55,13 @@ struct Wrapper
 	int n = 0;
 }
 
+struct Cube
+{
+	int lengthX = 1;
+	int lengthY = 1;
+	int lengthZ = 1;
+}
+
 Pair MakePair(int a, int b)
 {
 	Pair p = default(Pair);
@@ -236,6 +243,12 @@ void test_operator()
 	Console::PrintLn("pair add result =" + (string)c.a + "," + (string)c.b);
 }
 
+void test_init()
+{	
+	Cube c = default(Cube);
+	Console::PrintLn("default init cube=" + (string)c.lengthX + "," + (string)c.lengthY + "," + (string)c.lengthZ);
+}
+
 void main()
 {
 	test_struct_small();
@@ -244,6 +257,7 @@ void main()
 	test_ref_param();
 	test_size();
 	test_operator();
+	test_init();
 
 	Console::PrintLn("Test finished!");
 	Console::ReadLn();
