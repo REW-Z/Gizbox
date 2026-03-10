@@ -11,7 +11,7 @@ namespace Gizbox
     {
         public List<string> terminalNames;
 
-        public bool disableLALRMerge = true;
+        public bool disableLALRMerge = false;
 
         public List<string> nonterminalNames = new List<string>() {
 
@@ -147,6 +147,7 @@ namespace Gizbox
             "stmt -> if ( expr ) stmt elifclauselist elseclause",
 
             "declstmt -> decltype ID = expr ;",
+            "declstmt -> decltype ID = braceinit ;",
             "declstmt -> const decltype ID = lit ;",
 
             "declstmt -> decltype ID = capture ( ID ) ;",
@@ -269,7 +270,6 @@ namespace Gizbox
             "primary -> call",
             "primary -> newobj",
             "primary -> newarr",
-            "primary -> braceinit",
             "primary -> kwexpr",
             "primary -> lit",
 

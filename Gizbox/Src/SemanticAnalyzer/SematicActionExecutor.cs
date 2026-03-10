@@ -259,6 +259,24 @@ namespace Gizbox.SemanticRule
                 };
             });
 
+            AddActionAtTail("declstmt -> decltype ID = braceinit ;", (psr, production) => {
+
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.VarDeclareNode()
+                {
+                    flags = (VarModifiers.None),
+                    typeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 4].attributes[ParseAttr.ast_node],
+                    identifierNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 3].attributes[ParseAttr.token] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField,
+                    },
+                    initializerNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
+
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+            });
+
 
             AddActionAtTail("namespaceblock -> namespace ID { statements }", (psr, production) => {
                 psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.NamespaceNode()
@@ -1306,9 +1324,6 @@ namespace Gizbox.SemanticRule
                 psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
             AddActionAtTail("primary -> newarr", (psr, production) => {
-                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
-            });
-            AddActionAtTail("primary -> braceinit", (psr, production) => {
                 psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
 

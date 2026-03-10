@@ -12,6 +12,25 @@ struct Pair
 	int b = 0;
 }
 
+namespace Pair
+{
+	Pair Create(int a, int b)
+	{
+		Pair p = default(Pair);
+		p.a = a;
+		p.b = b;
+		return p;
+	}
+	Pair operator add(Pair p1, Pair p2)
+	{
+		Pair result = default(Pair);
+		result.a = p1.a + p2.a;
+		result.b = p1.b + p2.b;
+		return result;
+	}
+}
+
+
 struct BigData
 {
 	long x = 0L;
@@ -207,6 +226,16 @@ void test_size()
 	Console::PrintLn("sizeof BigData=" + (string)sizeBigData);
 }
 
+
+
+void test_operator()
+{
+	Pair a = Pair::Create(1, 2);
+	Pair b = Pair::Create(3, 4);
+	Pair c = a + b;
+	Console::PrintLn("pair add result =" + (string)c.a + "," + (string)c.b);
+}
+
 void main()
 {
 	test_struct_small();
@@ -214,6 +243,7 @@ void main()
 	test_struct_big();
 	test_ref_param();
 	test_size();
+	test_operator();
 
 	Console::PrintLn("Test finished!");
 	Console::ReadLn();

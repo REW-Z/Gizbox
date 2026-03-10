@@ -1408,6 +1408,9 @@ namespace Gizbox
         public class NamedTypeNode : TypeNode
         {
             public IdentityNode classname { get => (IdentityNode)children_group_0[0]; set => children_group_0[0] = value; }
+            
+            private bool isCompleted = false;
+
             [DataMember]
             public readonly List<TypeNode> genericArguments = new();
             [DataMember]
@@ -1415,14 +1418,26 @@ namespace Gizbox
             [DataMember]
             public int structSize = 0;
 
+
+
             public NamedTypeNode()
             {
                 children_group_0 = new();
                 children_group_0.Add(null);
             }
 
+            public void Complate(bool isstruct, int size = 0)
+            {
+                this.isStructType = isstruct;
+                this.structSize = size;
+            }
+
+
             public override string TypeExpression()
             {
+                if(isCompleted)
+                    throw new SemanticException(ExceptioName.SemanticAnalysysError, this, "namedType not complete.");
+
                 string rawTypeName;
                 if(genericArguments.Count == 0)
                     rawTypeName = classname.FullName;

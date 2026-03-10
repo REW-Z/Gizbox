@@ -4657,21 +4657,19 @@ namespace Gizbox.SemanticRule
             {
                 case SyntaxTree.PrimitiveTypeNode primitiveTypeNode:
                     break;
-                case SyntaxTree.NamedTypeNode classTypeNode:
+                case SyntaxTree.NamedTypeNode namedTypeNode:
                     {
-                        TryCompleteIdenfier(classTypeNode.classname);
+                        TryCompleteIdenfier(namedTypeNode.classname);
 
-                        var typeName = classTypeNode.classname.FullName;
+                        var typeName = namedTypeNode.classname.FullName;
                         var rec = Query(typeName);
                         if(rec != null && rec.category == SymbolTable.RecordCatagory.Struct)
                         {
-                            classTypeNode.isStructType = true;
-                            classTypeNode.structSize = (int)rec.size;
+                            namedTypeNode.Complate(true, (int)rec.size);
                         }
                         else
                         {
-                            classTypeNode.isStructType = false;
-                            classTypeNode.structSize = 0;
+                            namedTypeNode.Complate(false);
                         }
                     }
                     break;
