@@ -135,6 +135,8 @@ namespace Gizbox
             keywords.Add(new TokenPattern("for", "for\\W", 1));
             keywords.Add(new TokenPattern("if", "if\\W", 1));
             keywords.Add(new TokenPattern("else", "else\\W", 1));
+            keywords.Add(new TokenPattern("switch", "switch\\W", 1));
+            keywords.Add(new TokenPattern("case", "case\\W", 1));
             keywords.Add(new TokenPattern("break", "break\\W", 1));
             keywords.Add(new TokenPattern("return", "return\\W", 1));
             keywords.Add(new TokenPattern("this", "this\\W", 1));

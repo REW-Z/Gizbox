@@ -41,6 +41,7 @@ namespace Gizbox
         primitive,
         generic_params,
         generic_args,
+        switch_clause_list,
 
         acmodif,
     }
@@ -138,6 +139,7 @@ namespace Gizbox.SemanticRule
         private int ifCounter = 0;//if语句标号自增  
         private int whileCounter = 0;//while语句标号自增  
         private int forCounter = 0;//for语句标号自增  
+        private int switchCounter = 0;//switch语句标号自增
 
         //temp  
         private string currentNamespace = "";
@@ -1150,6 +1152,16 @@ namespace Gizbox.SemanticRule
                         envStack.Pop();
                     }
                     break;
+                case SyntaxTree.SwitchStmtNode switchNode:
+                    {
+                        switchNode.attributes[AstAttr.uid] = switchCounter++;
+
+                        foreach(var caseNode in switchNode.caseNodes)
+                        {
+                            Pass2_CollectOtherSymbols(caseNode.statementsNode);
+                        }
+                    }
+                    break;
                 default:
                     break;
             }
@@ -1547,6 +1559,41 @@ namespace Gizbox.SemanticRule
 
                         //离开FOR循环作用域  
                         envStack.Pop();
+                    }
+                    break;
+                case SyntaxTree.SwitchStmtNode switchNode:
+                    {
+                        Pass3_AnalysisNode(switchNode.conditionNode);
+
+                        var switchTypeExpr = AnalyzeTypeExpression(switchNode.conditionNode);
+                        if(IsSupportedSwitchType(switchTypeExpr) == false)
+                            throw new SemanticException(ExceptioName.SemanticAnalysysError, switchNode, "switch only supports bool/char/integer primitive types.");
+
+                        int defaultCount = 0;
+                        var caseValueSet = new HashSet<string>();
+
+                        foreach(var caseNode in switchNode.caseNodes)
+                        {
+                            if(caseNode.isDefault)
+                            {
+                                defaultCount++;
+                                if(defaultCount > 1)
+                                    throw new SemanticException(ExceptioName.SemanticAnalysysError, caseNode, "switch can only contain one default clause.");
+                            }
+                            else
+                            {
+                                Pass3_AnalysisNode(caseNode.valueNode);
+
+                                var caseTypeExpr = AnalyzeTypeExpression(caseNode.valueNode);
+                                if(CheckType_Equal(switchTypeExpr, caseTypeExpr) == false)
+                                    throw new SemanticException(ExceptioName.SemanticAnalysysError, caseNode, $"switch case type mismatch: switch={switchTypeExpr}, case={caseTypeExpr}");
+
+                                if(TryGetSwitchCaseConstantKey(caseNode.valueNode, out var caseKey) && caseValueSet.Add(caseKey) == false)
+                                    throw new SemanticException(ExceptioName.SemanticAnalysysError, caseNode, "duplicate switch case value.");
+                            }
+
+                            Pass3_AnalysisNode(caseNode.statementsNode);
+                        }
                     }
                     break;
                 case SyntaxTree.ReturnStmtNode retNode:
@@ -2254,6 +2301,48 @@ namespace Gizbox.SemanticRule
                         //回归主分支  
                         lifeTimeInfo.currBranch = lastCurrTemp;
                         lifeTimeInfo.MergeBranchesTo(lastCurrTemp, branches);
+
+                        break;
+                    }
+                case SyntaxTree.SwitchStmtNode switchNode:
+                    {
+                        Pass4_OwnershipLifetime(switchNode.conditionNode);
+
+                        foreach(var caseNode in switchNode.caseNodes)
+                        {
+                            if(caseNode.isDefault == false)
+                                Pass4_OwnershipLifetime(caseNode.valueNode);
+                        }
+
+                        var saved = lifeTimeInfo.currBranch;
+                        List<LifetimeInfo.Branch> branches = new();
+
+                        for(int i = 0; i < switchNode.caseNodes.Count; ++i)
+                        {
+                            var branch = lifeTimeInfo.NewBranch(saved);
+                            lifeTimeInfo.currBranch = branch;
+
+                            for(int j = i; j < switchNode.caseNodes.Count; ++j)
+                            {
+                                Pass4_OwnershipLifetime(switchNode.caseNodes[j].statementsNode);
+
+                                if(SwitchCaseFallsThrough(switchNode.caseNodes[j]) == false)
+                                    break;
+                            }
+
+                            branches.Add(branch);
+                        }
+
+                        if(switchNode.caseNodes.Any(c => c.isDefault) == false)
+                        {
+                            branches.Add(lifeTimeInfo.NewBranch(saved));
+                        }
+
+                        lifeTimeInfo.currBranch = saved;
+                        if(branches.Count > 0)
+                        {
+                            lifeTimeInfo.MergeBranchesTo(saved, branches);
+                        }
 
                         break;
                     }
@@ -3090,6 +3179,52 @@ namespace Gizbox.SemanticRule
         }
 
 
+
+        private bool IsSupportedSwitchType(string typeExpr)
+        {
+            switch(NormalizeTypeExprForTypeCheck(typeExpr))
+            {
+                case "bool":
+                case "byte":
+                case "char":
+                case "int":
+                case "uint":
+                case "long":
+                case "ulong":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private bool TryGetSwitchCaseConstantKey(SyntaxTree.ExprNode exprNode, out string caseKey)
+        {
+            if(exprNode == null)
+            {
+                caseKey = null;
+                return false;
+            }
+
+            if(exprNode.overrideNode is SyntaxTree.ExprNode overrideExpr)
+                return TryGetSwitchCaseConstantKey(overrideExpr, out caseKey);
+
+            if(exprNode is SyntaxTree.LiteralNode literalNode)
+            {
+                caseKey = NormalizeTypeExprForTypeCheck(AnalyzeTypeExpression(literalNode)) + ":" + literalNode.token.attribute;
+                return true;
+            }
+
+            caseKey = null;
+            return false;
+        }
+
+        private bool SwitchCaseFallsThrough(SyntaxTree.SwitchCaseNode caseNode)
+        {
+            if(caseNode?.statementsNode == null || caseNode.statementsNode.statements.Count == 0)
+                return true;
+
+            return caseNode.statementsNode.statements[caseNode.statementsNode.statements.Count - 1] is not SyntaxTree.BreakStmtNode;
+        }
 
         private void CollectAllUsingNamespacePrefix()
         {
@@ -4520,6 +4655,25 @@ namespace Gizbox.SemanticRule
                             }
                         }
                         return allPathValid;
+                    }
+                case SyntaxTree.SwitchStmtNode switchNode:
+                    {
+                        bool hasDefault = false;
+                        bool allPathValid = true;
+
+                        foreach(var caseNode in switchNode.caseNodes)
+                        {
+                            if(caseNode.isDefault)
+                                hasDefault = true;
+
+                            if(CheckReturnStmt(caseNode.statementsNode, returnType) == false)
+                            {
+                                allPathValid = false;
+                                break;
+                            }
+                        }
+
+                        return hasDefault && allPathValid;
                     }
 
                 //返回节点  

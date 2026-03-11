@@ -1629,25 +1629,6 @@ namespace Gizbox.LALRGenerator
             return core1.SetEquals(core2);
         }
 
-        private bool Utils_CanNotMerge(LR1ItemSet set1, LR1ItemSet set2, HashSet<Production> noMergeProductions)
-        {
-            if (noMergeProductions == null || noMergeProductions.Count == 0)
-                return false;
-
-            foreach(var item in set1)
-            {
-                if(noMergeProductions.Contains(item.production))
-                    return true;
-            }
-            foreach(var item in set2)
-            {
-                if(noMergeProductions.Contains(item.production))
-                    return true;
-            }
-
-            return false;
-        }
-
         private LR1ItemSet Utils_UnionSet(IEnumerable<LR1ItemSet> setArr)
         {
             LR1ItemSet setNew = new LR1ItemSet();

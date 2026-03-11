@@ -32,6 +32,25 @@ bool RightOfOr()
 	return false;
 }
 
+void test_switch(int value)
+{
+	switch(value)
+	{
+	    case 1:
+			Console::PrintLn("case 1");
+			break;
+	    case 2:
+			Console::PrintLn("case 2");
+			break;
+	    case 3:
+			Console::PrintLn("case 3");
+			break;
+	    default:
+			Console::PrintLn("case default");
+			break;
+	}
+}
+
 void main()
 {
 	if(LeftFalse() && RightOfAnd())
@@ -65,6 +84,13 @@ void main()
 	{
 		Console::PrintLn("FAIL: LeftTrue() || RightOfOr() should be true");
 	}
+
+
+	int aaa = 2;
+	test_switch(aaa);
+	int bbb = 444;
+	test_switch(bbb);
+
 
 	Console::PrintLn("Test finished!");
 	Console::ReadLn();

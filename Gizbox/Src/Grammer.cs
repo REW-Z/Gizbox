@@ -48,6 +48,8 @@ namespace Gizbox
             "elifclauselist",
             "elifclause",
             "elseclause",
+            "switchclauses",
+            "switchclause",
             
             //复合语句表达式  
             "stmtexpr",//特殊的表达式（不属于expr）(仅作为几种特殊表达式的集合)
@@ -145,6 +147,13 @@ namespace Gizbox
             "stmt -> while ( expr ) stmt",
             "stmt -> for ( stmt bexpr ; stmtexpr ) stmt",
             "stmt -> if ( expr ) stmt elifclauselist elseclause",
+            "stmt -> switch ( expr ) { switchclauses }",
+
+            "switchclauses -> switchclauses switchclause",
+            "switchclauses -> switchclause",
+            "switchclauses -> ε",
+            "switchclause -> case expr : statements",
+            "switchclause -> default : statements",
 
             "declstmt -> decltype ID = expr ;",
             "declstmt -> decltype ID = braceinit ;",

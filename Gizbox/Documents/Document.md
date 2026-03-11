@@ -164,6 +164,32 @@ string operator add(string a, string b)
 ```
 
 
+## Switch-Case
+
+示例：
+```
+switch(x)
+{
+    case 1:
+        Foo();
+        break;
+    case 2:
+        Bar();
+        break;
+    default:
+        Baz();
+        break;
+}
+```
+
+注意事项：
+  - 当前实现采用顺序比较链。
+  - `switch` 条件仅支持 `bool`、`char`、`byte`、`int`、`uint`、`long`、`ulong`。
+  - `case` 表达式类型必须与 `switch` 条件类型一致。
+  - 最多只能有一个 `default`。
+  - 支持 C++ 风格 fallthrough；不写 `break` 会继续执行后续 case。
+
+
 ## 所有权（Ownership）
 
 引用类型有三种所有权模型：  

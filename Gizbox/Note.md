@@ -59,5 +59,4 @@ void foo()
 完善标准库  
 隐式动态链接DLL  
 生成DLL库  
-switch语句实现  
 优化：常量折叠  

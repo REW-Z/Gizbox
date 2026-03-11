@@ -29,7 +29,7 @@ namespace Gizbox.IR
 
         //status  
         private int tmpCounter = 0;//临时变量自增    
-        private GStack<string> loopExitStack = new GStack<string>();
+        private GStack<string> breakExitStack = new GStack<string>();
         private int markCounter = 0;//防重复标签自增  
 
 
@@ -541,11 +541,11 @@ namespace Gizbox.IR
 
                         EmitCode("IF_FALSE_JUMP", GetRet(whileNode.conditionNode), "%LABEL:EndWhile_" + whileCounter);
 
-                        loopExitStack.Push("EndWhile_" + whileCounter);
+                        breakExitStack.Push("EndWhile_" + whileCounter);
 
                         GenNode(whileNode.stmtNode);
 
-                        loopExitStack.Pop();
+                        breakExitStack.Pop();
 
                         EmitCode("JUMP", "%LABEL:While_" + whileCounter);
 
@@ -569,7 +569,7 @@ namespace Gizbox.IR
                         GenNode(forNode.conditionNode);
                         EmitCode("IF_FALSE_JUMP", GetRet(forNode.conditionNode), "%LABEL:EndFor_" + forCounter);
 
-                        loopExitStack.Push("EndFor_" + forCounter);
+                        breakExitStack.Push("EndFor_" + forCounter);
 
                         GenNode(forNode.stmtNode);
 
@@ -577,7 +577,7 @@ namespace Gizbox.IR
                         GenNode(forNode.iteratorNode);
 
 
-                        loopExitStack.Pop();
+                        breakExitStack.Pop();
 
                         EmitCode("JUMP", "%LABEL:For_" + forCounter);
 
@@ -587,10 +587,77 @@ namespace Gizbox.IR
                         envStackTemp.Pop();
                     }
                     break;
+                case SwitchStmtNode switchNode:
+                    {
+                        int switchCounter = (int)switchNode.attributes[AstAttr.uid];
+                        string endLabel = "EndSwitch_" + switchCounter;
+
+                        GenNode(switchNode.conditionNode);
+                        string switchValueTemp = NewTemp((string)switchNode.conditionNode.attributes[AstAttr.type]);
+                        EmitCode("=", switchValueTemp, GetRet(switchNode.conditionNode));
+
+                        var caseLabels = new List<string>();
+                        var dispatchCaseIndexes = new List<int>();
+                        string defaultLabel = null;
+
+                        for(int i = 0; i < switchNode.caseNodes.Count; ++i)
+                        {
+                            var caseNode = switchNode.caseNodes[i];
+                            string caseLabel = caseNode.isDefault ? $"SwitchDefault_{switchCounter}" : $"SwitchCase_{switchCounter}_{i}";
+                            caseLabels.Add(caseLabel);
+
+                            if(caseNode.isDefault)
+                                defaultLabel = caseLabel;
+                            else
+                                dispatchCaseIndexes.Add(i);
+                        }
+
+                        if(dispatchCaseIndexes.Count == 0)
+                        {
+                            if(defaultLabel != null)
+                                EmitCode("JUMP", "%LABEL:" + defaultLabel);
+                        }
+                        else
+                        {
+                            for(int dispatchIdx = 0; dispatchIdx < dispatchCaseIndexes.Count; ++dispatchIdx)
+                            {
+                                int caseIdx = dispatchCaseIndexes[dispatchIdx];
+                                var caseNode = switchNode.caseNodes[caseIdx];
+
+                                if(dispatchIdx > 0)
+                                    EmitCode("").label = $"SwitchCheck_{switchCounter}_{dispatchIdx}";
+
+                                GenNode(caseNode.valueNode);
+
+                                string cmpTemp = NewTemp("bool");
+                                EmitCode("==", cmpTemp, switchValueTemp, GetRet(caseNode.valueNode));
+
+                                string falseLabel = dispatchIdx < dispatchCaseIndexes.Count - 1
+                                    ? $"SwitchCheck_{switchCounter}_{dispatchIdx + 1}"
+                                    : (defaultLabel ?? endLabel);
+
+                                EmitCode("IF_FALSE_JUMP", cmpTemp, "%LABEL:" + falseLabel);
+                                EmitCode("JUMP", "%LABEL:" + caseLabels[caseIdx]);
+                            }
+                        }
+
+                        breakExitStack.Push(endLabel);
+
+                        for(int i = 0; i < switchNode.caseNodes.Count; ++i)
+                        {
+                            EmitCode("").label = caseLabels[i];
+                            GenNode(switchNode.caseNodes[i].statementsNode);
+                        }
+
+                        breakExitStack.Pop();
+
+                        EmitCode("").label = endLabel;
+                    }
+                    break;
 
                 case BreakStmtNode breakNode:
                     {
-                        EmitCode("JUMP", "%LABEL:" + loopExitStack.Peek());
+                        EmitCode("JUMP", "%LABEL:" + breakExitStack.Peek());
                     }
                     break;
 

@@ -136,6 +136,8 @@ namespace Gizbox
         [KnownType(typeof(WhileStmtNode))]
         [KnownType(typeof(ForStmtNode))]
         [KnownType(typeof(IfStmtNode))]
+        [KnownType(typeof(SwitchStmtNode))]
+        [KnownType(typeof(SwitchCaseNode))]
         [KnownType(typeof(ConditionClauseNode))]
         [KnownType(typeof(ElseClauseNode))]
         [KnownType(typeof(IdentityNode))]
@@ -998,6 +1000,38 @@ namespace Gizbox
                 conditionClauseList = new ChildList<ConditionClauseNode>(children_group_0);
                 children_group_1 = new();
                 children_group_1.Add(null);
+            }
+        }
+
+        [DataContract(IsReference = true)]
+        public class SwitchStmtNode : StmtNode
+        {
+            public ExprNode conditionNode { get => (ExprNode)children_group_0[0]; set => children_group_0[0] = value; }
+            public readonly ChildList<SwitchCaseNode> caseNodes;
+
+            public SwitchStmtNode()
+            {
+                children_group_0 = new();
+                children_group_0.Add(null);
+                children_group_1 = new();
+                caseNodes = new ChildList<SwitchCaseNode>(children_group_1);
+            }
+        }
+
+        [DataContract(IsReference = true)]
+        public class SwitchCaseNode : Node
+        {
+            [DataMember]
+            public bool isDefault;
+
+            public ExprNode valueNode { get => (ExprNode)children_group_0[0]; set => children_group_0[0] = value; }
+            public StatementsNode statementsNode { get => (StatementsNode)children_group_0[1]; set => children_group_0[1] = value; }
+
+            public SwitchCaseNode()
+            {
+                children_group_0 = new();
+                children_group_0.Add(null);
+                children_group_0.Add(null);
             }
         }
 

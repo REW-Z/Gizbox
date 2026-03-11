@@ -444,6 +444,55 @@ namespace Gizbox.SemanticRule
                     );
             });
 
+            AddActionAtTail("stmt -> switch ( expr ) { switchclauses }", (psr, production) => {
+                var n = new SyntaxTree.SwitchStmtNode()
+                {
+                    conditionNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 4].attributes[ParseAttr.ast_node],
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+
+                n.caseNodes.AddRange((List<SyntaxTree.SwitchCaseNode>)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.switch_clause_list]);
+                psr.newElement.attributes[ParseAttr.ast_node] = n;
+            });
+
+            AddActionAtTail("switchclauses -> switchclauses switchclause", (psr, production) => {
+                psr.newElement.attributes[ParseAttr.switch_clause_list] = psr.stack[psr.stack.Top - 1].attributes[ParseAttr.switch_clause_list];
+                ((List<SyntaxTree.SwitchCaseNode>)psr.newElement.attributes[ParseAttr.switch_clause_list]).Add(
+                    (SyntaxTree.SwitchCaseNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node]
+                );
+            });
+
+            AddActionAtTail("switchclauses -> switchclause", (psr, production) => {
+                psr.newElement.attributes[ParseAttr.switch_clause_list] = new List<SyntaxTree.SwitchCaseNode>
+                {
+                    (SyntaxTree.SwitchCaseNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node]
+                };
+            });
+
+            AddActionAtTail("switchclauses -> ε", (psr, production) => {
+                psr.newElement.attributes[ParseAttr.switch_clause_list] = new List<SyntaxTree.SwitchCaseNode>();
+            });
+
+            AddActionAtTail("switchclause -> case expr : statements", (psr, production) => {
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.SwitchCaseNode()
+                {
+                    isDefault = false,
+                    valueNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node],
+                    statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+            });
+
+            AddActionAtTail("switchclause -> default : statements", (psr, production) => {
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.SwitchCaseNode()
+                {
+                    isDefault = true,
+                    valueNode = null,
+                    statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+            });
+
 
             AddActionAtTail("declstmt -> decltype ID = expr ;", (psr, production) => {
 
