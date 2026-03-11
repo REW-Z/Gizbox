@@ -1585,10 +1585,13 @@ namespace Gizbox.SemanticRule
                                 Pass3_AnalysisNode(caseNode.valueNode);
 
                                 var caseTypeExpr = AnalyzeTypeExpression(caseNode.valueNode);
+                                if(TryGetSwitchCaseConstantKey(caseNode.valueNode, out var caseKey) == false)
+                                    throw new SemanticException(ExceptioName.SemanticAnalysysError, caseNode, "switch case must be a compile-time literal.");
+
                                 if(CheckType_Equal(switchTypeExpr, caseTypeExpr) == false)
                                     throw new SemanticException(ExceptioName.SemanticAnalysysError, caseNode, $"switch case type mismatch: switch={switchTypeExpr}, case={caseTypeExpr}");
 
-                                if(TryGetSwitchCaseConstantKey(caseNode.valueNode, out var caseKey) && caseValueSet.Add(caseKey) == false)
+                                if(caseValueSet.Add(caseKey) == false)
                                     throw new SemanticException(ExceptioName.SemanticAnalysysError, caseNode, "duplicate switch case value.");
                             }
 

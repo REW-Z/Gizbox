@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using static Gizbox.SyntaxTree;
@@ -31,6 +32,7 @@ namespace Gizbox.IR
         private int tmpCounter = 0;//临时变量自增    
         private GStack<string> breakExitStack = new GStack<string>();
         private int markCounter = 0;//防重复标签自增  
+        private const int SwitchCaseThreshold = 5;//Switch语句使用二分决策树优化的case数量阈值
 
 
 
@@ -597,7 +599,8 @@ namespace Gizbox.IR
                         EmitCode("=", switchValueTemp, GetRet(switchNode.conditionNode));
 
                         var caseLabels = new List<string>();
-                        var dispatchCaseIndexes = new List<int>();
+                        var linearDispatchCaseIndexes = new List<int>();
+                        var binaryDispatchCases = new List<(decimal sortValue, SwitchCaseNode caseNode, string label)>();
                         string defaultLabel = null;
 
                         for(int i = 0; i < switchNode.caseNodes.Count; ++i)
@@ -609,19 +612,35 @@ namespace Gizbox.IR
                             if(caseNode.isDefault)
                                 defaultLabel = caseLabel;
                             else
-                                dispatchCaseIndexes.Add(i);
+                            {
+                                linearDispatchCaseIndexes.Add(i);
+
+                                if(TryGetSwitchCaseSortValue(caseNode, out decimal sortValue))
+                                {
+                                    binaryDispatchCases.Add((sortValue, caseNode, caseLabel));
+                                }
+                            }
                         }
 
-                        if(dispatchCaseIndexes.Count == 0)
+                        if(linearDispatchCaseIndexes.Count == 0)
                         {
+                            //没有case标签 -> 直接跳到default或end
                             if(defaultLabel != null)
                                 EmitCode("JUMP", "%LABEL:" + defaultLabel);
                         }
+                        else if(linearDispatchCaseIndexes.Count > SwitchCaseThreshold
+                            && binaryDispatchCases.Count == linearDispatchCaseIndexes.Count)
+                        {
+                            //这个switch实现为二分决策树  
+                            binaryDispatchCases.Sort((x, y) => x.sortValue.CompareTo(y.sortValue));
+                            EmitBinarySwitchDispatch(switchValueTemp, binaryDispatchCases, defaultLabel ?? endLabel);
+                        }
                         else
                         {
-                            for(int dispatchIdx = 0; dispatchIdx < dispatchCaseIndexes.Count; ++dispatchIdx)
+                            //这个switch实现为if-elseif比较链  
+                            for(int dispatchIdx = 0; dispatchIdx < linearDispatchCaseIndexes.Count; ++dispatchIdx)
                             {
-                                int caseIdx = dispatchCaseIndexes[dispatchIdx];
+                                int caseIdx = linearDispatchCaseIndexes[dispatchIdx];
                                 var caseNode = switchNode.caseNodes[caseIdx];
 
                                 if(dispatchIdx > 0)
@@ -632,7 +651,7 @@ namespace Gizbox.IR
                                 string cmpTemp = NewTemp("bool");
                                 EmitCode("==", cmpTemp, switchValueTemp, GetRet(caseNode.valueNode));
 
-                                string falseLabel = dispatchIdx < dispatchCaseIndexes.Count - 1
+                                string falseLabel = dispatchIdx < linearDispatchCaseIndexes.Count - 1
                                     ? $"SwitchCheck_{switchCounter}_{dispatchIdx + 1}"
                                     : (defaultLabel ?? endLabel);
 
@@ -1264,6 +1283,125 @@ namespace Gizbox.IR
             }
 
             return null;
+        }
+
+        private void EmitBinarySwitchDispatch(string switchValueTemp, List<(decimal sortValue, SwitchCaseNode caseNode, string label)> sortedCases, string fallbackLabel)
+        {
+            EmitBinarySwitchDispatchRecursive(switchValueTemp, sortedCases, 0, sortedCases.Count - 1, fallbackLabel);
+        }
+
+        private void EmitBinarySwitchDispatchRecursive(string switchValueTemp, List<(decimal sortValue, SwitchCaseNode caseNode, string label)> sortedCases, int left, int right, string fallbackLabel)
+        {
+            if(left > right)
+            {
+                EmitCode("JUMP", "%LABEL:" + fallbackLabel);
+                return;
+            }
+
+            int mid = left + ((right - left) / 2);
+            var midCase = sortedCases[mid];
+
+            GenNode(midCase.caseNode.valueNode);
+
+            string eqTemp = NewTemp("bool");
+            EmitCode("==", eqTemp, switchValueTemp, GetRet(midCase.caseNode.valueNode));
+
+            string notEqualLabel = $"SwitchBinaryNotEqual_{markCounter++}";
+            EmitCode("IF_FALSE_JUMP", eqTemp, "%LABEL:" + notEqualLabel);
+            EmitCode("JUMP", "%LABEL:" + midCase.label);
+            EmitCode("").label = notEqualLabel;
+
+            if(left == right)
+            {
+                EmitCode("JUMP", "%LABEL:" + fallbackLabel);
+                return;
+            }
+
+            string ltTemp = NewTemp("bool");
+            EmitCode("<", ltTemp, switchValueTemp, GetRet(midCase.caseNode.valueNode));
+
+            string rightLabel = $"SwitchBinaryRight_{markCounter++}";
+            EmitCode("IF_FALSE_JUMP", ltTemp, "%LABEL:" + rightLabel);
+            EmitBinarySwitchDispatchRecursive(switchValueTemp, sortedCases, left, mid - 1, fallbackLabel);
+            EmitCode("").label = rightLabel;
+            EmitBinarySwitchDispatchRecursive(switchValueTemp, sortedCases, mid + 1, right, fallbackLabel);
+        }
+
+        private bool TryGetSwitchCaseSortValue(SwitchCaseNode caseNode, out decimal sortValue)
+        {
+            sortValue = 0m;
+
+            if(caseNode?.isDefault != false)
+                return false;
+
+            var expr = caseNode.valueNode;
+            if(expr == null)
+                return false;
+
+            if(expr.overrideNode is ExprNode overrideExpr)
+                expr = overrideExpr;
+
+            if(expr is not LiteralNode literalNode)
+                return false;
+
+            string typeExpr = literalNode.attributes != null && literalNode.attributes.TryGetValue(AstAttr.type, out var typeObj)
+                ? typeObj as string
+                : TypeUtils.GetLitType(literalNode.token);
+
+            if(string.IsNullOrWhiteSpace(typeExpr))
+                return false;
+
+            switch(GType.Parse(typeExpr).Category)
+            {
+                case GType.Kind.Bool:
+                    sortValue = string.Equals(literalNode.token.attribute, "true", StringComparison.OrdinalIgnoreCase) ? 1m : 0m;
+                    return true;
+                case GType.Kind.Byte:
+                case GType.Kind.Int:
+                    sortValue = decimal.Parse(literalNode.token.attribute, CultureInfo.InvariantCulture);
+                    return true;
+                case GType.Kind.UInt:
+                    sortValue = decimal.Parse(literalNode.token.attribute.TrimEnd('u', 'U'), CultureInfo.InvariantCulture);
+                    return true;
+                case GType.Kind.Long:
+                    sortValue = decimal.Parse(literalNode.token.attribute.TrimEnd('l', 'L'), CultureInfo.InvariantCulture);
+                    return true;
+                case GType.Kind.ULong:
+                    sortValue = decimal.Parse(literalNode.token.attribute.TrimEnd('u', 'U', 'l', 'L'), CultureInfo.InvariantCulture);
+                    return true;
+                case GType.Kind.Char:
+                    sortValue = ParseSwitchCharLiteral(literalNode.token.attribute);
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private int ParseSwitchCharLiteral(string raw)
+        {
+            if(string.IsNullOrEmpty(raw) || raw.Length < 3 || raw[0] != '\'' || raw[raw.Length - 1] != '\'')
+                throw new GizboxException(ExceptioName.SemanticAnalysysError, $"invalid char literal: {raw}");
+
+            string content = raw.Substring(1, raw.Length - 2);
+            if(content.Length == 1)
+                return content[0];
+
+            if(content.Length == 2 && content[0] == '\\')
+            {
+                return content[1] switch
+                {
+                    '0' => '\0',
+                    'n' => '\n',
+                    'r' => '\r',
+                    't' => '\t',
+                    '\\' => '\\',
+                    '\'' => '\'',
+                    '"' => '"',
+                    _ => content[1],
+                };
+            }
+
+            throw new GizboxException(ExceptioName.SemanticAnalysysError, $"invalid char literal: {raw}");
         }
 
         public void EmitDeleteArrayCode(string expr)
