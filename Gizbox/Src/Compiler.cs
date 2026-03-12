@@ -299,6 +299,133 @@ namespace Gizbox
             }
         }
 
+        /// <summary>
+        /// 解析外部链接项  
+        /// 静态库返回.lib/.a路径；动态库返回“参与链接的文件路径”和“运行时要复制的dll路径”。
+        /// </summary>
+        private (List<string> staticLibPaths, List<string> dynamicLinkPaths, List<string> runtimeDllPaths) CheckExternalLinkFiles(CompileOptions options, string workingDir)
+        {
+            List<string> staticLibPaths = new();
+            List<string> dynamicLinkPaths = new();
+            List<string> runtimeDllPaths = new();
+            List<string> searchDirs = new();
+
+            if(string.IsNullOrWhiteSpace(workingDir) == false)
+                searchDirs.Add(workingDir);
+            searchDirs.Add(AppDomain.CurrentDomain.BaseDirectory);
+            searchDirs.Add(Environment.CurrentDirectory);
+            foreach(var dir in this.libPathFindList)
+            {
+                if(string.IsNullOrWhiteSpace(dir) == false)
+                    searchDirs.Add(dir);
+            }
+
+            string FindExistingFile(string rawValue, params string[] fallbackExtensions)
+            {
+                if(string.IsNullOrWhiteSpace(rawValue))
+                    throw new GizboxException(ExceptioName.Link, "外部链接文件名不能为空");
+
+                var normalized = rawValue.Trim().Trim('"');
+                HashSet<string> candidates = new(StringComparer.OrdinalIgnoreCase);
+                List<string> names = new() { normalized };
+                if(System.IO.Path.HasExtension(normalized) == false)
+                {
+                    foreach(var ext in fallbackExtensions)
+                    {
+                        if(string.IsNullOrWhiteSpace(ext) == false)
+                            names.Add(normalized + ext);
+                    }
+                }
+
+                foreach(var name in names)
+                {
+                    if(System.IO.Path.IsPathRooted(name))
+                    {
+                        candidates.Add(name);
+                    }
+                    else
+                    {
+                        candidates.Add(name);
+                        foreach(var dir in searchDirs)
+                        {
+                            candidates.Add(System.IO.Path.Combine(dir, name));
+                        }
+                    }
+                }
+
+                foreach(var candidate in candidates)
+                {
+                    if(System.IO.File.Exists(candidate))
+                        return System.IO.Path.GetFullPath(candidate);
+                }
+
+                throw new GizboxException(ExceptioName.Link, $"外部链接文件未找到: {rawValue}");
+            }
+
+            if(options?.libs != null)
+            {
+                foreach(var lib in options.libs)
+                {
+                    staticLibPaths.Add(FindExistingFile(lib, ".lib", ".a"));
+                }
+            }
+
+            if(options?.dlls != null)
+            {
+                foreach(var dll in options.dlls)
+                {
+                    var runtimeDllPath = FindExistingFile(dll, ".dll");
+                    var linkPath = runtimeDllPath;
+                    var dllDir = System.IO.Path.GetDirectoryName(runtimeDllPath);
+                    var dllName = System.IO.Path.GetFileNameWithoutExtension(runtimeDllPath);
+
+                    if(string.IsNullOrWhiteSpace(dllDir) == false && string.IsNullOrWhiteSpace(dllName) == false)
+                    {
+                        foreach(var ext in new[] { ".lib", ".dll.a", ".a" })
+                        {
+                            var importLibPath = System.IO.Path.Combine(dllDir, dllName + ext);
+                            if(System.IO.File.Exists(importLibPath))
+                            {
+                                linkPath = System.IO.Path.GetFullPath(importLibPath);
+                                break;
+                            }
+                        }
+                    }
+
+                    dynamicLinkPaths.Add(linkPath);
+                    runtimeDllPaths.Add(runtimeDllPath);
+                }
+            }
+
+            return (staticLibPaths, dynamicLinkPaths, runtimeDllPaths);
+        }
+
+        /// <summary>
+        /// 将运行时依赖的dll复制到输出目录（避免生成的exe启动时找不到动态库）  
+        /// </summary>
+        private static void CopyRuntimeDlls(IEnumerable<string> runtimeDllPaths, string outputDir)
+        {
+            if(runtimeDllPaths == null)
+                return;
+
+            HashSet<string> copied = new(StringComparer.OrdinalIgnoreCase);
+            foreach(var runtimeDllPath in runtimeDllPaths)
+            {
+                if(string.IsNullOrWhiteSpace(runtimeDllPath))
+                    continue;
+                if(copied.Add(runtimeDllPath) == false)
+                    continue;
+
+                var dstPath = System.IO.Path.Combine(outputDir, System.IO.Path.GetFileName(runtimeDllPath));
+                if(string.Equals(System.IO.Path.GetFullPath(dstPath), System.IO.Path.GetFullPath(runtimeDllPath), StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if(System.IO.File.Exists(dstPath))
+                    System.IO.File.Delete(dstPath);
+                System.IO.File.Copy(runtimeDllPath, dstPath);
+            }
+        }
+
 
         /// <summary>
         /// 编译库  
@@ -518,10 +645,14 @@ namespace Gizbox
         {
             if(options == null)
                 options = new CompileOptions();
+
+            System.IO.Directory.CreateDirectory(outputDir);
+
+            //编译源文件生成汇编  
             var allfiles = Gizbox.Src.Backend.Win64Target.GenAsms(this, ir, outputDir, options);
 
+            //提取文件名（不带路径和扩展名）
             List<string> fileNames = new();
-
             foreach(var fileFullName in allfiles)
             {
                 fileNames.Add(System.IO.Path.GetFileNameWithoutExtension(fileFullName));
@@ -534,28 +665,46 @@ namespace Gizbox
             //测试：使用把corert.c编译为win64的asm
             Run(mingw_gcc, $"-S -m64 -masm=intel -o corert.s corert.c", AppDomain.CurrentDomain.BaseDirectory);
 #endif
-
+            //编译corert.c为obj  
             Run(mingw_gcc, $"-c corert.c -o corert.obj", AppDomain.CurrentDomain.BaseDirectory);
 
             //复制corert.obj到outputDir
             var srcPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "corert.obj");
             if(System.IO.File.Exists(srcPath) == false)
                 throw new GizboxException(ExceptioName.Link, "obj not exist:" + srcPath);
-
             var dstPath = System.IO.Path.Combine(outputDir, "corert.obj");
             if(System.IO.File.Exists(dstPath))
                 System.IO.File.Delete(dstPath);
-
-
             System.IO.File.Copy(srcPath, dstPath);
 
+            //编译生成的asm为obj
             foreach(var fileName in fileNames)
             {
                 GixConsole.WriteLine($">>>nasm -f win64 {fileName}.asm -o {fileName}.obj");
                 Run("nasm", $"-f win64 {fileName}.asm -o {fileName}.obj", outputDir);
             }
 
-            var ret = Run(mingw_gcc, $"corert.obj {string.Join(" ", fileNames.Select(f => $"{f}.obj"))} -o {ir.name}.exe", outputDir);
+            var quoteArg = new Func<string, string>(value =>
+            {
+                if(string.IsNullOrEmpty(value))
+                    return "\"\"";
+                if(value.IndexOfAny(new[] { ' ', '\t', '"' }) < 0)
+                    return value;
+                return "\"" + value.Replace("\"", "\\\"") + "\"";
+            });
+
+            var externalLinkFiles = CheckExternalLinkFiles(options, outputDir);
+            CopyRuntimeDlls(externalLinkFiles.runtimeDllPaths, outputDir);
+
+            List<string> linkInputs = new();
+            linkInputs.Add(quoteArg("corert.obj"));
+            linkInputs.AddRange(fileNames.Select(f => quoteArg($"{f}.obj")));
+            linkInputs.AddRange(externalLinkFiles.staticLibPaths.Select(quoteArg));
+            linkInputs.AddRange(externalLinkFiles.dynamicLinkPaths.Select(quoteArg));
+
+            //链接所有obj生成exe
+            var ret = Run(mingw_gcc, $"{string.Join(" ", linkInputs)} -o {quoteArg($"{ir.name}.exe")}", outputDir);
+
 
             GixConsole.WriteLine($"编译完成...结束码:{ret}");
         }
@@ -578,5 +727,8 @@ namespace Gizbox
     {
         public BuildMode buildMode = BuildMode.Debug;
         public Platform platform = Platform.Windows_X64;
+
+        public List<string> libs;//参与链接的外部静态库（支持文件名或路径，默认查找.lib/.a）
+        public List<string> dlls;//参与动态链接的外部dll（支持文件名或路径，会复制到输出目录）    
     }
 }

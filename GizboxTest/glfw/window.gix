@@ -1,0 +1,58 @@
+﻿import <"core">  
+import <"stdlib">  
+
+using Core;  
+using Console;
+
+extern bool glfwInit();
+extern void glfwTerminate();
+extern ulong glfwCreateWindow(int width, int height, string title, ulong monitor, ulong share);
+extern void glfwDestroyWindow(ulong window);
+extern void glfwPollEvents();
+extern void glfwSwapBuffers(ulong window);
+extern void glfwMakeContextCurrent(ulong window);
+extern int glfwWindowShouldClose(ulong window);
+extern void glfwSetWindowShouldClose(ulong window, int value);
+
+void main()
+{
+    Window w = new Window();
+    delete w;
+
+
+    if (!glfwInit())
+    {
+        Console::PrintLn("Failed to initialize GLFW");
+        return;
+    }
+
+    string title = "Gizbox GLFW Test";
+    ulong window = glfwCreateWindow(800, 600, title, 0ul, 0ul);
+    if (window == 0ul)
+    {
+        Console::PrintLn("Failed to create GLFW window");
+        glfwTerminate();
+        return;
+    }
+
+    glfwMakeContextCurrent(window);
+
+    while (glfwWindowShouldClose(window) == 0)
+    {
+        // 处理事件并交换缓冲区
+        glfwPollEvents();
+        glfwSwapBuffers(window);
+    }
+
+    glfwDestroyWindow(window);
+    glfwTerminate();
+}
+
+
+class Window 
+{
+    ~Window()
+    {
+        Console::PrintLn("GLFWWindow destructor called");
+    }
+}

@@ -13,6 +13,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="glfw\window.gix">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="lib\graphics.gix">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

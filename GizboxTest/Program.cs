@@ -18,6 +18,7 @@ string[] cmds = {
     "2.生成分析器硬编码",
     "3.测试杂项",
     "4.测试x64目标代码生成",
+    "5.glfw测试",
     };
 
 Console.WindowWidth = 150;
@@ -143,6 +144,33 @@ switch(cmdIdx)
             {
                 Console.WriteLine("无效数字");
             }
+        }
+        break;
+    case 5:
+        {
+            var path = AppDomain.CurrentDomain.BaseDirectory + "\\glfw\\window.gix";
+
+            CompileOptions options = new CompileOptions()
+            {
+                buildMode = BuildMode.Debug,
+                platform = Platform.Windows_X64,
+                dlls = new List<string> { "glfw3.dll" },
+            };
+
+            //测试脚本Test  
+            string source = System.IO.File.ReadAllText(path);
+            Gizbox.Compiler compiler = new Compiler();
+            compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
+            compiler.AddLibPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "glfw"));
+            compiler.AddLibPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "lib"));
+            compiler.AddLibPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "test"));
+            compiler.ConfigParserDataSource(hardcode: true);
+            //compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
+            var il = compiler.CompileToIR(source, isMainUnit: true, "test");
+
+            il.Print();
+
+            compiler.CompileIRToExe(il, System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop), options);
         }
         break;
 }
