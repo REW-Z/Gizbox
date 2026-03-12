@@ -155,6 +155,7 @@ switch(cmdIdx)
                 buildMode = BuildMode.Debug,
                 platform = Platform.Windows_X64,
                 dlls = new List<string> { "glfw3.dll" },
+                libs = new List<string> { "ImGuiLib.lib" },
             };
 
             //测试脚本Test  
