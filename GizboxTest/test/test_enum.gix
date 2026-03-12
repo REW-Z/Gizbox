@@ -1,0 +1,38 @@
+﻿import <"core">  
+import <"stdlib">  
+
+using Core;  
+using Console;
+using Collections;
+using TestEnum;
+
+namespace TestEnum
+{
+	enum Color
+	{
+		Red = 1,
+		Green = 2,
+		Blue = 4
+	}
+}
+
+void main()
+{
+	Color c1 = TestEnum::Color.Blue;
+	int v1 = (int)c1;
+
+	Color c2 = (Color)4;
+	bool iseq = (c1 == c2);
+
+	Color c3 = (Color)3;
+	int v3 = (int)c3;
+
+
+	Console::PrintLn("Color blue: " + (string)v1);
+	Console::PrintLn("Color equal: " + (string)iseq);
+	
+	Console::PrintLn("Color 3: " + (string)v3);
+
+	Console::PrintLn("Test finished!");
+	Console::ReadLn();
+}

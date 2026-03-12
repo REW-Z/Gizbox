@@ -763,24 +763,7 @@ namespace Gizbox.SemanticRule
                 );
             });
 
-            AddActionAtTail("declstmt -> struct TYPE_NAME { declstatements }", (psr, production) => {
-                var node = new SyntaxTree.StructDeclareNode()
-                {
-                    structNameNode = new SyntaxTree.IdentityNode()
-                    {
-                        attributes = new Dictionary<AstAttr, object>(),
-                        token = psr.stack[psr.stack.Top - 3].attributes[ParseAttr.token] as Token,
-                        identiferType = SyntaxTree.IdentityNode.IdType.Class,
-                    },
-                    attributes = new Dictionary<AstAttr, object>(),
-                };
 
-                node.memberDelareNodes.AddRange(
-                    (List<SyntaxTree.DeclareNode>)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.decl_stmts]
-                );
-
-                psr.newElement.attributes[ParseAttr.ast_node] = node;
-            });
 
             AddActionAtTail("declstmt -> class own TYPE_NAME genparams inherit { declstatements }", (psr, production) => {
                 psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.ClassDeclareNode()
@@ -822,6 +805,68 @@ namespace Gizbox.SemanticRule
                     (List<SyntaxTree.DeclareNode>)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.decl_stmts]
                 );
             });
+
+            AddActionAtTail("declstmt -> struct TYPE_NAME { declstatements }", (psr, production) => {
+                var node = new SyntaxTree.StructDeclareNode()
+                {
+                    structNameNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 3].attributes[ParseAttr.token] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.Class,
+                    },
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+
+                node.memberDelareNodes.AddRange(
+                    (List<SyntaxTree.DeclareNode>)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.decl_stmts]
+                );
+
+                psr.newElement.attributes[ParseAttr.ast_node] = node;
+            });
+
+            AddActionAtTail("declstmt -> enum TYPE_NAME { enumitems }", (psr, production) => {
+                var node = new SyntaxTree.EnumDeclareNode() { enumNameNode = new SyntaxTree.IdentityNode() { attributes = new Dictionary<AstAttr, object>(), token = psr.stack[psr.stack.Top - 3].attributes[ParseAttr.token] as Token, identiferType = SyntaxTree.IdentityNode.IdType.Class, }, attributes = new Dictionary<AstAttr, object>(), };
+                node.memberNodes.AddRange(
+                    (List<SyntaxTree.EnumMemberNode>)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.enum_member_list]
+                );
+
+                psr.newElement.attributes[ParseAttr.ast_node] = node;
+            });
+
+
+
+            AddActionAtTail("enumitems -> enumitems , enumitem", (psr, production) => {
+                var list = (List<SyntaxTree.EnumMemberNode>)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.enum_member_list];
+                list.Add((SyntaxTree.EnumMemberNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node]);
+                psr.newElement.attributes[ParseAttr.enum_member_list] = list;
+            });
+
+            AddActionAtTail("enumitems -> enumitem", (psr, production) => {
+                psr.newElement.attributes[ParseAttr.enum_member_list] = new List<SyntaxTree.EnumMemberNode>()
+            {
+                (SyntaxTree.EnumMemberNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node]
+            };
+            });
+
+            AddActionAtTail("enumitems -> ε", (psr, production) => {
+                psr.newElement.attributes[ParseAttr.enum_member_list] = new List<SyntaxTree.EnumMemberNode>();
+            });
+
+            AddActionAtTail("enumitem -> ID = lit", (psr, production) => {
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.EnumMemberNode()
+                {
+                    identifierNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 2].attributes[ParseAttr.token] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField,
+                    },
+                    valueNode = (SyntaxTree.LiteralNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+            });
+
 
 
             AddActionAtTail("declstmt -> acmodif :", (psr, production) =>
@@ -1368,6 +1413,9 @@ namespace Gizbox.SemanticRule
             AddActionAtTail("primary -> memberaccess", (psr, production) => {
                 psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
+            AddActionAtTail("primary -> enumvalueaccess", (psr, production) => {
+                psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
+            });
 
             AddActionAtTail("primary -> newobj", (psr, production) => {
                 psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
@@ -1659,6 +1707,27 @@ namespace Gizbox.SemanticRule
                 psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.ObjectMemberAccessNode()
                 {
                     objectNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node],
+                    memberNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top].attributes[ParseAttr.token] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField,
+                        isMemberIdentifier = true,
+                    },
+
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+            });
+
+            AddActionAtTail("enumvalueaccess -> TYPE_NAME . ID", (psr, production) => {
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.EnumAccessNode()
+                {
+                    enumTypeNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 2].attributes[ParseAttr.token] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.Class,
+                    },
                     memberNode = new SyntaxTree.IdentityNode()
                     {
                         attributes = new Dictionary<AstAttr, object>(),

@@ -126,6 +126,8 @@ namespace Gizbox
         [KnownType(typeof(FuncDeclareNode))]
         [KnownType(typeof(ClassDeclareNode))]
         [KnownType(typeof(StructDeclareNode))]
+        [KnownType(typeof(EnumDeclareNode))]
+        [KnownType(typeof(EnumMemberNode))]
         [KnownType(typeof(AccessLabelNode))]
         [KnownType(typeof(OwnershipLeakStmtNode))]
         [KnownType(typeof(OwnershipCaptureStmtNode))]
@@ -155,6 +157,7 @@ namespace Gizbox
         [KnownType(typeof(CastNode))]
         [KnownType(typeof(ElementAccessNode))]
         [KnownType(typeof(ObjectMemberAccessNode))]
+        [KnownType(typeof(EnumAccessNode))]
         [KnownType(typeof(ThisNode))]
         [KnownType(typeof(TypeOfNode))]
         [KnownType(typeof(SizeOfNode))]
@@ -876,6 +879,36 @@ namespace Gizbox
 
 
         [DataContract(IsReference = true)]
+        public class EnumDeclareNode : DeclareNode
+        {
+            public IdentityNode enumNameNode { get => (IdentityNode)children_group_0[0]; set => children_group_0[0] = value; }
+            public readonly ChildList<EnumMemberNode> memberNodes;
+
+            public EnumDeclareNode()
+            {
+                children_group_0 = new();
+                children_group_0.Add(null);
+                children_group_1 = new();
+                memberNodes = new ChildList<EnumMemberNode>(children_group_1);
+            }
+        }
+
+        [DataContract(IsReference = true)]
+        public class EnumMemberNode : Node
+        {
+            public IdentityNode identifierNode { get => (IdentityNode)children_group_0[0]; set => children_group_0[0] = value; }
+            public LiteralNode valueNode { get => (LiteralNode)children_group_0[1]; set => children_group_0[1] = value; }
+
+            public EnumMemberNode()
+            {
+                children_group_0 = new();
+                children_group_0.Add(null);
+                children_group_0.Add(null);
+            }
+        }
+
+
+        [DataContract(IsReference = true)]
         public class AccessLabelNode : DeclareNode
         {
             [DataMember]
@@ -1356,6 +1389,20 @@ namespace Gizbox
         }
 
         [DataContract(IsReference = true)]
+        public class EnumAccessNode : ExprNode
+        {
+            public IdentityNode enumTypeNode { get => (IdentityNode)children_group_0[0]; set => children_group_0[0] = value; }
+            public IdentityNode memberNode { get => (IdentityNode)children_group_0[1]; set => children_group_0[1] = value; }
+
+            public EnumAccessNode()
+            {
+                children_group_0 = new();
+                children_group_0.Add(null);
+                children_group_0.Add(null);
+            }
+        }
+
+        [DataContract(IsReference = true)]
         public class ThisNode : ExprNode
         {
             [DataMember]
@@ -1450,6 +1497,8 @@ namespace Gizbox
             [DataMember]
             public bool isStructType = false;
             [DataMember]
+            public bool isEnumType = false;
+            [DataMember]
             public int structSize = 0;
 
 
@@ -1459,10 +1508,11 @@ namespace Gizbox
                 children_group_0 = new();
                 children_group_0.Add(null);
             }
-
-            public void Complate(bool isstruct, int size = 0)
+            
+            public void Complate(bool isstruct, int size = 0, bool isenum = false)
             {
                 this.isStructType = isstruct;
+                this.isEnumType = isenum;
                 this.structSize = size;
             }
 
@@ -1477,6 +1527,9 @@ namespace Gizbox
                     rawTypeName = classname.FullName;
                 else
                     rawTypeName = Utils.MangleTemplateInstanceName(classname.FullName, genericArguments.Select(t => GType.Parse(t.TypeExpression())));
+
+                if(isEnumType)
+                    return "(enum)" + rawTypeName;
 
                 if(ownershipModifier.HasFlag(VarModifiers.Own))
                     return "(own-class)" + rawTypeName;

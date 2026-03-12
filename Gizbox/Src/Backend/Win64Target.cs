@@ -2485,7 +2485,7 @@ namespace Gizbox.Src.Backend
                 return typeExpr;
 
             var t = GType.Parse(typeExpr);
-            if(t.IsClassType || t.IsStructType)
+            if(t.IsClassType || t.IsStructType || t.IsEnumType)
                 return t.ObjectTypeName;
 
             return t.Category switch

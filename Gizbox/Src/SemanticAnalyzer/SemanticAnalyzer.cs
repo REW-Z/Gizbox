@@ -42,6 +42,7 @@ namespace Gizbox
         generic_params,
         generic_args,
         switch_clause_list,
+        enum_member_list,
 
         acmodif,
     }
@@ -69,6 +70,7 @@ namespace Gizbox
         func_rec,
         func_ptr_ownsig,
         class_rec,
+        enum_rec,
         obj_class_rec,
         not_a_property,
         name_completed,
@@ -576,6 +578,29 @@ namespace Gizbox.SemanticRule
                         else
                         {
                             throw new SemanticException(ExceptioName.ClassDefinitionGlobalOrNamespaceOnly, structDeclNode, "");
+                        }
+                    }
+                    break;
+                case SyntaxTree.EnumDeclareNode enumDeclNode:
+                    {
+                        if(isGlobalOrTopNamespace)
+                        {
+                            if(isTopLevelAtNamespace)
+                                enumDeclNode.enumNameNode.SetPrefix(currentNamespace);
+                            var newEnv = new SymbolTable(enumDeclNode.enumNameNode.FullName, SymbolTable.TableCatagory.ClassScope, envStack.Peek());
+                            enumDeclNode.attributes[AstAttr.env] = newEnv;
+
+                            var newRec = envStack.Peek().NewRecord(
+                                enumDeclNode.enumNameNode.FullName,
+                                SymbolTable.RecordCatagory.Enum,
+                                "(enum)" + enumDeclNode.enumNameNode.FullName,
+                                newEnv
+                            );
+                            enumDeclNode.attributes[AstAttr.enum_rec] = newRec;
+                        }
+                        else
+                        {
+                            throw new SemanticException(ExceptioName.ClassDefinitionGlobalOrNamespaceOnly, enumDeclNode, "");
                         }
                     }
                     break;
@@ -1110,6 +1135,26 @@ namespace Gizbox.SemanticRule
                         envStack.Pop();
                     }
                     break;
+                case SyntaxTree.EnumDeclareNode enumDeclNode:
+                    {
+                        envStack.Push(enumDeclNode.attributes[AstAttr.env] as SymbolTable);
+                        string enumTypeExpr = "(enum)" + enumDeclNode.enumNameNode.FullName;
+                        foreach(var memberNode in enumDeclNode.memberNodes)
+                        {
+                            memberNode.identifierNode.SetPrefix(null);
+
+                            var newRec = envStack.Peek().NewRecord(
+                                memberNode.identifierNode.FullName,
+                                SymbolTable.RecordCatagory.Constant,
+                                enumTypeExpr,
+                                initValue: memberNode.valueNode.token.attribute
+                            );
+                            memberNode.attributes[AstAttr.const_rec] = newRec;
+                        }
+
+                        envStack.Pop();
+                    }
+                    break;
                 case SyntaxTree.IfStmtNode ifNode:
                     {
                         ifNode.attributes[AstAttr.uid] = ifCounter++;
@@ -1511,6 +1556,23 @@ namespace Gizbox.SemanticRule
                         envStack.Pop();
                     }
                     break;
+                case SyntaxTree.EnumDeclareNode enumDeclNode:
+                    {
+                        envStack.Push(enumDeclNode.attributes[AstAttr.env] as SymbolTable);
+                        HashSet<int> values = new();
+                        foreach(var memberNode in enumDeclNode.memberNodes)
+                        {
+                            int val = ParseEnumMemberValue(memberNode);
+                            if(values.Add(val) == false)
+                                throw new SemanticException(ExceptioName.SemanticAnalysysError, memberNode, "duplicate enum member value.");
+
+                            var rec = memberNode.attributes[AstAttr.const_rec] as SymbolTable.Record;
+                            rec.initValue = val.ToString();
+                        }
+
+                        envStack.Pop();
+                    }
+                    break;
                 case SyntaxTree.SingleExprStmtNode singleStmtNode:
                     {
                         //单语句语义分析  
@@ -1773,6 +1835,7 @@ namespace Gizbox.SemanticRule
                         var srcType = GType.Parse((string)castNode.factorNode.attributes[AstAttr.type]);
                         var targetType = GType.Parse(castNode.typeNode.TypeExpression());
 
+                        //非string类型 -> string类型
                         if(targetType.Category == GType.Kind.String && srcType.Category != GType.Kind.String)
                         {
                             //基元类型转string   
@@ -1799,8 +1862,9 @@ namespace Gizbox.SemanticRule
 
                                 break;
                             }
+
                             //类对象转string -> 调用ToString成员函数  
-                            else
+                            else if(srcType.Category == GType.Kind.Object)
                             {
                                 var overrideNode = new SyntaxTree.CallNode()
                                 {
@@ -1812,8 +1876,8 @@ namespace Gizbox.SemanticRule
                                         {
                                             token = new Token("ID", PatternType.Id, "ToString", default, default, default),
                                             attributes = new Dictionary<AstAttr, object>(),
-                                            identiferType = IdentityNode.IdType.VariableOrField,                                            
-                                        }, 
+                                            identiferType = IdentityNode.IdType.VariableOrField,
+                                        },
                                         objectNode = castNode.factorNode,
                                     },
                                     argumantsNode = new SyntaxTree.ArgumentListNode()
@@ -1826,7 +1890,13 @@ namespace Gizbox.SemanticRule
                                 Pass3_AnalysisNode(castNode.overrideNode);
                                 break;
                             }
+                            //结构体或者枚举 -> string （暂不支持）
+                            else if(srcType.IsStructType || srcType.IsEnumType)
+                            {
+                                throw new SemanticException(ExceptioName.SemanticAnalysysError, castNode, "cast struct or enum to string is not supported.");
+                            }
                         }
+                        //string类型 -> string类型
                         else if(targetType.Category == GType.Kind.String && srcType.Category == GType.Kind.String)
                         {
                             castNode.overrideNode = castNode.factorNode;
@@ -1834,6 +1904,7 @@ namespace Gizbox.SemanticRule
                             castNode.Parent.ReplaceChild(castNode, castNode.overrideNode);
                             Pass3_AnalysisNode(castNode.overrideNode);
                         }
+                        //不支持的转换  
                         else if(targetType.Category == GType.Kind.Array)
                         {
                             throw new SemanticException(ExceptioName.SemanticAnalysysError, castNode, "cast to array not support.");
@@ -1943,8 +2014,12 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.AssignNode assignNode:
                     {
+                        //禁止枚举成员赋值 
+                        if(assignNode.lvalueNode is SyntaxTree.EnumAccessNode)
+                            throw new SemanticException(ExceptioName.AssignmentTypeError, assignNode, "enum member is not assignable.");
+
                         //!!setter属性替换  
-                        if (assignNode.lvalueNode is SyntaxTree.ObjectMemberAccessNode)
+                        if(assignNode.lvalueNode is SyntaxTree.ObjectMemberAccessNode)
                         {
                             var memberAccess = assignNode.lvalueNode as SyntaxTree.ObjectMemberAccessNode;
 
@@ -2002,7 +2077,10 @@ namespace Gizbox.SemanticRule
                     {
                         Pass3_AnalysisNode(objMemberAccessNode.objectNode);
 
-                        var className = GType.Normalize(AnalyzeTypeExpression(objMemberAccessNode.objectNode));
+                        var objectTypeExpr = GetValueTypeExpression(AnalyzeTypeExpression(objMemberAccessNode.objectNode));
+                        var objectType = GType.Parse(objectTypeExpr);
+
+                        var className = objectType.NormTypeName;
                         var classRec = Query(className);
                         if(classRec == null) throw new SemanticException(ExceptioName.ClassSymbolTableNotFound, objMemberAccessNode, className);
                         var classEnv = classRec.envPtr;
@@ -2053,6 +2131,12 @@ namespace Gizbox.SemanticRule
                         objMemberAccessNode.attributes[AstAttr.obj_class_rec] = classRec;
 
                         AnalyzeTypeExpression(objMemberAccessNode);
+                    }
+                    break;
+                case SyntaxTree.EnumAccessNode enumAccessNode:
+                    {
+                        TryCompleteIdenfier(enumAccessNode.enumTypeNode);
+                        AnalyzeTypeExpression(enumAccessNode);
                     }
                     break;
                 case SyntaxTree.ThisNode thisObjNode:
@@ -3185,6 +3269,11 @@ namespace Gizbox.SemanticRule
 
         private bool IsSupportedSwitchType(string typeExpr)
         {
+            //switch-case支持枚举值  
+            if(GType.Parse(typeExpr).IsEnumType)
+                return true;
+
+            //switch-case支持整型   
             switch(NormalizeTypeExprForTypeCheck(typeExpr))
             {
                 case "bool":
@@ -3200,14 +3289,14 @@ namespace Gizbox.SemanticRule
             }
         }
 
+
         private bool TryGetSwitchCaseConstantKey(SyntaxTree.ExprNode exprNode, out string caseKey)
         {
             if(exprNode == null)
-            {
+            { 
                 caseKey = null;
                 return false;
             }
-
             if(exprNode.overrideNode is SyntaxTree.ExprNode overrideExpr)
                 return TryGetSwitchCaseConstantKey(overrideExpr, out caseKey);
 
@@ -3215,6 +3304,20 @@ namespace Gizbox.SemanticRule
             {
                 caseKey = NormalizeTypeExprForTypeCheck(AnalyzeTypeExpression(literalNode)) + ":" + literalNode.token.attribute;
                 return true;
+            }
+
+            //枚举的switch-case-key  
+            if(exprNode is SyntaxTree.EnumAccessNode accessNode
+                && accessNode.attributes.TryGetValue(AstAttr.enum_rec, out var enumRecObj)
+                && enumRecObj is SymbolTable.Record enumRec
+                && enumRec.envPtr != null)
+            {
+                var memberRec = enumRec.envPtr.records.Values.FirstOrDefault(r => r.rawname == accessNode.memberNode.FullName);
+                if(memberRec != null)
+                {
+                    caseKey = NormalizeTypeExprForTypeCheck(AnalyzeTypeExpression(accessNode)) + ":" + memberRec.initValue;
+                    return true;
+                }
             }
 
             caseKey = null;
@@ -4177,25 +4280,49 @@ namespace Gizbox.SemanticRule
                     }
                     break;
 
-
                 case SyntaxTree.ObjectMemberAccessNode accessNode:
                     {
                         var classTypeExpression = GetValueTypeExpression(AnalyzeTypeExpression(accessNode.objectNode));
                         GType classType = GType.Parse(classTypeExpression);
+                        if(classType.IsEnumType)
+                        {
+                            var enumRec = Query(classType.ObjectTypeName);
+                            if(enumRec == null || enumRec.envPtr == null)
+                                throw new SemanticException(ExceptioName.ClassNameNotFound, accessNode.objectNode, classType.ObjectTypeName);
+
+                            var memberRec = enumRec.envPtr.records.Values.FirstOrDefault(r => r.rawname == accessNode.memberNode.FullName);
+                            if(memberRec == null)
+                                throw new SemanticException(ExceptioName.MemberFieldNotFound, accessNode.objectNode, accessNode.memberNode.FullName);
+
+                            accessNode.attributes[AstAttr.enum_rec] = enumRec;
+                            accessNode.attributes[AstAttr.klass] = classTypeExpression;
+                            accessNode.attributes[AstAttr.member_name] = accessNode.memberNode.FullName;
+
+                            nodeTypeExprssion = memberRec.typeExpression;
+                            break;
+                        }
 
                         var classRec = Query(classType.ObjectTypeName);
-                        if (classRec == null) throw new SemanticException(ExceptioName.ClassNameNotFound, accessNode.objectNode, classType.ObjectTypeName);
+                        if(classRec == null)
+                            throw new SemanticException(ExceptioName.ClassNameNotFound, accessNode.objectNode, classType.ObjectTypeName);
 
                         var classEnv = classRec.envPtr;
-                        if (classEnv == null) throw new SemanticException(ExceptioName.ClassScopeNotFound, accessNode.objectNode, "");
+                        if(classEnv == null)
+                            throw new SemanticException(ExceptioName.ClassScopeNotFound, accessNode.objectNode, "");
 
-                        var memberRec = classEnv.Class_GetMemberRecordInChainByRawname(accessNode.memberNode.FullName);//使用RawName以防找不到成员为函数时找不到    
-                        if (memberRec == null) throw new SemanticException(ExceptioName.MemberFieldNotFound, accessNode.objectNode, accessNode.memberNode.FullName);
+                        var memberRec2 = classEnv.Class_GetMemberRecordInChainByRawname(accessNode.memberNode.FullName);
+                        if(memberRec2 == null)
+                            throw new SemanticException(ExceptioName.MemberFieldNotFound, accessNode.objectNode, accessNode.memberNode.FullName);
 
-                        accessNode.attributes[AstAttr.klass] = classTypeExpression;//记录memberAccess节点的点左边类型
-                        accessNode.attributes[AstAttr.member_name] = accessNode.memberNode.FullName;//记录memberAccess节点的点右边名称
+                        accessNode.attributes[AstAttr.klass] = classTypeExpression;
+                        accessNode.attributes[AstAttr.member_name] = accessNode.memberNode.FullName;
 
-                        nodeTypeExprssion = memberRec.typeExpression;
+                        nodeTypeExprssion = memberRec2.typeExpression;
+                    }
+                    break;
+                case SyntaxTree.EnumAccessNode enumValueAccessNode:
+                    {
+                        nodeTypeExprssion = $"(enum){enumValueAccessNode.enumTypeNode.FullName}";
                     }
                     break;
                 case SyntaxTree.ElementAccessNode eleAccessNode:
@@ -4521,6 +4648,9 @@ namespace Gizbox.SemanticRule
             if(t.IsClassType || t.IsStructType)
                 return t.ObjectTypeName;
 
+            if(t.IsEnumType)
+                return "(enum)" + t.ObjectTypeName;
+
             if(t.IsArray)
                 return NormalizeTypeExprForTypeCheck(t.ArrayElementType.ToString()) + "[]";
 
@@ -4573,6 +4703,11 @@ namespace Gizbox.SemanticRule
                 var n = t.ObjectTypeName;
                 var size = t.Size;
                 return $"(struct:{size}){n}";
+            }
+
+            if(t.IsEnumType)
+            {
+                return $"(enum){t.ObjectTypeName}";
             }
 
             if(t.IsClassType)
@@ -4933,6 +5068,10 @@ namespace Gizbox.SemanticRule
                         {
                             namedTypeNode.Complate(true, (int)rec.size);
                         }
+                        else if(rec != null && rec.category == SymbolTable.RecordCatagory.Enum)
+                        {
+                            namedTypeNode.Complate(false, 0, true);
+                        }
                         else
                         {
                             namedTypeNode.Complate(false);
@@ -5147,6 +5286,89 @@ namespace Gizbox.SemanticRule
             return classTypeNode;
         }
 
+        //解析枚举成员的整型常量值  
+        private int ParseEnumMemberValue(SyntaxTree.EnumMemberNode memberNode)
+        {
+            string DealNumStr(string num)
+            {
+                StringBuilder strb = new StringBuilder();
+                foreach(char c in num)
+                {
+                    if(char.IsDigit(c))
+                        strb.Append(c);
+                    else if(c == '.')
+                        strb.Append(c);
+                }
+                return strb.ToString();
+            }
+
+            var token = memberNode?.valueNode?.token;
+            if(token == null)
+                throw new SemanticException(ExceptioName.SemanticAnalysysError, memberNode, "enum member value is missing.");
+            try
+            {
+                checked
+                {
+                    switch(token.name)
+                    {
+                        case "LITINT":
+                            return int.Parse(token.attribute);
+
+                        case "LITUINT":
+                            {
+                                uint v = uint.Parse(DealNumStr(token.attribute));
+                                return (int)v;
+                            }
+
+                        case "LITLONG":
+                            {
+                                long v = long.Parse(DealNumStr(token.attribute));
+                                return (int)v;
+                            }
+
+                        case "LITULONG":
+                            {
+                                string raw = DealNumStr(token.attribute);
+                                ulong v = ulong.Parse(raw);
+                                return (int)v;
+                            }
+
+                        case "LITCHAR":
+                            {
+                                string raw = token.attribute;
+                                if(raw.Length >= 3 && raw[0] == '\'' && raw[raw.Length - 1] == '\'')
+                                {
+                                    string content = raw.Substring(1, raw.Length - 2);
+                                    if(content.Length == 1)
+                                        return content[0];
+
+                                    if(content.Length == 2 && content[0] == '\\')
+                                    {
+                                        return content[1] switch
+                                        {
+                                            '0' => '\0',
+                                            'n' => '\n',
+                                            'r' => '\r',
+                                            't' => '\t',
+                                            '\\' => '\\',
+                                            '\'' => '\'',
+                                            '"' => '"',
+                                            _ => content[1],
+                                        };
+                                    }
+                                }
+                                break;
+                            }
+                    }
+                }
+            }
+            catch(OverflowException)
+            {
+                throw new SemanticException(ExceptioName.SemanticAnalysysError, memberNode, "enum member value overflow.");
+            }
+
+            throw new SemanticException(ExceptioName.SemanticAnalysysError, memberNode, "enum member only supports int-compatible literal values.");
+        }
 
         private bool CheckIntrinsicCall(SyntaxTree.CallNode callNode, out SyntaxTree.Node replace)
         {

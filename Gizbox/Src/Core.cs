@@ -96,6 +96,7 @@ namespace Gizbox
             Function,
             Class,
             Struct,
+            Enum,
             Other
         }
         public enum TableCatagory
@@ -577,6 +578,7 @@ namespace Gizbox
             String,
             Object, //引用类型
             Struct, //值类型结构体
+            Enum, //枚举类型
             Ref, //按地址别名
             Array, //数组类型
             Function, //函数类型
@@ -709,6 +711,10 @@ namespace Gizbox
                         type._Kind = Kind.Struct;
                         type._ObjectTypeName = normalizedExpr;
                         break;
+                    case Kind.Enum:
+                        type._Kind = Kind.Enum;
+                        type._ObjectTypeName = normalizedExpr;
+                        break;
                     case Kind.Object:
                         if(type._Kind == Kind.Object || type._Kind == Kind.Struct)
                         {
@@ -768,6 +774,12 @@ namespace Gizbox
             {
                 explicitKind = Kind.Struct;
                 return typeExpression.Substring("(struct)".Length).Trim();
+            }
+
+            if(typeExpression.StartsWith("(enum)"))
+            {
+                explicitKind = Kind.Enum;
+                return typeExpression.Substring("(enum)".Length).Trim();
             }
 
             if(typeExpression.StartsWith("(primitive)"))
@@ -881,6 +893,7 @@ namespace Gizbox
                     Kind.String => 8,
                     Kind.Object => 8,
                     Kind.Struct => _ExplicitSize > 0 ? _ExplicitSize : 8,
+                    Kind.Enum => 4,
                     Kind.Ref => 8,
                     Kind.Array => 8,
                     Kind.Function => 8,
@@ -908,6 +921,7 @@ namespace Gizbox
                     Kind.String => 8,
                     Kind.Object => 8,
                     Kind.Struct => _ExplicitSize > 0 ? Math.Min(_ExplicitSize, 8) : 8,
+                    Kind.Enum => 4,
                     Kind.Ref => 8,
                     Kind.Array => 8,
                     Kind.Function => 8,
@@ -989,7 +1003,9 @@ namespace Gizbox
         public bool IsRefType => _Kind == Kind.Ref;
 
         public bool IsStructType => _Kind == Kind.Struct;
-
+        
+        public bool IsEnumType => _Kind == Kind.Enum;
+        
         public bool IsArray
         {
             get => _Kind == Kind.Array;
@@ -1032,7 +1048,7 @@ namespace Gizbox
         {
             get
             {
-                return _Kind == Kind.Byte || _Kind == Kind.Int || _Kind == Kind.UInt || _Kind == Kind.Long || _Kind == Kind.ULong;
+                return _Kind == Kind.Byte || _Kind == Kind.Int || _Kind == Kind.UInt || _Kind == Kind.Long || _Kind == Kind.ULong || _Kind == Kind.Enum;
             }
         }
 
@@ -1040,7 +1056,7 @@ namespace Gizbox
         {
             get
             {
-                return _Kind == Kind.Int || _Kind == Kind.Long || _Kind == Kind.Float || _Kind == Kind.Double;
+                return _Kind == Kind.Int || _Kind == Kind.Long || _Kind == Kind.Float || _Kind == Kind.Double || _Kind == Kind.Enum;
             }
         }
 
@@ -1188,6 +1204,8 @@ namespace Gizbox
                 GType.Kind.Double => "0d",
                 GType.Kind.Bool => "false",
                 GType.Kind.Char => "'\\0'",
+
+                GType.Kind.Enum => "0",
                 _ => "null"
             };
         }
@@ -1207,6 +1225,8 @@ namespace Gizbox
                 GType.Kind.Char => "LITCHAR",
                 GType.Kind.Bool => "LITBOOL",
                 GType.Kind.String => "LITSTRING",
+
+                GType.Kind.Enum => "LITINT",
                 _ => "null"
             };
         }

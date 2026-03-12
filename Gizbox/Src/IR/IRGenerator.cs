@@ -89,18 +89,6 @@ namespace Gizbox.IR
                         GenNode(programNode.statementsNode);
                     }
                     break;
-                case StructDeclareNode structDeclNode:
-                    {
-                        envStackTemp.Push(structDeclNode.attributes[AstAttr.env] as SymbolTable);
-                        EnvBegin(structDeclNode.attributes[AstAttr.env] as SymbolTable);
-
-                        EmitCode("").label = "struct_begin:" + structDeclNode.structNameNode.FullName;
-                        EmitCode("").label = "struct_end:" + structDeclNode.structNameNode.FullName;
-
-                        EnvEnd(structDeclNode.attributes[AstAttr.env] as SymbolTable);
-                        envStackTemp.Pop();
-                    }
-                    break;
                 case NamespaceNode namespaceNode:
                     {
                         GenNode(namespaceNode.stmtsNode);
@@ -203,6 +191,29 @@ namespace Gizbox.IR
                         EmitCode("").label = "class_end:" + className;
 
                         EnvEnd(classDeclNode.attributes[AstAttr.env] as SymbolTable);
+                        envStackTemp.Pop();
+                    }
+                    break;
+                case StructDeclareNode structDeclNode:
+                    {
+                        envStackTemp.Push(structDeclNode.attributes[AstAttr.env] as SymbolTable);
+                        EnvBegin(structDeclNode.attributes[AstAttr.env] as SymbolTable);
+
+                        EmitCode("").label = "struct_begin:" + structDeclNode.structNameNode.FullName;
+                        EmitCode("").label = "struct_end:" + structDeclNode.structNameNode.FullName;
+
+                        EnvEnd(structDeclNode.attributes[AstAttr.env] as SymbolTable);
+                        envStackTemp.Pop();
+                    }
+                    break;
+                case EnumDeclareNode enumDeclNode:
+                    {
+                        envStackTemp.Push(enumDeclNode.attributes[AstAttr.env] as SymbolTable);
+                        EnvBegin(enumDeclNode.attributes[AstAttr.env] as SymbolTable);
+                        EmitCode("").label = "enum_begin:" + enumDeclNode.enumNameNode.FullName;
+                        EmitCode("").label = "enum_end:" + enumDeclNode.enumNameNode.FullName;
+
+                        EnvEnd(enumDeclNode.attributes[AstAttr.env] as SymbolTable);
                         envStackTemp.Pop();
                     }
                     break;
@@ -704,6 +715,23 @@ namespace Gizbox.IR
                         SetRet(literalNode, litret);
                     }
                     break;
+                case EnumAccessNode enumAccessNode:
+                    {
+                        SymbolTable.Record enumRec = null;
+                        if(enumAccessNode.attributes.TryGetValue(AstAttr.enum_rec, out var enumRecObj))
+                            enumRec = enumRecObj as SymbolTable.Record;
+
+                        enumRec ??= Query(enumAccessNode.enumTypeNode.FullName);
+                        if(enumRec?.envPtr == null)
+                            throw new SemanticException(ExceptioName.SemanticAnalysysError, enumAccessNode, "enum type not found.");
+
+                        var memberRec = enumRec.envPtr.records.Values.FirstOrDefault(r => r.rawname == enumAccessNode.memberNode.FullName);
+                        if(memberRec == null)
+                            throw new SemanticException(ExceptioName.SemanticAnalysysError, enumAccessNode, "enum member not found.");
+
+                        SetRet(enumAccessNode, "%LITINT:" + memberRec.initValue);
+                    }
+                    break;
                 case DefaultValueNode defaultNode:
                     {
                         string typeExpr = defaultNode.typeNode.TypeExpression();
@@ -750,14 +778,11 @@ namespace Gizbox.IR
                         }
                         else
                         {
-                            // 右值：读一次到临时变量，返回该临时
                             string valueType = (string)objMemberAccess.attributes[AstAttr.type];
                             string tmp = NewTemp(valueType);
                             EmitCode("=", tmp, accessExpr);
                             SetRet(objMemberAccess, tmp);
                         }
-
-
                     }
                     break;
                 case CastNode castNode:
@@ -1246,6 +1271,8 @@ namespace Gizbox.IR
                     GenNode(idNode);
                     return GetRet(idNode);
                 case ObjectMemberAccessNode objMemberAccess:
+                    if(objMemberAccess.attributes.ContainsKey(AstAttr.enum_rec))
+	                   throw new GizboxException(ExceptioName.SemanticAnalysysError, "enum member is not addressable.");
                     GenNode(objMemberAccess.objectNode);
                     string objExpr = TrimName(GetRet(objMemberAccess.objectNode));
                     string objTypeExpr = (string)objMemberAccess.objectNode.attributes[AstAttr.type];
@@ -1340,6 +1367,20 @@ namespace Gizbox.IR
 
             if(expr.overrideNode is ExprNode overrideExpr)
                 expr = overrideExpr;
+
+            if(expr is SyntaxTree.EnumAccessNode enumAccessNode)
+            {
+                if(enumAccessNode.attributes.TryGetValue(AstAttr.enum_rec, out var enumRecObj)
+                    && enumRecObj is SymbolTable.Record enumRec
+                    && enumRec.envPtr != null)
+                {
+                    var memberRec = enumRec.envPtr.records.Values.FirstOrDefault(r => r.rawname == enumAccessNode.memberNode.FullName);
+                    if(memberRec != null && decimal.TryParse(memberRec.initValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out sortValue))
+                        return true;
+                }
+
+                return false;
+            }
 
             if(expr is not LiteralNode literalNode)
                 return false;
@@ -1966,6 +2007,9 @@ namespace Gizbox.IR
                     return "%LITNULL:";
                 case GType.Kind.Struct:
                     return "%LITDEFAULT:" + typeExpr;
+
+                case GType.Kind.Enum:
+                    return "%LITINT:0";
             }
 
             return "%LITNULL:";

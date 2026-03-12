@@ -108,6 +108,7 @@ namespace Gizbox
             keywords.Add(new TokenPattern("var", "var\\W", 1));
             keywords.Add(new TokenPattern("class", "class\\W", 1));
             keywords.Add(new TokenPattern("struct", "struct\\W", 1));
+            keywords.Add(new TokenPattern("enum", "enum\\W", 1));
             keywords.Add(new TokenPattern("void", "void\\W", 1));
             keywords.Add(new TokenPattern("bool", "bool\\W", 1));
             keywords.Add(new TokenPattern("byte", "byte\\W", 1));
@@ -395,7 +396,7 @@ namespace Gizbox
                     {
                         tokenName = identifierPattern.tokenName;
                     }
-                    else if(prevToken != null && (prevToken.name == "class" || prevToken.name == "struct"))
+                    else if(prevToken != null && (prevToken.name == "class" || prevToken.name == "struct" || prevToken.name == "enum"))
                     {
                         tokenName = "TYPE_NAME";
 

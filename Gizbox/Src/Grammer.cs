@@ -32,6 +32,10 @@ namespace Gizbox
             "namespaceblock",
             "statementblock",
             "declstatements",
+
+            //枚举
+            "enumitems",
+            "enumitem",
             
             //访问修饰符  
             "acmodif",
@@ -86,6 +90,7 @@ namespace Gizbox
             "cast",
             "lvalue",
             "memberaccess",
+            "enumvalueaccess",
             "braceinit",
             "kwexpr",
 
@@ -171,6 +176,12 @@ namespace Gizbox
             "declstmt -> class TYPE_NAME genparams inherit { declstatements }",
             "declstmt -> class own TYPE_NAME genparams inherit { declstatements }",
             "declstmt -> struct TYPE_NAME { declstatements }",
+            "declstmt -> enum TYPE_NAME { enumitems }",
+
+            "enumitems -> enumitems , enumitem",
+            "enumitems -> enumitem",
+            "enumitems -> ε",
+            "enumitem -> ID = lit",
 
             "declstmt -> acmodif :",
 
@@ -275,6 +286,7 @@ namespace Gizbox
             "primary -> ID",
             "primary -> this",
             "primary -> memberaccess",
+            "primary -> enumvalueaccess",
             "primary -> indexaccess",
             "primary -> call",
             "primary -> newobj",
@@ -304,6 +316,7 @@ namespace Gizbox
             "cast -> ( type ) factor",
 
             "memberaccess -> primary . ID",
+            "enumvalueaccess -> TYPE_NAME . ID",
 
             "kwexpr -> typeof ( type )",
             "kwexpr -> sizeof ( type )",
