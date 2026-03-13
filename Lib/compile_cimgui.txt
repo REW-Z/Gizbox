@@ -1,0 +1,34 @@
+
+# 在 MinGW-w64 (MSYS2) shell 下执行
+# 1) 进入项目目录（替换为你的路径或在 VS 的项目目录下运行）
+cd D:\\Workspace\\imgui\\dear_bindings\\examples
+
+# 2) 创建输出目录
+mkdir -p build
+
+# 3) 编译所有源为对象文件
+CXX=x86_64-w64-mingw32-gcc 
+CXXFLAGS="-O2 -std=c++11 -Wall -I..\\.. -I..\\..\\imgui"  # 根据需要调整 include 路径
+# 编译单个文件示例（为每个源重复或用循环）
+$CXX $CXXFLAGS -c ..\\generated\\dcimgui.cpp -o build\\dcimgui.o
+$CXX $CXXFLAGS -c ..\\generated\\dcimgui_internal.cpp -o build\\dcimgui_internal.o
+$CXX $CXXFLAGS -c ..\\..\\imgui\\imgui.cpp -o build\\imgui.o
+$CXX $CXXFLAGS -c ..\\..\\imgui\\imgui_demo.cpp -o build\\imgui_demo.o
+$CXX $CXXFLAGS -c ..\\..\\imgui\\imgui_draw.cpp -o build\\imgui_draw.o
+$CXX $CXXFLAGS -c ..\\..\\imgui\\imgui_tables.cpp -o build\\imgui_tables.o
+$CXX $CXXFLAGS -c ..\\..\\imgui\\imgui_widgets.cpp -o build\\imgui_widgets.o
+
+# 或者用循环批量编译（更简洁）
+# SRC="..\\generated\\dcimgui.cpp ..\\generated\\dcimgui_internal.cpp ..\\..\\imgui\\imgui.cpp ..\\..\\imgui\\imgui_demo.cpp ..\\..\\imgui\\imgui_draw.cpp ..\\..\\imgui\\imgui_tables.cpp ..\\..\\imgui\\imgui_widgets.cpp"
+# for s in $SRC; do $CXX $CXXFLAGS -c "$s" -o build\\$(basename "${s%.*}").o; done
+
+# 4) 打包为静态库
+ar rcs build/libImGuiLib.a build/*.o
+
+# 5) (可选) 生成动态库（DLL）及其 import lib
+$CXX -shared -o ImGuiLib.dll build\\*.o -Wl,--out-implib,libImGuiLib.dll.a
+# 注意：若需要链接系统库（例如用户界面\\渲染），在上面添加诸如 -lopengl32 -luser32 -lgdi32 -lSDL2 等
+
+# 6) 验证
+echo "静态库: $(pwd)\\libImGuiLib.a"
+echo "动态库(可选): $(pwd)\\ImGuiLib.dll"

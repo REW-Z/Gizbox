@@ -1,0 +1,15 @@
+﻿import <"core">  
+import <"stdlib">  
+
+using Core;  
+using Console;
+using Collections;
+
+void main()
+{
+	long a = (1L + 3L) << 2;
+	Console::PrintLn("a = " + (string)a);
+
+	Console::PrintLn("Test finished!");
+	Console::ReadLn();
+}

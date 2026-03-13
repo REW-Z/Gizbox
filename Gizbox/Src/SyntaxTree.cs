@@ -169,7 +169,7 @@ namespace Gizbox
         [KnownType(typeof(ArgumentListNode))]
         [KnownType(typeof(ParameterListNode))]
         [KnownType(typeof(ParameterNode))]
-        public abstract class Node 
+        public abstract class Node
         {
             [DataMember]
             protected List<Node> children_group_0; //可选附加节点列表1
@@ -203,10 +203,10 @@ namespace Gizbox
                     return this.parent;
                 }
 
-                set 
+                set
                 {
                     this.parent = value;
-                    
+
                     if(this.parent != null)
                     {
                         this.depth = this.parent.depth + 1;
@@ -218,7 +218,7 @@ namespace Gizbox
             public int ChildCount
             {
                 get
-                { 
+                {
                     int count = 0;
                     if(this.children_group_0 != null)
                     {
@@ -351,7 +351,7 @@ namespace Gizbox
                 if(this is PrimitiveTypeNode primitiveTypeNode)
                     return primitiveTypeNode.token;
 
-                for(int i = 0 ; i < ChildCount; i++)
+                for(int i = 0; i < ChildCount; i++)
                 {
                     this.startToken = GetChild(i).StartToken();
                     if(this.startToken != null)
@@ -423,6 +423,7 @@ namespace Gizbox
 
                 return clone;
             }
+
         }
 
         private static List<Node> CloneChildrenGroup(List<Node> source, List<Node> target, Dictionary<Node, Node> visited, Node parent)
@@ -563,6 +564,7 @@ namespace Gizbox
         public class ChildList<T> where T : Node
         {
             private List<Node> container;
+
             public ChildList(List<Node> c)
             {
                 container = c;
@@ -651,8 +653,13 @@ namespace Gizbox
         [DataContract(IsReference = true)]
         public class ProgramNode : Node
         {
-            public readonly ChildList<ImportNode> importNodes;
-            public readonly ChildList<UsingNode> usingNamespaceNodes;
+            [IgnoreDataMember]
+            private ChildList<ImportNode> _importNodes;
+            [IgnoreDataMember]
+            private ChildList<UsingNode> _usingNamespaceNodes;
+
+            public ChildList<ImportNode> importNodes => _importNodes ??= new ChildList<ImportNode>(children_group_0);
+            public ChildList<UsingNode> usingNamespaceNodes => _usingNamespaceNodes ??= new ChildList<UsingNode>(children_group_1);
             public StatementsNode statementsNode { get => (StatementsNode)children_group_2[0]; set => children_group_2[0] = value; }
 
             public ProgramNode()
@@ -661,9 +668,6 @@ namespace Gizbox
                 children_group_1 = new();
                 children_group_2 = new();
                 children_group_2.Add(null);
-
-                importNodes = new ChildList<ImportNode>(children_group_0);
-                usingNamespaceNodes = new ChildList<UsingNode>(children_group_1);
             }
         }
 
@@ -683,24 +687,28 @@ namespace Gizbox
         [DataContract(IsReference = true)]
         public class StatementsNode : Node
         {
-            public readonly ChildList<StmtNode> statements;
+            [IgnoreDataMember]
+            private ChildList<StmtNode> _statements;
+
+            public ChildList<StmtNode> statements => _statements ??= new ChildList<StmtNode>(children_group_0);
 
             public StatementsNode()
             {
                 children_group_0 = new();
-                statements = new ChildList<StmtNode>(children_group_0);
             }
         }
 
         [DataContract(IsReference = true)]
         public class StatementBlockNode : StmtNode
         {
-            public readonly ChildList<StmtNode> statements;
+            [IgnoreDataMember]
+            private ChildList<StmtNode> _statements;
+
+            public ChildList<StmtNode> statements => _statements ??= new ChildList<StmtNode>(children_group_0);
 
             public StatementBlockNode()
             {
                 children_group_0 = new();
-                statements = new ChildList<StmtNode>(children_group_0);
             }
         }
 
@@ -743,7 +751,7 @@ namespace Gizbox
         {
             public TypeNode typeNode { get => (TypeNode)children_group_0[0]; set => children_group_0[0] = value; }
             public IdentityNode identifierNode { get => (IdentityNode)children_group_0[1]; set => children_group_0[1] = value; }
-            public LiteralNode litValNode { get => (LiteralNode)children_group_0[2]; set => children_group_0[2] = value; }
+            public ExprNode litValNode { get => (ExprNode)children_group_0[2]; set => children_group_0[2] = value; }
 
             public ConstantDeclareNode()
             {
@@ -849,7 +857,10 @@ namespace Gizbox
 
             public IdentityNode classNameNode { get => (IdentityNode)children_group_0[0]; set => children_group_0[0] = value; }
             public IdentityNode baseClassNameNode { get => (IdentityNode)children_group_0[1]; set => children_group_0[1] = value; }
-            public readonly ChildList<DeclareNode> memberDelareNodes;
+            [IgnoreDataMember]
+            private ChildList<DeclareNode> _memberDelareNodes;
+
+            public ChildList<DeclareNode> memberDelareNodes => _memberDelareNodes ??= new ChildList<DeclareNode>(children_group_1);
 
             public ClassDeclareNode()
             {
@@ -857,7 +868,6 @@ namespace Gizbox
                 children_group_0.Add(null);
                 children_group_0.Add(null);
                 children_group_1 = new();
-                memberDelareNodes = new ChildList<DeclareNode>(children_group_1);
             }
 
         }
@@ -866,14 +876,17 @@ namespace Gizbox
         public class StructDeclareNode : DeclareNode
         {
             public IdentityNode structNameNode { get => (IdentityNode)children_group_0[0]; set => children_group_0[0] = value; }
-            public readonly ChildList<DeclareNode> memberDelareNodes;
+
+            [IgnoreDataMember]
+            private ChildList<DeclareNode> _memberDelareNodes;
+
+            public ChildList<DeclareNode> memberDelareNodes => _memberDelareNodes ??= new ChildList<DeclareNode>(children_group_1);
 
             public StructDeclareNode()
             {
                 children_group_0 = new();
                 children_group_0.Add(null);
                 children_group_1 = new();
-                memberDelareNodes = new ChildList<DeclareNode>(children_group_1);
             }
         }
 
@@ -882,14 +895,17 @@ namespace Gizbox
         public class EnumDeclareNode : DeclareNode
         {
             public IdentityNode enumNameNode { get => (IdentityNode)children_group_0[0]; set => children_group_0[0] = value; }
-            public readonly ChildList<EnumMemberNode> memberNodes;
+
+            [IgnoreDataMember]
+            private ChildList<EnumMemberNode> _memberNodes;
+
+            public ChildList<EnumMemberNode> memberNodes => _memberNodes ??= new ChildList<EnumMemberNode>(children_group_1);
 
             public EnumDeclareNode()
             {
                 children_group_0 = new();
                 children_group_0.Add(null);
                 children_group_1 = new();
-                memberNodes = new ChildList<EnumMemberNode>(children_group_1);
             }
         }
 
@@ -1023,14 +1039,16 @@ namespace Gizbox
         [DataContract(IsReference = true)]
         public class IfStmtNode : StmtNode
         {
-            public readonly ChildList<ConditionClauseNode> conditionClauseList;
+            [IgnoreDataMember]
+            private ChildList<ConditionClauseNode> _conditionClauseList;
+
+            public ChildList<ConditionClauseNode> conditionClauseList => _conditionClauseList ??= new ChildList<ConditionClauseNode>(children_group_0);
 
             public ElseClauseNode elseClause { get => (ElseClauseNode)children_group_1[0]; set => children_group_1[0] = value; }
 
             public IfStmtNode()
             {
                 children_group_0 = new();
-                conditionClauseList = new ChildList<ConditionClauseNode>(children_group_0);
                 children_group_1 = new();
                 children_group_1.Add(null);
             }
@@ -1040,14 +1058,16 @@ namespace Gizbox
         public class SwitchStmtNode : StmtNode
         {
             public ExprNode conditionNode { get => (ExprNode)children_group_0[0]; set => children_group_0[0] = value; }
-            public readonly ChildList<SwitchCaseNode> caseNodes;
+            [IgnoreDataMember]
+            private ChildList<SwitchCaseNode> _caseNodes;
+
+            public ChildList<SwitchCaseNode> caseNodes => _caseNodes ??= new ChildList<SwitchCaseNode>(children_group_1);
 
             public SwitchStmtNode()
             {
                 children_group_0 = new();
                 children_group_0.Add(null);
                 children_group_1 = new();
-                caseNodes = new ChildList<SwitchCaseNode>(children_group_1);
             }
         }
 
@@ -1176,12 +1196,14 @@ namespace Gizbox
         [DataContract(IsReference = true)]
         public class BraceInitializerNode : ExprNode
         {
-            public readonly ChildList<ExprNode> fieldExprNodes;
+            [IgnoreDataMember]
+            private ChildList<ExprNode> _fieldExprNodes;
+
+            public ChildList<ExprNode> fieldExprNodes => _fieldExprNodes ??= new ChildList<ExprNode>(children_group_0);
 
             public BraceInitializerNode()
             {
                 children_group_0 = new();
-                fieldExprNodes = new ChildList<ExprNode>(children_group_0);
             }
         }
 
@@ -1514,12 +1536,13 @@ namespace Gizbox
                 this.isStructType = isstruct;
                 this.isEnumType = isenum;
                 this.structSize = size;
+                this.isCompleted = true;
             }
 
 
             public override string TypeExpression()
             {
-                if(isCompleted)
+                if(isCompleted == false)
                     throw new SemanticException(ExceptioName.SemanticAnalysysError, this, "namedType not complete.");
 
                 string rawTypeName;
@@ -1593,24 +1616,28 @@ namespace Gizbox
         [DataContract(IsReference = true)]
         public class ArgumentListNode : Node
         {
-            public readonly ChildList<ExprNode> arguments;
+            [IgnoreDataMember]
+            private ChildList<ExprNode> _arguments;
+
+            public ChildList<ExprNode> arguments => _arguments ??= new ChildList<ExprNode>(children_group_0);
 
             public ArgumentListNode()
             {
                 children_group_0 = new();
-                arguments = new ChildList<ExprNode>(children_group_0);
             }
         }
 
         [DataContract(IsReference = true)]
         public class ParameterListNode : Node
         {
-            public readonly ChildList<ParameterNode> parameterNodes;
+            [IgnoreDataMember]
+            private ChildList<ParameterNode> _parameterNodes;
+
+            public ChildList<ParameterNode> parameterNodes => _parameterNodes ??= new ChildList<ParameterNode>(children_group_0);
 
             public ParameterListNode()
             {
                 children_group_0 = new();
-                parameterNodes = new ChildList<ParameterNode>(children_group_0);
             }
         }
 

@@ -162,7 +162,7 @@ namespace Gizbox
 
             "declstmt -> decltype ID = expr ;",
             "declstmt -> decltype ID = braceinit ;",
-            "declstmt -> const decltype ID = lit ;",
+            "declstmt -> const decltype ID = aexpr ;",
 
             "declstmt -> decltype ID = capture ( ID ) ;",
             "declstmt -> decltype ID = leak ( ID ) ;",

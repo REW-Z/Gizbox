@@ -307,6 +307,13 @@ namespace Gizbox.Src.Backend
                             classDict.Add(k, r);
                             break;
                         case SymbolTable.RecordCatagory.Function:
+                            {
+                                if(k.Contains("Math::Sin"))
+                                {
+                                    Console.WriteLine(this.ir.name);
+                                    Console.WriteLine(unit.name);
+                                }
+                            }
                             funcDict.Add(k, r);
                             break;
                     }

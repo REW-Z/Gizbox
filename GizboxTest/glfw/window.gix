@@ -16,17 +16,14 @@ extern void glfwSetWindowShouldClose(ulong window, int value);
 
 void main()
 {
-    Window w = new Window();
-    delete w;
-
-
+    // 初始化 GLFW
     if (!glfwInit())
     {
         Console::PrintLn("Failed to initialize GLFW");
         return;
     }
-
-    string title = "Gizbox GLFW Test";
+    
+    string title = "Gizbox GLFW";
     ulong window = glfwCreateWindow(800, 600, title, 0ul, 0ul);
     if (window == 0ul)
     {
@@ -34,25 +31,19 @@ void main()
         glfwTerminate();
         return;
     }
-
+    
+    // 创建并设置 GL 上下文
     glfwMakeContextCurrent(window);
 
+
+    // 主循环
     while (glfwWindowShouldClose(window) == 0)
     {
-        // 处理事件并交换缓冲区
         glfwPollEvents();
         glfwSwapBuffers(window);
     }
-
+    
+    // 清理 
     glfwDestroyWindow(window);
     glfwTerminate();
-}
-
-
-class Window 
-{
-    ~Window()
-    {
-        Console::PrintLn("GLFWWindow destructor called");
-    }
 }

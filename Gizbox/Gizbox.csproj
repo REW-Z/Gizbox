@@ -11,6 +11,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="cimgui_gizbox.c">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="corert.c">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

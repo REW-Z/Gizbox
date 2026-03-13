@@ -1,0 +1,466 @@
+﻿import <"core">
+
+using ImGui;
+
+struct ImVec2
+{
+    float x = 0.0f;
+    float y = 0.0f;
+}
+
+struct ImVec4
+{
+    float x = 0.0f;
+    float y = 0.0f;
+    float z = 0.0f;
+    float w = 0.0f;
+}
+
+struct ImGuiBoolResultRaw
+{
+    int changed = 0;
+    int value = 0;
+}
+
+struct ImGuiFloatResultRaw
+{
+    int changed = 0;
+    float value = 0.0f;
+}
+
+struct ImGuiIntResultRaw
+{
+    int changed = 0;
+    int value = 0;
+}
+
+extern ulong Gizbox_ImGui_CreateContext();
+extern void Gizbox_ImGui_DestroyContext(ulong ctx);
+extern ulong Gizbox_ImGui_GetCurrentContext();
+extern void Gizbox_ImGui_SetCurrentContext(ulong ctx);
+extern ulong Gizbox_ImGui_GetIO();
+extern ulong Gizbox_ImGui_GetDrawData();
+extern string Gizbox_ImGui_GetVersion();
+
+extern void Gizbox_ImGui_StyleColorsDark();
+extern void Gizbox_ImGui_NewFrame();
+extern void Gizbox_ImGui_EndFrame();
+extern void Gizbox_ImGui_Render();
+extern void Gizbox_ImGui_ShowDemoWindow();
+
+extern void Gizbox_ImGui_SetNextWindowPos(ImVec2 pos, int cond);
+extern void Gizbox_ImGui_SetNextWindowSize(ImVec2 size, int cond);
+
+extern void Gizbox_ImGui_SetDisplaySize(ImVec2 size, int cond);
+
+extern int Gizbox_ImGui_Begin(string name, int flags);
+extern void Gizbox_ImGui_End();
+
+extern int Gizbox_ImGui_BeginChild(string str_id, ImVec2 size, int child_flags, int window_flags);
+extern void Gizbox_ImGui_EndChild();
+
+extern void Gizbox_ImGui_Text(string text);
+extern int Gizbox_ImGui_Button(string label);
+extern int Gizbox_ImGui_ButtonEx(string label, ImVec2 size);
+extern ImGuiBoolResultRaw Gizbox_ImGui_Checkbox(string label, int value);
+extern ImGuiFloatResultRaw Gizbox_ImGui_InputFloat(string label, float value);
+extern ImGuiIntResultRaw Gizbox_ImGui_InputInt(string label, int value);
+extern ImGuiFloatResultRaw Gizbox_ImGui_SliderFloat(string label, float value, float min_value, float max_value);
+
+extern void Gizbox_ImGui_Separator();
+extern void Gizbox_ImGui_SameLine(float offset_from_start_x, float spacing);
+extern void Gizbox_ImGui_NewLine();
+extern void Gizbox_ImGui_Dummy(ImVec2 size);
+
+extern ImVec2 Gizbox_ImGui_GetContentRegionAvail();
+extern ImVec2 Gizbox_ImGui_GetCursorScreenPos();
+extern void Gizbox_ImGui_SetCursorScreenPos(ImVec2 pos);
+extern int Gizbox_ImGui_IsItemHovered(int flags);
+extern uint Gizbox_ImGui_GetColorU32(ImVec4 color);
+extern ImVec2 Gizbox_ImGui_CalcTextSize(string text);
+
+extern ulong Gizbox_ImGui_GetWindowDrawList();
+extern ulong Gizbox_ImGui_GetForegroundDrawList();
+extern ulong Gizbox_ImGui_GetBackgroundDrawList();
+
+extern void Gizbox_ImDrawList_AddLine(ulong draw_list, ImVec2 p1, ImVec2 p2, uint col, float thickness);
+extern void Gizbox_ImDrawList_AddRect(ulong draw_list, ImVec2 p_min, ImVec2 p_max, uint col, float rounding, int flags, float thickness);
+extern void Gizbox_ImDrawList_AddRectFilled(ulong draw_list, ImVec2 p_min, ImVec2 p_max, uint col, float rounding, int flags);
+extern void Gizbox_ImDrawList_AddCircle(ulong draw_list, ImVec2 center, float radius, uint col, int num_segments, float thickness);
+extern void Gizbox_ImDrawList_AddCircleFilled(ulong draw_list, ImVec2 center, float radius, uint col, int num_segments);
+extern void Gizbox_ImDrawList_AddText(ulong draw_list, ImVec2 pos, uint col, string text);
+
+
+namespace ImGui::WindowFlags
+{
+    const int None = 0;
+    const int NoTitleBar = 1;
+    const int NoResize = 2;
+    const int NoMove = 4;
+    const int NoScrollbar = 8;
+    const int NoCollapse = 32;
+    const int AlwaysAutoResize = 64;
+    const int NoBackground = 128;
+    const int NoSavedSettings = 256;
+    const int MenuBar = 1024;
+}
+
+namespace ImGui::ChildFlags
+{
+    const int None = 0;
+    const int Borders = 1;
+    const int AlwaysUseWindowPadding = 2;
+    const int ResizeX = 4;
+    const int ResizeY = 8;
+    const int AutoResizeX = 16;
+    const int AutoResizeY = 32;
+    const int AlwaysAutoResize = 64;
+    const int FrameStyle = 128;
+}
+
+namespace ImGui::Cond
+{
+    const int None = 0;
+    const int Always = 1;
+    const int Once = 2;
+    const int FirstUseEver = 4;
+    const int Appearing = 8;
+}
+
+namespace ImGui::HoveredFlags
+{
+    const int None = 0;
+    const int AllowWhenBlockedByPopup = 1 << 5;
+    const int AllowWhenBlockedByActiveItem = 1 << 7;
+    const int AllowWhenDisabled = 1 << 10;
+}
+
+namespace ImGui::DrawFlags
+{
+    const int None = 0;
+    const int Closed = 1;
+    const int RoundCornersTopLeft = 1 << 4;
+    const int RoundCornersTopRight = 1 << 5;
+    const int RoundCornersBottomLeft = 1 << 6;
+    const int RoundCornersBottomRight = 1 << 7;
+    const int RoundCornersNone = 1 << 8;
+    const int RoundCornersAll = ImGui::DrawFlags::RoundCornersTopLeft | ImGui::DrawFlags::RoundCornersTopRight | ImGui::DrawFlags::RoundCornersBottomLeft | ImGui::DrawFlags::RoundCornersBottomRight;
+}
+
+
+namespace ImGui
+{
+    struct BoolResult
+    {
+        bool changed = false;
+        bool value = false;
+    }
+
+    struct FloatResult
+    {
+        bool changed = false;
+        float value = 0.0f;
+    }
+
+    struct IntResult
+    {
+        bool changed = false;
+        int value = 0;
+    }
+
+
+    //创建 ImVec2
+    ImVec2 Vec2(float x, float y)
+    {
+        ImVec2 v = { x, y };
+        return v;
+    }
+
+    //创建 ImVec4
+    ImVec4 Vec4(float x, float y, float z, float w)
+    {
+        ImVec4 v = { x, y, z, w };
+        return v;
+    }
+
+    //创建 ImGui 上下文
+    ulong CreateContext()
+    {
+        return Gizbox_ImGui_CreateContext();
+    }
+
+    //销毁 ImGui 上下文
+    void DestroyContext(ulong ctx)
+    {
+        Gizbox_ImGui_DestroyContext(ctx);
+    }
+
+    //获取当前上下文
+    ulong GetCurrentContext()
+    {
+        return Gizbox_ImGui_GetCurrentContext();
+    }
+
+    //设置当前上下文
+    void SetCurrentContext(ulong ctx)
+    {
+        Gizbox_ImGui_SetCurrentContext(ctx);
+    }
+
+    //获取 IO 指针
+    ulong GetIOPtr()
+    {
+        return Gizbox_ImGui_GetIO();
+    }
+
+    //获取 DrawData 指针
+    ulong GetDrawDataPtr()
+    {
+        return Gizbox_ImGui_GetDrawData();
+    }
+
+    //获取版本字符串
+    string GetVersion()
+    {
+        return Gizbox_ImGui_GetVersion();
+    }
+
+    //应用深色主题
+    void StyleColorsDark()
+    {
+        Gizbox_ImGui_StyleColorsDark();
+    }
+
+    //开始新帧
+    void NewFrame()
+    {
+        Gizbox_ImGui_NewFrame();
+    }
+
+    //结束当前帧
+    void EndFrame()
+    {
+        Gizbox_ImGui_EndFrame();
+    }
+
+    //生成渲染数据
+    void Render()
+    {
+        Gizbox_ImGui_Render();
+    }
+
+    //显示 Demo 窗口
+    void ShowDemoWindow()
+    {
+        Gizbox_ImGui_ShowDemoWindow();
+    }
+
+    //设置下一个窗口位置
+    void SetNextWindowPos(ImVec2 pos, int cond)
+    {
+        Gizbox_ImGui_SetNextWindowPos(pos, cond);
+    }
+
+    //设置下一个窗口大小
+    void SetNextWindowSize(ImVec2 size, int cond)
+    {
+        Gizbox_ImGui_SetNextWindowSize(size, cond);
+    }
+
+    //开始一个窗口。即使返回 false，也必须调用 End
+    bool Begin(string name, int flags)
+    {
+        return Gizbox_ImGui_Begin(name, flags) != 0;
+    }
+
+    //结束当前窗口
+    void End()
+    {
+        Gizbox_ImGui_End();
+    }
+
+    //开始子窗口。即使返回 false，也必须调用 EndChild
+    bool BeginChild(string strId, ImVec2 size, int childFlags, int windowFlags)
+    {
+        return Gizbox_ImGui_BeginChild(strId, size, childFlags, windowFlags) != 0;
+    }
+
+    //结束子窗口
+    void EndChild()
+    {
+        Gizbox_ImGui_EndChild();
+    }
+
+    //输出普通文本
+    void Text(string text)
+    {
+        Gizbox_ImGui_Text(text);
+    }
+
+    //按钮
+    bool Button(string label)
+    {
+        return Gizbox_ImGui_Button(label) != 0;
+    }
+
+    //指定尺寸的按钮
+    bool ButtonEx(string label, ImVec2 size)
+    {
+        return Gizbox_ImGui_ButtonEx(label, size) != 0;
+    }
+
+    //复选框。返回是否变化以及新值
+    BoolResult Checkbox(string label, bool value)
+    {
+        var t = 0;
+        if(value)
+            t = 1;
+        else
+            t = 0;
+
+        var raw = Gizbox_ImGui_Checkbox(label, t);
+        BoolResult r = { raw.changed != 0, raw.value != 0 };
+        return r;
+    }
+
+    //浮点输入框。返回是否变化以及新值
+    FloatResult InputFloat(string label, float value)
+    {
+        var raw = Gizbox_ImGui_InputFloat(label, value);
+        FloatResult r = { raw.changed != 0, raw.value };
+        return r;
+    }
+
+    //整数输入框。返回是否变化以及新值
+    IntResult InputInt(string label, int value)
+    {
+        var raw = Gizbox_ImGui_InputInt(label, value);
+        IntResult r = { raw.changed != 0, raw.value };
+        return r;
+    }
+
+    //浮点滑条。返回是否变化以及新值
+    FloatResult SliderFloat(string label, float value, float minValue, float maxValue)
+    {
+        var raw = Gizbox_ImGui_SliderFloat(label, value, minValue, maxValue);
+        FloatResult r = { raw.changed != 0, raw.value };
+        return r;
+    }
+
+    //分隔线
+    void Separator()
+    {
+        Gizbox_ImGui_Separator();
+    }
+
+    //与前一个控件同行
+    void SameLine(float offsetFromStartX, float spacing)
+    {
+        Gizbox_ImGui_SameLine(offsetFromStartX, spacing);
+    }
+
+    //换到新行
+    void NewLine()
+    {
+        Gizbox_ImGui_NewLine();
+    }
+
+    //放置一个占位区域
+    void Dummy(ImVec2 size)
+    {
+        Gizbox_ImGui_Dummy(size);
+    }
+
+    //获取剩余内容区域大小
+    ImVec2 GetContentRegionAvail()
+    {
+        return Gizbox_ImGui_GetContentRegionAvail();
+    }
+
+    //获取当前屏幕坐标光标位置
+    ImVec2 GetCursorScreenPos()
+    {
+        return Gizbox_ImGui_GetCursorScreenPos();
+    }
+
+    //设置当前屏幕坐标光标位置
+    void SetCursorScreenPos(ImVec2 pos)
+    {
+        Gizbox_ImGui_SetCursorScreenPos(pos);
+    }
+
+    //判断上一项是否被悬停
+    bool IsItemHovered(int flags)
+    {
+        return Gizbox_ImGui_IsItemHovered(flags) != 0;
+    }
+
+    //将颜色转换为 U32
+    uint GetColorU32(ImVec4 color)
+    {
+        return Gizbox_ImGui_GetColorU32(color);
+    }
+
+    //计算文本尺寸
+    ImVec2 CalcTextSize(string text)
+    {
+        return Gizbox_ImGui_CalcTextSize(text);
+    }
+
+    //获取当前窗口 DrawList 指针
+    ulong GetWindowDrawList()
+    {
+        return Gizbox_ImGui_GetWindowDrawList();
+    }
+
+    //获取前景 DrawList 指针
+    ulong GetForegroundDrawList()
+    {
+        return Gizbox_ImGui_GetForegroundDrawList();
+    }
+
+    //获取背景 DrawList 指针
+    ulong GetBackgroundDrawList()
+    {
+        return Gizbox_ImGui_GetBackgroundDrawList();
+    }
+}
+
+namespace ImGui::DrawList
+{
+    //绘制直线
+    void AddLine(ulong drawList, ImVec2 p1, ImVec2 p2, uint col, float thickness)
+    {
+        Gizbox_ImDrawList_AddLine(drawList, p1, p2, col, thickness);
+    }
+
+    //绘制空心矩形
+    void AddRect(ulong drawList, ImVec2 pMin, ImVec2 pMax, uint col, float rounding, int flags, float thickness)
+    {
+        Gizbox_ImDrawList_AddRect(drawList, pMin, pMax, col, rounding, flags, thickness);
+    }
+
+    //绘制实心矩形
+    void AddRectFilled(ulong drawList, ImVec2 pMin, ImVec2 pMax, uint col, float rounding, int flags)
+    {
+        Gizbox_ImDrawList_AddRectFilled(drawList, pMin, pMax, col, rounding, flags);
+    }
+
+    //绘制空心圆
+    void AddCircle(ulong drawList, ImVec2 center, float radius, uint col, int numSegments, float thickness)
+    {
+        Gizbox_ImDrawList_AddCircle(drawList, center, radius, col, numSegments, thickness);
+    }
+
+    //绘制实心圆
+    void AddCircleFilled(ulong drawList, ImVec2 center, float radius, uint col, int numSegments)
+    {
+        Gizbox_ImDrawList_AddCircleFilled(drawList, center, radius, col, numSegments);
+    }
+
+    //在 DrawList 上直接绘制文本
+    void AddText(ulong drawList, ImVec2 pos, uint col, string text)
+    {
+        Gizbox_ImDrawList_AddText(drawList, pos, col, text);
+    }
+}

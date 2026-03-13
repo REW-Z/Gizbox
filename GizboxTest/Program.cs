@@ -73,6 +73,7 @@ switch(cmdIdx)
             Console.WriteLine("生成库文件");
             string libsrcCore = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\lib\\core.gix");
             string libsrcStd = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\lib\\stdlib.gix");
+            string libsrcIMGUI = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\lib\\imgui.gix");
             Compiler libCompiler = new Compiler();
             libCompiler.AddLibPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "lib"));
             libCompiler.AddLibPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "test"));
@@ -80,6 +81,7 @@ switch(cmdIdx)
             //libCompiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
             libCompiler.CompileToLib(libsrcCore, "core", AppDomain.CurrentDomain.BaseDirectory + "\\lib\\core.gixlib");
             libCompiler.CompileToLib(libsrcStd, "stdlib", AppDomain.CurrentDomain.BaseDirectory + "\\lib\\stdlib.gixlib");
+            libCompiler.CompileToLib(libsrcIMGUI, "imgui", AppDomain.CurrentDomain.BaseDirectory + "\\lib\\imgui.gixlib");
             return;
         }
         break;
@@ -154,8 +156,8 @@ switch(cmdIdx)
             {
                 buildMode = BuildMode.Debug,
                 platform = Platform.Windows_X64,
-                dlls = new List<string> { "glfw3.dll" },
-                libs = new List<string> { "ImGuiLib.lib" },
+                dlls = new List<string> { "glfw3.dll", "GizboxImgui.dll" },
+                libs = new List<string> { "libGizboxImgui.dll.a" },
             };
 
             //测试脚本Test  

@@ -235,16 +235,18 @@ namespace Gizbox
         }
 
 
-        //查询信息  
+        //访问符号  
         public Record GetRecord(string symbolName)
         {
-            if (records.ContainsKey(symbolName) == false)
+            if(records.ContainsKey(symbolName) == false)
             {
                 this.Print();
                 throw new Exception(this.name + "表中获取不到记录：" + symbolName);
             }
             return records[symbolName];
         }
+
+        //访问符号（原名）  
         public Record GetRecordByRawname(string rawSymbolName)
         {
             foreach (var kv in records)
@@ -253,6 +255,27 @@ namespace Gizbox
             }
             throw new Exception(this.name + "表中获取不到记录原名：" + rawSymbolName);
         }
+
+        //查找符号  
+        public Record FindRecord(string symbolName)
+        {
+            if(records.TryGetValue(symbolName, out var rs))
+            {
+                return rs;
+            }
+            return null; 
+        }
+
+        //查找符号（原名）  
+        public Record FindRecordByRawname(string rawSymbolName)
+        {
+            foreach (var kv in records)
+            {
+                if (kv.Value.rawname == rawSymbolName) return kv.Value;
+            }
+            return null;
+        }
+
         public void GetAllRecordByRawname(string rawSymbolName, List<SymbolTable.Record> result)
         {
             foreach(var kv in records)

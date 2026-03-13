@@ -49,6 +49,8 @@ public partial class SemanticAnalyzer
         if(ast?.rootNode == null)
             return;
 
+        EnsureTemplateSpecializationDependenciesLoaded();
+
         //收集当前模块的模板类定义
         var templatesLocal = new Dictionary<string, SyntaxTree.ClassDeclareNode>();
         CollectClassTemplates(ast.rootNode, templatesLocal);
@@ -196,6 +198,8 @@ public partial class SemanticAnalyzer
     //特化函数模板：收集模板定义、实例化并生成专用函数
     private void SpecializeFunctionTemplates()
     {
+        EnsureTemplateSpecializationDependenciesLoaded();
+
         //收集函数模板定义  
         var templatesLocal = new Dictionary<string, SyntaxTree.FuncDeclareNode>();
         CollectTemplateFunctions(ast.rootNode, templatesLocal);
@@ -373,18 +377,18 @@ public partial class SemanticAnalyzer
 
         foreach(var dep in ilUnit.dependencyLibs)
         {
-            dep.EnsureAst();
-            if(dep.ast?.rootNode?.statementsNode?.statements == null)
-                continue;
-
-            foreach(var stmt in dep.ast.rootNode.statementsNode.statements)
-            {
-                if(stmt is SyntaxTree.FuncDeclareNode funcDecl && !funcDecl.isTemplateFunction && funcDecl.identifierNode.FullName == mangledBaseName)
-                    return true;
-            }
+            var rec = dep.QueryTopSymbol(mangledBaseName);
+            if(rec != null && rec.category == SymbolTable.RecordCatagory.Function)
+                return true;
         }
 
         return false;
+    }
+
+    /// <summary>模板特化前校验依赖库是否已经按名称完整加载。</summary>
+    private void EnsureTemplateSpecializationDependenciesLoaded()
+    {
+        ilUnit.ValidateDependencyLibraries();
     }
 
     private void ApplyFunctionTemplateSpecialization(SyntaxTree.FuncDeclareNode template,
@@ -473,7 +477,8 @@ public partial class SemanticAnalyzer
 
         foreach(var dep in ilUnit.dependencyLibs)
         {
-            if(dep.QueryTopSymbol(mangledName) != null)
+            var rec = dep.QueryTopSymbol(mangledName);
+            if(rec != null && rec.category == SymbolTable.RecordCatagory.Class)
                 return true;
         }
 

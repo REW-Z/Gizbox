@@ -199,8 +199,10 @@ namespace Gizbox.IR
                         envStackTemp.Push(structDeclNode.attributes[AstAttr.env] as SymbolTable);
                         EnvBegin(structDeclNode.attributes[AstAttr.env] as SymbolTable);
 
-                        EmitCode("").label = "struct_begin:" + structDeclNode.structNameNode.FullName;
-                        EmitCode("").label = "struct_end:" + structDeclNode.structNameNode.FullName;
+                        //EmitCode("").label = "struct_begin:" + structDeclNode.structNameNode.FullName;
+                        //EmitCode("").label = "struct_end:" + structDeclNode.structNameNode.FullName;
+                        EmitCode("");//空行确保env的起止行不报错    
+
 
                         EnvEnd(structDeclNode.attributes[AstAttr.env] as SymbolTable);
                         envStackTemp.Pop();
@@ -210,8 +212,10 @@ namespace Gizbox.IR
                     {
                         envStackTemp.Push(enumDeclNode.attributes[AstAttr.env] as SymbolTable);
                         EnvBegin(enumDeclNode.attributes[AstAttr.env] as SymbolTable);
-                        EmitCode("").label = "enum_begin:" + enumDeclNode.enumNameNode.FullName;
-                        EmitCode("").label = "enum_end:" + enumDeclNode.enumNameNode.FullName;
+
+                        //EmitCode("").label = "enum_begin:" + enumDeclNode.enumNameNode.FullName;
+                        //EmitCode("").label = "enum_end:" + enumDeclNode.enumNameNode.FullName;
+                        EmitCode("");//空行确保env的起止行不报错  
 
                         EnvEnd(enumDeclNode.attributes[AstAttr.env] as SymbolTable);
                         envStackTemp.Pop();
@@ -2045,6 +2049,9 @@ namespace Gizbox.IR
             var scopeTmp = currScopeDescs.FirstOrDefault(s => s.env == env);
             scopeTmp.tmpLineTo = ilUnit.codes.Count - 1;
 
+            if(ilUnit.codes.Count == 0)
+                throw new GizboxException(ExceptioName.Undefine, "ilcodes count 0.");
+
             scopeTmp.finalScope = currScopeNode.value;
             scopeDescs.Add(scopeTmp);
 
@@ -2063,7 +2070,7 @@ namespace Gizbox.IR
                 if (envStackTemp[i].ContainRecordName(id))
                 {
                     //Log("在" + envStack[i].name + "中查询：" + id + "成功");
-                    var rec = envStackTemp[i].GetRecord(id);
+                    var rec = envStackTemp[i].FindRecord(id);
                     return rec;
                 }
                 //Log("在" + envStack[i].name + "中查询：" + id + "失败");
@@ -2072,7 +2079,7 @@ namespace Gizbox.IR
             //导入库查找  
             foreach (var lib in ilUnit.dependencyLibs)
             {
-                var rec = lib.globalScope.env.GetRecord(id);
+                var rec = lib.globalScope.env.FindRecord(id);
                 if (rec != null)
                 {
                     return rec;

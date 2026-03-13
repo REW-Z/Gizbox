@@ -298,9 +298,8 @@ namespace Gizbox.SemanticRule
                             var newRec = envStack.Peek().NewRecord(
                                 constDeclNode.identifierNode.FullName,
                                 SymbolTable.RecordCatagory.Constant,
-                                constDeclNode.typeNode.TypeExpression(),
-
-                                initValue: constDeclNode.litValNode.token.attribute
+                                constDeclNode.typeNode.TypeExpression()
+                                //暂不写入initValue,需要Pass3常量表达式求值  
                                 );
                             constDeclNode.attributes[AstAttr.const_rec] = newRec;
                         }
@@ -1279,8 +1278,15 @@ namespace Gizbox.SemanticRule
 
                         //类型检查（初始值）  
                         bool valid = CheckType_Equal(constDeclNode.typeNode.TypeExpression(), AnalyzeTypeExpression(constDeclNode.litValNode));
-                        if (!valid)
+                        if(!valid)
                             throw new SemanticException(ExceptioName.ConstantTypeDeclarationError, constDeclNode, "type:" + constDeclNode.typeNode.TypeExpression() + "  value type:" + AnalyzeTypeExpression(constDeclNode.litValNode));
+
+                        //写入initValue值    
+                        var rec = constDeclNode.attributes[AstAttr.const_rec] as SymbolTable.Record;
+                        bool isConstExpr = TryGetLiteralConstant(constDeclNode.litValNode, out string typeExpr, out object val);
+                        if(isConstExpr == false)
+                            throw new SemanticException(ExceptioName.SemanticAnalysysError, constDeclNode.litValNode, "constant initializer must be a constant expression.");
+                        rec.initValue = FormatLiteralAttribute(GType.Parse(typeExpr), val);
                     }
                     break;
                 case SyntaxTree.VarDeclareNode varDeclNode:
@@ -1293,8 +1299,10 @@ namespace Gizbox.SemanticRule
                             Pass3_AnalysisNode(varDeclNode.initializerNode);
                         }
 
+                        TryCompleteType(varDeclNode.typeNode);
+
                         //类型推断  
-                        if (varDeclNode.typeNode is InferTypeNode typeNode)
+                        if(varDeclNode.typeNode is InferTypeNode typeNode)
                         {
                             if(isBraceInitializer)
                                 throw new SemanticException(ExceptioName.VariableTypeDeclarationError, varDeclNode, "brace initializer does not support var inference.");
@@ -1773,13 +1781,28 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.UnaryOpNode unaryNode:
                     {
                         Pass3_AnalysisNode(unaryNode.exprNode);
+
+                        if(TryFoldUnaryConstant(unaryNode, out var foldedUnaryNode))
+                        {
+                            unaryNode.overrideNode = foldedUnaryNode;
+                            unaryNode.overrideNode.Parent = unaryNode.Parent;
+                            Pass3_AnalysisNode(foldedUnaryNode);
+                            break;
+                        }
+
                         AnalyzeTypeExpression(unaryNode);
                     }
                     break;
                 case SyntaxTree.BinaryOpNode binaryNode:
                     {
-                        string typeExprL = AnalyzeTypeExpression(binaryNode.leftNode);
-                        string typeExprR = AnalyzeTypeExpression(binaryNode.rightNode);
+                        Pass3_AnalysisNode(binaryNode.leftNode);
+                        Pass3_AnalysisNode(binaryNode.rightNode);
+
+                        var effectiveLeftNode = GetEffectiveExprNode(binaryNode.leftNode);
+                        var effectiveRightNode = GetEffectiveExprNode(binaryNode.rightNode);
+
+                        string typeExprL = AnalyzeTypeExpression(effectiveLeftNode);
+                        string typeExprR = AnalyzeTypeExpression(effectiveRightNode);
                         var typeL = GType.Parse(typeExprL);
                         var typeR = GType.Parse(typeExprR);
 
@@ -1813,8 +1836,13 @@ namespace Gizbox.SemanticRule
                             }
                         }
 
-                        Pass3_AnalysisNode(binaryNode.leftNode);
-                        Pass3_AnalysisNode(binaryNode.rightNode);
+                        if(TryFoldBinaryConstant(binaryNode, out var foldedBinaryNode))
+                        {
+                            binaryNode.overrideNode = foldedBinaryNode;
+                            binaryNode.overrideNode.Parent = binaryNode.Parent;
+                            Pass3_AnalysisNode(foldedBinaryNode);
+                            break;
+                        }
 
                         AnalyzeTypeExpression(binaryNode);
                     }
@@ -1829,10 +1857,11 @@ namespace Gizbox.SemanticRule
                         // !!特殊的转换需要重写为函数调用
                         TryCompleteType(castNode.typeNode);
                         Pass3_AnalysisNode(castNode.factorNode);
-                        AnalyzeTypeExpression(castNode.factorNode);
+                        var effectiveFactorNode = GetEffectiveExprNode(castNode.factorNode);
+                        AnalyzeTypeExpression(effectiveFactorNode);
                         AnalyzeTypeExpression(castNode);
 
-                        var srcType = GType.Parse((string)castNode.factorNode.attributes[AstAttr.type]);
+                        var srcType = GType.Parse((string)effectiveFactorNode.attributes[AstAttr.type]);
                         var targetType = GType.Parse(castNode.typeNode.TypeExpression());
 
                         //非string类型 -> string类型
@@ -1909,6 +1938,7 @@ namespace Gizbox.SemanticRule
                         {
                             throw new SemanticException(ExceptioName.SemanticAnalysysError, castNode, "cast to array not support.");
                         }
+
                     }
                     break;
                 case SyntaxTree.ElementAccessNode eleAccessNode:
@@ -4480,8 +4510,8 @@ namespace Gizbox.SemanticRule
                             
                             throw new SemanticException(ExceptioName.ClassDefinitionNotFound, newObjNode.className, className);
                         }
-                        
 
+                        TryCompleteType(newObjNode.typeNode);
                         nodeTypeExprssion = newObjNode.typeNode?.TypeExpression() ?? $"(class){className}";
                     }
                     break;
@@ -4503,7 +4533,14 @@ namespace Gizbox.SemanticRule
 
                             nodeTypeExprssion = "(primitive)bool";
                         }
-                        //普通运算符  
+                        //移位运算符（仅允许用于int/uint/long/ulong）
+                        else if(op == "<<" || op == ">>")
+                        {
+                            if (GType.Parse(typeR).IsInteger == false) throw new SemanticException(ExceptioName.BinaryOperationTypeMismatch, binaryOp, "shift operator requires integer type");
+                            if (GType.Parse(typeL).IsInteger == false) throw new SemanticException(ExceptioName.BinaryOperationTypeMismatch, binaryOp, "shift operator requires integer type");
+                            nodeTypeExprssion = typeL;
+                        }
+                        //其他普通运算符  
                         else
                         {
                             if (CheckType_Equal(typeL, typeR) == false) throw new SemanticException(ExceptioName.BinaryOperationTypeMismatch, binaryOp, "");
@@ -4881,6 +4918,10 @@ namespace Gizbox.SemanticRule
                 }
             }
 
+            if(rawname.Contains("CreateCon"))
+            {
+                Console.WriteLine();
+            }
             return null;
         }
 
@@ -5064,11 +5105,14 @@ namespace Gizbox.SemanticRule
 
                         var typeName = namedTypeNode.classname.FullName;
                         var rec = Query(typeName);
-                        if(rec != null && rec.category == SymbolTable.RecordCatagory.Struct)
+                        if(rec == null)
+                            throw new GizboxException(ExceptioName.Undefine, $"namedType:{typeName} not found!");
+
+                        if(rec.category == SymbolTable.RecordCatagory.Struct)
                         {
                             namedTypeNode.Complate(true, (int)rec.size);
                         }
-                        else if(rec != null && rec.category == SymbolTable.RecordCatagory.Enum)
+                        else if(rec.category == SymbolTable.RecordCatagory.Enum)
                         {
                             namedTypeNode.Complate(false, 0, true);
                         }
@@ -5490,6 +5534,17 @@ namespace Gizbox.SemanticRule
             replace = null;
             return false;
         }
+
+        private SyntaxTree.ExprNode GetEffectiveExprNode(SyntaxTree.ExprNode exprNode)
+        {
+            while(exprNode?.overrideNode is SyntaxTree.ExprNode overrideExpr)
+            {
+                exprNode = overrideExpr;
+            }
+
+            return exprNode;
+        }
+
 
         private void GenClassLayoutInfo(SymbolTable.Record classRec)
         {

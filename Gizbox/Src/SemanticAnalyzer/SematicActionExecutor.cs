@@ -514,7 +514,7 @@ namespace Gizbox.SemanticRule
 
 
 
-            AddActionAtTail("declstmt -> const decltype ID = lit ;", (psr, production) => {
+            AddActionAtTail("declstmt -> const decltype ID = aexpr ;", (psr, production) => {
 
                 psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.ConstantDeclareNode()
                 {
@@ -525,7 +525,7 @@ namespace Gizbox.SemanticRule
                         token = psr.stack[psr.stack.Top - 3].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.VariableOrField,
                     },
-                    litValNode = (SyntaxTree.LiteralNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
+                    litValNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
 
                     attributes = new Dictionary<AstAttr, object>(),
                 };

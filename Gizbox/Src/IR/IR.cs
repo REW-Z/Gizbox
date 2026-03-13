@@ -175,13 +175,7 @@ namespace Gizbox.IR
                 dependencyLibs = new();
 
             if(dependencyLibs.Count > 0)
-            {
-                var uniqueCount = dependencyLibs.Select(d => d.name).Distinct().Count();
-                if (dependencies.Count != uniqueCount)
-                {
-                    throw new GizboxException(ExceptioName.Undefine, $"libs of {this.name} loaded error.");
-                }
-            }
+                ValidateDependencyLibraries();
                 
 
             if(this.dependencyLibs.Count == 0 && this.dependencies.Count != 0)
@@ -201,7 +195,29 @@ namespace Gizbox.IR
                 }
             }
 
+            ValidateDependencyLibraries();
+
         }
+
+        /// <summary>校验依赖名称列表与已加载依赖库列表是否完全一致。</summary>
+        public void ValidateDependencyLibraries()
+        {
+            var expected = new HashSet<string>(dependencies ?? Enumerable.Empty<string>());
+            var loaded = new HashSet<string>(
+                (dependencyLibs ?? new List<IRUnit>())
+                    .Where(d => d != null && string.IsNullOrWhiteSpace(d.name) == false)
+                    .Select(d => d.name));
+
+            if(expected.SetEquals(loaded))
+                return;
+
+            var missing = expected.Except(loaded).ToList();
+            var extra = loaded.Except(expected).ToList();
+            throw new GizboxException(
+                ExceptioName.Undefine,
+                $"libs of {this.name} loaded error. expected:[{string.Join(",", expected)}] loaded:[{string.Join(",", loaded)}] missing:[{string.Join(",", missing)}] extra:[{string.Join(",", extra)}]");
+        }
+
         //添加依赖  
         public void AddDependencyLib(IRUnit dep)
         {
