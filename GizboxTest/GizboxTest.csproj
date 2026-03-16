@@ -31,6 +31,9 @@
     <None Update="lib\stdlib.gix">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="test\test_string.gix">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="test\test_optimize.gix">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

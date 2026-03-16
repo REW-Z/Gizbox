@@ -1,0 +1,21 @@
+﻿import <"core">  
+import <"stdlib">  
+
+using Core;  
+using Console;
+using Collections;
+
+void test_stringobj()
+{
+	own Core::String s = new Core::String("Hello World!");
+	Console::PrintLn("String.value: " + s.ToString());
+}
+
+
+void main()
+{
+	test_stringobj();
+
+	Console::PrintLn("Test finished!");
+	Console::ReadLn();
+}

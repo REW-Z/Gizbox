@@ -21,6 +21,27 @@ namespace Core
 	}
 
 
+	class String
+	{
+	private:
+		string value = null;
+	public:
+		String(string v)
+		{
+			this.value = Core::Extern::StringClone(v);
+		}
+
+		~String()
+		{
+			Core::Extern::StringFree(this.value);
+		}
+
+		string ToString()
+		{
+			return this.value;
+		}
+	}
+
 
 	class Bool
 	{
