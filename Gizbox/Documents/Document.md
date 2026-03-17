@@ -7,6 +7,24 @@
 命名空间导入`using XXX`在`import`语句之后、顶层语句之前。   
 
 
+### 注意事项：  
+
+命名空间禁止嵌套。    
+```
+//错误：禁止命名空间嵌套
+namespace A
+{
+    namespace B//错误
+    {}
+}
+
+//正确：命名空间嵌套应该使用::分隔  
+namespace A
+{}
+namespace A::B
+{}
+```
+
 
 
 ## 顶层语句和全局作用域    
@@ -171,6 +189,16 @@ else if(yyy)
 else
 {}
 ```
+
+#### 三元条件运算符
+
+示例：
+```
+int a = flag ? 1 : 2;
+```
+
+注意事项：
+`condition ? expr1 : expr2` 中，`condition` 必须是 `bool`，两个分支表达式类型必须一致。  
 
 #### switch-case  
 

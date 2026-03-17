@@ -1778,6 +1778,21 @@ namespace Gizbox.SemanticRule
                         throw new SemanticException(ExceptioName.SemanticAnalysysError, braceInitializerNode, "brace initializer requires a known target type.");
                     }
                     break;
+                case SyntaxTree.TernaryConditionNode ternaryNode:
+                    {
+                        Pass3_AnalysisNode(ternaryNode.conditionNode);
+                        Pass3_AnalysisNode(ternaryNode.trueNode);
+                        Pass3_AnalysisNode(ternaryNode.falseNode);
+
+                        if(CheckType_Equal("bool", ternaryNode.conditionNode) == false)
+                            throw new SemanticException(ExceptioName.SemanticAnalysysError, ternaryNode, "ternary condition must be bool.");
+
+                        if(CheckType_Equal(ternaryNode.trueNode, ternaryNode.falseNode) == false)
+                            throw new SemanticException(ExceptioName.SemanticAnalysysError, ternaryNode, "ternary branch type mismatch.");
+
+                        AnalyzeTypeExpression(ternaryNode);
+                    }
+                    break;
                 case SyntaxTree.UnaryOpNode unaryNode:
                     {
                         Pass3_AnalysisNode(unaryNode.exprNode);
@@ -2461,6 +2476,27 @@ namespace Gizbox.SemanticRule
                             lifeTimeInfo.MergeBranchesTo(saved, branches);
                         }
 
+                        break;
+                    }
+                case SyntaxTree.TernaryConditionNode ternaryNode:
+                    {
+                        Pass4_OwnershipLifetime(ternaryNode.conditionNode);
+
+                        var saved = lifeTimeInfo.currBranch;
+                        List<LifetimeInfo.Branch> branches = new();
+
+                        var trueBranch = lifeTimeInfo.NewBranch(saved);
+                        lifeTimeInfo.currBranch = trueBranch;
+                        Pass4_OwnershipLifetime(ternaryNode.trueNode);
+                        branches.Add(trueBranch);
+
+                        var falseBranch = lifeTimeInfo.NewBranch(saved);
+                        lifeTimeInfo.currBranch = falseBranch;
+                        Pass4_OwnershipLifetime(ternaryNode.falseNode);
+                        branches.Add(falseBranch);
+
+                        lifeTimeInfo.currBranch = saved;
+                        lifeTimeInfo.MergeBranchesTo(saved, branches);
                         break;
                     }
                 case SyntaxTree.ClassDeclareNode classDecl:
@@ -3862,6 +3898,18 @@ namespace Gizbox.SemanticRule
                 return;
             }
 
+            else if(rNode is TernaryConditionNode ternaryNode)
+            {
+                CheckOwnershipCompare_Core(errorNode, lModel, lname, ternaryNode.trueNode, out var trueModel);
+                CheckOwnershipCompare_Core(errorNode, lModel, lname, ternaryNode.falseNode, out var falseModel);
+
+                if(trueModel != falseModel)
+                    throw new SemanticException(ExceptioName.OwnershipError, errorNode, "ternary branch ownership mismatch.");
+
+                rModel = trueModel;
+                return;
+            }
+
             //临时右值 - Binary/Unary表达式
             else if(rNode is BinaryOpNode || rNode is UnaryOpNode)
             {
@@ -3944,6 +3992,13 @@ namespace Gizbox.SemanticRule
             if(rvalNode is SyntaxTree.CastNode castNode)
             {
                 CheckOwnershipCanMoveOut(castNode.factorNode);
+                return;
+            }
+
+            if(rvalNode is SyntaxTree.TernaryConditionNode ternaryNode)
+            {
+                CheckOwnershipCanMoveOut(ternaryNode.trueNode);
+                CheckOwnershipCanMoveOut(ternaryNode.falseNode);
             }
         }
 
@@ -4557,6 +4612,11 @@ namespace Gizbox.SemanticRule
                 case SyntaxTree.IncDecNode incDecOp:
                     {
                         nodeTypeExprssion = AnalyzeTypeExpression(incDecOp.identifierNode);
+                    }
+                    break;
+                case SyntaxTree.TernaryConditionNode ternaryNode:
+                    {
+                        nodeTypeExprssion = AnalyzeTypeExpression(ternaryNode.trueNode);
                     }
                     break;
                 case SyntaxTree.CastNode castNode:

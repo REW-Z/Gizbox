@@ -146,6 +146,7 @@ namespace Gizbox
         [KnownType(typeof(LiteralNode))]
         [KnownType(typeof(DefaultValueNode))]
         [KnownType(typeof(BraceInitializerNode))]
+        [KnownType(typeof(TernaryConditionNode))]
         [KnownType(typeof(BinaryOpNode))]
         [KnownType(typeof(UnaryOpNode))]
         [KnownType(typeof(AssignNode))]
@@ -1204,6 +1205,22 @@ namespace Gizbox
             public BraceInitializerNode()
             {
                 children_group_0 = new();
+            }
+        }
+
+        [DataContract(IsReference = true)]
+        public class TernaryConditionNode : ExprNode
+        {
+            public ExprNode conditionNode { get => (ExprNode)children_group_0[0]; set => children_group_0[0] = value; }
+            public ExprNode trueNode { get => (ExprNode)children_group_0[1]; set => children_group_0[1] = value; }
+            public ExprNode falseNode { get => (ExprNode)children_group_0[2]; set => children_group_0[2] = value; }
+
+            public TernaryConditionNode()
+            {
+                children_group_0 = new();
+                children_group_0.Add(null);
+                children_group_0.Add(null);
+                children_group_0.Add(null);
             }
         }
 

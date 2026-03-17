@@ -123,6 +123,9 @@ void main()
 			break;
 	}
 
+	int a = 199;
+	string str = a > 200 ? ((string)a + " is greater than 200") : ((string)a + " is less than or equal to 200"); 
+	Console::PrintLn(str);
 
 	Console::PrintLn("Test finished!");
 	Console::ReadLn();

@@ -157,7 +157,7 @@ switch(cmdIdx)
                 buildMode = BuildMode.Debug,
                 platform = Platform.Windows_X64,
                 dlls = new List<string> { "glfw3.dll", "GizboxImgui.dll" },
-                libs = new List<string> { "libGizboxImgui.dll.a" },
+                libs = new List<string> { "libGizboxImgui.dll.a" },//windows下链接dll需要对应的.a文件  
             };
 
             //测试脚本Test  

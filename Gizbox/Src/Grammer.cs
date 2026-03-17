@@ -249,6 +249,7 @@ namespace Gizbox
 
             "nexpr -> bexpr",
             "nexpr -> aexpr",
+            "nexpr -> bexpr ? expr : expr",
 
             "bexpr -> bexpr && bexpr",
             "bexpr -> bexpr || bexpr",

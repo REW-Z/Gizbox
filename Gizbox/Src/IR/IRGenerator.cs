@@ -763,6 +763,29 @@ namespace Gizbox.IR
                         SetRet(braceInitNode, temp);
                     }
                     break;
+                case TernaryConditionNode ternaryNode:
+                    {
+                        GenNode(ternaryNode.conditionNode);
+
+                        string resultType = (string)ternaryNode.attributes[AstAttr.type];
+                        string resultTemp = NewTemp(resultType);
+                        string falseLabel = $"ternary_false_{markCounter++}";
+                        string endLabel = $"ternary_end_{markCounter++}";
+
+                        EmitCode("IF_FALSE_JUMP", GetRet(ternaryNode.conditionNode), "%LABEL:" + falseLabel);
+
+                        GenNode(ternaryNode.trueNode);
+                        EmitCode("=", resultTemp, GetRet(ternaryNode.trueNode));
+                        EmitCode("JUMP", "%LABEL:" + endLabel);
+
+                        EmitCode("").label = falseLabel;
+                        GenNode(ternaryNode.falseNode);
+                        EmitCode("=", resultTemp, GetRet(ternaryNode.falseNode));
+
+                        EmitCode("").label = endLabel;
+                        SetRet(ternaryNode, resultTemp);
+                    }
+                    break;
                 case ObjectMemberAccessNode objMemberAccess:
                     {
                         string accessExpr = BuildAddressableExpression(objMemberAccess);

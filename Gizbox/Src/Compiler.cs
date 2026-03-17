@@ -476,7 +476,10 @@ namespace Gizbox
                 }
                 else
                 {
-                    data = Gizbox.Utility.ParserHardcoder.GenerateParser();
+                    var grammer = new Grammer() { terminalNames = scanner.GetTokenNames() };
+                    string tempParserDataPath = Path.Combine(Path.GetTempPath(), "gizbox_parser_data.txt");
+                    LALRGenerator.LALRGenerator generator = new Gizbox.LALRGenerator.LALRGenerator(grammer, tempParserDataPath);
+                    data = generator.GetResult();
                 }
             }
             //文件系统读取语法分析器    

@@ -1215,6 +1215,15 @@ namespace Gizbox.SemanticRule
             AddActionAtTail("nexpr -> aexpr", (psr, production) => {
                 psr.newElement.attributes[ParseAttr.ast_node] = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node];
             });
+            AddActionAtTail("nexpr -> bexpr ? expr : expr", (psr, production) => {
+                psr.newElement.attributes[ParseAttr.ast_node] = new SyntaxTree.TernaryConditionNode()
+                {
+                    conditionNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 4].attributes[ParseAttr.ast_node],
+                    trueNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top - 2].attributes[ParseAttr.ast_node],
+                    falseNode = (SyntaxTree.ExprNode)psr.stack[psr.stack.Top].attributes[ParseAttr.ast_node],
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+            });
 
             string[] logicOperators = new string[] { "||", "&&" };
             foreach(var opname in logicOperators)
