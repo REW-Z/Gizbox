@@ -4559,10 +4559,6 @@ namespace Gizbox.SemanticRule
                         string className = newObjNode.className.FullName;
                         if(Query(className) == null)
                         {
-                            Console.WriteLine("AST");
-                            this.ilUnit.globalScope.env.Print();
-                            Console.WriteLine();
-                            
                             throw new SemanticException(ExceptioName.ClassDefinitionNotFound, newObjNode.className, className);
                         }
 
@@ -4951,7 +4947,6 @@ namespace Gizbox.SemanticRule
                 }
             }
 
-            Console.WriteLine();
             return null;
         }
 
@@ -4976,11 +4971,6 @@ namespace Gizbox.SemanticRule
                 {
                     return result;
                 }
-            }
-
-            if(rawname.Contains("CreateCon"))
-            {
-                Console.WriteLine();
             }
             return null;
         }
