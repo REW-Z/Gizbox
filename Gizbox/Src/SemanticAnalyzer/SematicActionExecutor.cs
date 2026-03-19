@@ -582,6 +582,7 @@ namespace Gizbox.SemanticRule
                 var funcNode = new SyntaxTree.FuncDeclareNode()
                 {
                     funcType = FunctionKind.Normal,
+                    isExport = false,
                     returnFlags = VarModifiers.None,
 
                     returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 8].attributes[ParseAttr.ast_node],
@@ -608,12 +609,44 @@ namespace Gizbox.SemanticRule
                 psr.newElement.attributes[ParseAttr.ast_node] = funcNode;
             });
 
+            AddActionAtTail("declstmt -> export decltype ID genparams ( params ) { statements }", (psr, production) => {
+                var funcNode = new SyntaxTree.FuncDeclareNode()
+                {
+                    funcType = FunctionKind.Normal,
+                    isExport = true,
+                    returnFlags = VarModifiers.None,
+
+                    returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 8].attributes[ParseAttr.ast_node],
+                    identifierNode = new SyntaxTree.IdentityNode()
+                    {
+                        attributes = new Dictionary<AstAttr, object>(),
+                        token = psr.stack[psr.stack.Top - 7].attributes[ParseAttr.token] as Token,
+                        identiferType = SyntaxTree.IdentityNode.IdType.FunctionOrMethod,
+                    },
+                    parametersNode = (SyntaxTree.ParameterListNode)psr.stack[psr.stack.Top - 4].attributes[ParseAttr.ast_node],
+                    statementsNode = (SyntaxTree.StatementsNode)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.ast_node],
+
+                    attributes = new Dictionary<AstAttr, object>(),
+                };
+
+                if(psr.stack[psr.stack.Top - 7].attributes.TryGetValue(ParseAttr.generic_params, out var gpObj)
+                    && gpObj is List<SyntaxTree.IdentityNode> gpList
+                    && gpList.Count > 0)
+                {
+                    funcNode.isTemplateFunction = true;
+                    funcNode.templateParameters.AddRange(gpList);
+                }
+
+                psr.newElement.attributes[ParseAttr.ast_node] = funcNode;
+            });
+
             AddActionAtTail("declstmt -> TYPE_NAME ( params ) { statements }", (psr, production) => {
                 var classToken = psr.stack[psr.stack.Top - 6].attributes[ParseAttr.token] as Token;
 
                 var ctorNode = new SyntaxTree.FuncDeclareNode()
                 {
                     funcType = FunctionKind.Ctor,
+                    isExport = false,
                     returnFlags = VarModifiers.None,
 
                     returnTypeNode = new SyntaxTree.PrimitiveTypeNode()
@@ -644,6 +677,7 @@ namespace Gizbox.SemanticRule
                 var dtorNode = new SyntaxTree.FuncDeclareNode()
                 {
                     funcType = FunctionKind.Dtor,
+                    isExport = false,
                     returnFlags = VarModifiers.None,
 
                     returnTypeNode = new SyntaxTree.PrimitiveTypeNode()
@@ -674,6 +708,7 @@ namespace Gizbox.SemanticRule
                 var funcNode = new SyntaxTree.FuncDeclareNode()
                 {
                     funcType = FunctionKind.OperatorOverload,
+                    isExport = false,
                     returnFlags = VarModifiers.None,
 
                     returnTypeNode = (SyntaxTree.TypeNode)psr.stack[psr.stack.Top - 9].attributes[ParseAttr.ast_node],

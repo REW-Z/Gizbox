@@ -168,6 +168,7 @@ namespace Gizbox
             "declstmt -> decltype ID = leak ( ID ) ;",
 
             "declstmt -> decltype ID genparams ( params ) { statements }",
+            "declstmt -> export decltype ID genparams ( params ) { statements }",
             "declstmt -> TYPE_NAME ( params ) { statements }",
             "declstmt -> ~ TYPE_NAME ( ) { statements }",
             "declstmt -> decltype operator ID genparams ( params ) { statements }",

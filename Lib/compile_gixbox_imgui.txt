@@ -1,3 +1,0 @@
-cd D:/Workspace/imgui/GizboxImgui/GizboxImgui/GizboxImgui 
-x86_64-w64-mingw32-gcc -O2 -I. -c cimgui_gizbox.c -o cimgui_gizbox.o              
-x86_64-w64-mingw32-g++ -shared -o GizboxImgui.dll cimgui_gizbox.o libImGuiLib.a -Wl,--out-implib,libGizboxImgui.dll.a

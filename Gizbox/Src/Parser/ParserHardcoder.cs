@@ -263,6 +263,16 @@ namespace Gizbox.Utility
             HardCodePart();
         }
 
+        /// <summary>
+        /// 获取硬编码的语法分析表数据。
+        /// </summary>
+        public static ParserData GetData()
+        {
+            ParserHardcoder hardcoder = new ParserHardcoder();
+            hardcoder.StartGenrate();
+            return hardcoder.outputData;
+        }
+
         private void HardCodePart() 
         {
 #region HardCode

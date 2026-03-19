@@ -365,6 +365,9 @@ namespace Gizbox.SemanticRule
                         //函数模板  
                         if(funcDeclNode.isTemplateFunction)
                         {
+                            if(funcDeclNode.isExport)
+                                throw new SemanticException(ExceptioName.SemanticAnalysysError, funcDeclNode, "export function cannot be generic.");
+
                             //附加命名空间名  
                             if(isGlobalOrTopNamespace == false)
                             {
@@ -380,6 +383,8 @@ namespace Gizbox.SemanticRule
 
                         if (isGlobalOrTopNamespace)
                         {
+                            if(funcDeclNode.isExport && isTopLevelAtNamespace)
+                                throw new SemanticException(ExceptioName.SemanticAnalysysError, funcDeclNode, "export function can only be declared at global scope.");
 
                             bool isMethod = envStack.Peek().tableCatagory == SymbolTable.TableCatagory.ClassScope;
                             if (isMethod) throw new Exception();//顶层函数不可能是方法
@@ -411,7 +416,7 @@ namespace Gizbox.SemanticRule
                             //函数修饰名称  
                             var paramTypeArr = funcDeclNode.parametersNode.parameterNodes.Select(n => n.typeNode.TypeExpression()).ToArray();
                             var funcMangledName = funcDeclNode.identifierNode.FullName;
-                            if(funcMangledName != "main")
+                            if(funcMangledName != "main" && funcDeclNode.isExport == false)
                             {
                                 funcMangledName = Utils.Mangle(funcDeclNode.identifierNode.FullName, paramTypeArr);
                             }
@@ -442,6 +447,14 @@ namespace Gizbox.SemanticRule
                             {
                                 newRec.flags |= SymbolTable.RecordFlag.OperatorOverloadFunc;
                             }
+                            if(funcDeclNode.isExport)
+                            {
+                                newRec.flags |= SymbolTable.RecordFlag.ExportFunc;
+                            }
+                        }
+                        else if(funcDeclNode.isExport)
+                        {
+                            throw new SemanticException(ExceptioName.SemanticAnalysysError, funcDeclNode, "export function can only be declared at global scope.");
                         }
                     }
                     break;
@@ -781,6 +794,14 @@ namespace Gizbox.SemanticRule
                     {
                         if(funcDeclNode.isTemplateFunction)
                             break;
+
+                        if(funcDeclNode.isExport)
+                        {
+                            if(isTopLevelAtNamespace)
+                                throw new SemanticException(ExceptioName.SemanticAnalysysError, funcDeclNode, "export function can only be declared at global scope.");
+                            if(isGlobalOrTopAtNamespace == false)
+                                throw new SemanticException(ExceptioName.SemanticAnalysysError, funcDeclNode, "export function can only be declared at global scope.");
+                        }
 
                         //Id at env
                         funcDeclNode.identifierNode.attributes[AstAttr.def_at_env] = envStack.Peek();

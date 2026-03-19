@@ -4,6 +4,7 @@ using System.Text;
 using System.Linq;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using Gizbox.IR;
 
@@ -642,9 +643,9 @@ namespace Gizbox
 
 
         /// <summary>
-        /// 编译为可执行文件  
+        /// 编译为二进制文件（`shared=true` 时输出动态库，否则输出可执行文件）    
         /// </summary>
-        public void CompileIRToExe(IRUnit ir, string outputDir, CompileOptions options = null)
+        public void ComileIRToBin(IRUnit ir, string outputDir, CompileOptions options = null, bool shared = false)
         {
             if(options == null)
                 options = new CompileOptions();
@@ -661,15 +662,26 @@ namespace Gizbox
                 fileNames.Add(System.IO.Path.GetFileNameWithoutExtension(fileFullName));
             }
 
-            //编译核心C运行库    
-            string mingw_gcc = "x86_64-w64-mingw32-gcc";
+            //系统信息    
+            string gcc;
+            Platform currentPlatform;
+            if(RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && RuntimeInformation.OSArchitecture == Architecture.X64)
+                currentPlatform = Platform.Windows_X64;
+            else
+                throw new NotImplementedException();
+            if(options.platform == Platform.Windows_X64 && currentPlatform == Platform.Windows_X64)
+                gcc = "x86_64-w64-mingw32-gcc";
+            else
+                gcc = "gcc";
+
 
 #if DEBUG
             //测试：使用把corert.c编译为win64的asm
-            Run(mingw_gcc, $"-S -m64 -masm=intel -o corert.s corert.c", AppDomain.CurrentDomain.BaseDirectory);
+            Run(gcc, $"-S -m64 -masm=intel -o corert.s corert.c", AppDomain.CurrentDomain.BaseDirectory);
 #endif
+            //编译核心C运行库    
             //编译corert.c为obj  
-            Run(mingw_gcc, $"-c corert.c -o corert.obj", AppDomain.CurrentDomain.BaseDirectory);
+            Run(gcc, $"-c corert.c -o corert.obj", AppDomain.CurrentDomain.BaseDirectory);
 
             //复制corert.obj到outputDir
             var srcPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "corert.obj");
@@ -705,8 +717,36 @@ namespace Gizbox
             linkInputs.AddRange(externalLinkFiles.staticLibPaths.Select(quoteArg));
             linkInputs.AddRange(externalLinkFiles.dynamicLinkPaths.Select(quoteArg));
 
-            //链接所有obj生成exe
-            var ret = Run(mingw_gcc, $"{string.Join(" ", linkInputs)} -o {quoteArg($"{ir.name}.exe")}", outputDir);
+            string outputFileName = shared ? $"{ir.name}.dll" : $"{ir.name}.exe";
+            string linkArgs = string.Join(" ", linkInputs);
+            if(shared)
+            {
+                var importLibPath = quoteArg(System.IO.Path.Combine(outputDir, $"lib{ir.name}.dll.a"));
+                var exportedFuncs = ir.globalScope.env.records.Values
+                    .Where(rec => rec.category == SymbolTable.RecordCatagory.Function && rec.flags.HasFlag(SymbolTable.RecordFlag.ExportFunc))
+                    .Select(rec => Gizbox.Src.Backend.UtilsW64.LegalizeName(rec.name))
+                    .Distinct()
+                    .ToList();
+
+                if(exportedFuncs.Count > 0)
+                {
+                    var defPath = System.IO.Path.Combine(outputDir, $"{ir.name}.def");
+                    StringBuilder defBuilder = new StringBuilder();
+                    defBuilder.AppendLine("EXPORTS");
+                    foreach(var exportName in exportedFuncs)
+                    {
+                        defBuilder.AppendLine($"    {exportName}");
+                    }
+                    System.IO.File.WriteAllText(defPath, defBuilder.ToString());
+                    linkInputs.Add(quoteArg(defPath));
+                    linkArgs = string.Join(" ", linkInputs);
+                }
+
+                linkArgs = $"-shared -Wl,--export-all-symbols -Wl,--out-implib,{importLibPath} {linkArgs}".Trim();
+            }
+
+            //链接所有obj生成二进制文件
+            var ret = Run(gcc, $"{linkArgs} -o {quoteArg(outputFileName)}", outputDir);
 
 
             GixConsole.WriteLine($"编译完成...结束码:{ret}");
@@ -728,8 +768,8 @@ namespace Gizbox
 
     public class CompileOptions
     {
-        public BuildMode buildMode = BuildMode.Debug;
-        public Platform platform = Platform.Windows_X64;
+        public BuildMode buildMode = BuildMode.Debug;//默认Debug
+        public Platform platform = Platform.Windows_X64;//目前只支持win64  
 
         public List<string> libs;//参与链接的外部静态库（支持文件名或路径，默认查找.lib/.a）
         public List<string> dlls;//参与动态链接的外部dll（支持文件名或路径，会复制到输出目录）    

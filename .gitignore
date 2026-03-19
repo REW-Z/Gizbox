@@ -8,5 +8,7 @@ GizboxAOT/bin
 GizboxAOT/obj
 GizboxLSP/bin
 GizboxLSP/obj
+GizboxCLI/bin
+GizboxCLI/obj
 GizboxTest/bin
 GizboxTest/obj

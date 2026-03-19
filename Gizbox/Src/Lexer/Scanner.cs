@@ -96,6 +96,7 @@ namespace Gizbox
             keywords.Add(new TokenPattern("using", "using\\W", 1));
 
             keywords.Add(new TokenPattern("namespace", "namespace\\W", 1));
+            keywords.Add(new TokenPattern("export", "export\\W", 1));
             keywords.Add(new TokenPattern("extern", "extern\\W", 1));
             keywords.Add(new TokenPattern("const", "const\\W", 1));
             keywords.Add(new TokenPattern("operator", "operator\\W", 1));

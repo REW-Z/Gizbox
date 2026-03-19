@@ -1,0 +1,20 @@
+﻿import <"core">   
+
+using Core;
+using Console;
+using Collections;
+
+
+int callcount = 0;
+
+export int AddInt(int x, int y)
+{
+	callcount++;
+	return x + y;
+}
+
+export int AddAndMulInt(int x, int y, int z)
+{
+	callcount++;
+	return AddInt(x, y) * z;
+}

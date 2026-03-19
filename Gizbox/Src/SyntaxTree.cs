@@ -828,6 +828,8 @@ namespace Gizbox
             [DataMember]
             public VarModifiers returnFlags;
             [DataMember]
+            public bool isExport;
+            [DataMember]
             public bool isTemplateFunction;
             [DataMember]
             public readonly List<IdentityNode> templateParameters = new();

@@ -10,7 +10,6 @@ using Gizbox;
 using GizboxTest;
 using Gizbox.Src.Backend;
 
-////测试
 
 string[] cmds = {
     "0.生成互操作代码",
@@ -19,6 +18,7 @@ string[] cmds = {
     "3.测试杂项",
     "4.测试x64目标代码生成",
     "5.glfw测试",
+    "6.dll导出测试",
     };
 
 Console.WindowWidth = 150;
@@ -73,7 +73,6 @@ switch(cmdIdx)
             Console.WriteLine("生成库文件");
             string libsrcCore = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\lib\\core.gix");
             string libsrcStd = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\lib\\stdlib.gix");
-            string libsrcIMGUI = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\lib\\imgui.gix");
             Compiler libCompiler = new Compiler();
             libCompiler.AddLibPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "lib"));
             libCompiler.AddLibPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "test"));
@@ -81,7 +80,6 @@ switch(cmdIdx)
             //libCompiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
             libCompiler.CompileToLib(libsrcCore, "core", AppDomain.CurrentDomain.BaseDirectory + "\\lib\\core.gixlib");
             libCompiler.CompileToLib(libsrcStd, "stdlib", AppDomain.CurrentDomain.BaseDirectory + "\\lib\\stdlib.gixlib");
-            libCompiler.CompileToLib(libsrcIMGUI, "imgui", AppDomain.CurrentDomain.BaseDirectory + "\\lib\\imgui.gixlib");
             return;
         }
         break;
@@ -140,7 +138,7 @@ switch(cmdIdx)
 
                 il.Print();
 
-                compiler.CompileIRToExe(il, System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
+                compiler.ComileIRToBin(il, System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
             }
             else
             {
@@ -173,7 +171,31 @@ switch(cmdIdx)
 
             il.Print();
 
-            compiler.CompileIRToExe(il, System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop), options);
+            compiler.ComileIRToBin(il, System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop), options);
+        }
+        break;
+    case 6:
+        {
+            var path = AppDomain.CurrentDomain.BaseDirectory + "\\test\\test_export.gix";
+
+            CompileOptions options = new CompileOptions()
+            {
+                buildMode = BuildMode.Debug,
+                platform = Platform.Windows_X64,
+            };
+
+            //测试脚本Test  
+            string source = System.IO.File.ReadAllText(path);
+            Gizbox.Compiler compiler = new Compiler();
+            compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
+            compiler.AddLibPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "lib"));
+            compiler.ConfigParserDataSource(hardcode: true);
+            //compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
+            var il = compiler.CompileToIR(source, isMainUnit: true, "test_export");
+
+            il.Print();
+
+            compiler.ComileIRToBin(il, System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop), options, shared:true);
         }
         break;
 }

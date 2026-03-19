@@ -350,3 +350,21 @@ extern bool glfwInit();
 ```
 
 注意extern函数不应该在命名空间内，否则会导致名称错误和链接错误。  
+
+
+## 导出函数
+
+使用 `export` 修饰顶层函数，可使该函数保留原始名称，不参与名称修饰（mangling），并作为 DLL 导出符号。
+
+示例：
+```
+export int AddAndMul(int x, int y, int z)
+{
+    return (x + y) * z;
+}
+```
+
+注意事项：
+- `export` 只能用于全局作用域函数，不能定义在命名空间内。
+- `export` 函数在本编译单元内调用时，也按原始名称解析，不会再走 mangling 名称。
+- `export` 函数不支持泛型。
