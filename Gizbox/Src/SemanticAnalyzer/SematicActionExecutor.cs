@@ -841,17 +841,25 @@ namespace Gizbox.SemanticRule
                 );
             });
 
-            AddActionAtTail("declstmt -> struct TYPE_NAME { declstatements }", (psr, production) => {
+            AddActionAtTail("declstmt -> struct TYPE_NAME genparams { declstatements }", (psr, production) => {
                 var node = new SyntaxTree.StructDeclareNode()
                 {
                     structNameNode = new SyntaxTree.IdentityNode()
                     {
                         attributes = new Dictionary<AstAttr, object>(),
-                        token = psr.stack[psr.stack.Top - 3].attributes[ParseAttr.token] as Token,
+                        token = psr.stack[psr.stack.Top - 4].attributes[ParseAttr.token] as Token,
                         identiferType = SyntaxTree.IdentityNode.IdType.Class,
                     },
                     attributes = new Dictionary<AstAttr, object>(),
                 };
+
+                if(psr.stack[psr.stack.Top - 3].attributes.TryGetValue(ParseAttr.generic_params, out var gpObj)
+                    && gpObj is List<SyntaxTree.IdentityNode> gpList
+                    && gpList.Count > 0)
+                {
+                    node.isTemplateStruct = true;
+                    node.templateParameters.AddRange(gpList);
+                }
 
                 node.memberDelareNodes.AddRange(
                     (List<SyntaxTree.DeclareNode>)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.decl_stmts]

@@ -196,6 +196,9 @@ namespace Gizbox.IR
                     break;
                 case StructDeclareNode structDeclNode:
                     {
+                        if(structDeclNode.isTemplateStruct)
+                            break;
+
                         envStackTemp.Push(structDeclNode.attributes[AstAttr.env] as SymbolTable);
                         EnvBegin(structDeclNode.attributes[AstAttr.env] as SymbolTable);
 

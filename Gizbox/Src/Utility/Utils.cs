@@ -28,7 +28,17 @@ namespace Gizbox
             if (argTypes == null)
                 return baseName;
 
-            var args = argTypes.Where(a => !string.IsNullOrWhiteSpace(a.ToExpression())).Select(a => a.NormTypeName).Select(SanitizeTypeName).ToArray();
+            var args = argTypes.Where(a => !string.IsNullOrWhiteSpace(a.ToExpression())).Select(a => a.NormTypeName).ToArray();
+            return MangleTemplateInstanceName(baseName, args);
+        }
+
+        /// <summary>根据模板参数名称生成模板实例修饰名。</summary>
+        public static string MangleTemplateInstanceName(string baseName, IEnumerable<string> argTypeNames)
+        {
+            if(argTypeNames == null)
+                return baseName;
+
+            var args = argTypeNames.Where(a => !string.IsNullOrWhiteSpace(a)).Select(SanitizeTypeName).ToArray();
             if (args.Length == 0)
                 return baseName;
 

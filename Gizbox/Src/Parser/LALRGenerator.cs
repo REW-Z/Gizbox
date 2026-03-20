@@ -85,8 +85,8 @@ namespace Gizbox.LRParse
             // 反序列化时可能重复调用，确保不重复添加
             if (this.itemHashSet.Add(item))
             {
-            items.Add(item);
-        }
+                items.Add(item);
+            }
         }
 
         public void AddDistinct(LR1Item item)

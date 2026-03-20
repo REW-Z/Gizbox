@@ -1,0 +1,17 @@
+﻿import <"core">  
+import <"stdlib">  
+
+using Core;  
+using Console;
+using Collections;
+
+
+void main()
+{
+	Ptr<int> p1 = default(Ptr<int>);
+	Console::PrintLn("Ptr size: " + (string)(sizeof(Ptr<int>)));
+	Console::PrintLn("ulong size: " + (string)(sizeof(ulong)));
+	
+	Console::PrintLn("Test finished!");
+	Console::ReadLn();
+}

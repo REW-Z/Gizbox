@@ -116,7 +116,14 @@ namespace Core
 		}
 	}
 
+
+
+	struct Ptr<T>
+	{
+		ulong value = 0UL;
+	}
 }
+
 
 namespace Core::Extern
 {

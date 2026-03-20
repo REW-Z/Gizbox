@@ -176,7 +176,7 @@ namespace Gizbox
 
             "declstmt -> class TYPE_NAME genparams inherit { declstatements }",
             "declstmt -> class own TYPE_NAME genparams inherit { declstatements }",
-            "declstmt -> struct TYPE_NAME { declstatements }",
+            "declstmt -> struct TYPE_NAME genparams { declstatements }",
             "declstmt -> enum TYPE_NAME { enumitems }",
 
             "enumitems -> enumitems , enumitem",

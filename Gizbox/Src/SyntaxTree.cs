@@ -878,6 +878,11 @@ namespace Gizbox
         [DataContract(IsReference = true)]
         public class StructDeclareNode : DeclareNode
         {
+            [DataMember]
+            public bool isTemplateStruct;
+            [DataMember]
+            public readonly List<IdentityNode> templateParameters = new();
+
             public IdentityNode structNameNode { get => (IdentityNode)children_group_0[0]; set => children_group_0[0] = value; }
 
             [IgnoreDataMember]

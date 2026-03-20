@@ -542,6 +542,13 @@ namespace Gizbox
                     yield return match.Groups[1].Value;
             }
 
+            var structRegex = new Regex(@"\bstruct\s+([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*)");
+            foreach(Match match in structRegex.Matches(source))
+            {
+                if(match.Success)
+                    yield return match.Groups[1].Value;
+            }
+
             var classGenericRegex = new Regex(@"\bclass\s+(?:own\s+)?[A-Za-z_][A-Za-z0-9_]*\s*<([^>]+)>");
             foreach (Match match in classGenericRegex.Matches(source))
             {
@@ -549,6 +556,18 @@ namespace Gizbox
                     continue;
 
                 foreach (var name in SplitGenericParams(match.Groups[1].Value))
+                {
+                    yield return name;
+                }
+            }
+
+            var structGenericRegex = new Regex(@"\bstruct\s+[A-Za-z_][A-Za-z0-9_]*\s*<([^>]+)>");
+            foreach(Match match in structGenericRegex.Matches(source))
+            {
+                if(!match.Success)
+                    continue;
+
+                foreach(var name in SplitGenericParams(match.Groups[1].Value))
                 {
                     yield return name;
                 }
@@ -595,6 +614,11 @@ namespace Gizbox
             foreach(var templateClass in lib.templateClasses)
             {
                 AddTypeName(result, templateClass);
+            }
+
+            foreach(var templateStruct in lib.templateStructs)
+            {
+                AddTypeName(result, templateStruct);
             }
 
             foreach (var record in lib.globalScope.env.records.Values)

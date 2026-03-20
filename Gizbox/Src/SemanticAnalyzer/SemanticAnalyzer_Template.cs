@@ -20,9 +20,23 @@ namespace Gizbox.SemanticRule;
 public partial class SemanticAnalyzer
 {
 
-    //模板类实例信息
-    private class ClassTemplateInstance
+    private enum NamedTypeTemplateKind
     {
+        Class,
+        Struct,
+    }
+
+    private class NamedTypeTemplateDefinition
+    {
+        public NamedTypeTemplateKind kind;
+        public SyntaxTree.DeclareNode templateNode;
+        public IdentityNode nameNode;
+    }
+
+    //模板命名类型实例信息
+    private class NamedTypeTemplateInstance
+    {
+        public NamedTypeTemplateKind kind;
         public string templateName;
         public string mangledName;
         public List<SyntaxTree.TypeNode> typeArguments;
@@ -43,74 +57,52 @@ public partial class SemanticAnalyzer
 
 
 
-    //模板类特化（AST层面）：收集模板定义、实例化并生成专用类
-    private void SpecializeClassTemplates()
+    /// <summary>模板命名类型特化（AST层面）：统一处理类模板和结构体模板。</summary>
+    private bool SpecializeNamedTypeTemplates()
     {
         if(ast?.rootNode == null)
-            return;
+            return false;
 
         EnsureTemplateSpecializationDependenciesLoaded();
 
-        //收集当前模块的模板类定义
-        var templatesLocal = new Dictionary<string, SyntaxTree.ClassDeclareNode>();
-        CollectClassTemplates(ast.rootNode, templatesLocal);
+        templateFullNameDict.Clear();
 
-        var templatesDeps = new Dictionary<string, SyntaxTree.ClassDeclareNode>();
+        //收集当前模块的命名类型模板定义
+        var templatesLocal = new Dictionary<string, NamedTypeTemplateDefinition>();
+        CollectNamedTypeTemplates(ast.rootNode, templatesLocal);
+
+        var templatesDeps = new Dictionary<string, NamedTypeTemplateDefinition>();
         foreach(var dep in ilUnit.dependencyLibs)
         {
             dep.EnsureAst();
             if(dep.ast?.rootNode == null)
                 continue;
 
-            CollectClassTemplates(dep.ast.rootNode, templatesDeps);
+            CollectNamedTypeTemplates(dep.ast.rootNode, templatesDeps);
         }
 
-        //生成ShortName ->  [FullName]映射（辅助命名空间匹配）  
-        foreach(var t in templatesLocal)
-        {
-            var shortname = t.Value.classNameNode.token.attribute;
-            var fullname = t.Value.classNameNode.FullName;
-            if(templateFullNameDict.TryGetValue(shortname, out var list) == false)
-            {
-                list = new();
-                templateFullNameDict[shortname] = list;
-            }
-            list.Add(fullname);
-        }
-        foreach (var t in templatesDeps)
-        {
-            var shortname = t.Value.classNameNode.token.attribute;
-            var fullname = t.Value.classNameNode.FullName;
-            if (templateFullNameDict.TryGetValue(shortname, out var list) == false)
-            {
-                list = new();
-                templateFullNameDict[shortname] = list;
-            }
-            list.Add(fullname);
-        }
+        //记录所有命名类型模板实例化信息（类型引用和new表达式）
+        BuildTemplateFullNameDict(templatesLocal.Values.Concat(templatesDeps.Values));
 
+        var instances = new Dictionary<string, NamedTypeTemplateInstance>();
+        CollectNamedTypeTemplateInstantiations(ast.rootNode, instances, templatesLocal, templatesDeps, inTemplate: false);
 
-
-        //记录所有模板实例化信息（类型引用和new表达式）
-        var instances = new Dictionary<string, ClassTemplateInstance>();
-        CollectClassTemplateInstantiations(ast.rootNode, instances, inTemplate: false);
-
-        var newSpecializations = new List<SyntaxTree.ClassDeclareNode>();
+        var newSpecializations = new List<SyntaxTree.DeclareNode>();
 
 
         foreach(var inst in instances.Values)
         {
-            if(IsSpecializationAvailable(inst.mangledName))
+            if(IsNamedTypeSpecializationAvailable(inst.kind, inst.mangledName))
                 continue;
 
-            var templateNode = FindTemplateClass(inst.templateName, templatesLocal, templatesDeps);
+            var templateNode = FindNamedTypeTemplate(inst.templateName, templatesLocal, templatesDeps);
             if(templateNode == null)
             {
                 continue;
             }
 
-            var specialized = (SyntaxTree.ClassDeclareNode)templateNode.DeepClone();
-            ApplyTemplateSpecialization(templateNode, specialized, inst.mangledName, inst.typeArguments);
+            var specialized = (SyntaxTree.DeclareNode)templateNode.templateNode.DeepClone();
+            ApplyNamedTypeTemplateSpecialization(templateNode, specialized, inst.mangledName, inst.typeArguments);
             newSpecializations.Add(specialized);
         }
 
@@ -121,35 +113,75 @@ public partial class SemanticAnalyzer
                 ast.rootNode.statementsNode.statements.Insert(0, newSpecializations[i]);
             }
         }
+
+        return newSpecializations.Count > 0;
     }
 
-    //收集模板类定义
-    private void CollectClassTemplates(SyntaxTree.Node node, Dictionary<string, SyntaxTree.ClassDeclareNode> templates)
+    /// <summary>收集命名类型模板定义（类/结构体）。</summary>
+    private void CollectNamedTypeTemplates(SyntaxTree.Node node, Dictionary<string, NamedTypeTemplateDefinition> templates)
     {
-        //遍历语法树收集模板类定义
         if(node == null)
             return;
 
         if(node is SyntaxTree.ClassDeclareNode classDecl && classDecl.isTemplateClass)
         {
             TemplateCompleteDefineFullName(classDecl.classNameNode);
-            templates[classDecl.classNameNode.FullName] = classDecl;
+            templates[classDecl.classNameNode.FullName] = new NamedTypeTemplateDefinition()
+            {
+                kind = NamedTypeTemplateKind.Class,
+                templateNode = classDecl,
+                nameNode = classDecl.classNameNode,
+            };
+            return;
+        }
+
+        if(node is SyntaxTree.StructDeclareNode structDecl && structDecl.isTemplateStruct)
+        {
+            TemplateCompleteDefineFullName(structDecl.structNameNode);
+            templates[structDecl.structNameNode.FullName] = new NamedTypeTemplateDefinition()
+            {
+                kind = NamedTypeTemplateKind.Struct,
+                templateNode = structDecl,
+                nameNode = structDecl.structNameNode,
+            };
             return;
         }
 
         foreach(var child in node.Children())
         {
-            CollectClassTemplates(child, templates);
+            CollectNamedTypeTemplates(child, templates);
         }
     }
 
-    //收集模板类实例化信息
-    private void CollectClassTemplateInstantiations(SyntaxTree.Node node, Dictionary<string, ClassTemplateInstance> instances, bool inTemplate)
+    /// <summary>构建模板短名到全名的映射，供命名空间匹配使用。</summary>
+    private void BuildTemplateFullNameDict(IEnumerable<NamedTypeTemplateDefinition> templates)
+    {
+        foreach(var template in templates)
+        {
+            var shortname = template.nameNode.token.attribute;
+            var fullname = template.nameNode.FullName;
+            if(templateFullNameDict.TryGetValue(shortname, out var list) == false)
+            {
+                list = new();
+                templateFullNameDict[shortname] = list;
+            }
+            list.Add(fullname);
+        }
+    }
+
+    /// <summary>收集命名类型模板实例化信息（统一处理类模板和结构体模板）。</summary>
+    private void CollectNamedTypeTemplateInstantiations(SyntaxTree.Node node,
+        Dictionary<string, NamedTypeTemplateInstance> instances,
+        Dictionary<string, NamedTypeTemplateDefinition> templatesLocal,
+        Dictionary<string, NamedTypeTemplateDefinition> templatesDeps,
+        bool inTemplate)
     {
         if(node == null)
             return;
 
-        if(node is SyntaxTree.ClassDeclareNode classDecl && classDecl.isTemplateClass)
+        if((node is SyntaxTree.ClassDeclareNode classDecl && classDecl.isTemplateClass)
+            || (node is SyntaxTree.StructDeclareNode structDecl && structDecl.isTemplateStruct)
+            || (node is SyntaxTree.FuncDeclareNode funcDecl && funcDecl.isTemplateFunction))
         {
             inTemplate = true;
         }
@@ -160,29 +192,37 @@ public partial class SemanticAnalyzer
             {
                 //记录类型引用处的模板实例
                 TemplateTryMatchNamespace(classType.classname);
-                RegisterTemplateInstance(classType, instances);
-                NormalizeGenericUsage(classType);
+                var templateDef = FindNamedTypeTemplate(classType.classname.FullName, templatesLocal, templatesDeps);
+                if(templateDef != null)
+                {
+                    RegisterNamedTypeTemplateInstance(classType, templateDef, instances);
+                    NormalizeGenericUsage(classType);
+                }
             }
 
             if(node is SyntaxTree.NewObjectNode newObjNode && newObjNode.typeNode is SyntaxTree.NamedTypeNode newObjTypeNode && newObjTypeNode.genericArguments.Count > 0)
             {
                 //记录new处的模板实例并规范化名称
                 TemplateTryMatchNamespace(newObjTypeNode.classname);
-                RegisterTemplateInstance(newObjTypeNode, instances);
-                NormalizeGenericUsage(newObjNode, newObjTypeNode);
+                var templateDef = FindNamedTypeTemplate(newObjTypeNode.classname.FullName, templatesLocal, templatesDeps);
+                if(templateDef != null && templateDef.kind == NamedTypeTemplateKind.Class)
+                {
+                    RegisterNamedTypeTemplateInstance(newObjTypeNode, templateDef, instances);
+                    NormalizeGenericUsage(newObjNode, newObjTypeNode);
+                }
             }
         }
 
         foreach(var child in node.Children())
         {
-            CollectClassTemplateInstantiations(child, instances, inTemplate);
+            CollectNamedTypeTemplateInstantiations(child, instances, templatesLocal, templatesDeps, inTemplate);
         }
 
         if(node is SyntaxTree.CallNode callNode)
         {
             foreach(var arg in callNode.genericArguments)
             {
-                CollectClassTemplateInstantiations(arg, instances, inTemplate);
+                CollectNamedTypeTemplateInstantiations(arg, instances, templatesLocal, templatesDeps, inTemplate);
             }
         }
 
@@ -190,13 +230,13 @@ public partial class SemanticAnalyzer
         {
             foreach(var arg in classTypeWithArgs.genericArguments)
             {
-                CollectClassTemplateInstantiations(arg, instances, inTemplate);
+                CollectNamedTypeTemplateInstantiations(arg, instances, templatesLocal, templatesDeps, inTemplate);
             }
         }
     }
 
     //特化函数模板：收集模板定义、实例化并生成专用函数
-    private void SpecializeFunctionTemplates()
+    private bool SpecializeFunctionTemplates()
     {
         EnsureTemplateSpecializationDependenciesLoaded();
 
@@ -242,7 +282,7 @@ public partial class SemanticAnalyzer
 
         //记录所有函数模板特化信息  
         var instances = new Dictionary<string, FunctionTemplateInstance>();
-        CollectFunctionTemplateInstantiations(ast.rootNode, instances, inTemplate: false);
+        CollectFunctionTemplateInstantiations(ast.rootNode, instances, templatesLocal, templatesDeps, inTemplate: false);
 
         var newSpecializations = new List<SyntaxTree.FuncDeclareNode>();
         foreach(var inst in instances.Values)
@@ -266,6 +306,8 @@ public partial class SemanticAnalyzer
                 ast.rootNode.statementsNode.statements.Insert(0, newSpecializations[i]);
             }
         }
+
+        return newSpecializations.Count > 0;
     }
 
     //收集模板函数定义
@@ -293,7 +335,11 @@ public partial class SemanticAnalyzer
 
 
     //收集模板函数实例化信息
-    private void CollectFunctionTemplateInstantiations(SyntaxTree.Node node, Dictionary<string, FunctionTemplateInstance> instances, bool inTemplate)
+    private void CollectFunctionTemplateInstantiations(SyntaxTree.Node node,
+        Dictionary<string, FunctionTemplateInstance> instances,
+        Dictionary<string, SyntaxTree.FuncDeclareNode> templatesLocal,
+        Dictionary<string, SyntaxTree.FuncDeclareNode> templatesDeps,
+        bool inTemplate)
     {
         if(node == null)
             return;
@@ -309,21 +355,23 @@ public partial class SemanticAnalyzer
             {
                 //记录函数调用处的模板实例
                 TemplateTryMatchNamespace(funcId);
-                RegisterFunctionTemplateInstance(funcId, callNode, instances);
+                if(templatesLocal.ContainsKey(funcId.FullName) || templatesDeps.ContainsKey(funcId.FullName))
+                {
+                    RegisterFunctionTemplateInstance(funcId, callNode, instances);
+                }
             }
         }
 
         foreach(var child in node.Children())
         {
-            CollectFunctionTemplateInstantiations(child, instances, inTemplate);
+            CollectFunctionTemplateInstantiations(child, instances, templatesLocal, templatesDeps, inTemplate);
         }
     }
 
     //注册函数模板实例
     private void RegisterFunctionTemplateInstance(SyntaxTree.IdentityNode funcId, SyntaxTree.CallNode callNode, Dictionary<string, FunctionTemplateInstance> instances)
     {
-        var argTypes = callNode.genericArguments.Select(t => GType.Parse(t.TypeExpression())).ToArray();
-        var mangledBaseName = Utils.MangleTemplateInstanceName(funcId.FullName, argTypes);
+        var mangledBaseName = BuildTemplateInstanceName(funcId.FullName, callNode.genericArguments);
         if(instances.ContainsKey(mangledBaseName))
         {
             // 已记录实例，仍需规范化调用表达式
@@ -417,25 +465,26 @@ public partial class SemanticAnalyzer
         ApplyTemplateTypeReplacement(specialized, typeMap);
     }
 
-    //注册模板类实例
-    private void RegisterTemplateInstance(SyntaxTree.NamedTypeNode classType, Dictionary<string, ClassTemplateInstance> instances)
+    /// <summary>注册命名类型模板实例。</summary>
+    private void RegisterNamedTypeTemplateInstance(SyntaxTree.NamedTypeNode namedType, NamedTypeTemplateDefinition templateDef, Dictionary<string, NamedTypeTemplateInstance> instances)
     {
-        var mangledName = GType.Normalize(classType.TypeExpression());
+        var mangledName = BuildTemplateInstanceName(namedType.classname.FullName, namedType.genericArguments);
         if(instances.ContainsKey(mangledName))
             return;
 
-        instances[mangledName] = new ClassTemplateInstance
+        instances[mangledName] = new NamedTypeTemplateInstance
         {
-            templateName = classType.classname.FullName,
+            kind = templateDef.kind,
+            templateName = namedType.classname.FullName,
             mangledName = mangledName,
-            typeArguments = classType.genericArguments.ToList(),
+            typeArguments = namedType.genericArguments.ToList(),
         };
     }
 
     //规范化模板类类型引用（清理泛型参数并替换类型名）
     private void NormalizeGenericUsage(SyntaxTree.NamedTypeNode classType)
     {
-        var mangledName = GType.Normalize(classType.TypeExpression());
+        var mangledName = BuildTemplateInstanceName(classType.classname.FullName, classType.genericArguments);
         classType.genericArguments.Clear();
         classType.classname.SetPrefix(null);
         classType.classname.token.attribute = mangledName;
@@ -444,7 +493,7 @@ public partial class SemanticAnalyzer
     //规范化new语句中的模板类型引用
     private void NormalizeGenericUsage(SyntaxTree.NewObjectNode newObjNode, SyntaxTree.NamedTypeNode classType)
     {
-        var mangledName = GType.Normalize(classType.TypeExpression());
+        var mangledName = BuildTemplateInstanceName(classType.classname.FullName, classType.genericArguments);
         classType.genericArguments.Clear();
         classType.classname.SetPrefix(null);
         classType.classname.token.attribute = mangledName;
@@ -453,9 +502,54 @@ public partial class SemanticAnalyzer
         newObjNode.className.token.attribute = mangledName;
     }
 
-    private SyntaxTree.ClassDeclareNode FindTemplateClass(string name,
-        Dictionary<string, SyntaxTree.ClassDeclareNode> localTemplates,
-        Dictionary<string, SyntaxTree.ClassDeclareNode> depTemplates)
+    /// <summary>在模板阶段根据语法类型节点构造稳定的模板实例名。</summary>
+    private string BuildTemplateInstanceName(string baseName, IEnumerable<SyntaxTree.TypeNode> typeArguments)
+    {
+        return Utils.MangleTemplateInstanceName(baseName, typeArguments?.Select(BuildTemplateTypeNameFromSyntax));
+    }
+
+    /// <summary>在模板阶段从语法类型节点构造类型名，不依赖语义补全后的 TypeExpression。</summary>
+    private string BuildTemplateTypeNameFromSyntax(SyntaxTree.TypeNode typeNode)
+    {
+        if(typeNode == null)
+            return string.Empty;
+
+        string ownershipPrefix = typeNode.ownershipModifier switch
+        {
+            VarModifiers.Own => "own_",
+            VarModifiers.Bor => "bor_",
+            _ => string.Empty,
+        };
+
+        switch(typeNode)
+        {
+            case SyntaxTree.PrimitiveTypeNode primitiveTypeNode:
+                return ownershipPrefix + primitiveTypeNode.token.name;
+            case SyntaxTree.InferTypeNode:
+                return ownershipPrefix + "var";
+            case SyntaxTree.NamedTypeNode namedTypeNode:
+                {
+                    var baseTypeName = ownershipPrefix + namedTypeNode.classname.FullName;
+                    if(namedTypeNode.genericArguments.Count == 0)
+                        return baseTypeName;
+
+                    return BuildTemplateInstanceName(baseTypeName, namedTypeNode.genericArguments);
+                }
+            case SyntaxTree.ArrayTypeNode arrayTypeNode:
+                return ownershipPrefix + BuildTemplateTypeNameFromSyntax(arrayTypeNode.elemtentType) + "[]";
+            case SyntaxTree.RefTypeNode refTypeNode:
+                return ownershipPrefix + "ref_" + BuildTemplateTypeNameFromSyntax(refTypeNode.targetType);
+            case SyntaxTree.FuncPtrTypeNode funcPtrTypeNode:
+                return ownershipPrefix + "fn_" + string.Join("_", funcPtrTypeNode.typeArguments.Select(BuildTemplateTypeNameFromSyntax));
+            default:
+                return ownershipPrefix + typeNode.GetType().Name;
+        }
+    }
+
+    /// <summary>查找命名类型模板定义。</summary>
+    private NamedTypeTemplateDefinition FindNamedTypeTemplate(string name,
+        Dictionary<string, NamedTypeTemplateDefinition> localTemplates,
+        Dictionary<string, NamedTypeTemplateDefinition> depTemplates)
     {
         if(localTemplates.TryGetValue(name, out var local))
             return local;
@@ -464,44 +558,83 @@ public partial class SemanticAnalyzer
         return null;
     }
 
-    private bool IsSpecializationAvailable(string mangledName)
+    /// <summary>判断命名类型模板特化是否已存在。</summary>
+    private bool IsNamedTypeSpecializationAvailable(NamedTypeTemplateKind kind, string mangledName)
     {
         if(ast.rootNode?.statementsNode?.statements != null)
         {
             foreach(var stmt in ast.rootNode.statementsNode.statements)
             {
-                if(stmt is SyntaxTree.ClassDeclareNode classDecl && !classDecl.isTemplateClass && classDecl.classNameNode.FullName == mangledName)
+                if(kind == NamedTypeTemplateKind.Class
+                    && stmt is SyntaxTree.ClassDeclareNode classDecl
+                    && !classDecl.isTemplateClass
+                    && classDecl.classNameNode.FullName == mangledName)
+                {
                     return true;
+                }
+
+                if(kind == NamedTypeTemplateKind.Struct
+                    && stmt is SyntaxTree.StructDeclareNode structDecl
+                    && !structDecl.isTemplateStruct
+                    && structDecl.structNameNode.FullName == mangledName)
+                {
+                    return true;
+                }
             }
         }
 
         foreach(var dep in ilUnit.dependencyLibs)
         {
             var rec = dep.QueryTopSymbol(mangledName);
-            if(rec != null && rec.category == SymbolTable.RecordCatagory.Class)
+            if(rec == null)
+                continue;
+
+            if(kind == NamedTypeTemplateKind.Class && rec.category == SymbolTable.RecordCatagory.Class)
+                return true;
+            if(kind == NamedTypeTemplateKind.Struct && rec.category == SymbolTable.RecordCatagory.Struct)
                 return true;
         }
 
         return false;
     }
 
-    //应用类模板特化（替换模板参数并生成具体类）
-    private void ApplyTemplateSpecialization(SyntaxTree.ClassDeclareNode template,
-        SyntaxTree.ClassDeclareNode specialized,
+    /// <summary>应用命名类型模板特化并替换模板参数。</summary>
+    private void ApplyNamedTypeTemplateSpecialization(NamedTypeTemplateDefinition templateDef,
+        SyntaxTree.DeclareNode specialized,
         string mangledName,
         List<SyntaxTree.TypeNode> typeArguments)
     {
-        var paramList = template.templateParameters;
+        List<IdentityNode> paramList;
+        if(templateDef.kind == NamedTypeTemplateKind.Class)
+        {
+            paramList = ((SyntaxTree.ClassDeclareNode)templateDef.templateNode).templateParameters;
+        }
+        else
+        {
+            paramList = ((SyntaxTree.StructDeclareNode)templateDef.templateNode).templateParameters;
+        }
+
         if(paramList.Count != typeArguments.Count)
-            throw new SemanticException(ExceptioName.SemanticAnalysysError, template, "template argument count mismatch");
+            throw new SemanticException(ExceptioName.SemanticAnalysysError, templateDef.templateNode, "template argument count mismatch");
 
-        specialized.isTemplateClass = false;
-        specialized.templateParameters.Clear();
-
-        specialized.classNameNode.SetPrefix(null);
-        specialized.classNameNode.token.attribute = mangledName;
-        specialized.classNameNode.SetPrefix(null);
-        specialized.classNameNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
+        if(templateDef.kind == NamedTypeTemplateKind.Class)
+        {
+            var specializedClass = (SyntaxTree.ClassDeclareNode)specialized;
+            specializedClass.isTemplateClass = false;
+            specializedClass.templateParameters.Clear();
+            specializedClass.classNameNode.SetPrefix(null);
+            specializedClass.classNameNode.token.attribute = mangledName;
+            specializedClass.classNameNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
+        }
+        else
+        {
+            var specializedStruct = (SyntaxTree.StructDeclareNode)specialized;
+            specializedStruct.isTemplateStruct = false;
+            specializedStruct.templateParameters.Clear();
+            specializedStruct.structNameNode.SetPrefix(null);
+            specializedStruct.structNameNode.token.attribute = mangledName;
+            specializedStruct.structNameNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
+        }
 
         var typeMap = new Dictionary<string, SyntaxTree.TypeNode>();
         for(int i = 0; i < paramList.Count; ++i)

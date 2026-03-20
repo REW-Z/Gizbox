@@ -69,7 +69,7 @@ namespace Gizbox
         const_rec,
         func_rec,
         func_ptr_ownsig,
-        class_rec,
+        decl_type_rec,
         enum_rec,
         obj_class_rec,
         not_a_property,
@@ -205,8 +205,14 @@ namespace Gizbox.SemanticRule
             //可用命名空间前缀收集  
             CollectAllUsingNamespacePrefix();
             //模板特化（AST层面）
-            SpecializeClassTemplates();
-            SpecializeFunctionTemplates();
+            bool specialized;
+            do
+            {
+                specialized = false;
+                specialized |= SpecializeNamedTypeTemplates();
+                specialized |= SpecializeFunctionTemplates();
+            }
+            while(specialized);
 
             //Pass1
             envStack = new GStack<SymbolTable>();
@@ -555,7 +561,7 @@ namespace Gizbox.SemanticRule
                                 "",
                                 newEnv
                                 );
-                            classDeclNode.attributes[AstAttr.class_rec] = newRec;
+                            classDeclNode.attributes[AstAttr.decl_type_rec] = newRec;
 
                             //所有权模型  
                             if(classDeclNode.flags.HasFlag(TypeModifiers.Own))
@@ -569,23 +575,34 @@ namespace Gizbox.SemanticRule
                         }
                     }
                     break;
+                //结构体声明  
                 case SyntaxTree.StructDeclareNode structDeclNode:
                     {
+                        if(structDeclNode.isTemplateStruct)
+                        {
+                            if(isTopLevelAtNamespace)
+                                structDeclNode.structNameNode.SetPrefix(currentNamespace);
+                            ilUnit.templateStructs.Add(structDeclNode.structNameNode.FullName);
+                            break;
+                        }
+
                         if(isGlobalOrTopNamespace)
                         {
                             if(isTopLevelAtNamespace)
                                 structDeclNode.structNameNode.SetPrefix(currentNamespace);
 
+                            //新的作用域  
                             var newEnv = new SymbolTable(structDeclNode.structNameNode.FullName, SymbolTable.TableCatagory.ClassScope, envStack.Peek());
                             structDeclNode.attributes[AstAttr.env] = newEnv;
 
+                            //添加条目-结构体名
                             var newRec = envStack.Peek().NewRecord(
                                 structDeclNode.structNameNode.FullName,
                                 SymbolTable.RecordCatagory.Struct,
                                 "",
                                 newEnv
                             );
-                            structDeclNode.attributes[AstAttr.class_rec] = newRec;
+                            structDeclNode.attributes[AstAttr.decl_type_rec] = newRec;
                         }
                         else
                         {
@@ -933,7 +950,7 @@ namespace Gizbox.SemanticRule
                             //隐藏的this参数加入符号表    
                             if(isMethod)
                             {
-                                var classRec = funcDeclNode.Parent.attributes[AstAttr.class_rec] as SymbolTable.Record;
+                                var classRec = funcDeclNode.Parent.attributes[AstAttr.decl_type_rec] as SymbolTable.Record;
                                 bool isOwnershipClass = classRec.flags.HasFlag(SymbolTable.RecordFlag.OwnershipClass);
                                 funcEnv.NewRecord("this", SymbolTable.RecordCatagory.Param, $"{ (isOwnershipClass ? "(own-class)" : "(class)")}{className}");
                             }
@@ -1127,7 +1144,7 @@ namespace Gizbox.SemanticRule
                         }
 
                         //生成类的内存布局  
-                        GenClassLayoutInfo(classDeclNode.attributes[AstAttr.class_rec] as SymbolTable.Record);
+                        GenClassLayoutInfo(classDeclNode.attributes[AstAttr.decl_type_rec] as SymbolTable.Record);
 
 
                         //离开类作用域  
@@ -1136,6 +1153,9 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.StructDeclareNode structDeclNode:
                     {
+                        if(structDeclNode.isTemplateStruct)
+                            break;
+
                         structDeclNode.structNameNode.attributes[AstAttr.def_at_env] = envStack.Peek();
 
                         var newEnv = (SymbolTable)structDeclNode.attributes[AstAttr.env];
@@ -1150,7 +1170,7 @@ namespace Gizbox.SemanticRule
                         }
 
                         // 生成结构体内存布局
-                        GenStructLayoutInfo(structDeclNode.attributes[AstAttr.class_rec] as SymbolTable.Record);
+                        GenStructLayoutInfo(structDeclNode.attributes[AstAttr.decl_type_rec] as SymbolTable.Record);
 
                         envStack.Pop();
                     }
@@ -1572,6 +1592,9 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.StructDeclareNode structDeclNode:
                     {
+                        if(structDeclNode.isTemplateStruct)
+                            break;
+
                         envStack.Push(structDeclNode.attributes[AstAttr.env] as SymbolTable);
 
                         foreach(var declNode in structDeclNode.memberDelareNodes)
@@ -2555,6 +2578,9 @@ namespace Gizbox.SemanticRule
                     }
                 case SyntaxTree.StructDeclareNode structDecl:
                     {
+                        if(structDecl.isTemplateStruct)
+                            break;
+
                         envStack.Push(structDecl.attributes[AstAttr.env] as SymbolTable);
 
                         foreach(var decl in structDecl.memberDelareNodes)
@@ -3738,7 +3764,7 @@ namespace Gizbox.SemanticRule
             else if(rNode is ThisNode thisNode)
             {
                 var classDecl = TrygetClassDeclNode(thisNode);
-                var classrec = classDecl.attributes[AstAttr.class_rec] as SymbolTable.Record;
+                var classrec = classDecl.attributes[AstAttr.decl_type_rec] as SymbolTable.Record;
                 if(classrec.flags.HasFlag(SymbolTable.RecordFlag.OwnershipClass))
                 {
                     rModel = SymbolTable.RecordFlag.OwnerVar;
@@ -5064,6 +5090,8 @@ namespace Gizbox.SemanticRule
                 return true;
             if(ilUnit.templateFunctions.Contains(name))
                 return true;
+            if(ilUnit.templateStructs.Contains(name))
+                return true;
 
 
             //库依赖中查找  
@@ -5072,6 +5100,8 @@ namespace Gizbox.SemanticRule
                 if(lib.templateClasses.Contains(name))
                     return true;
                 if(lib.templateFunctions.Contains(name))
+                    return true;
+                if(lib.templateStructs.Contains(name))
                     return true;
             }
 

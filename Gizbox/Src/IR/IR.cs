@@ -148,6 +148,9 @@ namespace Gizbox.IR
         //模板列表  
         [DataMember]
         public List<string> templateFunctions = new();
+        //模板列表  
+        [DataMember]
+        public List<string> templateStructs = new();
 
         //(不序列化) 临时载入的依赖      
         public List<IRUnit> dependencyLibs = new List<IRUnit>();
