@@ -1,0 +1,42 @@
+﻿import <"core">  
+import <"stdlib">  
+
+using Core;  
+using Console;
+using Collections;
+
+
+
+void test_funcptr()
+{
+	Console::PrintLn("------- test_funcptr -------");
+
+	//测试函数指针和函数指针转换整数
+	int(int,int) funcPtr = Add;
+	int rs = funcPtr(111,444);
+	Console::PrintLn("FuncPtr result:" + (string)rs);
+
+	ulong intptr1 = (ulong)funcPtr;
+	Console::PrintLn("intptr1 - " + (string)intptr1);
+	int(int,int) ptrnew1 = (int(int,int))intptr1;
+	
+	ulong intptr2 = (ulong)ptrnew1;
+	int(int,int) ptrnew2 = (int(int,int))intptr2;
+
+
+	int rs2 = ptrnew2(222, 555);
+	Console::PrintLn("FuncPtr(222, 555) result:" + (string)rs2);
+}
+
+int Add(int a, int b)
+{
+	return a + b;
+}
+
+void main()
+{
+	test_funcptr();
+
+	Console::PrintLn("Test finished!");
+	Console::ReadLn();
+}

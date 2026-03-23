@@ -42,85 +42,148 @@ namespace Core
 		}
 	}
 
-
-	class Bool
-	{
-		bool value = false;
-
-		string ToString()
-		{
-			return Core::Extern::BoolToString(this.value);
-		}
-	}
-	class Char
-	{
-		char value = ' ';
-
-		string ToString()
-		{
-			return Core::Extern::CharToString(this.value);
-		}
-	}
-	class Int
-	{
-		int value = 0;
-		
-		string ToString()
-		{
-			return Core::Extern::IntToString(this.value);
-		}
-	}
-	class Long
-	{
-		long value = 0L;
-		
-		string ToString()
-		{
-			return Core::Extern::LongToString(this.value);
-		}
-	}
-	class UInt
-	{
-		uint value = 0u;
-		
-		string ToString()
-		{
-			return Core::Extern::UIntToString(this.value);
-		}
-	}
-	class ULong
-	{
-		ulong value = 0ul;
-		
-		string ToString()
-		{
-			return Core::Extern::ULongToString(this.value);
-		}
-	}
-	class Float
-	{
-		float value = 0.0f;
-		
-		string ToString()
-		{
-			return Core::Extern::FloatToString(this.value);
-		}
-	}
-	class Double
-	{
-		double value = 0.0d;
-		
-		string ToString()
-		{
-			return Core::Extern::DoubleToString(this.value);
-		}
-	}
-
-
-
 	struct Ptr<T>
 	{
 		ulong value = 0UL;
+	}
+
+
+
+
+	class SharedBox<T>
+	{
+	private:
+		int refCount = 1;
+		T value = default(T);
+	public:
+		SharedBox(T v)
+		{
+			this.value = v;
+		}
+
+		void AddRef()
+		{
+			this.refCount += 1;
+		}
+
+		int ReleaseRef()
+		{
+			this.refCount -= 1;
+			if(this.refCount <= 0)
+			{
+				this.refCount = 0;
+				if(this.value != default(T))
+				{
+					delete this.value;
+					this.value = default(T);
+				}
+			}
+			return this.refCount;
+		}
+
+		bor T Borrow()
+		{
+			return this.value;
+		}
+
+		int UseCount()
+		{
+			return this.refCount;
+		}
+
+		bool IsUnique()
+		{
+			return this.refCount == 1;
+		}
+
+		bool IsNull()
+		{
+			return this.value == default(T);
+		}
+	}
+
+	class own Shared<T>
+	{
+	private:
+		Core::SharedBox<T> box = null;
+	public:
+		Shared()
+		{
+		}
+
+		Shared(T value)
+		{
+			this.box = new Core::SharedBox<T>(value);
+		}
+
+		~Shared()
+		{
+			this.Reset();
+		}
+
+		Shared<T> Clone()
+		{
+			Shared<T> ptr = new Core::Shared<T>();
+			if(this.box != null)
+			{
+				this.box.AddRef();
+				ptr.box = this.box;
+			}
+			return ptr;
+		}
+
+		bor T Get()
+		{
+			if(this.box == null)
+				return null;
+			return this.box.Borrow();
+		}
+
+		bor T Borrow()
+		{
+			return this.Get();
+		}
+
+		int UseCount()
+		{
+			if(this.box == null)
+				return 0;
+			return this.box.UseCount();
+		}
+
+		bool IsUnique()
+		{
+			return this.UseCount() == 1;
+		}
+
+		bool IsNull()
+		{
+			if(this.box == null)
+				return true;
+			return this.box.IsNull();
+		}
+
+		void Reset()
+		{
+			if(this.box == null)
+				return;
+
+			int remaining = this.box.ReleaseRef();
+			if(remaining == 0)
+			{
+				delete this.box;
+			}
+
+			this.box = null;
+		}
+	}
+}
+
+namespace Core::Shared
+{
+	Core::Shared<T> New<T>(T value)
+	{
+		return new Core::Shared<T>(value);
 	}
 }
 
@@ -152,25 +215,6 @@ namespace Core::Extern
 
 	extern float Sin(float v);
 	extern float Cos(float v);
-}
-
-
-
-namespace Core::Boolean
-{
-	const int size = 8;
-}
-namespace Core::Integer
-{
-	const int size = 32;
-}
-namespace Core::Float
-{
-	const int size = 32;
-}
-namespace Core::Double
-{
-	const int size = 64;
 }
 
 namespace Console

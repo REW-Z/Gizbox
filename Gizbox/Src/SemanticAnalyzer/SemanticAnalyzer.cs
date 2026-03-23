@@ -275,9 +275,19 @@ namespace Gizbox.SemanticRule
                     break;
                 case SyntaxTree.StatementsNode stmtsNode:
                     {
-                        foreach (var stmtNode in stmtsNode.statements)
+                        //先扫描类型声明（类、结构体、枚举） -> 模板函数声明等可以引用这些类型  
+                        foreach(var stmtNode in stmtsNode.statements)
                         {
+                            if(stmtNode is FuncDeclareNode)
+                                continue;
                             Pass1_CollectGlobalSymbols(stmtNode);
+                        }
+                        foreach(var stmtNode in stmtsNode.statements)
+                        {
+                            if(stmtNode is FuncDeclareNode)
+                            {
+                                Pass1_CollectGlobalSymbols(stmtNode);
+                            }
                         }
                     }
                     break;
@@ -5206,7 +5216,7 @@ namespace Gizbox.SemanticRule
 
                         var typeName = namedTypeNode.classname.FullName;
                         var rec = Query(typeName);
-                        if(rec == null)
+                        if(rec == null) 
                             throw new GizboxException(ExceptioName.Undefine, $"namedType:{typeName} not found!");
 
                         if(rec.category == SymbolTable.RecordCatagory.Struct)
@@ -5395,19 +5405,8 @@ namespace Gizbox.SemanticRule
                 return arrTypeNode;
             }
 
-            bool isPrimitive = typeExpr == "void"
-                || typeExpr == "bool"
-                || typeExpr == "char"
-                || typeExpr == "byte"
-                || typeExpr == "int"
-                || typeExpr == "uint"
-                || typeExpr == "long"
-                || typeExpr == "ulong"
-                || typeExpr == "float"
-                || typeExpr == "double"
-                || typeExpr == "string";
 
-            if(isPrimitive)
+            if(parsedType.IsPrimitive)
             {
                 return new SyntaxTree.PrimitiveTypeNode()
                 {

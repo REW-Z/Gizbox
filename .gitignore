@@ -4,8 +4,8 @@
 
 Gizbox/bin
 Gizbox/obj
-GizboxAOT/bin
-GizboxAOT/obj
+GizboxLLVM/bin
+GizboxLLVM/obj
 GizboxLSP/bin
 GizboxLSP/obj
 GizboxCLI/bin

@@ -31,6 +31,9 @@
     <None Update="lib\stdlib.gix">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="test\test_funcptr.gix">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="test\test_ptr.gix">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

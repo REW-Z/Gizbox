@@ -5,6 +5,10 @@ using Core;
 using Console;
 using Collections;
 
+class Int
+{
+    int value = 0;
+}
 class own OInt
 {
     int value = 0;

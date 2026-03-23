@@ -11,6 +11,14 @@ using GizboxTest;
 using Gizbox.Src.Backend;
 
 
+
+
+string workspace = Path.Combine(System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "GizboxWorkspace");
+if(System.IO.Directory.Exists(workspace) == false)
+    System.IO.Directory.CreateDirectory(workspace);
+
+
+
 string[] cmds = {
     "0.生成互操作代码",
     "1.生成库文件",
@@ -121,8 +129,8 @@ switch(cmdIdx)
             }
             Console.ResetColor();
 
-            var key = Console.ReadKey();
-            if(int.TryParse(key.KeyChar.ToString(), out int idx))
+            var key = Console.ReadLine();
+            if(int.TryParse(key, out int idx))
             {
                 var path = gixFiles[idx].FullName;
 
@@ -138,7 +146,7 @@ switch(cmdIdx)
 
                 il.Print();
 
-                compiler.ComileIRToBin(il, System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
+                compiler.ComileIRToBin(il, workspace);
             }
             else
             {
@@ -171,7 +179,7 @@ switch(cmdIdx)
 
             il.Print();
 
-            compiler.ComileIRToBin(il, System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop), options);
+            compiler.ComileIRToBin(il, workspace, options);
         }
         break;
     case 6:

@@ -1,17 +1,55 @@
 ﻿import <"core">  
-import <"stdlib">  
 
 using Core;  
 using Console;
-using Collections;
 
 
-void main()
+class Vector
+{
+	string name = "VectorTest";
+	float x = 1.0f;
+	float y = 1.0f;
+
+	void Print()
+	{
+		Console::PrintLn("x: " + (string)this.x);
+	}
+	~Vector()
+	{
+		Console::PrintLn("Vector " + this.name + " destructor called!");
+	}
+}
+
+Shared<Vector> test_shared()
+{
+	Shared<Vector> sp1 = Core::Shared::New<Vector>(new Vector());
+
+	Shared<Vector> sp2 = sp1.Clone();
+
+	sp2.Get().x = 555.0f;
+
+	Console::PrintLn("Shared sp1 value: ");
+	sp1.Get().Print();
+
+	Console::PrintLn("Shared sp2 value: ");
+	sp1.Get().Print();
+
+	Console::PrintLn("function test_shared end");
+	return sp2;
+}
+
+void test_interop_ptr()
 {
 	Ptr<int> p1 = default(Ptr<int>);
 	Console::PrintLn("Ptr size: " + (string)(sizeof(Ptr<int>)));
 	Console::PrintLn("ulong size: " + (string)(sizeof(ulong)));
+}
+
+void main()
+{
+	test_interop_ptr();
+	Shared<Vector> v = test_shared();
 	
-	Console::PrintLn("Test finished!");
+	Console::PrintLn("Test finished! Press Enter To Release Vector...");
 	Console::ReadLn();
 }
