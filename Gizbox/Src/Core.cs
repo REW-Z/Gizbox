@@ -1084,34 +1084,6 @@ namespace Gizbox
             }
         }
 
-        public GType BoxType
-        {
-            get
-            {
-                switch(_Kind)
-                {
-                    case Kind.Bool:
-                        return Parse("Core::Bool");
-                    case Kind.Char:
-                        return Parse("Core::Char");
-                    case Kind.Int:
-                        return Parse("Core::Int");
-                    case Kind.Long:
-                        return Parse("Core::Long");
-                    case Kind.UInt:
-                        return Parse("Core::UInt");
-                    case Kind.ULong:
-                        return Parse("Core::ULong");
-                    case Kind.Float:
-                        return Parse("Core::Float");
-                    case Kind.Double:
-                        return Parse("Core::Double");
-                    default:
-                        return this;
-                }
-            }
-        }
-
         public string ExternConvertStringFunction
         {
             get

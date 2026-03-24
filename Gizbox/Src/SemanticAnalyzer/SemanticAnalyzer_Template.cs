@@ -624,7 +624,7 @@ public partial class SemanticAnalyzer
             specializedClass.templateParameters.Clear();
             specializedClass.classNameNode.SetPrefix(null);
             specializedClass.classNameNode.token.attribute = mangledName;
-            specializedClass.classNameNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
+            specializedClass.classNameNode.identiferType = SyntaxTree.IdentityNode.IdType.TypeName;
         }
         else
         {
@@ -633,7 +633,7 @@ public partial class SemanticAnalyzer
             specializedStruct.templateParameters.Clear();
             specializedStruct.structNameNode.SetPrefix(null);
             specializedStruct.structNameNode.token.attribute = mangledName;
-            specializedStruct.structNameNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
+            specializedStruct.structNameNode.identiferType = SyntaxTree.IdentityNode.IdType.TypeName;
         }
 
         var typeMap = new Dictionary<string, SyntaxTree.TypeNode>();

@@ -769,7 +769,7 @@ namespace Gizbox.SemanticRule
                     {
                         attributes = new Dictionary<AstAttr, object>(),
                         token = psr.stack[psr.stack.Top - 5].attributes[ParseAttr.token] as Token,
-                        identiferType = SyntaxTree.IdentityNode.IdType.Class,
+                        identiferType = SyntaxTree.IdentityNode.IdType.TypeName,
                     },
 
                     attributes = new Dictionary<AstAttr, object>(),
@@ -810,7 +810,7 @@ namespace Gizbox.SemanticRule
                     {
                         attributes = new Dictionary<AstAttr, object>(),
                         token = psr.stack[psr.stack.Top - 5].attributes[ParseAttr.token] as Token,
-                        identiferType = SyntaxTree.IdentityNode.IdType.Class,
+                        identiferType = SyntaxTree.IdentityNode.IdType.TypeName,
                     },
 
 
@@ -848,7 +848,7 @@ namespace Gizbox.SemanticRule
                     {
                         attributes = new Dictionary<AstAttr, object>(),
                         token = psr.stack[psr.stack.Top - 4].attributes[ParseAttr.token] as Token,
-                        identiferType = SyntaxTree.IdentityNode.IdType.Class,
+                        identiferType = SyntaxTree.IdentityNode.IdType.TypeName,
                     },
                     attributes = new Dictionary<AstAttr, object>(),
                 };
@@ -869,7 +869,7 @@ namespace Gizbox.SemanticRule
             });
 
             AddActionAtTail("declstmt -> enum TYPE_NAME { enumitems }", (psr, production) => {
-                var node = new SyntaxTree.EnumDeclareNode() { enumNameNode = new SyntaxTree.IdentityNode() { attributes = new Dictionary<AstAttr, object>(), token = psr.stack[psr.stack.Top - 3].attributes[ParseAttr.token] as Token, identiferType = SyntaxTree.IdentityNode.IdType.Class, }, attributes = new Dictionary<AstAttr, object>(), };
+                var node = new SyntaxTree.EnumDeclareNode() { enumNameNode = new SyntaxTree.IdentityNode() { attributes = new Dictionary<AstAttr, object>(), token = psr.stack[psr.stack.Top - 3].attributes[ParseAttr.token] as Token, identiferType = SyntaxTree.IdentityNode.IdType.TypeName, }, attributes = new Dictionary<AstAttr, object>(), };
                 node.memberNodes.AddRange(
                     (List<SyntaxTree.EnumMemberNode>)psr.stack[psr.stack.Top - 1].attributes[ParseAttr.enum_member_list]
                 );
@@ -955,7 +955,7 @@ namespace Gizbox.SemanticRule
                     {
                         attributes = new Dictionary<AstAttr, object>(),
                         token = psr.stack[psr.stack.Top].attributes[ParseAttr.token] as Token,
-                        identiferType = SyntaxTree.IdentityNode.IdType.Class,
+                        identiferType = SyntaxTree.IdentityNode.IdType.TypeName,
                     }
                 };
             });
@@ -967,7 +967,7 @@ namespace Gizbox.SemanticRule
                     {
                         attributes = new Dictionary<AstAttr, object>(),
                         token = psr.stack[psr.stack.Top].attributes[ParseAttr.token] as Token,
-                        identiferType = SyntaxTree.IdentityNode.IdType.Class,
+                        identiferType = SyntaxTree.IdentityNode.IdType.TypeName,
                     });
             });
 
@@ -1167,7 +1167,7 @@ namespace Gizbox.SemanticRule
 
             AddActionAtTail("stype -> namedtype", (psr, production) => {
                 var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[ParseAttr.id];
-                idNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
+                idNode.identiferType = SyntaxTree.IdentityNode.IdType.TypeName;
 
                 var classTypeNode = new SyntaxTree.NamedTypeNode()
                 {
@@ -1692,7 +1692,7 @@ namespace Gizbox.SemanticRule
             AddActionAtTail("newobj -> new namedtype ( args )", (psr, production) => {
 
                 var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top - 3].attributes[ParseAttr.id];
-                idNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
+                idNode.identiferType = SyntaxTree.IdentityNode.IdType.TypeName;
 
                 var classTypeNode = new SyntaxTree.NamedTypeNode()
                 {
@@ -1720,7 +1720,7 @@ namespace Gizbox.SemanticRule
             AddActionAtTail("newarr -> new namedtype [ aexpr ]", (psr, production) => {
 
                 var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top - 3].attributes[ParseAttr.id];
-                idNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
+                idNode.identiferType = SyntaxTree.IdentityNode.IdType.TypeName;
 
                 var classTypeNode = new SyntaxTree.NamedTypeNode()
                 {
@@ -1778,7 +1778,7 @@ namespace Gizbox.SemanticRule
                     {
                         attributes = new Dictionary<AstAttr, object>(),
                         token = psr.stack[psr.stack.Top - 2].attributes[ParseAttr.token] as Token,
-                        identiferType = SyntaxTree.IdentityNode.IdType.Class,
+                        identiferType = SyntaxTree.IdentityNode.IdType.TypeName,
                     },
                     memberNode = new SyntaxTree.IdentityNode()
                     {
@@ -1901,7 +1901,7 @@ namespace Gizbox.SemanticRule
 
             AddActionAtTail("stypesb -> typeidsb", (psr, production) => {
 
-                ((SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[ParseAttr.id]).identiferType = SyntaxTree.IdentityNode.IdType.Class;
+                ((SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[ParseAttr.id]).identiferType = SyntaxTree.IdentityNode.IdType.TypeName;
 
                 var classTypeNode = new SyntaxTree.NamedTypeNode()
                 {
@@ -1960,7 +1960,7 @@ namespace Gizbox.SemanticRule
 
             AddActionAtTail("inherit -> : namedtype", (psr, production) => {
                 var idNode = (SyntaxTree.IdentityNode)psr.stack[psr.stack.Top].attributes[ParseAttr.id];
-                idNode.identiferType = SyntaxTree.IdentityNode.IdType.Class;
+                idNode.identiferType = SyntaxTree.IdentityNode.IdType.TypeName;
 
                 psr.newElement.attributes[ParseAttr.ast_node] = idNode;
             });

@@ -104,6 +104,7 @@ namespace Gizbox.LanguageServices
         public LanguageService()
         {
             compiler = new Compiler();
+            compiler.ConfigParserDataSource(hardcode:true);
             compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
             scanner = new Scanner();
             parser = new LRParser(ParserHardcoder.GenerateParser(), compiler);
@@ -149,9 +150,9 @@ namespace Gizbox.LanguageServices
             sourceB.Clear();
             sourceB.Append(str);
 
-            UpdateUnit();
-
             UpdateLineInfos();
+
+            UpdateUnit();
         }
 
         public void DidChange(int start_line, int start_char, int end_line, int end_char, string text)
@@ -168,9 +169,9 @@ namespace Gizbox.LanguageServices
             }
             else
             {
-                if (start_line > lineStartsList.Count - 1 || end_line > lineStartsList.Count - 1)
+                if (start_line > lineCount - 1 || end_line > lineCount - 1)
                 {
-                    throw new Exception("Line Idx Out of Index,当前行：" + end_line + "总行数：" + lineStartsList.Count);
+                    throw new Exception("Line Idx Out of Index,当前行：" + end_line + "总行数：" + lineCount);
                 }
 
                 int start = lineStartsList[start_line] + start_char;
@@ -184,9 +185,9 @@ namespace Gizbox.LanguageServices
                 sourceB.Insert(start, text);
             }
 
-            UpdateUnit();
-
             UpdateLineInfos();
+
+            UpdateUnit();
         }
 
         public string UpdateUnit()
@@ -207,10 +208,66 @@ namespace Gizbox.LanguageServices
                 foreach (var idNode in this.tempAST.identityNodes)
                 {
                     var token = idNode.token;
+                    int highlightEndChar = token.start + token.length;
+                    string sourceIdentifierText = null;
+
+                    if(idNode.Parent is SyntaxTree.NamedTypeNode parentNamedTypeNode)
+                    {
+                        var endToken = parentNamedTypeNode.EndToken();
+                        if(endToken != null && endToken.line == token.line)
+                        {
+                            int namedTypeEndChar = endToken.start + endToken.length;
+                            if(namedTypeEndChar > highlightEndChar)
+                                highlightEndChar = namedTypeEndChar;
+                        }
+                    }
+
+                    if(token.line > 0 && token.line <= lineCount)
+                    {
+                        int absoluteStart = lineStartsList[token.line - 1] + token.start;
+                        if(absoluteStart >= 0 && absoluteStart < sourceB.Length)
+                        {
+                            int availableLength = Math.Min(token.length, sourceB.Length - absoluteStart);
+                            if(availableLength > 0)
+                            {
+                                char[] buffer = new char[availableLength];
+                                sourceB.CopyTo(absoluteStart, buffer, 0, availableLength);
+                                sourceIdentifierText = new string(buffer);
+                            }
+                        }
+                    }
+
                     int kind = 4;
-                    if (idNode.identiferType == SyntaxTree.IdentityNode.IdType.Class)
+                    if (idNode.identiferType == SyntaxTree.IdentityNode.IdType.TypeName)
                     {
                         kind = 1;
+                        if(idNode.Parent is SyntaxTree.NamedTypeNode namedTypeNode)
+                        {
+                            if(namedTypeNode.kind == SyntaxTree.NameTypeKind.Class)
+                            {
+                                kind = 1;
+                            }
+                            else if(namedTypeNode.kind == SyntaxTree.NameTypeKind.Enum)
+                            {
+                                kind = 5;
+                            }
+                            else if(namedTypeNode.kind == SyntaxTree.NameTypeKind.Struct)
+                            {
+                                kind = 6;
+                            }
+                        }
+                        else if(idNode.Parent is SyntaxTree.ClassDeclareNode)
+                        {
+                            kind = 1;
+                        }
+                        else if(idNode.Parent is SyntaxTree.EnumDeclareNode)
+                        {
+                            kind = 5;
+                        }
+                        else if(idNode.Parent is SyntaxTree.StructDeclareNode)
+                        {
+                            kind = 6;
+                        }
                     }
                     else if (
                         idNode.identiferType == SyntaxTree.IdentityNode.IdType.VariableOrField ||
@@ -221,20 +278,20 @@ namespace Gizbox.LanguageServices
                     }
 
 
-                    if (token.attribute.Contains("::") == false)
+                    if (string.IsNullOrEmpty(sourceIdentifierText) || sourceIdentifierText.Contains("::") == false)
                     {
                         result.Add(new HighLightToken()
                         {
                             startLine = token.line,
                             startChar = token.start,
                             endLine = token.line,
-                            endChar = token.start + token.attribute.Length,
+                            endChar = highlightEndChar,
                             kind = kind
                         });
                     }
                     else
                     {
-                        var lastSplit = token.attribute.LastIndexOf(':');
+                        var lastSplit = sourceIdentifierText.LastIndexOf(':');
                         result.Add(new HighLightToken()
                         {
                             startLine = token.line,
@@ -248,7 +305,7 @@ namespace Gizbox.LanguageServices
                             startLine = token.line,
                             startChar = token.start + lastSplit + 1,
                             endLine = token.line,
-                            endChar = token.start + token.attribute.Length,
+                            endChar = highlightEndChar,
                             kind = kind
                         });
                     }
@@ -276,7 +333,7 @@ namespace Gizbox.LanguageServices
 
         public List<Completion> GetCompletion(int line, int character)
         {
-            if(line > lineStartsList.Count - 1)
+            if(line > lineCount - 1)
             {
                 return new List<Completion>{
                     new Completion(){
@@ -289,7 +346,7 @@ namespace Gizbox.LanguageServices
             }
 
             int curr = lineStartsList[line] + character;
-            if(curr <= 1 || curr > sourceB.Length)
+            if(curr < 0 || curr > sourceB.Length)
             {
                 //注意：光标没有对应的字符（越界光标）  
                 return new List<Completion>{
@@ -304,15 +361,16 @@ namespace Gizbox.LanguageServices
                 
 
             List<Completion> result = new List<Completion>();
+            HashSet<string> addedCompletionKeys = new HashSet<string>(StringComparer.Ordinal);
 
             //标识符边界(包含空格)
             char wordedgeChar = ' ';
-            int wordedgeIdx = curr - 1;
+            int wordedgeIdx = -1;
             //分割边界  
             char splitChar = ' ';
-            int splitCharIdx = curr - 1;
+            int splitCharIdx = -1;
 
-            for(int i = curr - 1; i > 0; --i)
+            for(int i = curr - 1; i >= 0; --i)
             {
                 char c = sourceB[i];
                 if(Utils_IsWordedgeChar(c))
@@ -322,7 +380,7 @@ namespace Gizbox.LanguageServices
                     break;
                 }
             }
-            for (int i = curr - 1; i > 0; --i)
+            for (int i = curr - 1; i >= 0; --i)
             {
                 char c = sourceB[i];
                 if (Utils_IsSplitChar(c))
@@ -378,11 +436,11 @@ namespace Gizbox.LanguageServices
             }
             result.Add(new Completion()
             {
-                label = "DEBUG_GLOABL_ENV_COUNT:" + "(" + ((persistentGlobalEnvs != null) ? persistentGlobalEnvs.Count : "null") + ") rec-counts:" + (string.Concat(persistentGlobalEnvs.Select(e => e.records.Values.Count + ", "))),
+                label = "DEBUG_GLOABL_ENV_COUNT:" + "(" + ((persistentGlobalEnvs != null) ? persistentGlobalEnvs.Count : "null") + ") rec-counts:" + (persistentGlobalEnvs != null ? string.Concat(persistentGlobalEnvs.Select(e => e.records.Values.Count + ", ")) : ""),
                 kind = ComletionKind.Class,
                 detail = "",
                 documentation = "",
-                insertText = "DEBUG_GLOABL_ENV_COUNT:" + "(" + ((persistentGlobalEnvs != null) ? persistentGlobalEnvs.Count : "null") + ") rec-counts:" + (string.Concat(persistentGlobalEnvs.Select(e => e.records.Values.Count + ", ")))
+                insertText = "DEBUG_GLOABL_ENV_COUNT:" + "(" + ((persistentGlobalEnvs != null) ? persistentGlobalEnvs.Count : "null") + ") rec-counts:" + (persistentGlobalEnvs != null ? string.Concat(persistentGlobalEnvs.Select(e => e.records.Values.Count + ", ")) : "")
             });
 
 
@@ -405,7 +463,7 @@ namespace Gizbox.LanguageServices
                     });
 
                     //从符号表链收集  
-                    TraversalEnvChain(currEnv, curre => CollectCompletionInEnv(curre, prefix, result));
+                    TraversalEnvChain(currEnv, curre => CollectCompletionInEnv(curre, prefix, result, addedCompletionKeys));
                 }
             }
             // *** 成员自动提示 ***   
@@ -457,36 +515,61 @@ namespace Gizbox.LanguageServices
                     }
                     if(typeRec != null && typeRec.envPtr != null)
                     {
+                        HashSet<string> addedMemberKeys = new HashSet<string>(StringComparer.Ordinal);
                         var members = typeRec.envPtr.records.Values;
                         foreach(var member in members)
                         {
+                            var memberName = string.IsNullOrWhiteSpace(member.rawname) ? member.name : member.rawname;
+                            if(string.IsNullOrWhiteSpace(memberName))
+                                continue;
+
                             if(member.category == SymbolTable.RecordCatagory.Variable || member.category == SymbolTable.RecordCatagory.Param)
                             {
-                                result.Add(new Completion()
+                                if(addedMemberKeys.Add("field:" + memberName))
                                 {
-                                    label = member.rawname,
-                                    kind = ComletionKind.Field,
-                                    detail = $"{member.typeExpression} {member.rawname}",
-                                    documentation = "",
-                                    insertText = member.rawname,
-                                });
+                                    result.Add(new Completion()
+                                    {
+                                        label = memberName,
+                                        kind = ComletionKind.Field,
+                                        detail = $"{member.typeExpression} {memberName}",
+                                        documentation = "",
+                                        insertText = memberName,
+                                    });
+                                }
+                            }
+                            else if(member.category == SymbolTable.RecordCatagory.Constant)
+                            {
+                                if(addedMemberKeys.Add("constant:" + memberName))
+                                {
+                                    result.Add(new Completion()
+                                    {
+                                        label = memberName,
+                                        kind = ComletionKind.EnumMember,
+                                        detail = $"{member.typeExpression} {memberName}",
+                                        documentation = "",
+                                        insertText = memberName,
+                                    });
+                                }
                             }
                             else if(member.category == SymbolTable.RecordCatagory.Function)
                             {
                                 string paramStr = Utils_ConcatWithComma(
-                                    member.envPtr.records.Values
+                                    member.envPtr != null ? member.envPtr.records.Values
                                     .Where(r => r.category == SymbolTable.RecordCatagory.Param)
-                                    .Select(p => p.typeExpression + " " + p.name)
+                                    .Select(p => p.typeExpression + " " + p.name) : Enumerable.Empty<string>()
                                     );
 
-                                result.Add(new Completion()
+                                if(addedMemberKeys.Add("method:" + memberName + ":" + paramStr))
                                 {
-                                    label = $"{member.rawname}({paramStr})",
-                                    kind = ComletionKind.Method,
-                                    detail = $"{member.rawname}({paramStr})",
-                                    documentation = "",
-                                    insertText = member.rawname,
-                                });
+                                    result.Add(new Completion()
+                                    {
+                                        label = $"{memberName}({paramStr})",
+                                        kind = ComletionKind.Method,
+                                        detail = $"{memberName}({paramStr})",
+                                        documentation = "",
+                                        insertText = memberName,
+                                    });
+                                }
                             }
                         }
 
@@ -603,14 +686,18 @@ namespace Gizbox.LanguageServices
             rec = null;
             return false;
         }
-        private bool CollectCompletionInEnv(SymbolTable env, string prefix, List<Completion> result)
+        private bool CollectCompletionInEnv(SymbolTable env, string prefix, List<Completion> result, HashSet<string> addedCompletionKeys)
         {
             foreach(var rec in env.records.Values)
             {
+                var rawName = string.IsNullOrWhiteSpace(rec.rawname) ? rec.name : rec.rawname;
+                if(string.IsNullOrWhiteSpace(rawName))
+                    continue;
+
                 //尝试名称空间    
                 bool valid = false;
                 int offsetNamespace = 0;
-                if(rec.rawname.StartsWith(prefix))
+                if(rawName.StartsWith(prefix))
                 {
                     valid = true;
                     offsetNamespace = 0;
@@ -620,7 +707,7 @@ namespace Gizbox.LanguageServices
                     foreach(var nameUsingNode in persistentAST.rootNode.usingNamespaceNodes)
                     {
                         string namespaceName = nameUsingNode.namespaceNameNode.token.attribute;
-                        if(Utils_CheckPrefixUseNamespace(namespaceName, prefix, rec.rawname))
+                        if(Utils_CheckPrefixUseNamespace(namespaceName, prefix, rawName))
                         {
                             valid = true;
                             offsetNamespace = namespaceName.Length + 2;
@@ -635,78 +722,129 @@ namespace Gizbox.LanguageServices
                 int offsetPrefix = 0;
                 if(prefix.Contains(":"))
                     offsetPrefix = prefix.LastIndexOf(':') + 1;
-                string completionStr = rec.rawname.Substring(offsetNamespace + offsetPrefix);
+                if(offsetNamespace + offsetPrefix > rawName.Length)
+                    continue;
+
+                string completionStr = rawName.Substring(offsetNamespace + offsetPrefix);
+                if(string.IsNullOrWhiteSpace(completionStr))
+                    continue;
 
                 if(rec.category == SymbolTable.RecordCatagory.Class)
                 {
-                    result.Add(new Completion()
+                    if(addedCompletionKeys.Add("class:" + completionStr))
                     {
-                        label = completionStr,
-                        kind = ComletionKind.Class,
-                        detail = $"class {completionStr}",
-                        documentation = "",
-                        insertText = completionStr
-                    });
+                        result.Add(new Completion()
+                        {
+                            label = completionStr,
+                            kind = ComletionKind.Class,
+                            detail = $"class {completionStr}",
+                            documentation = "",
+                            insertText = completionStr
+                        });
+                    }
+                }
+                else if(rec.category == SymbolTable.RecordCatagory.Struct)
+                {
+                    if(addedCompletionKeys.Add("struct:" + completionStr))
+                    {
+                        result.Add(new Completion()
+                        {
+                            label = completionStr,
+                            kind = ComletionKind.Struct,
+                            detail = $"struct {completionStr}",
+                            documentation = "",
+                            insertText = completionStr
+                        });
+                    }
+                }
+                else if(rec.category == SymbolTable.RecordCatagory.Enum)
+                {
+                    if(addedCompletionKeys.Add("enum:" + completionStr))
+                    {
+                        result.Add(new Completion()
+                        {
+                            label = completionStr,
+                            kind = ComletionKind.Enum,
+                            detail = $"enum {completionStr}",
+                            documentation = "",
+                            insertText = completionStr
+                        });
+                    }
                 }
                 else if(rec.category == SymbolTable.RecordCatagory.Function)
                 {
                     string paramStr = Utils_ConcatWithComma(
-                        rec.envPtr.records.Values
+                        rec.envPtr != null ? rec.envPtr.records.Values
                         .Where(r => r.category == SymbolTable.RecordCatagory.Param)
-                        .Select(p => p.typeExpression + " " + p.name)
+                        .Select(p => p.typeExpression + " " + p.name) : Enumerable.Empty<string>()
                         );
-                    result.Add(new Completion()
+                    if(addedCompletionKeys.Add("func:" + completionStr + ":" + paramStr))
                     {
-                        label = $"{completionStr}({paramStr})",
-                        kind = ComletionKind.Function,
-                        detail = $"{rec.rawname}({paramStr})",
-                        documentation = "",
-                        insertText = completionStr
-                    });
+                        result.Add(new Completion()
+                        {
+                            label = $"{completionStr}({paramStr})",
+                            kind = ComletionKind.Function,
+                            detail = $"{rawName}({paramStr})",
+                            documentation = "",
+                            insertText = completionStr
+                        });
+                    }
                 }
                 else if(rec.category == SymbolTable.RecordCatagory.Variable)
                 {
-                    result.Add(new Completion()
+                    if(addedCompletionKeys.Add("var:" + completionStr))
                     {
-                        label = completionStr,
-                        kind = ComletionKind.Variable,
-                        detail = $"{rec.typeExpression} {rec.rawname}",
-                        documentation = "",
-                        insertText = completionStr
-                    });
+                        result.Add(new Completion()
+                        {
+                            label = completionStr,
+                            kind = ComletionKind.Variable,
+                            detail = $"{rec.typeExpression} {rawName}",
+                            documentation = "",
+                            insertText = completionStr
+                        });
+                    }
                 }
                 else if(rec.category == SymbolTable.RecordCatagory.Param)
                 {
-                    result.Add(new Completion()
+                    if(addedCompletionKeys.Add("param:" + completionStr))
                     {
-                        label = completionStr,
-                        kind = ComletionKind.Variable,
-                        detail = $"{rec.typeExpression} {rec.rawname}",
-                        documentation = "",
-                        insertText = completionStr
-                    });
+                        result.Add(new Completion()
+                        {
+                            label = completionStr,
+                            kind = ComletionKind.Variable,
+                            detail = $"{rec.typeExpression} {rawName}",
+                            documentation = "",
+                            insertText = completionStr
+                        });
+                    }
                 }
                 else if (rec.category == SymbolTable.RecordCatagory.Constant)
                 {
-                    result.Add(new Completion()
+                    if(addedCompletionKeys.Add("const:" + completionStr))
                     {
-                        label = completionStr,
-                        kind = ComletionKind.Constant,
-                        detail = $"{rec.typeExpression} {rec.rawname}",
-                        documentation = "",
-                        insertText = completionStr
-                    });
+                        result.Add(new Completion()
+                        {
+                            label = completionStr,
+                            kind = ComletionKind.Constant,
+                            detail = $"{rec.typeExpression} {rawName}",
+                            documentation = "",
+                            insertText = completionStr
+                        });
+                    }
                 }
                 else
                 {
-                    result.Add(new Completion()
+                    if(addedCompletionKeys.Add("other:" + completionStr))
                     {
-                        label = completionStr,
-                        kind = ComletionKind.Text,
-                        detail = $"{rec.typeExpression} {rec.rawname}",
-                        documentation = "",
-                        insertText = completionStr
-                    });
+                        result.Add(new Completion()
+                        {
+                            label = completionStr,
+                            kind = ComletionKind.Text,
+                            detail = $"{rec.typeExpression} {rawName}",
+                            documentation = "",
+                            insertText = completionStr
+                        });
+                    }
                 }
             }
 
@@ -715,14 +853,14 @@ namespace Gizbox.LanguageServices
 
         private SymbolTable GetCurrEnv(int line, int character, ref string msg)
         {
-            if(line > lineStartsList.Count - 1)
+            if(line > lineCount - 1)
             {
                 msg = "Out of line";
                 return null;
             }
                 
             int curr = lineStartsList[line] + character;
-            if(curr <= 1 || curr > sourceB.Length)
+            if(curr < 0 || curr > sourceB.Length)
             {
                 msg = "Out of index";
                 return null;//注意：光标没有对应的字符（越界光标）  
@@ -836,13 +974,14 @@ namespace Gizbox.LanguageServices
             {
                 IRUnit unit = new IR.IRUnit();
 
+                string source = sourceB.ToString();
+
                 //词法分析  
-                Scanner scanner = new Scanner();
-                List<Token> tokens = scanner.Scan(sourceB.ToString());
+                scanner.SetTypeNames(compiler.GetKnownTypeNames(source));
+                List<Token> tokens = scanner.Scan(source);
 
 
                 //语法分析  
-                LRParse.LRParser parser = new LRParse.LRParser(Gizbox.Utility.ParserHardcoder.GenerateParser(), compiler);
                 parser.Parse(tokens);
                 var syntaxTree = parser.syntaxTree;
 
@@ -962,21 +1101,17 @@ namespace Gizbox.LanguageServices
 
         private void UpdateLineInfos()
         {
+            lineStartsList.Clear();
+            lineStartsList.Add(0);
+
             int line = 0;
-            lineStartsList[0] = 0;
 
             for (int i = 0; i < sourceB.Length; i++)
             {
                 if (sourceB[i] == '\n')
                 {
                     line++;
-
-                    if (line > lineStartsList.Count - 10)
-                    {
-                        ResizeLineIdxArr();
-                    }
-
-                    lineStartsList[line] = (i + 1);
+                    lineStartsList.Add(i + 1);
                 }
             }
 
@@ -999,19 +1134,28 @@ namespace Gizbox.LanguageServices
 
         public int GetEndLine()
         {
-            return lineStartsList.Count - 1;
+            if(lineCount <= 0)
+                return 0;
+
+            return lineCount - 1;
         }
 
         public int GetEndCharacter()
         {
-            return sourceB.Length - lineStartsList[lineStartsList.Count - 1];
+            if(lineCount <= 0)
+                return 0;
+
+            return sourceB.Length - lineStartsList[lineCount - 1];
         }
 
 
         public static bool Utils_InRange(Token startToken, Token endToken, int line, int character)
         {
-            bool leftInRange = line > startToken.line ? true : (line == startToken.line && character >= (startToken.start + startToken.length));
-            bool rightInRange = line < endToken.line ? true : (line == endToken.line && character <= (endToken.start));
+            int startLine = startToken.line - 1;
+            int endLine = endToken.line - 1;
+
+            bool leftInRange = line > startLine ? true : (line == startLine && character >= (startToken.start + startToken.length));
+            bool rightInRange = line < endLine ? true : (line == endLine && character <= (endToken.start));
             return leftInRange && rightInRange;
         }
         public static bool Utils_CheckPrefixUseNamespace(string namesp, string prefix, string fullname)

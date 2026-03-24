@@ -233,9 +233,15 @@ class CCC
 	}
 }
 
+struct SSSSSSS
+{
+
+}
+
 // ----------------- Main ------------------
 void main()
 {
+	SSSSSSS s = default(SSSSSSS);
 	test_global_var();
 	test_reg_alloc();
 	test_call();

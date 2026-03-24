@@ -222,6 +222,5 @@ void main()
     test6();
 
     Console::PrintLn("Test Finish.");
-
     Console::ReadLn();
 }

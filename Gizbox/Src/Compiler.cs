@@ -511,6 +511,14 @@ namespace Gizbox
             return irUnit;
         }
 
+        /// <summary>
+        /// 收集源码及依赖库中的已知类型名，供语言服务和扫描器识别新类型。
+        /// </summary>
+        public HashSet<string> GetKnownTypeNames(string source)
+        {
+            return CollectTypeNames(source);
+        }
+
         private HashSet<string> CollectTypeNames(string source)
         {
             var result = new HashSet<string>(StringComparer.Ordinal);
@@ -544,6 +552,13 @@ namespace Gizbox
 
             var structRegex = new Regex(@"\bstruct\s+([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*)");
             foreach(Match match in structRegex.Matches(source))
+            {
+                if(match.Success)
+                    yield return match.Groups[1].Value;
+            }
+
+            var enumRegex = new Regex(@"\benum\s+([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*)");
+            foreach(Match match in enumRegex.Matches(source))
             {
                 if(match.Success)
                     yield return match.Groups[1].Value;
@@ -624,7 +639,8 @@ namespace Gizbox
             foreach (var record in lib.globalScope.env.records.Values)
             {
                 if (record.category != SymbolTable.RecordCatagory.Class
-                    && record.category != SymbolTable.RecordCatagory.Struct)
+                    && record.category != SymbolTable.RecordCatagory.Struct
+                    && record.category != SymbolTable.RecordCatagory.Enum)
                     continue;
 
                 var name = string.IsNullOrWhiteSpace(record.rawname) ? record.name : record.rawname;

@@ -5221,15 +5221,15 @@ namespace Gizbox.SemanticRule
 
                         if(rec.category == SymbolTable.RecordCatagory.Struct)
                         {
-                            namedTypeNode.Complate(true, (int)rec.size);
+                            namedTypeNode.Complete(NameTypeKind.Struct, (int)rec.size);
                         }
                         else if(rec.category == SymbolTable.RecordCatagory.Enum)
                         {
-                            namedTypeNode.Complate(false, 0, true);
+                            namedTypeNode.Complete(NameTypeKind.Enum);
                         }
                         else
                         {
-                            namedTypeNode.Complate(false);
+                            namedTypeNode.Complete(NameTypeKind.Class);
                         }
                     }
                     break;
@@ -5418,7 +5418,7 @@ namespace Gizbox.SemanticRule
             var idNode = new SyntaxTree.IdentityNode()
             {
                 token = new Token("ID", PatternType.Id, GType.Normalize(typeExpr), refToken.line, refToken.start, refToken.length),
-                identiferType = SyntaxTree.IdentityNode.IdType.Class,
+                identiferType = SyntaxTree.IdentityNode.IdType.TypeName,
                 attributes = new Dictionary<AstAttr, object>(),
             };
             var classTypeNode = new SyntaxTree.NamedTypeNode()

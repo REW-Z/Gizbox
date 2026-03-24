@@ -1135,7 +1135,7 @@ namespace Gizbox
             {
                 Undefined,
                 Namespace,
-                Class,
+                TypeName,
                 VariableOrField,
                 FunctionOrMethod,
             }
@@ -1531,19 +1531,27 @@ namespace Gizbox
             }
         }
 
+
+
+        public enum NameTypeKind
+        {
+            Unknown = 0,
+            Class,
+            Struct,
+            Enum,
+        }
+
         [DataContract(IsReference = true)]
         public class NamedTypeNode : TypeNode
         {
             public IdentityNode classname { get => (IdentityNode)children_group_0[0]; set => children_group_0[0] = value; }
             
-            private bool isCompleted = false;
+            private bool isCompleted => kind != NameTypeKind.Unknown;
 
             [DataMember]
             public readonly List<TypeNode> genericArguments = new();
             [DataMember]
-            public bool isStructType = false;
-            [DataMember]
-            public bool isEnumType = false;
+            public NameTypeKind kind = NameTypeKind.Unknown;
             [DataMember]
             public int structSize = 0;
 
@@ -1555,12 +1563,10 @@ namespace Gizbox
                 children_group_0.Add(null);
             }
             
-            public void Complate(bool isstruct, int size = 0, bool isenum = false)
+            public void Complete(NameTypeKind kind, int structSize = 0)
             {
-                this.isStructType = isstruct;
-                this.isEnumType = isenum;
-                this.structSize = size;
-                this.isCompleted = true;
+                this.kind = kind;
+                this.structSize = structSize;
             }
 
 
@@ -1575,7 +1581,7 @@ namespace Gizbox
                 else
                     rawTypeName = Utils.MangleTemplateInstanceName(classname.FullName, genericArguments.Select(t => GType.Parse(t.TypeExpression())));
 
-                if(isEnumType)
+                if(kind == NameTypeKind.Enum)
                     return "(enum)" + rawTypeName;
 
                 if(ownershipModifier.HasFlag(VarModifiers.Own))
@@ -1583,7 +1589,7 @@ namespace Gizbox
                 if(ownershipModifier.HasFlag(VarModifiers.Bor))
                     return "(bor-class)" + rawTypeName;
 
-                if(isStructType)
+                if(kind == NameTypeKind.Struct)
                 {
                     if(structSize > 0)
                         return $"(struct:{structSize})" + rawTypeName;

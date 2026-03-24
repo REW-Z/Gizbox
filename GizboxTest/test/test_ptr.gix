@@ -3,6 +3,10 @@
 using Core;  
 using Console;
 
+class GameObject
+{
+	Shared<Vector> position = new Shared<Vector>();
+}
 
 class Vector
 {
@@ -20,7 +24,7 @@ class Vector
 	}
 }
 
-Shared<Vector> test_shared()
+Shared<Vector> test_shared_return()
 {
 	Shared<Vector> sp1 = Core::Shared::New<Vector>(new Vector());
 
@@ -38,6 +42,28 @@ Shared<Vector> test_shared()
 	return sp2;
 }
 
+
+
+void test_shared_field()
+{
+	var vec = new Vector();
+	vec.name = "Test2";
+	Shared<Vector> sp1 = Core::Shared::New<Vector>(vec);
+
+	GameObject obj1 = new GameObject();
+	obj1.position = sp1.Clone();
+
+	GameObject obj2 = new GameObject();
+	obj2.position = sp1;
+
+	Console::PrintLn("obj1 delete");
+	delete obj1;
+	Console::PrintLn("obj2 delete");
+	delete obj2;
+}
+
+
+
 void test_interop_ptr()
 {
 	Ptr<int> p1 = default(Ptr<int>);
@@ -48,7 +74,8 @@ void test_interop_ptr()
 void main()
 {
 	test_interop_ptr();
-	Shared<Vector> v = test_shared();
+	test_shared_field();
+	Shared<Vector> v = test_shared_return();
 	
 	Console::PrintLn("Test finished! Press Enter To Release Vector...");
 	Console::ReadLn();
