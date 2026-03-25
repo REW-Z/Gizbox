@@ -18,6 +18,11 @@ if(System.IO.Directory.Exists(workspace) == false)
     System.IO.Directory.CreateDirectory(workspace);
 
 
+string gizboxHomeDir = CompilerUtility.GetGizboxHomePath();
+if(string.IsNullOrEmpty(gizboxHomeDir))
+    throw new Exception("不存在gizbox路径");
+string gizboxLibDir = Path.Combine(gizboxHomeDir, "lib");
+
 
 string[] cmds = {
     "0.生成互操作代码",
@@ -82,12 +87,13 @@ switch(cmdIdx)
             string libsrcCore = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\lib\\core.gix");
             string libsrcStd = System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "\\lib\\stdlib.gix");
             Compiler libCompiler = new Compiler();
+            libCompiler.ConfigParserDataSource(ParserSource.Hardcode);
             libCompiler.AddLibPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "lib"));
             libCompiler.AddLibPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "test"));
-            libCompiler.ConfigParserDataSource(hardcode: true);
+            libCompiler.AddLibPath(gizboxLibDir);
             //libCompiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
-            libCompiler.CompileToLib(libsrcCore, "core", AppDomain.CurrentDomain.BaseDirectory + "\\lib\\core.gixlib");
-            libCompiler.CompileToLib(libsrcStd, "stdlib", AppDomain.CurrentDomain.BaseDirectory + "\\lib\\stdlib.gixlib");
+            libCompiler.CompileToLib(libsrcCore, "core", Path.Combine(gizboxLibDir, "core.gixlib"));
+            libCompiler.CompileToLib(libsrcStd, "stdlib", Path.Combine(gizboxLibDir, "stdlib.gixlib"));
             return;
         }
         break;
@@ -96,7 +102,7 @@ switch(cmdIdx)
             //生成分析器硬编码  
             Console.WriteLine("生成分析器硬编码");
             Gizbox.Compiler compilerTest = new Compiler();
-            compilerTest.ConfigParserDataSource(hardcode: false);
+            compilerTest.ConfigParserDataSource(ParserSource.File);
             compilerTest.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
             compilerTest.InsertParserHardcodeToSourceFile(Path.Combine(Utility.CoreProjPath, "Src\\Parser\\ParserHardcoder.cs"));
             Console.WriteLine("生成硬编码完成");
@@ -137,10 +143,11 @@ switch(cmdIdx)
                 //测试脚本Test  
                 string source = System.IO.File.ReadAllText(path);
                 Gizbox.Compiler compiler = new Compiler();
+                compiler.ConfigParserDataSource(ParserSource.Hardcode);
+                compiler.AddLibPath(gizboxLibDir);
                 compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
                 compiler.AddLibPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "lib"));
                 compiler.AddLibPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "test"));
-                compiler.ConfigParserDataSource(hardcode: true);
                 //compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
                 var il = compiler.CompileToIR(source, isMainUnit: true, "test");
 
@@ -169,11 +176,12 @@ switch(cmdIdx)
             //测试脚本Test  
             string source = System.IO.File.ReadAllText(path);
             Gizbox.Compiler compiler = new Compiler();
+            compiler.ConfigParserDataSource(ParserSource.Hardcode);
+            compiler.AddLibPath(gizboxLibDir);
             compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
             compiler.AddLibPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "glfw"));
             compiler.AddLibPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "lib"));
             compiler.AddLibPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "test"));
-            compiler.ConfigParserDataSource(hardcode: true);
             //compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
             var il = compiler.CompileToIR(source, isMainUnit: true, "test");
 
@@ -195,9 +203,10 @@ switch(cmdIdx)
             //测试脚本Test  
             string source = System.IO.File.ReadAllText(path);
             Gizbox.Compiler compiler = new Compiler();
+            compiler.ConfigParserDataSource(ParserSource.Hardcode);
+            compiler.AddLibPath(gizboxLibDir);
             compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
             compiler.AddLibPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "lib"));
-            compiler.ConfigParserDataSource(hardcode: true);
             //compiler.ConfigParserDataPath(AppDomain.CurrentDomain.BaseDirectory + "parser_data.txt");
             var il = compiler.CompileToIR(source, isMainUnit: true, "test_export");
 

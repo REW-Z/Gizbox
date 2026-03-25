@@ -17,4 +17,5 @@ void main()
 
 	Console::PrintLn("Test finished!");
 	Console::ReadLn();
-}
+}  
+

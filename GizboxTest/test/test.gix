@@ -233,15 +233,11 @@ class CCC
 	}
 }
 
-struct SSSSSSS
-{
-
-}
 
 // ----------------- Main ------------------
 void main()
 {
-	SSSSSSS s = default(SSSSSSS);
+	float32 s = default(float32);
 	test_global_var();
 	test_reg_alloc();
 	test_call();
@@ -255,4 +251,16 @@ void main()
 
 	Console::PrintLn("Test finished!");
 	Console::ReadLn();
+}
+
+
+
+struct float32
+{
+
+}
+
+void foooo()
+{
+	float32 f = default(float32);
 }

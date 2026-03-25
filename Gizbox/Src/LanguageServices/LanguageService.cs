@@ -104,8 +104,15 @@ namespace Gizbox.LanguageServices
         public LanguageService()
         {
             compiler = new Compiler();
-            compiler.ConfigParserDataSource(hardcode:true);
+            compiler.ConfigParserDataSource(ParserSource.Hardcode);
             compiler.AddLibPath(AppDomain.CurrentDomain.BaseDirectory);
+
+            var gizboxpath = CompilerUtility.GetGizboxHomePath();
+            if(gizboxpath != null)
+            {
+                compiler.AddLibPath(System.IO.Path.Combine(gizboxpath, "lib"));
+            }
+            
             scanner = new Scanner();
             parser = new LRParser(ParserHardcoder.GenerateParser(), compiler);
 
@@ -211,16 +218,6 @@ namespace Gizbox.LanguageServices
                     int highlightEndChar = token.start + token.length;
                     string sourceIdentifierText = null;
 
-                    if(idNode.Parent is SyntaxTree.NamedTypeNode parentNamedTypeNode)
-                    {
-                        var endToken = parentNamedTypeNode.EndToken();
-                        if(endToken != null && endToken.line == token.line)
-                        {
-                            int namedTypeEndChar = endToken.start + endToken.length;
-                            if(namedTypeEndChar > highlightEndChar)
-                                highlightEndChar = namedTypeEndChar;
-                        }
-                    }
 
                     if(token.line > 0 && token.line <= lineCount)
                     {
@@ -314,7 +311,7 @@ namespace Gizbox.LanguageServices
                 foreach (var litNode in this.tempAST.literalNodes)
                 {
                     var token = litNode.token;
-                    if (token.name != "LITSTRING" && token.name != "LITCHAR")
+                    if (token.name != "LITSTRING" && token.name != "LITCHAR" && token.name != "LITBOOL" && token.name != "null")
                     {
                         int kind = 3;
                         result.Add(new HighLightToken()
@@ -391,6 +388,11 @@ namespace Gizbox.LanguageServices
                 }
             }
 
+            //空前缀  
+            if((curr - wordedgeIdx - 1) == 0)
+            {
+                return result;
+            }
 
             //DEBUG  
             result.Add(new Completion()
@@ -444,7 +446,7 @@ namespace Gizbox.LanguageServices
             });
 
 
-            // *** 类名/变量名自动提示 ***   
+            // *** 类名/变量名/关键字 自动提示 ***   
             if(splitChar != '.')
             {
                 if(persistentGlobalEnvs != null && persistentAST != null)
@@ -461,6 +463,9 @@ namespace Gizbox.LanguageServices
                         documentation = "",
                         insertText = "DEBUG_GLOABL_PREFIX:" + prefix,
                     });
+
+                    //收集关键字
+                    CollectKeywords(prefix, result);
 
                     //从符号表链收集  
                     TraversalEnvChain(currEnv, curre => CollectCompletionInEnv(curre, prefix, result, addedCompletionKeys));
@@ -510,8 +515,8 @@ namespace Gizbox.LanguageServices
                     //查找对象类型Record
                     if(idRec != null)
                     {
-                        string classname = idRec.typeExpression;
-                        TraversalEnvChain(currEnv, curre => FindTypeRecInEnv(curre, classname, out typeRec));
+                        string classTypeExpression = idRec.typeExpression;
+                        TraversalEnvChain(currEnv, curre => FindTypeRecInEnv(curre, classTypeExpression, out typeRec));
                     }
                     if(typeRec != null && typeRec.envPtr != null)
                     {
@@ -555,8 +560,8 @@ namespace Gizbox.LanguageServices
                             {
                                 string paramStr = Utils_ConcatWithComma(
                                     member.envPtr != null ? member.envPtr.records.Values
-                                    .Where(r => r.category == SymbolTable.RecordCatagory.Param)
-                                    .Select(p => p.typeExpression + " " + p.name) : Enumerable.Empty<string>()
+                                    .Where(r => r.category == SymbolTable.RecordCatagory.Param && r.name != "this")
+                                    .Select(p => GType.Normalize(p.typeExpression) + " " + p.name) : Enumerable.Empty<string>()
                                     );
 
                                 if(addedMemberKeys.Add("method:" + memberName + ":" + paramStr))
@@ -677,15 +682,35 @@ namespace Gizbox.LanguageServices
         }
         private bool FindTypeRecInEnv(SymbolTable env, string typeExpression, out SymbolTable.Record rec)
         {
-            if(env.ContainRecordName(typeExpression))
+            string normTypeName = GType.Normalize(typeExpression);
+            if(env.ContainRecordName(normTypeName))
             {
-                rec = env.GetRecord(typeExpression);
+                rec = env.GetRecord(normTypeName);
                 return true;
             }
 
             rec = null;
             return false;
         }
+
+        private void CollectKeywords(string prefix, List<Completion> result)
+        {
+            foreach(var k in scanner.keywords)
+            {
+                if(k.tokenName.StartsWith(prefix))
+                {
+                    result.Add(new Completion()
+                    {
+                        label = k.tokenName,
+                        kind = ComletionKind.Keyword,
+                        detail = "",
+                        documentation = "",
+                        insertText = k.tokenName
+                    });
+                }
+            }
+        }
+
         private bool CollectCompletionInEnv(SymbolTable env, string prefix, List<Completion> result, HashSet<string> addedCompletionKeys)
         {
             foreach(var rec in env.records.Values)
@@ -776,7 +801,7 @@ namespace Gizbox.LanguageServices
                     string paramStr = Utils_ConcatWithComma(
                         rec.envPtr != null ? rec.envPtr.records.Values
                         .Where(r => r.category == SymbolTable.RecordCatagory.Param)
-                        .Select(p => p.typeExpression + " " + p.name) : Enumerable.Empty<string>()
+                        .Select(p => GType.Normalize(p.typeExpression) + " " + p.name) : Enumerable.Empty<string>()
                         );
                     if(addedCompletionKeys.Add("func:" + completionStr + ":" + paramStr))
                     {
@@ -1021,8 +1046,8 @@ namespace Gizbox.LanguageServices
 
                                 startLine = lexerExc.line - 1,
                                 startChar = lexerExc.charinline,
-                                endLine = GetEndLine(),
-                                endChar = GetEndCharacter(),
+                                endLine = lexerExc.line - 1,
+                                endChar = lexerExc.charinline + lexerExc.scanning.Length,
                                 message = lexerExc.Message,
                                 severity = 1,
                             };
@@ -1035,8 +1060,8 @@ namespace Gizbox.LanguageServices
                             {
                                 code = "0002",
 
-                                startLine = 0,
-                                startChar = 0,
+                                startLine = parseEx.token.line - 1,
+                                startChar = parseEx.token.start,
                                 endLine = GetEndLine(),
                                 endChar = GetEndCharacter(),
                                 message = parseEx.Message,

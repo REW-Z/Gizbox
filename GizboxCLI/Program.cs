@@ -102,7 +102,7 @@ namespace GizboxCLI
 
 
             //使用硬编码的语法分析器  
-            compiler.ConfigParserDataSource(true);
+            compiler.ConfigParserDataSource(ParserSource.Hardcode);
 
 
 

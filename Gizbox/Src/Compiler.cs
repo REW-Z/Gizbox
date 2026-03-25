@@ -24,7 +24,7 @@ namespace Gizbox
         public static bool enableLogCodeGen = true;
 
         //parser data  
-        private bool parserDataHardcode = true;
+        private ParserSource parserDataSource = ParserSource.Hardcode;
         public string parserDataPath;
 
         //lib info  
@@ -155,9 +155,9 @@ namespace Gizbox
         /// <summary>
         /// 配置分析器来源方式  
         /// </summary>
-        public void ConfigParserDataSource(bool hardcode)
+        public void ConfigParserDataSource(ParserSource parserSource)
         {
-            this.parserDataHardcode = hardcode;
+            this.parserDataSource = parserSource;
         }
 
         /// <summary>
@@ -444,7 +444,7 @@ namespace Gizbox
         /// </summary>
         public IRUnit CompileToIR(string source, bool isMainUnit, string name)
         {
-            if (string.IsNullOrEmpty(this.parserDataPath) && parserDataHardcode == false) throw new Exception("语法分析器数据源没有设置");
+            if (string.IsNullOrEmpty(this.parserDataPath) && parserDataSource == ParserSource.File) throw new Exception("语法分析器数据源没有设置");
             if(name == null)
                 throw new Exception("ir name cant be empty");
 
@@ -456,7 +456,7 @@ namespace Gizbox
 
             //硬编码生成语法分析器    
             Gizbox.LALRGenerator.ParserData data;
-            if (parserDataHardcode)
+            if (parserDataSource == ParserSource.Hardcode)
             {
                 string dataPath = this.parserDataPath;
                 if (string.IsNullOrEmpty(dataPath))
@@ -793,6 +793,42 @@ namespace Gizbox
         }
     }
 
+
+    public static class CompilerUtility
+    {
+        public static string GetGizboxHomePath()
+        {
+            string PATH = Environment.GetEnvironmentVariable("PATH");
+            if(string.IsNullOrEmpty(PATH))
+                throw new Exception("environment PATH not set");
+
+            string[] pathArr = PATH.Split(';');
+
+            foreach(var p in pathArr)
+            {
+                string pathNorm = p.Trim();
+                if(string.IsNullOrEmpty(pathNorm))
+                    continue;
+
+                if(p[p.Length - 1] == Path.PathSeparator)
+                {
+                    pathNorm = pathNorm.Substring(0, pathNorm.Length - 1);
+                }
+                if(pathNorm.EndsWith("gizbox"))
+                {
+                    return pathNorm;
+                }
+            }
+
+            return null;
+        }
+    }
+
+    public enum ParserSource
+    {
+        Hardcode,
+        File,
+    }
 
 
     //Compile Options  
