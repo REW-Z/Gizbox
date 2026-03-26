@@ -188,7 +188,7 @@ public partial class SemanticAnalyzer
 
         if(!inTemplate)
         {
-            if(node is SyntaxTree.NamedTypeNode classType && classType.genericArguments.Count > 0)
+            if(node is SyntaxTree.NamedTypeNode classType && classType.tempGenericArguments.Count > 0)
             {
                 //记录类型引用处的模板实例
                 TemplateTryMatchNamespace(classType.classname);
@@ -200,7 +200,7 @@ public partial class SemanticAnalyzer
                 }
             }
 
-            if(node is SyntaxTree.NewObjectNode newObjNode && newObjNode.typeNode is SyntaxTree.NamedTypeNode newObjTypeNode && newObjTypeNode.genericArguments.Count > 0)
+            if(node is SyntaxTree.NewObjectNode newObjNode && newObjNode.typeNode is SyntaxTree.NamedTypeNode newObjTypeNode && newObjTypeNode.tempGenericArguments.Count > 0)
             {
                 //记录new处的模板实例并规范化名称
                 TemplateTryMatchNamespace(newObjTypeNode.classname);
@@ -220,7 +220,7 @@ public partial class SemanticAnalyzer
 
         if(node is SyntaxTree.CallNode callNode)
         {
-            foreach(var arg in callNode.genericArguments)
+            foreach(var arg in callNode.tempGenericArguments)
             {
                 CollectNamedTypeTemplateInstantiations(arg, instances, templatesLocal, templatesDeps, inTemplate);
             }
@@ -228,7 +228,7 @@ public partial class SemanticAnalyzer
 
         if(node is SyntaxTree.NamedTypeNode classTypeWithArgs)
         {
-            foreach(var arg in classTypeWithArgs.genericArguments)
+            foreach(var arg in classTypeWithArgs.tempGenericArguments)
             {
                 CollectNamedTypeTemplateInstantiations(arg, instances, templatesLocal, templatesDeps, inTemplate);
             }
@@ -349,7 +349,7 @@ public partial class SemanticAnalyzer
             inTemplate = true;
         }
 
-        if(!inTemplate && node is SyntaxTree.CallNode callNode && callNode.isMemberAccessFunction == false && callNode.genericArguments.Count > 0)
+        if(!inTemplate && node is SyntaxTree.CallNode callNode && callNode.isMemberAccessFunction == false && callNode.tempGenericArguments.Count > 0)
         {
             if(callNode.funcNode is SyntaxTree.IdentityNode funcId)
             {
@@ -371,7 +371,7 @@ public partial class SemanticAnalyzer
     //注册函数模板实例
     private void RegisterFunctionTemplateInstance(SyntaxTree.IdentityNode funcId, SyntaxTree.CallNode callNode, Dictionary<string, FunctionTemplateInstance> instances)
     {
-        var mangledBaseName = BuildTemplateInstanceName(funcId.FullName, callNode.genericArguments);
+        var mangledBaseName = BuildTemplateInstanceName(funcId.FullName, callNode.tempGenericArguments);
         if(instances.ContainsKey(mangledBaseName))
         {
             // 已记录实例，仍需规范化调用表达式
@@ -383,7 +383,7 @@ public partial class SemanticAnalyzer
         {
             templateName = funcId.FullName,
             mangledBaseName = mangledBaseName,
-            typeArguments = callNode.genericArguments.ToList(),
+            typeArguments = callNode.tempGenericArguments.ToList(),
         };
 
         NormalizeFunctionGenericUsage(callNode, mangledBaseName);
@@ -392,7 +392,7 @@ public partial class SemanticAnalyzer
     //规范化函数模板实例调用（清理泛型参数并替换函数名）
     private void NormalizeFunctionGenericUsage(SyntaxTree.CallNode callNode, string mangledBaseName)
     {
-        callNode.genericArguments.Clear();
+        callNode.tempGenericArguments.Clear();
 
         if(callNode.funcNode is SyntaxTree.IdentityNode funcId)
         {
@@ -468,7 +468,7 @@ public partial class SemanticAnalyzer
     /// <summary>注册命名类型模板实例。</summary>
     private void RegisterNamedTypeTemplateInstance(SyntaxTree.NamedTypeNode namedType, NamedTypeTemplateDefinition templateDef, Dictionary<string, NamedTypeTemplateInstance> instances)
     {
-        var mangledName = BuildTemplateInstanceName(namedType.classname.FullName, namedType.genericArguments);
+        var mangledName = BuildTemplateInstanceName(namedType.classname.FullName, namedType.tempGenericArguments);
         if(instances.ContainsKey(mangledName))
             return;
 
@@ -477,15 +477,15 @@ public partial class SemanticAnalyzer
             kind = templateDef.kind,
             templateName = namedType.classname.FullName,
             mangledName = mangledName,
-            typeArguments = namedType.genericArguments.ToList(),
+            typeArguments = namedType.tempGenericArguments.ToList(),
         };
     }
 
     //规范化模板类类型引用（清理泛型参数并替换类型名）
     private void NormalizeGenericUsage(SyntaxTree.NamedTypeNode classType)
     {
-        var mangledName = BuildTemplateInstanceName(classType.classname.FullName, classType.genericArguments);
-        classType.genericArguments.Clear();
+        var mangledName = BuildTemplateInstanceName(classType.classname.FullName, classType.tempGenericArguments);
+        classType.tempGenericArguments.Clear();
         classType.classname.SetPrefix(null);
         classType.classname.token.attribute = mangledName;
     }
@@ -493,8 +493,8 @@ public partial class SemanticAnalyzer
     //规范化new语句中的模板类型引用
     private void NormalizeGenericUsage(SyntaxTree.NewObjectNode newObjNode, SyntaxTree.NamedTypeNode classType)
     {
-        var mangledName = BuildTemplateInstanceName(classType.classname.FullName, classType.genericArguments);
-        classType.genericArguments.Clear();
+        var mangledName = BuildTemplateInstanceName(classType.classname.FullName, classType.tempGenericArguments);
+        classType.tempGenericArguments.Clear();
         classType.classname.SetPrefix(null);
         classType.classname.token.attribute = mangledName;
 
@@ -530,10 +530,10 @@ public partial class SemanticAnalyzer
             case SyntaxTree.NamedTypeNode namedTypeNode:
                 {
                     var baseTypeName = ownershipPrefix + namedTypeNode.classname.FullName;
-                    if(namedTypeNode.genericArguments.Count == 0)
+                    if(namedTypeNode.tempGenericArguments.Count == 0)
                         return baseTypeName;
 
-                    return BuildTemplateInstanceName(baseTypeName, namedTypeNode.genericArguments);
+                    return BuildTemplateInstanceName(baseTypeName, namedTypeNode.tempGenericArguments);
                 }
             case SyntaxTree.ArrayTypeNode arrayTypeNode:
                 return ownershipPrefix + BuildTemplateTypeNameFromSyntax(arrayTypeNode.elemtentType) + "[]";
@@ -684,7 +684,6 @@ public partial class SemanticAnalyzer
                 newArrayNode.typeNode = ReplaceTypeNode(newArrayNode.typeNode, typeMap, newArrayNode);
                 break;
             case SyntaxTree.NewObjectNode newObjNode:
-
                 if(newObjNode.className.FullName.Contains("BBB"))
                     throw new Exception();
 
@@ -696,8 +695,36 @@ public partial class SemanticAnalyzer
                     newObjNode.className.Parent = newObjNode;
                 }
                 break;
+            case SyntaxTree.CallNode callNode:
+                for(int i = 0; i < callNode.tempGenericArguments.Count; ++i)
+                {
+                    var replacedArg = ReplaceTypeNode(callNode.tempGenericArguments[i], typeMap, callNode);
+                    callNode.tempGenericArguments[i] = replacedArg;
+
+                    if(i < callNode.genericArguments.Count)
+                    {
+                        callNode.genericArguments[i] = replacedArg;
+                    }
+                }
+
+                for(int i = callNode.tempGenericArguments.Count; i < callNode.genericArguments.Count; ++i)
+                {
+                    callNode.genericArguments[i] = ReplaceTypeNode(callNode.genericArguments[i], typeMap, callNode);
+                }
+                break;
             case SyntaxTree.NamedTypeNode classTypeNode:
-                for(int i = 0; i < classTypeNode.genericArguments.Count; ++i)
+                for(int i = 0; i < classTypeNode.tempGenericArguments.Count; ++i)
+                {
+                    var replacedArg = ReplaceTypeNode(classTypeNode.tempGenericArguments[i], typeMap, classTypeNode);
+                    classTypeNode.tempGenericArguments[i] = replacedArg;
+
+                    if(i < classTypeNode.genericArguments.Count)
+                    {
+                        classTypeNode.genericArguments[i] = replacedArg;
+                    }
+                }
+
+                for(int i = classTypeNode.tempGenericArguments.Count; i < classTypeNode.genericArguments.Count; ++i)
                 {
                     classTypeNode.genericArguments[i] = ReplaceTypeNode(classTypeNode.genericArguments[i], typeMap, classTypeNode);
                 }
@@ -710,7 +737,6 @@ public partial class SemanticAnalyzer
         }
     }
 
-
     private SyntaxTree.TypeNode ReplaceTypeNode(SyntaxTree.TypeNode typeNode, Dictionary<string, SyntaxTree.TypeNode> typeMap, SyntaxTree.Node parent)
     {
         if(typeNode == null)
@@ -719,16 +745,29 @@ public partial class SemanticAnalyzer
         switch(typeNode)
         {
             case SyntaxTree.NamedTypeNode classTypeNode:
-                if(typeMap.TryGetValue(classTypeNode.classname.FullName, out var replacement) && classTypeNode.genericArguments.Count == 0)
+                if(typeMap.TryGetValue(classTypeNode.classname.FullName, out var replacement) && classTypeNode.tempGenericArguments.Count == 0)
                 {
                     var cloned = (SyntaxTree.TypeNode)replacement.DeepClone();
                     cloned.Parent = parent;
                     return cloned;
                 }
-                for(int i = 0; i < classTypeNode.genericArguments.Count; ++i)
+
+                for(int i = 0; i < classTypeNode.tempGenericArguments.Count; ++i)
+                {
+                    var replacedArg = ReplaceTypeNode(classTypeNode.tempGenericArguments[i], typeMap, classTypeNode);
+                    classTypeNode.tempGenericArguments[i] = replacedArg;
+
+                    if(i < classTypeNode.genericArguments.Count)
+                    {
+                        classTypeNode.genericArguments[i] = replacedArg;
+                    }
+                }
+
+                for(int i = classTypeNode.tempGenericArguments.Count; i < classTypeNode.genericArguments.Count; ++i)
                 {
                     classTypeNode.genericArguments[i] = ReplaceTypeNode(classTypeNode.genericArguments[i], typeMap, classTypeNode);
                 }
+
                 classTypeNode.Parent = parent;
                 return classTypeNode;
             case SyntaxTree.ArrayTypeNode arrayTypeNode:
@@ -747,7 +786,6 @@ public partial class SemanticAnalyzer
                 return typeNode;
         }
     }
-
 
     //检查模板定义的命名空间前缀
     private void TemplateCompleteDefineFullName(SyntaxTree.IdentityNode idNode)

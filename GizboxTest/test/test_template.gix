@@ -27,7 +27,6 @@ T Pow<T>(T x)
 
 void main()
 {
-    //语法冲突(小于比较和类型转换)  
     int a = 0;
     bool b = (a < 0);
     AAA[] arr = new AAA[10];

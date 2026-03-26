@@ -100,6 +100,9 @@ namespace Gizbox.LanguageServices
         public List<SymbolTable> persistentGlobalEnvs;
 
 
+        //Debug  
+        private bool debugMode = true;
+
         //构造函数  
         public LanguageService()
         {
@@ -261,6 +264,10 @@ namespace Gizbox.LanguageServices
                         {
                             kind = 5;
                         }
+                        else if(idNode.Parent is SyntaxTree.EnumAccessNode)
+                        {
+                            kind = 5;
+                        }
                         else if(idNode.Parent is SyntaxTree.StructDeclareNode)
                         {
                             kind = 6;
@@ -332,7 +339,9 @@ namespace Gizbox.LanguageServices
         {
             if(line > lineCount - 1)
             {
-                return new List<Completion>{
+                if(debugMode)
+                {
+                    return new List<Completion>{
                     new Completion(){
                         label = $"DEBUG_ERR_LINE_OUT_OF_INDEX:line{line}",
                         kind = ComletionKind.Class,
@@ -340,13 +349,20 @@ namespace Gizbox.LanguageServices
                         documentation = "",
                         insertText = ""
                     }};
+                }
+                else
+                {
+                    return new List<Completion>();
+                }
             }
 
             int curr = lineStartsList[line] + character;
             if(curr < 0 || curr > sourceB.Length)
             {
                 //注意：光标没有对应的字符（越界光标）  
-                return new List<Completion>{
+                if(debugMode)
+                {
+                    return new List<Completion>{
                     new Completion(){
                         label = $"DEBUG_ERR_CURR_OUT_OF_INDEX:line{line} character:{character}",
                         kind = ComletionKind.Class,
@@ -354,6 +370,11 @@ namespace Gizbox.LanguageServices
                         documentation = "",
                         insertText = ""
                     }};
+                }
+                else
+                {
+                    return new List<Completion>();
+                }
             }
                 
 
@@ -395,22 +416,25 @@ namespace Gizbox.LanguageServices
             }
 
             //DEBUG  
-            result.Add(new Completion()
+            if(debugMode)
             {
-                label = "DEBUG_SHOW_WORD_EDGE:" + Utils_CharToPrintFormat(wordedgeChar),
-                kind = ComletionKind.Class,
-                detail = "",
-                documentation = "",
-                insertText = "DEBUG_SHOW_WORD_EDGE:" + Utils_CharToPrintFormat(wordedgeChar),
-            });
-            result.Add(new Completion()
-            {
-                label = "DEBUG_SHOW_SPLIT:" + Utils_CharToPrintFormat(splitChar),
-                kind = ComletionKind.Class,
-                detail = "",
-                documentation = "",
-                insertText = "DEBUG_SHOW_SPLIT:" + Utils_CharToPrintFormat(splitChar),
-            });
+                result.Add(new Completion()
+                {
+                    label = "DEBUG_SHOW_WORD_EDGE:" + Utils_CharToPrintFormat(wordedgeChar),
+                    kind = ComletionKind.Class,
+                    detail = "",
+                    documentation = "",
+                    insertText = "DEBUG_SHOW_WORD_EDGE:" + Utils_CharToPrintFormat(wordedgeChar),
+                });
+                result.Add(new Completion()
+                {
+                    label = "DEBUG_SHOW_SPLIT:" + Utils_CharToPrintFormat(splitChar),
+                    kind = ComletionKind.Class,
+                    detail = "",
+                    documentation = "",
+                    insertText = "DEBUG_SHOW_SPLIT:" + Utils_CharToPrintFormat(splitChar),
+                });
+            }
 
             string errMsg = "";
             var currEnv = GetCurrEnv(line, character, ref errMsg);
@@ -1002,7 +1026,7 @@ namespace Gizbox.LanguageServices
                 string source = sourceB.ToString();
 
                 //词法分析  
-                scanner.SetTypeNames(compiler.GetKnownTypeNames(source));
+                scanner.SetTypeNames(compiler.lexerExtender.CollectTypeNames(source));
                 List<Token> tokens = scanner.Scan(source);
 
 

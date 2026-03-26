@@ -14,7 +14,6 @@ void test_stringobj()
 void main()
 {
 	test_stringobj();
-
 	Console::PrintLn("Test finished!");
 	Console::ReadLn();
 }  
