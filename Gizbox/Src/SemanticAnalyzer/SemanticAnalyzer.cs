@@ -5203,20 +5203,34 @@ namespace Gizbox.SemanticRule
 
         private void TryCompleteType(SyntaxTree.TypeNode typeNode)
         {
+            if(typeNode == null)
+                return;
+
+            typeNode.attributes ??= new Dictionary<AstAttr, object>();
             if(typeNode.attributes.ContainsKey(AstAttr.name_completed))
                 return;
 
-            switch (typeNode)
+            switch(typeNode)
             {
                 case SyntaxTree.PrimitiveTypeNode primitiveTypeNode:
                     break;
                 case SyntaxTree.NamedTypeNode namedTypeNode:
                     {
+                        for(int i = 0; i < namedTypeNode.tempGenericArguments.Count; ++i)
+                        {
+                            TryCompleteType(namedTypeNode.tempGenericArguments[i]);
+                        }
+
+                        for(int i = 0; i < namedTypeNode.genericArguments.Count; ++i)
+                        {
+                            TryCompleteType(namedTypeNode.genericArguments[i]);
+                        }
+
                         TryCompleteIdenfier(namedTypeNode.classname);
 
                         var typeName = namedTypeNode.classname.FullName;
                         var rec = Query(typeName);
-                        if(rec == null) 
+                        if(rec == null)
                             throw new GizboxException(ExceptioName.Undefine, $"namedType:{typeName} not found!");
 
                         if(rec.category == SymbolTable.RecordCatagory.Struct)
@@ -5243,7 +5257,16 @@ namespace Gizbox.SemanticRule
                         TryCompleteType(refTypeNode.targetType);
                     }
                     break;
+                case SyntaxTree.FuncPtrTypeNode funcPtrTypeNode:
+                    {
+                        for(int i = 0; i < funcPtrTypeNode.typeArguments.Count; ++i)
+                        {
+                            TryCompleteType(funcPtrTypeNode.typeArguments[i]);
+                        }
+                    }
+                    break;
             }
+
             typeNode.attributes[AstAttr.name_completed] = true;
         }
 

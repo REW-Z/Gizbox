@@ -1180,6 +1180,7 @@ namespace Gizbox.SemanticRule
                     && genericArgsObj is List<SyntaxTree.TypeNode> genericArgs
                     && genericArgs.Count > 0)
                 {
+                    classTypeNode.tempGenericArguments.AddRange(genericArgs);
                     classTypeNode.genericArguments.AddRange(genericArgs);
                 }
 
@@ -1623,6 +1624,7 @@ namespace Gizbox.SemanticRule
                     && gaObj is List<SyntaxTree.TypeNode> gaList
                     && gaList.Count > 0)
                 {
+                    callNode.tempGenericArguments.AddRange(gaList);
                     callNode.genericArguments.AddRange(gaList);
                 }
 
@@ -1643,6 +1645,7 @@ namespace Gizbox.SemanticRule
                     && gaObj is List<SyntaxTree.TypeNode> gaList
                     && gaList.Count > 0)
                 {
+                    callNode.tempGenericArguments.AddRange(gaList);
                     callNode.genericArguments.AddRange(gaList);
                 }
 
@@ -1704,6 +1707,7 @@ namespace Gizbox.SemanticRule
                     && genericArgsObj is List<SyntaxTree.TypeNode> genericArgs
                     && genericArgs.Count > 0)
                 {
+                    classTypeNode.tempGenericArguments.AddRange(genericArgs);
                     classTypeNode.genericArguments.AddRange(genericArgs);
                 }
 
@@ -1732,6 +1736,7 @@ namespace Gizbox.SemanticRule
                     && genericArgsObj is List<SyntaxTree.TypeNode> genericArgs
                     && genericArgs.Count > 0)
                 {
+                    classTypeNode.tempGenericArguments.AddRange(genericArgs);
                     classTypeNode.genericArguments.AddRange(genericArgs);
                 }
 
@@ -1914,6 +1919,7 @@ namespace Gizbox.SemanticRule
                     && genericArgsObj is List<SyntaxTree.TypeNode> genericArgs
                     && genericArgs.Count > 0)
                 {
+                    classTypeNode.tempGenericArguments.AddRange(genericArgs);
                     classTypeNode.genericArguments.AddRange(genericArgs);
                 }
 

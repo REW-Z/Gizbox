@@ -173,13 +173,10 @@ namespace Gizbox.LRParse
             //自动机运行  
             while (remainingInput.Count > 0)
             {
-                Log("剩余输入:" + string.Concat(remainingInput.ToArray().Select(t => t.name)));
-
                 //当前此法单元  
                 var currentToken = remainingInput.Peek();
 
                 //查找ACTION表  
-                Log("查询：ACTION[" + stack.Peek().state.idx + "," + currentToken.name + "]");
                 var action = data.table.ACTION(stack.Peek().state.idx, currentToken.name);
 
                 //ACTION语法分析动作    
@@ -188,8 +185,6 @@ namespace Gizbox.LRParse
                     //移入  
                     case ACTION_TYPE.Shift:
                         {
-                            Log("移入状态" + action.num + "");
-
                             var token = remainingInput.Dequeue();
 
                             // *** 移入 ***  
@@ -204,15 +199,11 @@ namespace Gizbox.LRParse
 
                             stack.Push(newEle);
                             // ************  
-
-                            Log("当前栈状态：" + string.Concat(stack.ToList().Select(s => "\n" + s.state.idx + ": \"" + s.state.name + "\"")) + "\n");
                         }
                         break;
                     //规约    
                     case ACTION_TYPE.Reduce:
                         {
-                            Log("按产生式：" + data.grammerSet.productions[action.num].ToExpression() + "规约");
-
                             // *** 确定产生式 ***  
                             var production = data.grammerSet.productions[action.num];
                             // ******************
@@ -243,17 +234,13 @@ namespace Gizbox.LRParse
                             {
                                 stack.Pop();
                             }
-                            Log(βLength + "个状态出栈");
                             // *********************
 
 
                             // *** 产生式头入栈 ***  
                             stack.Push(this.newElement);
                             this.newElement = null;
-                            Log(goTo.stateId + "状态入栈");
                             // *********************
-
-                            Log("当前栈状态：" + string.Concat(stack.ToList().Select(s => "\n" + s.state.idx + ": \"" + s.state.name + "\"")) + "\n");
                         }
                         break;
                     //接受  
@@ -287,11 +274,14 @@ namespace Gizbox.LRParse
             }
 
 
-            Log("\n\n语法分析树：");
-            Log(this.parseTree.Serialize());
+            if(Compiler.enableLogParser)
+            {
+                Log("\n\n语法分析树：");
+                Log(this.parseTree.Serialize());
 
-            Log("\n\n抽象语法树：");
-            Log(this.syntaxTree.Serialize());
+                Log("\n\n抽象语法树：");
+                Log(this.syntaxTree.Serialize());
+            }
             Compiler.Pause("抽象语法树生成完成");
         }
 

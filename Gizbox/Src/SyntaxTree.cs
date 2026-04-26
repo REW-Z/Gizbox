@@ -834,6 +834,8 @@ namespace Gizbox
             [DataMember]
             public readonly List<IdentityNode> templateParameters = new();
 
+
+
             public TypeNode returnTypeNode { get => (TypeNode)children_group_0[0]; set => children_group_0[0] = value; }
             public IdentityNode identifierNode { get => (IdentityNode)children_group_0[1]; set => children_group_0[1] = value; }
             public ParameterListNode parametersNode { get => (ParameterListNode)children_group_0[2]; set => children_group_0[2] = value; }
@@ -1313,17 +1315,26 @@ namespace Gizbox
             [DataMember]
             public bool isMemberAccessFunction;
             [DataMember]
-            public readonly List<TypeNode> genericArguments = new();
+            public readonly List<TypeNode> tempGenericArguments = new();
+            
+            
+            [IgnoreDataMember]
+            private ChildList<TypeNode> _genericArguments;
 
-            //id or memberaccesss  
+
+
             public ExprNode funcNode { get => (ExprNode)children_group_0[0]; set => children_group_0[0] = value; }
             public ArgumentListNode argumantsNode { get => (ArgumentListNode)children_group_0[1]; set => children_group_0[1] = value; }
+
+            public ChildList<TypeNode> genericArguments => _genericArguments ??= new ChildList<TypeNode>(children_group_1);
 
             public CallNode()
             {
                 children_group_0 = new();
                 children_group_0.Add(null);
                 children_group_0.Add(null);
+                
+                children_group_1 = new();
             }
         }
 
@@ -1546,10 +1557,13 @@ namespace Gizbox
         {
             public IdentityNode classname { get => (IdentityNode)children_group_0[0]; set => children_group_0[0] = value; }
             
-            private bool isCompleted => kind != NameTypeKind.Unknown;
+            public ChildList<TypeNode> genericArguments => _genericArguments ??= new ChildList<TypeNode>(children_group_1);
+
+            [IgnoreDataMember]
+            private ChildList<TypeNode> _genericArguments;
 
             [DataMember]
-            public readonly List<TypeNode> genericArguments = new();
+            public readonly List<TypeNode> tempGenericArguments = new();
             [DataMember]
             public NameTypeKind kind = NameTypeKind.Unknown;
             [DataMember]
@@ -1561,8 +1575,10 @@ namespace Gizbox
             {
                 children_group_0 = new();
                 children_group_0.Add(null);
+                children_group_1 = new();
             }
-            
+
+            private bool isCompleted => kind != NameTypeKind.Unknown;
             public void Complete(NameTypeKind kind, int structSize = 0)
             {
                 this.kind = kind;
@@ -1576,10 +1592,10 @@ namespace Gizbox
                     throw new SemanticException(ExceptioName.SemanticAnalysysError, this, "namedType not complete.");
 
                 string rawTypeName;
-                if(genericArguments.Count == 0)
+                if(tempGenericArguments.Count == 0)
                     rawTypeName = classname.FullName;
                 else
-                    rawTypeName = Utils.MangleTemplateInstanceName(classname.FullName, genericArguments.Select(t => GType.Parse(t.TypeExpression())));
+                    rawTypeName = Utils.MangleTemplateInstanceName(classname.FullName, tempGenericArguments.Select(t => GType.Parse(t.TypeExpression())));
 
                 if(kind == NameTypeKind.Enum)
                     return "(enum)" + rawTypeName;

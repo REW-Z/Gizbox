@@ -67,6 +67,7 @@ void test_call()
 	TestClass obj = new TestClass();
 	int rs = obj.Foo(123456);
 	Console::PrintLn("TestClass.Foo result:" + (string)rs);
+	Core::String str = new Core::String("Hello");
 }
 
 // ----------------- SizeOf ------------------
@@ -237,7 +238,6 @@ class CCC
 // ----------------- Main ------------------
 void main()
 {
-	float32 s = default(float32);
 	test_global_var();
 	test_reg_alloc();
 	test_call();
@@ -251,16 +251,4 @@ void main()
 
 	Console::PrintLn("Test finished!");
 	Console::ReadLn();
-}
-
-
-
-struct float32
-{
-
-}
-
-void foooo()
-{
-	float32 f = default(float32);
 }

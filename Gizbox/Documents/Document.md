@@ -97,6 +97,7 @@ class Human : Creature
 注意事项：  
   - 只允许单继承。  
   - 所有成员函数都是虚函数。  
+  - 通过成员函数访问成员字段，必须通过`this`参数，例如`this.name`。  
   - 通过`private:`和`public:`标注成员访问权限。如果不标注默认为public。  
   - 类中只能有非静态成员。    
   - 所有类都隐式继承自`Core::Object`。  
